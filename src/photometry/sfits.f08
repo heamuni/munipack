@@ -84,7 +84,7 @@ contains
          phsky,dphsky,mag,dmag,phr,dphr
     real, dimension(:,:,:), allocatable :: cube,tcube
     real(dbl), dimension(size(ctph)) :: xctph,sqarcsec,airmass,aring,nsky, &
-         leff,lfwhm
+         leff,lfwhm,rskies,rskydevs
     real(dbl), dimension(1,size(ctph)) :: skymag,dskymag,skyrate,dskyrate
     integer, allocatable, dimension(:) :: order
     integer :: i,j,k,n,status,nrows_max, width, height, nq, ncat, nfiles, nrows, npht
@@ -224,11 +224,13 @@ contains
     do n = 1,size(fitses)
        xctph(n) = fitses(n)%area * fitses(n)%exptime
        !xctph(n) = 1
-       sqarcsec(n) = (3600 * fitses(n)%scale)**2
-       ! unused:
-       aring(n) = pi*(fitses(n)%annuls(2)**2 - fitses(n)%annuls(1)**2) /  &
+       ! scale is in [pix/deg], annuls and aper in [deg]
+       ! square arcsec per pixel
+       sqarcsec(n) = (3600 / fitses(n)%scale)**2
+       ! unused, areas in pixels:
+       aring(n) = pi*(fitses(n)%annuls(2)**2 - fitses(n)%annuls(1)**2) *  &
             fitses(n)%scale**2
-       nsky(n) = pi*fitses(n)%aper**2/fitses(n)%scale**2
+       nsky(n) = pi*fitses(n)%aper**2*fitses(n)%scale**2
     end do
 
 !    write(*,*) aring
@@ -326,6 +328,8 @@ contains
     do i = 1, nfiles
        ! a mean sky by the sky in rings
        call rmean(phsky(:,i),rsky,stdsig=rskydev)
+       rskies(i) = rsky
+       rskydevs(i) = rskydev
        skyrate(1,i) = (rsky / xctph(i)) / sqarcsec(i)
        dskyrate(1,i)= (rskydev / (xctph(i)) / sqarcsec(i))
 !       write(*,*) rsky,skyrate(1,i),xctph(i),sqarcsec(i)
@@ -353,8 +357,8 @@ contains
        fitses(n)%mag = mag(:,n)
        fitses(n)%dmag = dmag(:,n)
        ! meaning of rsky,rskydev has been changed during April 2026
-       fitses(n)%rsky = rsky ! skyrate(1,n)
-       fitses(n)%rskydev = rskydev ! dskyrate(1,n)
+       fitses(n)%rsky = rskies(n) ! skyrate(1,n)
+       fitses(n)%rskydev = rskydevs(n) ! dskyrate(1,n)
        fitses(n)%skymag = skymag(1,n)
 
     end do
@@ -434,6 +438,7 @@ contains
     end if
     call wcs % get_affines(scale,rot,refl)
     call wcs % get_crval(crval)
+    call wcs % get_crder(crder)
     fits%scale = scale
 
     ! Citizen date
@@ -533,8 +538,8 @@ contains
     fits%annuls = fits%annuls / scale
 
     ! aperture
+    call fits_read_key(fitsfile,FITS_KEY_HWHM,hwhm,status)
     if( saper == 0 ) then
-       call fits_read_key(fitsfile,FITS_KEY_HWHM,hwhm,status)
        call fits_read_key(fitsfile,FITS_KEY_NAPER,naper,status)
        do i = 1, naper
           call fits_make_keyn(FITS_KEY_APER,i,key,status)
@@ -569,7 +574,7 @@ contains
        fits%phtype = 'APHOT'
     else
        call fits_read_key(fitsfile,FITS_KEY_RF90,fits%radf90,status)
-       fits%radf90 = fits%scale * fits%radf90
+       fits%radf90 = fits%radf90 / fits%scale
        fits%aper = -1
        call fits_get_colnum(fitsfile,.true.,FITS_COL_GCOUNT,ccol,status)
        call fits_get_colnum(fitsfile,.true.,FITS_COL_GCOUNTERR,dcol,status)
@@ -608,7 +613,13 @@ contains
     call wcs % pix2cel(xcen,ycen,fits%ra,fits%dec)
 
     fits%nrows = nrows
-    fits%coo_err = maxval(crder)
+    ! coordinate errors, when CRDER is undefined, HWHM is used as the matching
+    ! tolerance (5*coo_err) like in mfits
+    if( all(crder > 0) ) then
+       fits%coo_err = maxval(crder)
+    else
+       fits%coo_err = (hwhm / scale) / 5
+    end if
 
     deallocate(xcen,ycen)
     return
