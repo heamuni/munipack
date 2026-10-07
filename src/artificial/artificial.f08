@@ -802,7 +802,7 @@ contains
     ! background at zenit
     skyint = magiconv(phsys,filter, [skymag])
     back = sqrt(skyint**2 + gnoise**2)
-    back = back * exptime * area * qefficiency * (scale*3600)**2
+    back = back * exptime * area * qefficiency * (3600/scale)**2
     bgrad = 1.086 * skygrad * back
 
     if( atmosphere ) then

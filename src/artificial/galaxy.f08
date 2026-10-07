@@ -97,7 +97,7 @@ contains
     integer :: i,j
 
     call wcs % cel2pix(g%alpha,g%delta,xc,yc)
-    reff = g%reff / scale
+    reff = g%reff * scale
     c = cos(g%PA / rad)
     s = sin(g%PA / rad)
     a = 1
@@ -106,7 +106,7 @@ contains
     dmag = 9.999
     call phsysmagph1(phsys,filter,[g%mueff],[dmag],ct,dct)
     ceff = ct(1)
-    ceff = ceff * exptime * area * qe * (scale*3600)**2
+    ceff = ceff * exptime * area * qe * (3600/scale)**2
 
     n = g%sersic
     beff = 2*n - 1.0/3.0 + (9.8765e-3 + (1.8e-3 + (1.14e-4 - 7e-5/n)/n)/n)/n

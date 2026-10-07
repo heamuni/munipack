@@ -413,7 +413,7 @@ contains
     real(REAL64) :: r,a,df,dr
     integer :: m,l,k,i0,j1,j2
 
-    r = hypot(x,y) * scale
+    r = hypot(x,y) / scale
     m = size(mpsf,1)
     l = min(int(r / rgrid),0)
     i0 = 1 + l
