@@ -800,6 +800,7 @@ contains
        forall(n=1:size(tr,1))
           tr(n,n) = 1.0_dbl
        end forall
+       tr1 = tr
     end if
 
     catid = ''
