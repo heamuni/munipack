@@ -223,10 +223,10 @@ for magnitude 25 (see -2.5 log<sub>10</sub> 10<sup>-10</sup>).
 <caption>Table of available photometry quantities for fully calibrated data</caption>
 <tr><th>Quantity</th><th>Description</th><th>Units</th></tr>
 <tr><td>PHOTON<sup><a href="#photon">[a]</a></sup></td><td>Photon counts <i>n</i></td><td>photon</td></tr>
-<tr><td></td><td>Photon flux <i>Φ</i></td><td>ph/s/m<sup>2</sup></td></tr>
-<tr><td>PHOTNU<sup><a href="#photnu">[b]</a></sup></td><td>Photon rate per frequency n<sub>ν</sub></td><td>ph/m<sup>2</sup>/Hz</td></tr>
-<tr><td>PHOTLAM<sup><a href="#photlam">[c]</a></sup></td><td>Photon rate per wavelength n<sub>λ</sub></td><td>ph/m<sup>2</sup>/nm</td></tr>
-<tr><td>FLUX<sup><a href="#flux">[d]</a></sup></td><td>Energy flux in a band <i>f</i></td><td>W/m<sup>2</sup></td></tr>
+<tr><td>PHOTRATE<sup><a href="#photon">[a]</a></sup></td><td>Photon flux <i>ϕ</i></td><td>ph/s/m<sup>2</sup></td></tr>
+<tr><td>PHOTNU<sup><a href="#photnu">[b]</a></sup></td><td>Photon rate per frequency n<sub>ν</sub></td><td>ph/s/m<sup>2</sup>/Hz</td></tr>
+<tr><td>PHOTLAM<sup><a href="#photlam">[c]</a></sup></td><td>Photon rate per wavelength n<sub>λ</sub></td><td>ph/s/m<sup>2</sup>/nm</td></tr>
+<tr><td>FLUX<sup><a href="#flux">[d]</a></sup></td><td>Energy flux in a band <i>F</i></td><td>eV/s/m<sup>2</sup></td></tr>
 <tr><td>FNU<sup><a href="#fnu">[e]</a></sup></td><td>Energy density flux per frequency <i>f</i><sub>ν</sub></td><td>W/m<sup>2</sup>/Hz</td></tr>
 <tr><td>FLAM<sup><a href="#flam">[f]</a></sup></td><td>Energy density flux per wavelength <i>f</i><sub>λ</sub></td><td>W/m<sup>2</sup>/nm</td></tr>
 <tr><td>MAG<sup><a href="#mag">[g]</a></sup></td><td>Magnitude <i>m</i></td><td></td></tr>
@@ -238,63 +238,65 @@ for magnitude 25 (see -2.5 log<sub>10</sub> 10<sup>-10</sup>).
 <div class="notes">
 <p id="photon">
 <sup><a href="#photon">[a]</a></sup>
-Photon count <i>n</i> and photon flux <i>Φ</i> are the core of calibration.
+Photon count <i>n</i> and photon flux <i>ϕ</i> are the core of calibration.
 The fitting routines estimates ratio of detected <i>c</i> and expected
 <i>n</i> photons and derive quantity (efficiency by mean) <i>η = c / n</i>
 (0 ≤ <i>η</i> ≤ 1). The typical values are between
 0.1 — 0.5. The <i>η</i>  is included in header keywords as CTPH and its
 dispersion as CTPHERR. Photon count is derived from original data as
 <i>n = c / η</i>.
-The reference photon count in a band <i>B</i> is derived from a known (catalogue)
+The reference photon flux in a band <i>B</i> is derived from a known (catalogue)
 star magnitude <i>m<sub>B</sub></i><br>
-<i>Φ = (f<sub>νB</sub> Δν<sub>B</sub> / h ν<sub>B</sub>) 10<sup>-0.4 m</sup>  =
-(f<sub>λB</sub> Δλ<sub>B</sub>) (h c / λ<sub>B</sub>) 10<sup>-0.4 m</sup></i>,<br>
-where <i>f<sub>νB</sub></i> and
-<i>Δν<sub>B</sub></i> are spectral density flux and passband FWHM (in this order)
-defined by <a href="dataform_photosys.html">photometry system</a>.
-Count of photons is <i>n = Φ A T</i>.
-Note that product <i>f<sub>νB</sub> Δν<sub>B</sub></i> has meaning of
-energy flux and <i>h ν<sub>B</sub></i> is the mean
-energy of photon in the given band.<br>
-The photon flux is also frequently is used quantity defined as <i>ϕ = n / A T</i>.
+<i>ϕ = f<sub>λB</sub> W<sub>B</sub> (λ<sub>B</sub> / h c) 10<sup>-0.4 m</sup></i>,<br>
+where <i>f<sub>λB</sub></i> (FLAM_REF) and <i>λ<sub>B</sub></i> (LAM_EFF)
+are defined by <a href="dataform_photosys.html">photometry system</a>
+and <i>W<sub>B</sub></i> = √(π/2) Δλ<sub>B</sub> is the effective width
+of the passband, Δλ<sub>B</sub> is LAM_FWHM
+(see <a href="dataform_photosys.html#width">passband width convention</a>).
+Count of photons is <i>n = ϕ A T</i>
+(PHOTON), the photon flux <i>ϕ = n / A T</i> is PHOTRATE.
+Note that product <i>f<sub>λB</sub> W<sub>B</sub></i> has meaning of
+energy flux and <i>h c / λ<sub>B</sub></i> is the mean
+energy of photon in the given band.
+All the derived quantities below use the same <i>W</i> and the wavelength
+columns only; the frequency width is <i>W<sub>ν</sub> = c W / λ</i><sub>eff</sub><sup>2</sup>.
+</p>
 
 <p id="photnu">
 <sup><a href="#photnu">[b]</a></sup>
 Photon rate per unit frequency defined as
-<i>n<sub>ν</sub> = n / Δν</i>.
+<i>ϕ<sub>ν</sub> = ϕ / W<sub>ν</sub> = ϕ λ</i><sub>eff</sub><sup>2</sup><i> / c W</i>.
 </p>
 
 <p id="photlam">
 <sup><a href="#photlam">[c]</a></sup>
 Photon rate per 1nm of  wavelenght defined as
-<i>n<sub>λ</sub> = n Δλ c / λ</i><sub>eff</sub><sup>2</sup>.
+<i>ϕ<sub>λ</sub> = ϕ / W</i> (<i>W</i> in nm).
 </p>
 
 <p id="flux">
 <sup><a href="#flux">[d]</a></sup>
 Energy flux in given band (filter) defined as
-<i>F = ϕ h ν</i><sub>eff</sub><i> = ϕ h Δλ c / λ</i><sub>eff</sub><sup>2</sup>.
+<i>F = ϕ h c / λ</i><sub>eff</sub>, expressed in eV/s/m<sup>2</sup>.
 </p>
 
 <p id="fnu">
 <sup><a href="#fnu">[e]</a></sup>
 Spectral energy flux density per unit frequency defined as
-<i>f<sub>ν</sub> = ϕ<sub>ν</sub> h ν</i><sub>eff</sub><i>
-                 = ϕ h ν</i><sub>eff</sub><i> / Δν</i>.
+<i>f<sub>ν</sub> = F / W<sub>ν</sub> = ϕ h λ</i><sub>eff</sub><i> / W</i>.
 </p>
 
 <p id="flam">
 <sup><a href="#flam">[f]</a></sup>
 Spectral energy flux density per 1nm of wavelength defined as
-<i>f<sub>λ</sub> = ϕ<sub>λ</sub> Δλ c / λ</i><sup>2</sup><sub>eff</sub><i>
-                 = ϕ h c / λ</i><sup>2</sup><sub>eff</sub><i> /</i> 10<sup>-9</sup>.
+<i>f<sub>λ</sub> = F / W = ϕ h c / (λ</i><sub>eff</sub><i> W)</i> (<i>W</i> in nm).
+For a star of magnitude <i>m</i>, <i>f<sub>λ</sub> = f<sub>λB</sub> 10<sup>-0.4 m</sup></i>.
 </p>
 
 <p id="mag">
 <sup><a href="#mag">[g]</a></sup>
 Magnitudes in the given filter are computed as
-<i>m</i> = -2.5 log<sub>10</sub> <i>F / (f<sub>0ν</sub> Δν)</i> =
-           -2.5 log<sub>10</sub> <i>F / (f<sub>0λ</sub> Δλ)</i>.
+<i>m</i> = -2.5 log<sub>10</sub> <i>F / (f<sub>λB</sub> W)</i>.
 Undefined values are marked 99.999.
 </p>
 
@@ -303,7 +305,7 @@ Undefined values are marked 99.999.
 Magnitudes in the given filter are computed as
 <i>m</i> = -2.5 log<sub>10</sub> <i>f<sub>ν</sub> / f<sub>AB</sub></i>,
 where <i>f</i><sub>AB</sub> = 3.631 .10<sup>-23</sup> [W/m2/Hz] is
-spectral flux density for star of magnitude zero in V (545nm) band for AB system.
+spectral flux density for star of magnitude zero in AB system.
 Undefined values are marked 99.999.
 </p>
 
@@ -311,8 +313,9 @@ Undefined values are marked 99.999.
 <sup><a href="#stmag">[ch]</a></sup>
 Magnitudes in the given filter are computed as
 <i>m</i> = -2.5 log<sub>10</sub> <i>f<sub>λ</sub> / f<sub>ST</sub></i>,
-where <i>f</i><sub>ST</sub> = 3.6335 .10<sup>-10</sup> [W/m2/nm] is
-spectral flux density for star of magnitude zero in V (545nm) band for ST system.
+where <i>f</i><sub>ST</sub> = 3.6335 .10<sup>-11</sup> [W/m2/nm]
+(3.6335 .10<sup>-9</sup> erg/s/cm<sup>2</sup>/Å) is
+spectral flux density for star of magnitude zero in ST system.
 Undefined values are marked 99.999.
 </p>
 </div>

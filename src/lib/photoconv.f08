@@ -37,8 +37,9 @@ module photoconv
   ! spectral flux density for star of magnitude 0 in V (545nm) band for AB system
   real(dbl), parameter, private :: ABspflux = 3.631e-23 ! [W/m2/Hz]
 
-  ! spectral flux density for star of magnitude 0 in V (545nm) band for ST system
-  real(dbl), parameter, private :: STspflux = 3.6335e-10 ! [W/m2/nm]
+  ! spectral flux density for star of magnitude 0 for ST system
+  ! (3.6335e-9 erg/s/cm2/A, STMAG = -2.5 log10(FLAM) - 21.10 in cgs)
+  real(dbl), parameter, private :: STspflux = 3.6335e-11 ! [W/m2/nm]
 
   ! gauss-hermite coefficients
   real(dbl), parameter, private :: h0 = 1.1816359006_dbl, &
@@ -56,6 +57,37 @@ module photoconv
 
   ! sqrt(pi/2)
   real(dbl), parameter, private :: sqrtpi2 = 1.2533141373155001_dbl
+
+  ! 2.5 / ln(10), the factor converting relative errors to magnitudes
+  real(dbl), parameter, private :: magerr = 1.0857362047581294_dbl
+
+  ! Passband width convention
+  ! -------------------------
+  ! The photometric system table provides LAM_EFF and LAM_FWHM.
+  ! The passband is approximated by a Gaussian with the standard deviation
+  ! sigma = LAM_FWHM / 2 (LAM_FWHM is treated as 2*sigma, not as the true
+  ! FWHM = 2.355*sigma of the Gaussian). Its effective (equivalent) width,
+  ! the integral of the normalised transmission, is
+  !
+  !      W = sqrt(2*pi) * sigma = sqrt(pi/2) * LAM_FWHM = 1.2533 * LAM_FWHM
+  !
+  ! (a Gaussian with the true FWHM would give 1.0645 * FWHM). The calibration
+  ! (mag2ph0, ph2mag0) relates the photon rate ph [ph/s/m2] and the zero
+  ! magnitude spectral flux FLAM_REF [W/m2/nm] by
+  !
+  !      ph = FLAM_REF * 10**(-0.4*mag) * (W/1nm) * LAM_EFF / (h*c)
+  !
+  ! All derived quantities use the same width W and only the wavelength
+  ! columns (LAM_EFF, LAM_FWHM); the frequency width is derived
+  ! as W_nu = c * W / LAM_EFF**2, NU_EFF = c / LAM_EFF:
+  !
+  !      PHOTLAM = ph / (W/1nm)                  [ph/s/m2/nm]
+  !      PHOTNU  = ph / W_nu                     [ph/s/m2/Hz]
+  !      FLUX    = ph * h*c / LAM_EFF            [W/m2] (written in eV/s/m2)
+  !      FLAM    = ph * h*c / LAM_EFF / (W/1nm)  [W/m2/nm]
+  !      FNU     = ph * h*c / LAM_EFF / W_nu     [W/m2/Hz]
+  !      STMAG   = -2.5*log10(FLAM / 3.6335e-11 W/m2/nm)
+  !      ABMAG   = -2.5*log10(FNU / 3.631e-23 W/m2/Hz)
 
 
   ! known quantities
@@ -183,67 +215,69 @@ contains
 
   end subroutine ct2ph
 
-  subroutine ph2photlam(lfwhm,ph,dph,phlam,dphlam)
+  subroutine ph2photlam(lfwhm,ph,dph,q,dq)
 
-    ! photon rate per unit of wavelegth [ph/s/m2/nm]
+    ! photon rate per unit of wavelegth [ph/s/m2/nm],
+    ! ph / W, W = sqrt(pi/2)*lfwhm in nm (see the passband width convention)
 
     real(dbl), intent(in) :: lfwhm
     real(dbl), dimension(:), intent(in) :: ph,dph
-    real(dbl), dimension(:), intent(out) :: phlam,dphlam
+    real(dbl), dimension(:), intent(out) :: q,dq
     real(dbl) :: f
 
-    f = lfwhm / 1e-9_dbl
+    f = 1.0_dbl / (sqrtpi2 * lfwhm / 1e-9_dbl)
 
     where( ph >= 0.0_dbl )
-       phlam = f * ph
-       dphlam = f * dph
+       q = f * ph
+       dq = f * dph
     elsewhere
-       phlam = -1.0_dbl
-       dphlam = -1.0_dbl
+       q = -1.0_dbl
+       dq = -1.0_dbl
     end where
 
   end subroutine ph2photlam
 
-  subroutine ph2photnu(ffwhm,ph,dph,phnu,dphnu)
+  subroutine ph2photnu(leff,lfwhm,ph,dph,q,dq)
 
-    ! photon rate per unit of frequency [ph/s/m2/Hz]
+    ! photon rate per unit of frequency [ph/s/m2/Hz],
+    ! ph / W_nu, W_nu = c * W / leff**2, W = sqrt(pi/2)*lfwhm
 
-    real(dbl), intent(in) :: ffwhm
+    real(dbl), intent(in) :: leff,lfwhm
     real(dbl), dimension(:), intent(in) :: ph,dph
-    real(dbl), dimension(:), intent(out) :: phnu,dphnu
+    real(dbl), dimension(:), intent(out) :: q,dq
     real(dbl) :: f
 
-    f = 1.0 / ffwhm
+    f = leff**2 / (c * sqrtpi2 * lfwhm)
 
     where( ph >= 0.0_dbl )
-       phnu = f * ph
-       dphnu = f * dph
+       q = f * ph
+       dq = f * dph
     elsewhere
-       phnu = -1.0_dbl
-       dphnu = -1.0_dbl
+       q = -1.0_dbl
+       dq = -1.0_dbl
     end where
 
   end subroutine ph2photnu
 
 
-  subroutine ph2flux(feff,ph,dph,flux,dflux)
+  subroutine ph2flux(leff,ph,dph,q,dq)
 
-    ! (light intensity, energy) flux integrated over frequency band [W/m2],
-    ! in convenient electron-Volts
+    ! (light intensity, energy) flux integrated over the passband [W/m2],
+    ! in convenient electron-Volts [eV/s/m2]: ph * h*c/leff
 
-    real(dbl), intent(in) :: feff
+    real(dbl), intent(in) :: leff
     real(dbl), dimension(:), intent(in) :: ph,dph
-    real(dbl), dimension(:), intent(out) :: flux,dflux
+    real(dbl), dimension(:), intent(out) :: q,dq
     real(dbl) :: f
 
-    f = planck * feff / evolt
+    f = hc / leff / evolt
 
     where( ph >= 0.0_dbl )
-       flux = f * ph
-       dflux = f * dph
+       q = f * ph
+       dq = f * dph
     elsewhere
-       flux = -1.0_dbl
-       dflux = -1.0_dbl
+       q = -1.0_dbl
+       dq = -1.0_dbl
     end where
 
   end subroutine ph2flux
@@ -313,44 +347,46 @@ contains
   end subroutine ph2fllux
 
 
-  subroutine ph2fnu(feff,ffwhm,ph,dph,flux,dflux)
+  subroutine ph2fnu(leff,lfwhm,ph,dph,q,dq)
 
-    ! spectral flux density per frequency [W/m2/Hz]
+    ! spectral flux density per frequency [W/m2/Hz],
+    ! ph * (h*c/leff) / W_nu = ph * h * leff / W, W = sqrt(pi/2)*lfwhm
 
-    real(dbl), intent(in) :: feff, ffwhm
+    real(dbl), intent(in) :: leff,lfwhm
     real(dbl), dimension(:), intent(in) :: ph,dph
-    real(dbl), dimension(:), intent(out) :: flux,dflux
+    real(dbl), dimension(:), intent(out) :: q,dq
     real(dbl) :: f
 
-    f = planck * (feff / ffwhm)
+    f = planck * leff / (sqrtpi2 * lfwhm)
 
     where( ph >= 0.0_dbl )
-       flux = f * ph
-       dflux = f * dph
+       q = f * ph
+       dq = f * dph
     elsewhere
-       flux = -1.0_dbl
-       dflux = -1.0_dbl
+       q = -1.0_dbl
+       dq = -1.0_dbl
     end where
 
   end subroutine ph2fnu
 
-  subroutine ph2flam0(leff,lfwhm,ph,dph,flux,dflux)
+  subroutine ph2flam0(leff,lfwhm,ph,dph,q,dq)
 
-    ! spectral flux density per wavelength [W/m2/nm]
+    ! spectral flux density per wavelength [W/m2/nm],
+    ! ph * (h*c/leff) / W, W = sqrt(pi/2)*lfwhm in nm
 
-    real(dbl), intent(in) :: leff, lfwhm
+    real(dbl), intent(in) :: leff,lfwhm
     real(dbl), dimension(:), intent(in) :: ph,dph
-    real(dbl), dimension(:), intent(out) :: flux,dflux
+    real(dbl), dimension(:), intent(out) :: q,dq
     real(dbl) :: f
 
-    f =  (planck / 1e-9) * (leff / lfwhm)
+    f = (hc / leff) / (sqrtpi2 * lfwhm / 1e-9_dbl)
 
     where( ph >= 0.0_dbl )
-       flux = f * ph
-       dflux = f * dph
+       q = f * ph
+       dq = f * dph
     elsewhere
-       flux = -1.0_dbl
-       dflux = -1.0_dbl
+       q = -1.0_dbl
+       dq = -1.0_dbl
     end where
 
   end subroutine ph2flam0
@@ -370,7 +406,7 @@ contains
     end where
 
     where( dmag < 9 )
-       dflux = flux * dmag / 1.0857
+       dflux = flux * dmag / magerr
     elsewhere
        dflux = 0
     end where
@@ -466,7 +502,7 @@ contains
     end if
 
     ph = ph / hc
-    dph = dmag*ph/1.0857
+    dph = dmag*ph/magerr
 
 !    write(*,'(a,5es13.5)') 'ph',ph
 
@@ -530,7 +566,7 @@ contains
     call flam2plux(leff,lwidth/2,flam,ph)
     write(*,'(a,5es13.5)') 'ph',ph
 
-    dph = ph * dmag / 1.086
+    dph = ph * dmag / magerr
 
   end subroutine mag2ph3
 
@@ -568,7 +604,7 @@ contains
     call flam2flux(leff,lwidth/2,flam,flux)
 !    write(*,'(a,5es13.5)') 'flux',flux
     mag = -2.5*log10(flux/zeroflux)
-    dmag = (dph/ph) * mag * 1.086 !?
+    dmag = (dph/ph) * mag * magerr !?
 
   end subroutine ph2mag3
 
@@ -1102,7 +1138,7 @@ contains
     end where
 
     where( dmag < 9 .and. ph > 0 )
-       dph = ph * dmag / 1.0857
+       dph = ph * dmag / magerr
 !    elsewhere( dmag >= 9 .and. mag < 99 )
 !       dph = sqrt(ph)
     elsewhere
@@ -1129,7 +1165,7 @@ contains
     end where
 
     where( dph > 0 .and. ph > 0.0_dbl )
-       dmag = 1.086_dbl*dph/ph
+       dmag = magerr*dph/ph
     elsewhere
        dmag = 9.99999_dbl
     end where
@@ -1149,7 +1185,7 @@ contains
 
     where( flux > 0.0_dbl )
        mag = -2.5_dbl*log10(flux / f0)
-       dmag = 1.086_dbl*dflux/flux
+       dmag = magerr*dflux/flux
     elsewhere
        mag = 99.99999_dbl
        dmag = 9.99999_dbl
@@ -1214,7 +1250,7 @@ contains
 
        flux = hc * flux
        mag = -2.5_dbl * log10(flux / flamref)
-       dmag = 1.086 * (dph/ph) * mag
+       dmag = magerr * (dph/ph) * mag
 
     end if
 
@@ -1228,7 +1264,7 @@ contains
     real(dbl), dimension(:), intent(out) :: r,dr
 
     r = flux25*10.0_dbl**(-0.4_dbl*mag)
-    dr = dmag*r/1.0857
+    dr = dmag*r/magerr
 
   end subroutine mag2rate
 
@@ -1242,7 +1278,7 @@ contains
 
     where( flux > 0.0_dbl .and. f0 > 0.0_dbl )
        mag = -2.5_dbl*log10(flux/f0)
-       dmag = 1.0857*dflux/flux
+       dmag = magerr*dflux/flux
     elsewhere
        mag = 99.99999_dbl
        dmag = 9.99999_dbl
@@ -1259,7 +1295,7 @@ contains
 
     where( fnu > 0.0_dbl )
        mag = -2.5_dbl*log10(fnu/ABspflux)
-       dmag = 1.0857*dfnu/fnu
+       dmag = magerr*dfnu/fnu
     elsewhere
        mag = 99.99999_dbl
        dmag = 9.99999_dbl
@@ -1276,7 +1312,7 @@ contains
 
     where( flam > 0.0_dbl )
        mag = -2.5_dbl*log10(flam/STspflux)
-       dmag = 1.0857*dflam/flam
+       dmag = magerr*dflam/flam
     elsewhere
        mag = 99.99999_dbl
        dmag = 9.99999_dbl
@@ -1284,20 +1320,20 @@ contains
 
   end subroutine flam2stmag
 
-  subroutine ph2abmag(feff,ffwhm,ph,dph,mag,dmag)
+  subroutine ph2abmag(leff,lfwhm,ph,dph,mag,dmag)
 
-    ! photons to AB-magnitudes
+    ! photons to AB-magnitudes, -2.5*log10(FNU / ABspflux), FNU as in ph2fnu
 
-    real(dbl), intent(in) :: feff, ffwhm
+    real(dbl), intent(in) :: leff,lfwhm
     real(dbl), dimension(:), intent(in) :: ph,dph
     real(dbl), dimension(:), intent(out) :: mag,dmag
     real(dbl) :: f
 
-    f = planck * (feff / ffwhm) / ABspflux
+    f = planck * leff / (sqrtpi2 * lfwhm) / ABspflux
 
     where( ph > 0.0_dbl )
        mag = -2.5_dbl*log10(f*ph)
-       dmag = 1.0857*dph/ph
+       dmag = magerr*dph/ph
     elsewhere
        mag = 99.99999_dbl
        dmag = 9.99999_dbl
@@ -1307,18 +1343,18 @@ contains
 
   subroutine ph2stmag(leff,lfwhm,ph,dph,mag,dmag)
 
-    ! photons to ST-magnitudes
+    ! photons to ST-magnitudes, -2.5*log10(FLAM / STspflux), FLAM as in ph2flam0
 
-    real(dbl), intent(in) :: leff, lfwhm
+    real(dbl), intent(in) :: leff,lfwhm
     real(dbl), dimension(:), intent(in) :: ph,dph
     real(dbl), dimension(:), intent(out) :: mag,dmag
     real(dbl) :: f
 
-    f =  (planck / 1e-9) * (leff / lfwhm) / STspflux
+    f = (hc / leff) / (sqrtpi2 * lfwhm / 1e-9_dbl) / STspflux
 
     where( ph > 0.0_dbl )
        mag = -2.5_dbl*log10(f*ph)
-       dmag = 1.0857*dph/ph
+       dmag = magerr*dph/ph
     elsewhere
        mag = 99.99999_dbl
        dmag = 9.99999_dbl
@@ -1328,13 +1364,18 @@ contains
 
   subroutine hstparam(lam_eff,lam_fwhm,photflam,photzpt,photplam,photbw)
 
+    ! HST-like keywords: PHOTFLAM is the spectral flux density [erg/s/cm2/A]
+    ! corresponding to the photon rate 1 photon/s/cm2 in the passband,
+    ! (h*c/lam_eff) / W, W = sqrt(pi/2)*lam_fwhm; PHOTZPT is the ST
+    ! zero point, STMAG = -2.5*log10(FLAM) + PHOTZPT for FLAM in cgs.
+
     real(dbl), intent(in) :: lam_eff, lam_fwhm
     real(dbl), intent(out) :: photflam,photzpt,photplam,photbw
 
-    ! unit erg/.. <-> J/.. conversion
-    photflam = 1e6 * STspflux * (planck*c) / lam_eff**2
-    ! the aperture correction 0.1 has been ommited
-    photzpt = -21.0
+    ! [J/photon] -> [erg] (1e7), per [A] (W / 1e-10 m)
+    photflam = 1e7_dbl * (hc / lam_eff) / (sqrtpi2 * lam_fwhm / 1e-10_dbl)
+    ! [W/m2/nm] -> [erg/s/cm2/A] is factor 100
+    photzpt = 2.5_dbl * log10(100 * STspflux)
     photplam = lam_eff / 1e-10
     photbw = lam_fwhm / 1e-10
 

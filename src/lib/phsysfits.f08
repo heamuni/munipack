@@ -640,18 +640,15 @@ contains
     real(REAL64), dimension(:), intent(in) :: ph,dph
     real(REAL64), dimension(:), intent(out) :: q,dq
     real(REAL64), dimension(:), allocatable :: r,dr
-    real(REAL64) :: feff,ffwhm,leff,lfwhm,fnuref,flamref
+    real(REAL64) :: leff,lfwhm,flamref
     integer :: i
     logical :: defined
 
     defined = .false.
     do i = 1, phsyscal%nbands
        if( filter == phsyscal%filter(i) ) then
-          feff = phsyscal%nu_eff(i)
-          ffwhm = phsyscal%nu_fwhm(i)
           leff = phsyscal%lam_eff(i)
           lfwhm = phsyscal%lam_fwhm(i)
-          fnuref = phsyscal%fnu_ref(i)
           flamref = phsyscal%flam_ref(i)
           defined = .true.
        end if
@@ -667,21 +664,21 @@ contains
     call phrate(area,exptime,arcscale,ph,dph,r,dr)
 
     if( key == 'FNU' ) then
-       call ph2fnu(feff,ffwhm,r,dr,q,dq)
+       call ph2fnu(leff,lfwhm,r,dr,q,dq)
     else if( key == 'FLAM' ) then
        call ph2flam0(leff,lfwhm,r,dr,q,dq)
     else if( key == 'PHOTNU' ) then
-       call ph2photnu(ffwhm,r,dr,q,dq)
+       call ph2photnu(leff,lfwhm,r,dr,q,dq)
     else if( key == 'PHOTLAM' ) then
        call ph2photlam(lfwhm,r,dr,q,dq)
     else if( key == 'ABMAG' ) then
-       call ph2abmag(feff,ffwhm,r,dr,q,dq)
+       call ph2abmag(leff,lfwhm,r,dr,q,dq)
     else if( key == 'STMAG' ) then
        call ph2stmag(leff,lfwhm,r,dr,q,dq)
     else if( key == 'MAG' ) then
        call ph2mag0(leff,lfwhm,flamref,r,dr,q,dq)
     else if( key == 'FLUX' ) then
-       call ph2flux(feff,r,dr,q,dq)
+       call ph2flux(leff,r,dr,q,dq)
     else if( key == 'PHRATE' ) then
        q = r
        dq = dr
