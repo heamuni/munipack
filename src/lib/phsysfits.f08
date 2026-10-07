@@ -679,7 +679,7 @@ contains
        call ph2mag0(leff,lfwhm,flamref,r,dr,q,dq)
     else if( key == 'FLUX' ) then
        call ph2flux(leff,r,dr,q,dq)
-    else if( key == 'PHRATE' ) then
+    else if( key == 'PHOTRATE' .or. key == 'PHRATE' ) then
        q = r
        dq = dr
     else if( key(1:6) == 'PHOTON' ) then
