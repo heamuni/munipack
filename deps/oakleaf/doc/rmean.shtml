@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+  <!-- #include "meta.shtml" -->
+<body>
+  <!-- #include "head.shtml" -->
+
+<h1>Robust mean</h1>
+
+  <h2>Synopsis</h2>
+
+  <pre class="fortran">
+
+use oakleaf
+
+subroutine <span class="subroutine">rmean</span>(data,mean,stderr,stdsig,scale,reltol,robfun,sigic,rankinit,flag,verbose,report)
+
+   real, dimension(:), intent(in) :: data
+   real, intent(in out) :: mean
+   real, intent(out), optional :: stderr, stdsig
+   real, intent(in out), optional :: scale
+   real, intent(in) :: reltol
+   character(len=*), intent(in) :: robfun
+   logical, intent(in), optional :: sigic
+   logical, intent(in), optional :: rankinit
+   integer, intent(out), optional :: flag
+   logical, intent(in), optional :: verbose
+   character(len=*), intent(in), optional :: report
+
+end subroutine rmean
+  </pre>
+
+  <p>
+    The subroutine is generic, supporting
+    <a href="https://en.wikipedia.org/wiki/Single-precision_floating-point_format">REAL32</a>,
+    <a href="https://en.wikipedia.org/wiki/Double-precision_floating-point_format">REAL64</a> and
+    <a href="https://en.wikipedia.org/wiki/Quadruple-precision_floating-point_format">REAL128</a> (available on 64-bit platforms) datatypes.
+    The reccomended, if the nature of a given problem allows it, is REAL64.
+    REAL32 has low accuracy, whilst REAL128 is slow.
+  </p>
+
+  <h2>Description</h2>
+
+  <p>
+    The robust mean subroutine <code>rmean()</code> estimates
+    the mean, and related statistical quantities.
+    The data are supposed to be sample from the
+    Normal distribution with possible contamination of a unknown origin.
+  <p/>
+
+  <p>
+    The parameters for both the location and the dispersion of
+    the Normal distribution <i>N(mean,stdsig)</i> are estimated.
+    The true value <i>X</i> of the sample falls, with 68% probability,
+    into the interval  <i>mean - stderr  <  X  <  mean + stderr</i>.
+  </p>
+
+  <h2>Parameters</h2>
+
+  <h3>On input:</h3>
+  <dl>
+    <dt>data</dt><dd>array of data,</dd>
+    <dt>mean</dt><dd> (optional) an initial estimate of the mean,</dd></dt>
+    <dt>scale </dt><dd> (optional) an initial estimate of the scale (i.e. stdsig),</dd>
+    <dt>reltol </dt><dd> (optional) the relative accuracy of determination
+      of the optimum (default: 2.4%),</dd></dt>
+    <dt>robfun </dt><dd> (optional) select the robust function among:
+  <samp>`hampel'</samp> (default), <samp>`tukey', `huber'</samp>
+  or <samp>`square'</samp> (non-robust least square),</dd></dt>
+<dt>sigic </dt><dd> (optional) estimate the standard deviation by the
+  influence function (default: <samp>.false.</samp>)</dd></dt>
+    <dt>rankinit </dt><dd> (optional) estimate initial values by
+  <a href="order.html">the order estimates</a>
+  (default: <samp>.true.</samp>)</dd></dt>
+  <dt>verbose </dt><dd> (optional) print a detailed information
+  about the calulations.</dd></dt>
+<dt>report </dt><dd> (optional) a filename of
+  <a href="#reports">a report</a></dd></dt>
+  </dl>
+
+<p><samp>data</samp> are the mandatory input parameter.
+  The procedure initialisation is done internally
+  if <samp>rankinit == .true.</samp> (default);
+  otherwise, both <samp>mean,scale</samp> must be set
+  by the calling procedure.
+  The initial estimates are taken by the median and MAD
+  described in <a href="qmean.html">qmean</a>.
+</p>
+
+
+  <h3>On output:</h3>
+  <dl>
+    <dt>mean</dt><dd> the mean</dd>
+    <dt>stderr</dt><dd> (optional) the standard error</dd>
+    <dt>stdsig</dt><dd> (optional) the standard deviation</dd>
+    <dt>scale</dt><dd> (optional) the scale</dd>
+    <dt>flag</dt><dd> (optional) a flag,
+      see <a href="status.html">the status codes</a>.</dd>
+  </dl>
+
+<p>The mandatory output parameter is the robust mean.
+  The check of the status is recommended.
+  </p>
+
+  <h2>Example</h2>
+
+<p>
+    Save the program to the file <samp>example.f08</samp>:
+  </p>
+  <pre>
+program example
+
+   use oakleaf
+
+   real, dimension(5) :: data = [ 1, 2, 3, 4, 5 ]
+   real :: mean,stderr,stdsig
+
+   call rmean(data,mean,stderr,stdsig)
+   write(*,*) 'rmean:',mean,' stderr:',stderr,'stdsig:',stdsig
+
+end program example
+  </pre>
+  <p>
+    Than compile and run it (the paths of <samp>-I, -L</samp>
+    are an <a href="build.html#placement">example</a>):
+  </p>
+  <pre>
+$ gfortran -I/usr/local/include example.f08 -L/usr/local/lib -loakleaf -lminpack
+$ ./a.out
+ rmean:   3.00000000      stderr:  0.741289854     stdsig:   1.65757453
+  </pre>
+
+
+  <h2 id="reports">Reports</h2>
+<p>
+  The report file keeps the detailed track of the algorithm steps
+  for visualisation or debugging purposes. It is not recommended
+  for common use as it slow-down a run.
+</p>
+
+<p>
+  The format is (see <samp>src/sqpfmean.f08</samp>) self-descibing
+  and includes: initial estimates, the optimisation steps
+  (current values, trust-region radius, the step, the gradient, the quasi-Newton
+  hessian and the trust-step flag) and final number of iterations,
+  function evaluations, restores, steps out of the trust-region,
+  indefinite and hard steps and the final hessian computed analytically.
+</p>
+
+  <h2>References</h2>
+
+  <p>Hroch,F.: A contribution to the estimate of the robust mean value, in preparation</p>
+
+<!-- #include "foot.shtml" -->
+  </body>
+</html>

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VOTABLE version="1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.ivoa.net/xml/VOTable/v1.1" xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.1 http://www.ivoa.net/xml/VOTable/v1.1">
+<DESCRIPTION>
+Preferences of VO Catalogues for Munipack
+</DESCRIPTION>
+<!--
+Individual catalogues are inside RESOURCE tag. The parameter 'name'
+contains human-centric label.
+
+The parameters FIELDS must contains all required elements.
+
+Notes.
+The string in 'name' must contains a phrase which will be found in DESCRIPTION
+of the required RESURCE.
+
+http://python4astronomers.github.com/vo/votools.html
+
+-->
+
+<RESOURCE name="SITE">
+<TABLE>
+<FIELD name="Alias" />
+<FIELD name="URL" />
+<DATA>
+<TABLEDATA>
+<TR><TD>CDS, France</TD><TD>http://vizier.cds.unistra.fr</TD></TR>
+<TR><TD>Cambridge, UK</TD><TD>http://vizier.ast.cam.ac.uk</TD></TR>
+<TR><TD>Adac, Japan</TD><TD>http://vizier.nao.ac.jp</TD></TR>
+<TR><TD>CFA/Harvard, USA</TD><TD>http://vizier.cfa.harvard.edu</TD></TR>
+<TR><TD>CADC, Canada</TD><TD>http://vizier.hia.nrc.ca</TD></TR>
+<TR><TD>INASAN, Russia</TD><TD>http://vizier.inasan.ru</TD></TR>
+<TR><TD>IUCAA, India</TD><TD>https://vizier.iucaa.ernet.in</TD></TR>
+<TR><TD>Ukirt, Hawaii</TD><TD>http://www.ukirt.jach.hawaii.edu</TD></TR>
+<TR><TD>Beijing Obs., China</TD><TD>https://vizier.china-vo.org</TD></TR>
+<TR><TD>IDIA, South Africa</TD><TD>http://vizier.idia.ac.za</TD></TR>
+</TABLEDATA>
+</DATA>
+</TABLE>
+</RESOURCE>
+
+<RESOURCE name="CATALOGUE">
+<TABLE>
+<FIELD name="Alias" ucd="CAT"/>
+<FIELD name="ID" ucd="ID"/>
+<FIELD name="RA" ucd="POS_EQ_RA" />
+<FIELD name="DEC" ucd="POS_EQ_DEC" />
+<FIELD name="pmRA" ucd="POS_EQ_PMRA" />
+<FIELD name="pmDE" ucd="POS_EQ_PMDEC" />
+<FIELD name="EpRA" ucd="TIME_EPOCH_RA" />
+<FIELD name="EpDE" ucd="TIME_EPOCH_DEC" />
+<FIELD name="mag" ucd="PHOT_MAG" /> <!-- sort -->
+<PARAM name="query" value="viz-bin/votable/-A?-source=${ID}&amp;RA=${RA}&amp;DEC=${DEC}&amp;SR=${SR}&amp;VERB=3" />
+<DATA>
+<TABLEDATA>
+<TR><TD>UCAC5</TD><TD>I/340</TD><TD>RAJ2000</TD><TD>DEJ2000</TD><TD>pmRA</TD><TD>pmDE</TD><TD>EpRA</TD><TD>EpDE</TD><TD>f.mag</TD></TR>
+<TR><TD>UCAC4</TD><TD>I/322A</TD><TD>RAJ2000</TD><TD>DEJ2000</TD><TD>pmRA</TD><TD>pmDE</TD><TD>EpRA</TD><TD>EpDE</TD><TD>f.mag</TD></TR>
+<TR><TD>GSC</TD><TD>I/353</TD><TD>RA_ICRS</TD><TD>DE_ICRS</TD><TD>pmRA</TD><TD>pmDE</TD><TD>EpRA</TD><TD>EpDE</TD><TD>Vmag</TD></TR>
+<TR><TD>Hipparcos</TD><TD>I/239</TD><TD>RAICRS</TD><TD>DEICRS</TD><TD>pmRA</TD><TD>pmDE</TD><TD>EpRA</TD><TD>EpDE</TD><TD>Vmag</TD></TR>
+<TR><TD>Tycho</TD><TD>I/259</TD><TD>RA(ICRS)</TD><TD>DE(ICRS)</TD><TD>pmRA</TD><TD>pmDE</TD><TD>EpRAm</TD><TD>EpDEm</TD><TD>VTmag</TD></TR>
+<TR><TD>PPMXL</TD><TD>I/317</TD><TD>RAJ2000</TD><TD>DEJ2000</TD><TD>pmRA</TD><TD>pmDE</TD><TD>epRA</TD><TD>epDE</TD><TD>r2mag</TD></TR>
+<TR><TD>APASS</TD><TD>II/336</TD><TD>RAJ2000</TD><TD>DEJ2000</TD><TD></TD><TD></TD><TD></TD><TD></TD><TD>Vmag</TD></TR>
+<TR><TD>GaiaDR3</TD><TD>I/355</TD><TD>RA_ICRS</TD><TD>DE_ICRS</TD><TD>pmRA</TD><TD>pmDE</TD><TD></TD><TD></TD><TD>Gmag</TD></TR>
+</TABLEDATA>
+</DATA>
+</TABLE>
+</RESOURCE>
+
+</VOTABLE>

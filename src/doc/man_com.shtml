@@ -1,0 +1,366 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Common options</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Common options</h1>
+
+
+<p class="abstract">
+Commonly used options and switches.
+</p>
+
+
+<h2>Verbose output</h2>
+
+<code>
+$ munipack --verbose ... action and so on ...
+</code>
+
+<p>
+  This switch enables detailed reports.
+  The additional information can be useful for exploring
+  of processing or in doubts.
+</p>
+
+<p>
+  Without this switch,
+Munipack respects standard UNIX philosophy:
+<b>Only errors are reported. A silent run means no errors.</b>
+It is very usefully for processing of large datasets because
+only important errors should be delivered to users.
+</p>
+
+
+<h2>Parallel processing</h2>
+
+<pre>
+--mproc [1|2|..]
+--Xproc "options for MPI"
+</pre>
+
+<p>
+  Time demanding procedures are run in parallel.
+  If the appropriate amount of cores is available,
+  three processes are launched by default.
+  The amount is specified by <samp>--mproc</samp>.
+</p>
+
+<pre>
+  $ munipack artificial --verbose --count 7 --mproc 7
+</pre>
+
+<p>
+  The environment variable MUNIPACK_CAF_MPROC does the same
+  and is usefull in scripts.
+</p>
+<pre>
+  $ MUNIPACK_CAF_MPROC=7
+  $ munipack artificial --verbose --count 7
+</pre>
+
+<p>
+  The parallel processing is based on Fortran's
+  <a href="https://en.wikipedia.org/wiki/Coarray_Fortran">Coarrays (CAF)</a>,
+  currently implemented on top of a
+  <a href="https://en.wikipedia.org/wiki/Message_Passing_Interface">MPI</a>
+  library (<a href="https://www.open-mpi.org/">OpenMPI</a>
+  or <a href="https://www.mpich.org/">MPICH</a>).
+  Libraries provide a procedure launching the Fortran's program
+  named <samp>mpirun</samp>.
+  The option <samp>--Xproc</samp> is proposed
+  to pass additional parameters to the procedure,
+  like the requirement for run on separate computers (in clusters) described in
+  <a href="https://docs.open-mpi.org/en/v5.0.x/launching-apps/index.html">
+  OpenMPI</a> manual.
+</p>
+<pre>
+  $ munipack artificial --verbose --count 7 --Xproc "--host localhost:3"
+</pre>
+
+<p>
+  There are environment MPI variables.
+  MUNIPACK_CAF_RUN specifies the underlying procedure for runtime launch
+  (there is also <samp>cafrun</samp> which has no parameters).
+  MUNIPACK_CAF_XPROC is an equivalent of <samp>--Xproc</samp>.
+</p>
+<pre>
+  $ MUNIPACK_CAF_RUN=mpirun
+  $ MUNIPACK_CAF_XPROC="--host localhost:3"
+  $ munipack artificial --verbose --count 7
+</pre>
+
+
+<h2>Simple Output Filenames</h2>
+
+<pre>
+-o name
+--output name
+</pre>
+<p>
+Specify an output file name for a single file. If the option is not
+presented, the output name
+is derived from the particular action name.
+<!--
+Use dash '-' for  redirection  to
+the  standard  output.  Precede  the  filename  with exclamation
+point (!) to overwrite of an existing FITS file.
+In case that the name
+is a directory, newly created file(s) are stored here.
+-->
+</p>
+
+<h2>Target Directory</h2>
+
+<pre>
+-t directory
+--target-directory=directory
+</pre>
+
+<p>
+It would be useful to store output files in a specified directory.
+The most typical use is storing modified files in a working directory
+when original files are untouched.
+</p>
+
+
+<h2>Input filenames</h2>
+
+<p>
+  All actions for files expects a list of FITS files on
+  input. The list can be specified on a command-line or given by
+  a file.
+</p>
+
+<h3>Filenames as arguments</h3>
+
+<p>
+  The list of files to process. Usually as a names with wildcards (* or ?)
+  equivalent to standard shell synatax.
+  Example:
+</p>
+<pre>
+  $ munipack fits one.fits more.fits red.fits nightmare.fits
+  $ munipack fits -K DATE-OBS *.fits
+  $ munipack bias bias*.fits
+  $ munipack fits `find dir/ -name '*.fits'`
+</pre>
+
+<p>
+  The first example shows the FITS structre of the files gived by hand.
+  The second one show sthe structure for all files macthing the mask.
+  The third line prepares bias from all frames by mask <samp>bias*.fits</samp>
+  The last one illustrates scaning of FITS files troughout sub-directories.
+</p>
+
+<h3>An input file with filenames</h3>
+
+<p>
+  The input filename is powerfull alterantive to the argument lists
+  in case of huge lists, the batch processing or arbitrary modification
+  of output filenames.
+</p>
+
+<p>
+  The input filename can be given by specifing <samp>@[input]</samp>
+  or <samp>- [&lt; input]</samp> options:
+</p>
+
+<pre>
+@[input]
+- &lt; [input]
+</pre>
+
+<p>
+  The @ (at) or - (dash) indicates to read from a standard input. (@ character
+  has the same meaning like in classical softwares Iraf and Midas.)
+</p>
+
+<p>
+The input from file is initiated with @ character followed a file-name (file.lst).
+The file is a plain text file with single file per line. As example,
+the content of the file.lst equivalent to the previous example:
+</p>
+<pre>
+one.fits
+more.fits
+red.fits
+nightmare.fits
+</pre>
+<p>
+The file can be prepared by hand or prepared by the command with using
+of <a href="https://en.wikipedia.org/wiki/Redirection_(computing)">shell redirection</a>
+and <a href="https://en.wikipedia.org/wiki/Find">find</a> utility:
+</p>
+<pre>
+$ ls *.fits > file.lst                  # files in current directory
+$ find dir/ -name '*.fits' > file.lst   # all files in dir/, recursive
+$ ls *.fits | munipack dark -           # filenames are piped from ls
+</pre>
+
+<p>
+  An alternative form represents the input file in the form of
+  two items per line. The items are separated by spaces,
+  which means that spaces are not allowed in filenames.
+</p>
+<pre>
+  input1.fits output1.fits
+  input2.fits output2.fits
+  input3.fits output3.fits
+  ...
+</pre>
+<p>
+  This form can be usefull in case when a complex renaming is required.
+  It can be very usefull for cases like
+</p>
+<pre>
+  ls 0716_*[VR].fits | awk '{a=$1; gsub(/0716/,"pks0716+71"); print a,$1;}' > input
+  munipack phcorr @input
+</pre>
+
+<p>
+  The use of two items is also allowed on command line. The items
+  are stil separated by spaces so enclosing in apostrophes is
+  necessory.
+</p>
+<pre>
+  munipack fits --cat 'first.fits second.fits'
+</pre>
+
+<p>
+There are also another a powerful way as
+describes <a href="#advanced">Advanced Output Filenames</a> section.
+</p>
+
+
+
+
+<h2 id="advanced">Advanced Output Filenames</h2>
+
+<pre>
+-O
+--pattern pattern (default: (.+)\.(.+))
+--mask mask (default: empty)
+--format format (default: empty)
+</pre>
+<p>
+Specify a regular expression or a format to describe of an output file name(s).
+The <samp>-O</samp> switch-on the advanced functionality (else the simple backup
+with suffix is used). The pattern is a regular expression used to matching and
+on will usually include bracket expression for back-references. The back-references
+can be used in mask with \number. To test a regular expression, use sed:
+<samp>sed s/pattern/mask/</samp>. <samp>--mask</samp> is used for newly created
+files whilst <samp>--backup</samp> for specify of backup files.
+</p>
+
+<p>
+The default pattern splits filenames onto two parts name and extension separated
+by a dot (\.). The pattern recognizing algorithm uses
+<a href="https://en.wikipedia.org/wiki/Regular_expression">Regular Expression</a>
+rules syntax.
+The parts are accessible via \number operator. The \0 means original
+filename, \1 name and \2 extension.
+</p>
+
+<p>
+The format is a standard format for output of
+sequence images. To test a format, use <samp>printf "out%d.fits",666</samp>.
+</p>
+
+<p>
+When just only <samp>-O</samp> is specified, backups are disabled.
+</p>
+
+<p>
+When the advanced filename processing is set, the options <samp>-t,-S,-b</samp>
+are ignored, because their functionality can be simply simulated.
+</p>
+
+<!--
+<p>
+When <samp>-O</samp> is specified but no other specificators (like masks, format)
+are set, backups are disabled and the original file is modified in place.
+</p>
+-->
+
+
+<p>Examples:</p>
+<pre>
+# store outputs in /tmp directory : -O --mask '/tmp/\0'
+ barnard_0011R.fits -> /tmp/barnard_0011R.fits
+
+# modify suffix: -O --pattern '(.+)\.fits' --mask '\1.fit'
+ barnard_0011R.fits -> barnard_0011R.fit
+
+# modify filename: -O --pattern '(.+)\.(.+)' --mask '\1_D.\2'
+ barnard_0011R.fits -> barnard_0011R_D.fits
+
+# alternate backups: -O --mask '\0.bak'
+ barnard_0011R.fits -> barnard_0011R.fits.bak
+
+# overwrite output: -O --mask '!\0'
+ barnard_0011R.fits -> !barnard_0011R.fits
+
+# list of numbered files: -O --format 'out_%02d.fits'
+ barnard_0001R.fits -> out_01.fits
+
+# disable backups: -O
+ barnard_0001R.fits -> barnard_0001R.fits
+</pre>
+
+
+<p>See also: <a href="http://docs.wxwidgets.org/3.0/classwx_reg_ex.html">wxRegEx</a>,
+<a href="http://docs.wxwidgets.org/3.0/classwx_string.html">wxString</a></p>
+
+
+
+
+<h2>Numerical Data Types</h2>
+
+<pre>
+-B [8|16|32|-32]
+--bitpix[=8|16|32|-32]
+</pre>
+<p>
+Select bits per pixel of output images. Possible values are: 8
+(0-255),  16  (0-65535),  32  (0-4294967296) for integer non-negative numbers
+of ℕ set
+and -32 (-10<sup>-38</sup> .. 10<sup>38</sup>, 6 decimal digits) for real numbers
+of ℝ set, (values in braces indicates numerical ranges).
+</p>
+
+<p>
+The parameter is set according to BITPIX in original frames for photometric
+pre-corrections or set to -32 for derived images.
+Defaults are usually satisfactory.
+</p>
+
+<p>
+General guidelines: An optimal
+bitpix  for raw (instrumental) data is 16 (default) which covers
+a full range of digital  cameras.  The  representation  occupies
+2 × width × height bytes.  Some  out  of  range  (rare) values will
+be cut-off.
+</p>
+
+<p>
+The representing by real numbers (eg. -32)
+is  recommended value for images intended for further processing
+because saves numerical precision and their numerical range (but
+occupies of twice more space with respect to 16).
+</p>
+
+<p>
+8-bits reduces range (eg. suppress dynamical range) and  32  wastes
+a  lot  of storage place only.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

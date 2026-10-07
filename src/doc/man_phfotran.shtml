@@ -1,0 +1,140 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Photometric System Transformation</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Photometric System Transformation</h1>
+
+<p class="abstract">
+An approximation of photon fluxes in
+a standard set of filters by a linear combination of
+an instrumental set of filters
+is determined on a field with known calibration sources.
+</p>
+
+<h2>Synopsis</h2>
+
+<code>
+munipack phfotran [.. parameters ..] file(s)
+</code>
+
+<h2>Description</h2>
+
+<p>
+A common astronomical apparatus composed from a telescope, filter
+and a detector has slightly different spectral sensitivity than
+the standard one which had established the primary (stellar)
+standards of a photometric system. Fortunately, a commonly used
+equipment close fits the standard spectral sensitivity due to
+effort of manufactures. Therefore, any differences
+are small and can be, with suitable precision, approximated by
+a linear approximation.
+</p>
+
+<p>
+This action determines such transformation by application
+of the linear approximation between observed sum of counts and
+expected photons from calibration stars.
+</p>
+
+<p>
+The transformation table can be used to convert observed counts
+<i>c</i> in an instrumental system (identified by PHOTSYS1) to
+counts <i>c'</i> in a standard system (identified by PHOTSYS2).
+</p>
+<p>
+<i>
+c'<sub>i</sub> = Σ<sub>j</sub> C<sub>ij</sub> c<sub>j</sub>, i = { B,V ...}
+</i>
+</p>
+
+<p>
+The transformed counts <i>c'</i> will generally proportional to
+observed photons and can be used for calibration.
+</p>
+
+<p>
+The transformation is designed to be used on a calibration field.
+The sparse field with many of well calibrated stars. There are sources
+of such fields (which can be supposed as the secondary standards):
+</p>
+<ul>
+<li><a href="http://www3.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/community/STETSON/standards/">Stetson's fields</a></li>
+</ul>
+
+
+
+<h2>Algorithm</h2>
+
+<p>
+The transformation is determined by the way:
+</p>
+<ul>
+<li>Reference catalogue and frames are merged in spherical coordinates
+with nearly positions.</li>
+<li>From known filter in a photometric system and catalogue magnitude,
+photon fluxes are derived.</li>
+<li>Observed counts are normalized to rates using of both telescope
+area and exposure time.</li>
+<li>The transformation matrix is determined.</li>
+</ul>
+
+<p>
+A result of the transformation is a nearly tri-diagonal matrix (elements around
+diagonal dominates over other ones). The limitation of the shape is forced
+due to ill-conditioning of the problem.
+</p>
+
+
+<!-- #include virtual="/man_phcal_common.shtml" -->
+
+<h2>Input And Output</h2>
+
+<p>
+On input, FITS frames in several filters are
+required. Ones must be passed in order from short- to long-wavelengths.
+Composited frames are recommended.
+</p>
+
+<p>
+On output, a new FITS table representing the transformation is created.
+</p>
+
+<!-- #include virtual="/man_phcal_params.shtml" -->
+
+Add -E,--extin option description.
+
+<h2>Caveats</h2>
+
+<p>
+Just equal number of instrumental and standard filters is implemented.
+</p>
+
+
+
+<h2>Examples</h2>
+
+<p>
+Calibrate against to UCAC5 catalogue:
+</p>
+<pre>
+$ munipack cone -c UCAC5 -o 0716cat.fits  -r 0.1 110.47 71.34
+$ munipack phfotran --area 1.86 --photsys-instr DK154 -c T_Phe.fits --col-ra RA --col-dec DEC --col-mag B,V,R,I T_Phe_000001.fits T_Phe_000003.fits T_Phe_000005.fits T_Phe_000007.fits
+</pre>
+
+
+<h2>See Also</h2>
+<p>
+<a href="man_com.html">Common options</a>,
+<a href="man_phcal.html">Photometry Calibration</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

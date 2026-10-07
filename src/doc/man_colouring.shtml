@@ -1,0 +1,182 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Manual Page</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Colour frame composition</h1>
+
+<p class="abstract">
+  Colouring utility for composing of frames in natural colours.
+</p>
+
+<h2>Command</h2>
+
+<code>
+munipack coloring [options] [file(s)] ...
+</code>
+
+<h2>Description</h2>
+
+<p>
+Munipack implements a method which transforms images taken via
+a set of standard photometric filters (Johnson BVR or an equivalent)
+to <a href="https://en.wikipedia.org/wiki/CIE_1931_color_space">CIE 1931 XYZ</a>
+colour space ― sensitivity of the human eye.
+Main purpose of the utility is to offer possibility to create images
+in natural colours from instrument not equipped by CIE 1931 XYZ filters
+(eg. any astromical telescope).
+Results has colours near of natural colours and simulates how the object
+would be seen by an extraordinary observer, like a huge digital camera.
+</p>
+
+
+<h2>Calibrated results</h2>
+
+<p>
+  If the input frames are calibrated, or ctph is specified,
+  the output colour frames has absolute calibration in intensities
+  (energy carried by photon rates). To partialy preserve values,
+  the frames are keeped in energy rates in electronvolts per second,
+  square meter and square arcseconds (rather than W/m2/srad as
+  SI reccomends).
+</p>
+
+<p>
+  There are important difference between common digital detectors
+  (CCD, cameras) and human eye: the human eye detect energy, whilst
+  these are photon detectors.
+</p>
+
+
+<h2>RGB colour space</h2>
+
+<p>
+  CIE 1931 XYZ has been selected as the default output colour space
+  due compatibility with dcraw. Also, the colour space is
+  very near to Johnson giving more accurate transformation matrix.
+  Much more, CIE 1931 XYZ is ideal for additional processing due
+  wide common CIE Luv, CIE Lab.
+</p>
+
+<p>
+  In contsrast, sRGB or Adobe RGB are very specific spaces,
+  non-linear and very difficlout to modify. They are considered
+  as final product, whilst CIE 1931 XYZ are intended for additional
+  tunning.
+</p>
+
+<h2>Input and output</h2>
+
+<p>
+  On input, a list of frames is expected.
+  The frames should be specified in short wavelengths first order
+  (conventional BVR order)  on command line,
+  this is oppposite to RGB (XYZ).
+  The filters in headers should be specified exactly as <i>B</i>,
+  <i>V</i>, <i>R</i>
+  characters for Johnson's system, no aliases are allowed.
+</p>
+
+<p>
+  On output, the colour frame in <a href="colourfits.html">Colour FITS</a>
+  is created.
+</p>
+
+
+<h2>Parameters</h2>
+
+<dl>
+  <dt><samp>-c, --cspace-input colour-space</samp></dt><dd>
+    Specify the colour-space of input images (eg. 'Johnson BVR').
+    If the value is not given, passed frames are scaned for filters,
+    and the colour space is guessted from them.
+  </dd>
+  <dt><samp>--cspace-output colour-space</samp></dt><dd>
+    Specify the final colour space identification. 'CIE 1931 XYZ'
+    is used by default. Anotehr possible value is 'Johnson BVR'
+    which can be usefull for additional processing, like
+    tunning in xmunipack.
+  </dd>
+  <dt><samp>-w, --weights w1,w2,...</samp></dt><dd>
+    Gives weights of particular colour bands. There are no limitation
+    on weights except: all of them must be possitive numbers, their
+    count must corresponds to passed input frames.
+  </dd>
+  <dt><samp>-q, --ctphs ctph1,ctph2,...</samp></dt><dd>
+    Gives reciprocal quantum efficiency for particular colour bands.
+    The values can be determined by photon calibration.
+    Generally, it is proper characteristics of given aparatus
+    (detector, filters and telescope), but slighly varies with
+    observing conditions.
+  </dd>
+  <dt><samp>-b, --backs back1,back2,...</samp></dt><dd>
+    Gives background levels of particular colour bands on input frames.
+    By default, medians of image levels are used. It is very good
+    star point for fine tune, in case of astronomical frames.
+  </dd>
+  <dt><samp>--disable-back</samp></dt><dd>
+    Disables estimation of backgrounds levels. It is helful
+    for non-astronomical frames.
+  </dd>
+
+  <dt><samp>--white-spot x,y</samp></dt><dd>
+    Specifies coordinates in pixels of a spot of circular
+    shape with a radius (default 7 pixels). The spot is a white
+    part of frame, robust mean in particular filters is used
+    to determine weights.
+  </dd>
+
+  <dt><samp>--white-star x,y</samp></dt><dd>
+    Specifies coordinates in pixels of a star considered
+    as a white star (stars with temperatures 10 thusands
+    kelvins, with B-V = 0 or spectral class A0).
+    An aperture of circular shape with a radius (default 7 pixels)
+    is used to determine the total flux in particular filters
+    and to determine of weights.
+    This option is there mainly to give a prove that it works,
+    calibrated frames gives better results and are easy to use.
+  </dd>
+
+  <dt><samp>--white-radius r</samp></dt><dd>
+    Specifies radius of the aperture (for star) or the spot
+    for determination of white colour. By default, it is 7 pixels.
+  </dd>
+
+  <dt><samp>--list</samp></dt><dd>
+    Prints a table with available colour space transformations.
+  </dd>
+
+
+</dl>
+
+<p>See <a href="man_com.html">Common options</a> for input/output filenames.</p>
+
+<h2>Examples</h2>
+
+<p>Create a new color FITS image <samp>m27.fits</samp> from a set of files
+taken with filters <samp>m27_[B,V,R].fits</samp>:
+</p>
+<pre>
+$ munipack colouring -o m27.fits m27_B.fits m27_V.fits m27_R.fits
+</pre>
+
+<figure>
+<img class="figure" src="color-best.png" alt="color_best.png" title="M27 in Colours">
+<figcaption>
+Dumbbell nebula in natural colours
+</figcaption>
+</figure>
+
+<h2>See Also</h2>
+<p><a href="colorspace.html">Colour Processing</a>,
+<a href="man_com.html">Common options</a></p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

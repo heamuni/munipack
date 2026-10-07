@@ -1,0 +1,315 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Photometry Corrections</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Photometry Corrections</h1>
+
+<p class="abstract">
+Corrections of light exposures for gain, bias, dark and flat-field frames.
+</p>
+
+
+<h2>Synopsis</h2>
+
+<code>
+munipack phcorr [.. parameters ..] file(s)
+</code>
+
+
+<h2>Description</h2>
+
+<p>
+Photometry corrections are important for any further processing of astronomical
+images. Their proper applications ensures photometry calibration,
+eg. the constant ratio between detected electrons and expected photons.
+</p>
+
+<p>
+The photometry corrections reduces instrumental effects on imaging detectors (CCDs):
+</p>
+<ul>
+<li>Gain scales instrumental values onto counts of captured electrons per pixel
+and one is crucial for proper estimation of errors of photometry.
+</li>
+<li>The bias corrects counts on images for a constant added by control electronic.
+    Their subtraction is important when absolute photometry calibration is required.</li>
+<li>The dark correction reduces signal produced by the thermal noise of apparatus
+ and improves photometry precision about thousandths or hundredths.
+</li>
+<li>The flat-field describes spatial (angular) variation in detector sensitivity.
+The flat-field correction is crutial for any valuable photometry work
+and improves precision from tenths to thousandths.</li>
+</ul>
+
+
+<h2>Algorithm</h2>
+
+<p>
+A photometric corrected image <i>I<sup>c</sup><sub>ij</sub></i> is computed
+for every input image <i>I<sub>ij</sub></i> as
+</p>
+<p>
+<i>I<sup>c</sup><sub>ij</sub> = (g I<sub>ij</sub> - x D<sub>ij</sub> - B<sub>ij</sub>)/f<sub>ij</sub></i>,
+</p>
+<p>
+where <i>i,j</i> is an index of a pixel, <i>g</i> is gain, <i>D<sub>ij</sub></i>
+is the dark frame,
+<i>x</i> is a multiplication factor (see below). <i>B<sub>ij</sub></i>
+is the bias frame
+and <i>f<sub>ij</sub></i> is the normalised flat-field frame (with absolute
+photometry fluxes conserved):
+</p>
+<p>
+<i>f<sub>ij</sub> = F<sub>ij</sub> / 〈F<sub>ij</sub>〉</i>.
+</p>
+<p>
+<i>〈F<sub>ij</sub>〉</i> means averaged level determined by robust meaning.
+</p>
+
+<p>
+In case, that bias or dark is undefined, their values are set to zero (in
+real numbers).
+When flat-field is missing, values are <i>f<sub>ij</sub></i>=1 (real).
+If <i>|〈F<sub>ij</sub>〉|</i> is under machine precision, the
+value <i>f<sub>ij</sub></i>=0 (real) is set for all pixels.
+When <i>f<sub>ij</sub></i> is (machine) zero, the
+<i>I<sup>c</sup><sub>ij</sub></i>=0 (real).
+</p>
+
+<p class="indent">
+The multiplication factor <i>x</i> is determined by the way: when parameter
+<samp>-xdark</samp> is
+provided, its value is used, otherwise ratio of exposure times
+<i>T</i> of the scientific exposure <i>I</i> and the dark frame <i>D</i>
+ are used as <i>x= T<sub>I</sub> / T<sub>D</sub></i>. Both exposure times
+are extracted from FITS header
+(given by FITS_KEY_EXPOSURE <a href="man_env.html">environment
+variable</a>). When the ratio can not be determined by previous way,
+the <i>x</i>=1 is silently set (this choice is compatible to traditional methods).
+</p>
+
+<p class="indent">
+It is recommended to use averaged values of all correction images
+<i>B,D,F</i> produced by <a href="man_bias.html">bias</a>,
+<a href="man_dark.html">dark</a> and <a href="man_flat.html">flat</a>.
+</p>
+
+<p class="indent">
+When records with keys FITS_KEY_FILTER and FITS_KEY_TEMPERATURE
+(<a href="man_env.html">environment variables</a>) are available,
+checking for compatibility of the parameters is also performed.
+</p>
+
+<h2>Gain</h2>
+
+<p>
+A common CCD camera captures electrons produced by photons illuminating
+pixels. These electrons are usually not directly available, but the control
+electronics converts their counts to another counts via analogue to digital
+converter with a gain <i>g</i>. New values and original ones are related
+by the relation
+</p>
+<p>
+(values provided by camera) = <i>g</i>* (count of electrons).
+</p>
+<p>
+The reason for this is usually due to storing usuall capacity of about 200k
+electrons per pixel to two bytes (range 0-65565).
+</p>
+
+<p class="indent">
+Because the primary quantity are electrons and we need acute the
+primary quantity for estimation of statistical errors, we must convert
+values reported by camera to electrons for proper function of all other utilities.
+The output frame is identical (on the first view), but values are multiplied
+by the gain so values of output frames will generally different to originals.
+</p>
+
+<p><b>Output values are in counts not ADU!</b></p>
+
+<p class="indent">
+Gain value is preferably get from FITS header where is identified by GAIN keyword.
+If the value is not found, the input frame is not corrected.
+</p>
+
+<p class="indent">
+The gain can be specified on command line with <samp>-gain</samp>.
+In this case, the value is used rather than the value in header.
+However, the usage is primary designed to correct a potentially wrong
+values of the gain.
+</p>
+
+<p class="indent">
+The parameter <samp>--gain-ignore</samp> can be used to surprise
+any manipulation with gain. In this case, the values are left in
+an ADU. Please, keep in mind, that the photometry errors may be useless.
+</p>
+
+<p class="indent">
+The gain will modify ranges of values and if the SATURATE keyword
+is found, one is adequately modified.
+</p>
+
+
+<h2>Strategies For Corrections</h2>
+
+<p>
+There are two basic strategies for photometry corrections:
+</p>
+<ul>
+<li>No bias, dark's duration is equal to scientific. </li>
+<li>Bias, dark's duration is equal to scientific. </li>
+</ul>
+
+<p class="indent">
+The first case is the traditional approach. Because duration
+of both scientific and dark exposure are the same, also bias
+is the same and subtraction removes bias together with the dark. The benefit
+is simpler processing of many exposures with the same exposure time.
+</p>
+
+<p class="indent">
+The second strategy requires little more processing, but it is ideal
+for many exposures with theirs different duration. A lot of biases
+is made and only a few long-duration darks is taken. This approach
+is more flexible (when many exposure times is available) and also
+may save some observation time.
+</p>
+
+<h2><a id="masking">Masking</a></h2>
+
+<p>
+A array mask <i>M<sub>ij</sub></i> can be applied on result image
+with photometry corrections applied. The mask sets suppressed pixels
+(where <i>M<sub>ij</sub></i>=0) and other left unchanged
+(where <i>M<sub>ij</sub></i>=1). The masking technique has been adopted from
+bitmap editors (in computer graphics fields) where masked values are
+intended to be not shown. The masking is not limited on regions, a single (hot)
+pixel can be masked as well as.
+</p>
+
+<p class="indent">
+Two choices for replacing of pixels are implemented:
+the robust mean and zero.
+</p>
+
+<p class="indent">
+The mask is a FITS image, which must contain zeros at pixels to be replaced
+and the number one for pixels without any change. The BITPIX=8 is sufficient.
+The mask must have same dimensions as other images.
+</p>
+
+<p class="indent">
+A process for create of <i>M<sub>ij</sub></i> is complex. One strongly depends
+on values intended to by masked and on a masked image itself. Therefore there is
+no an unique way, how to prepare it.
+</p>
+
+
+<h2>Parameters</h2>
+
+<dl>
+<dt><samp>-gain g</samp></dt><dd>provide value of gain (rather than FITS keyword)</dd>
+<dt><samp>-flat file</samp></dt><dd>flat-field frame</dd>
+<dt><samp>-bias file</samp></dt><dd>bias frame</dd>
+<dt><samp>-dark file</samp></dt><dd>dark frame</dd>
+<dt><samp>-xdark x</samp></dt><dd>dark frame multiplicative factor</dd>
+<dt><samp>-bitmask file</samp></dt><dd>mask frame</dd>
+<dt><samp>-xbitmask</samp></dt><dd>the mask frame is used as ZERO (default) or
+                                    MEAN (average), MEDIAN</dd>
+<dt><samp>-box 5</samp></dt><dd>Box size used to -xbitmask MEDIAN, 5 by default.
+    The value should be decreased to 3 for sharper estimate if mask has no
+    overlaping elements.</dd>
+<dt><samp>--normalise-flat</samp></dt><dd>Normalise flat-field prior to use.
+    <!--
+    The frames are just divided by flat-field frame. As the consequence,
+    the mean level of images is reduced by mean level of the flat
+    and as consequence, the absolute photometry information is lost.
+      -->
+    The normalisation keeps values of original frames
+    (by multiplication of original flat-field level).
+    Both frames must have the same gain. Averaged flat-field
+frames produced by <a href="man_flat.html">flat</a> utility are normalised
+on level one and the normalisation can be omited. Be careful with saving frames
+to integer values (in this case normalisation must be used else all values
+will be zeros).
+</dd>
+<dt><samp>--enable-overwrite</samp></dt>
+<dd>overwrite existing files</dd>
+</dl>
+
+<p>
+  Files are converted to _proc (indicating procesed immediate
+  products) by default.
+  </p>
+
+<p>
+  Note that we have
+similar parameters <samp>-bitmask</samp> and <samp>--mask</samp> with roughly
+different meaning!</p>
+
+<p>Also see <a href="man_com.html">Common options</a>.
+  A temperature and exposure time parameteres are set via
+  <a href="man_setup.html#preprocenv">Environment variables</a>.
+</p>
+
+
+
+<h2>Examples</h2>
+
+<p>Subtract <samp>dark120.fits</samp> from set of files
+  <samp>halley_*.fits</samp>. Originals are untouched,
+  results are saved as <samp>halley_*_corr.fits~</samp>):
+</p>
+<pre>
+$ munipack phcorr -dark dark120.fits halley_*.fits
+</pre>
+
+<p>Subtract <samp>dark120.fits</samp> from set of files
+  <samp>halley_*.fits</samp> and store results,
+  with identical filenames, in /tmp directory.
+</p>
+<pre>
+$ munipack phcorr -t /tmp  -dark dark120.fits halley_*.fits
+</pre>
+
+
+<figure>
+<img class="figure" src="0716_original.png" alt="0716_original.png" title="An original image">
+<figcaption>
+An raw exposure of blazar 0716+714.
+</figcaption>
+</figure>
+
+<figure>
+<img class="figure" src="0716_dark.png" alt="0716_dark.png" title="An original image with the dark-frame subtracted">
+<figcaption>
+An exposure of blazar 0716+714 with d120 dark-frame subtracted.
+</figcaption>
+</figure>
+
+<figure>
+<img class="figure" src="0716_final.png" alt="0716_final.png" title="A fully corrected scientific exposure">
+<figcaption>
+A fully corrected (dark and flat), image of blazar 0716+714.
+</figcaption>
+</figure>
+
+<h2>See Also</h2>
+<p><a href="lctut.html">Light Curve Tutorial</a>,
+<a href="phcorrtut.html">Photometry corrections tutorial</a>,
+<a href="man_bias.html">Averaged bias frame</a>,
+<a href="man_dark.html">Averaged dark frame</a>,
+<a href="man_flat.html">Averaged flat-field frame</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

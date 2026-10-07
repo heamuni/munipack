@@ -1,0 +1,24 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ FWHM</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+
+<h1>FWHM</h1>
+
+<p class="abstract">
+The key parameter used in image processing of astronomical frames
+is FWHM.
+<a href="https://en.wikipedia.org/wiki/Full_width_at_half_maximum">FWHM</a>
+is an abbreviation of <em>full width at half maximum</em>.
+</p>
+
+
+
+
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

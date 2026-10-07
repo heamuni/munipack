@@ -1,0 +1,115 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Averaged dark frame</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Averaged dark frame</h1>
+
+<p class="abstract">
+Compute an average dark frame of a set of dark frames.
+</p>
+
+<h2>Synopsis</h2>
+
+<code>
+munipack dark [-bias file] [..] file(s)
+</code>
+
+<h2>Description</h2>
+
+<p>
+A dark frame is a map of a dark current, thermally generated charged particles
+captured in pixels. Amount of the dark current is proportional both temperature
+and exposure time. This routine creates an average dark frame,
+sometimes named as a masterdark.
+</p>
+
+<p>
+An output image <i>O<sub>ij</sub></i> is computed as the average of every pixel of
+input images <i>(I<sub>k</sub>)<sub>ij</sub></i>:
+</p>
+<p>
+<i>O<sub>ij</sub></i> = 〈<i>I<sub>k</sub></i> - <i>B</i>〉<i><sub>ij</sub></i>,
+</p>
+<p>
+  where <i>i,j</i> is an index of a pixel and <i>k</i> is an index of an image.
+  The bias frame <i>B<sub>ij</sub></i> is optional.
+When one is available, one is subtracted from dark exposures before averaging.
+</p>
+
+<p class="indent">
+It is strongly recommended correct setting of FITS_KEY_EXPTIME
+(<a href="man_env.html">environment variables</a>) because
+the exposure time will usable for later processing.
+Chip temperatures are checked to be equal during processing when
+FITS_KEY_TEMPERATURE is valuable.
+</p>
+
+<h2>Input and output</h2>
+
+<p>
+  On input, list of dark frame frames is expected.
+  Optionaly, a bias can by pre-applied on every frame.
+</p>
+
+<p>
+On output, a single file representing of mean dark frame is created.
+  The file has STDERR extension with standard errors.
+  Masked values (if parameter <samp>-bitmask</samp> is presented) are
+  set to the frame mean.
+</p>
+
+<h2>Parameters</h2>
+
+<dl>
+  <dt><samp>-bias file</samp></dt><dd>use the specified bias frame</dd>
+  <!-- #include virtual="/man_phcorr_common.shtml" -->
+  <dt><samp>-B bitpix</samp></dt><dd>set numerical type of output images,
+    see <a href="man_com.html">Common options</a> (default -32)</dd>
+  <dt><samp>-o filename</samp></dt><dd>save to the output file,
+    see <a href="man_com.html">Common options</a></dd>
+</dl>
+
+<p>Also see <a href="man_com.html">Common options</a>.
+  A temperature and exposure time parameteres are set via
+<a href="man_setup.html#preprocenv">Environment variables</a>.
+</p>
+
+
+<h2>Examples</h2>
+
+<pre>
+$ munipack dark -o d120.fits d120_*.fits
+</pre>
+
+<figure>
+<img class="figure" src="d120_1.png" alt="d10_1.png" title="A dark image">
+<figcaption>
+Single dark image
+</figcaption>
+</figure>
+
+<figure>
+<img class="figure" src="d120.png" alt="d120.png" title="Mean of dark-frames">
+<figcaption>
+Mean of dark frames.
+</figcaption>
+</figure>
+
+
+<h2>See also</h2>
+<p>
+<a href="lctut.html">Light Curve Tutorial</a>,
+<a href="phcorrtut.html">Photometric corrections tutorial</a>,
+<a href="man_bias.html">Averaged bias frame</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

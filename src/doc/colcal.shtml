@@ -1,0 +1,183 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Colour Calibration Tutorial</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Colour Calibration Of An Instrumental Photometric System</h1>
+
+<p class="abstract">
+How to calibrate of an instrumental photometric system.
+</p>
+
+<h1>Open Cluster M 67</h1>
+
+<p>
+Open cluster M 67 is an old galactic cluster with a differently
+evolved stars and with many kinds of spectra. The wide variability
+induces variability on fluxes per filters and are the crucial
+for successful calibration.
+</p>
+
+<p>
+The principle of colour calibration is determining of a relation
+between instrumental and standard (calibrated) fluxes.
+</p>
+
+
+<!-- #include virtual="/m67-common.shtml" -->
+
+
+<h2>Photometry Calibration</h2>
+
+<p>
+The main goal of photometry calibration is
+to determine relations between instrumental counts
+offered by our camera and expected number of
+photons (derived from magnitudes in optical bands) defined
+by a photometric system (with conventionally defined
+transmission of filters).
+</p>
+
+<p>
+General relations can by derived as an approximation
+of a set of functions (instrumental filters) by another
+set functions (standard filters) as a linear transformations.
+A simple example is the calibration of instrumental
+<i>v</i>-filter by a standard <i>V</i>-filter:
+</p>
+<p>
+<i>
+F<sub>V</sub> = c<sub>Vv</sub> F<sub>v</sub> + c<sub>Vr</sub> F<sub>r</sub><br>
+F<sub>R</sub> = c<sub>Rv</sub> F<sub>v</sub> + c<sub>Rr</sub> F<sub>r</sub>
+</i>
+</p>
+<p>
+The goal is to determine coefficients <i>c<sub>ij</sub></i> by a fit
+of the linear transformation. The precision and availability
+depends on coverage of colour of stars and that is why we use
+the evolved cluster.
+</p>
+
+
+<h2>Data Processing</h2>
+
+<p>
+There is an algorithm to get data for the calibration.
+</p>
+
+<ol>
+<!-- #include virtual="/m67-proc.shtml" -->
+<li>
+<p class="li">
+As the calibration stars, we had selected data
+for <a href="http://binaries.boulder.swri.edu/binaries/fields/m67.html">M67 Standards Field</a> measured by Arne Henden (other calibration
+sequences can be found at
+<a href="http://binaries.boulder.swri.edu/fields/">fields</a>).
+Unfortunately, the tables are in plain text format. Munipack needs
+a structured table (FITS table or VOTable) as the reference catalogue.
+The script <a href="henden_m67.sh">henden_m67.sh</a> has been prepared
+for convert the catalogue to more reliable format (and as an example how
+that catalogues can be created from own data).
+</p>
+<pre>
+$ wget http://binaries.boulder.swri.edu/binaries/fields/m67ids.txt
+$ bash henden_m67.sh
+</pre>
+The file <samp>m67ids.fits</samp> is created.
+</li>
+<li>
+<p class="li">
+The colour transformation is determined by <samp>phfotran</samp> action.
+There is many parameters which can not be omitted. The identification
+of instrumental and standard system (for documentation purposes and
+for filter properties), the telescope area and the toleration for
+star's cross-matching will usually required.
+</p>
+<p class="li">
+The crucial is selection of magnitude columns from catalogue
+<samp>--col-mag B,V,R</samp> for frames in appropriate filters.
+The relation is determined on base of descending order
+(B for m67_B.fits, etc).
+</p>
+<pre>
+$ munipack phfotran \
+  --photsys-instr MonteBoo --photsys-ref Johnson
+  -c m67ids.fits \
+  --col-ra RAJ2000 --col-dec DEJ2000 \
+  --col-mag B,V,R \
+  --tol 0.0005 \
+  --area 0.283  \
+  m67_B.fits m67_V.fits m67_R.fits
+</pre>
+<p  class="li">
+The action creates the file <samp>phfotran.fits</samp> which contains
+a table like this:
+</p>
+
+<div class="table">
+<table>
+<tr><th></th><th>B</th><th>V</th><th>R</th></tr>
+<tr><td>b</td><td>18.05</td><td>-0.87</td><td>0</td></tr>
+<tr><td>v</td><td>-0.47</td><td>7.48</td><td>0.27</td></tr>
+<tr><td>r</td><td>0</td><td>-0.72</td><td>7.78</td></tr>
+</table>
+</div>
+
+<p class="li">
+As we can see, the instrumental filters on MonteBoo
+Observatory are nearly to Johnson filters (at least filters
+used on calibration field). The off-diagonal elements are
+negligible to diagonal ones. Also efficiency in <i>V,R</i> filters
+is twice more than in <i>B</i> filter (due to quantum sensitivity of
+used CCD camera).
+</p>
+
+<p class="li">
+The result table can be used on precise of <a href="man_phcal.html">photometric calibration</a>.
+</p>
+</li>
+</ol>
+
+<h2>Colour Look</h2>
+
+<p>
+Just for a nice picture, the colour frame can be easy prepared:
+</p>
+<pre>
+munipack coloring -o m67.fits -c 'Johnson BVR' m67_B.fits,B m67_V.fits,V m67_R.fits,R
+</pre>
+
+<figure>
+<img class="figure" src="m67.png" alt="m67.png" title="Color Image of M67">
+<figcaption>
+M67 in Colours
+</figcaption>
+</figure>
+
+
+<h2>Notes</h2>
+
+<p>
+This example is illustrative only! The instrumental
+magnitudes are also affected by the atmospheric extinction
+and to get correct values, we need to determine extra-atmospheric magnitudes
+by observing of the field in different air masses and an extrapolation
+on null air mass.
+</p>
+
+<h2>See Also</h2>
+<p>
+<a href="man_phcal.html">Photometry calibration</a>,
+<a href="man_phfotran.html">Photometric System Transformation</a>,
+<a href="dataform_photometry.html">Photometry Format</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

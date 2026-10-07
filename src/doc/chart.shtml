@@ -1,0 +1,77 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ A Star Chart Tutorial</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Star Charts</h1>
+
+<p class="abstract">
+How to create a star chart from a catalogue provided by Virtual Observatory.
+</p>
+
+<h1>Open Cluster NGC 637</h1>
+
+<p>
+NGC 637 is an open cluster in Cassiopeia. Stars are distributed
+randomly but the look is similar to upside-down silhouette of owl:
+Wings are spread and two brighter stars placed to its head suggests
+big eyes. The cluster is looking pretty good in a binocular.
+</p>
+
+<h2>Catalogue Search</h2>
+
+<p>
+To get coordinates of NGC 637, we are searching a selected
+catalogue UCAC5 with center α = 25.775° and δ = 64.03°
+and the cone radius 0.1°:
+</p>
+
+<pre>
+$ munipack cone -o ngc637.xml -c UCAC5 -r 0.1 -- 25.775 64.03
+</pre>
+
+<p>
+All found stars are saved to VOTable (Virtual Observatory transfer table).
+</p>
+
+<h2>Plotting</h2>
+
+<p>
+The output VOTable can be converted to SVG and be used for drawing of star charts:
+</p>
+<pre>
+$ munipack votable -o ngc637.svg -pa 25.78 -pd 64.03 -ps 2000 -ml 12 \
+         --col-mag f.mag --col-ra RAJ2000 --col-dec DEJ2000  ngc637.xml
+$ firefox ngc637.svg
+</pre>
+
+<figure>
+  <img class="figure" width="400" height="400" src="ngc637.svg" alt="ngc637.svg" title="NGC 637">
+<figcaption>Open Cluster NGC 637 (<a href="ngc637.svg">file</a>)</figcaption>
+</figure>
+
+<h2>Tips</h2>
+
+<ul>
+<li>Best viewed with Internet browsers (Firefox, Chrome).</li>
+<li>Try interesting regions like globular clusters, neighborhood of bright galaxies</li>
+<li>SVG format is a kind of XML format and can be easy modified: added text descriptions, graphics elements like axes, etc.</li>
+<li>The output can be easy included to web pages.</li>
+</ul>
+
+<h2>See Also</h2>
+
+<ul>
+<li><a href="man_votable.html">VOTable</a></li>
+<li><a href="man_cone.html">Cone Search</a></li>
+</ul>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

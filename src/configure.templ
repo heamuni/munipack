@@ -1,0 +1,278 @@
+dnl
+dnl  Copyright © 1997-2026 F.Hroch (hroch@physics.muni.cz)
+dnl
+dnl  This file is part of Munipack.
+dnl
+dnl  Munipack is free software: you can redistribute it and/or modify
+dnl  it under the terms of the GNU General Public License as published by
+dnl  the Free Software Foundation, either version 3 of the License, or
+dnl  (at your option) any later version.
+dnl
+dnl  Munipack is distributed in the hope that it will be useful,
+dnl  but WITHOUT ANY WARRANTY; without even the implied warranty of
+dnl  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+dnl  GNU General Public License for more details.
+dnl
+dnl  You should have received a copy of the GNU General Public License
+dnl  along with Munipack.  If not, see <http://www.gnu.org/licenses/>.
+dnl
+
+AC_PREREQ([2.69])
+
+dnl The macro(s) has been added during bootstraping:
+dnl AC_INCLUDE('configure.inc')
+dnl .
+
+AC_DEFINE(PACKAGE_COPYLEFT,["(C) 1997-2026 F.Hroch <hroch@physics.muni.cz>"],
+				 [package copyleft])
+AC_DEFINE(PACKAGE_DESCRIPTION,["An astronomical image processing software"],
+				   [package description])
+
+AC_CANONICAL_BUILD
+
+AM_INIT_AUTOMAKE
+
+AC_PROG_CC
+AC_PROG_CXX
+AC_PROG_CPP
+AC_PROG_FC
+AC_PROG_RANLIB
+AC_PROG_INSTALL
+AC_PROG_LN_S
+AC_PROG_MAKE_SET
+AC_PROG_AWK
+
+AC_TYPE_SIZE_T
+AC_STRUCT_TM
+AC_C_CONST
+AC_FUNC_MALLOC
+
+AC_FC_MODULE_FLAG
+AC_FC_MODULE_OUTPUT_FLAG
+AC_FC_MODULE_EXTENSION
+dnl The above macros are defined for recent Autotools, for some older ones,
+dnl uncomment, and modify, these subtitutions (and comment out the above lines
+dnl and AC_PREREQ):
+dnl AC_SUBST(FC_MODEXT,[mod])
+dnl AC_SUBST(FC_MODINC,[-I])
+dnl AC_SUBST(FC_MODOUT,[-J])
+
+dnl Define the AM_ include path for Fortran modules: required for OakLeaf.
+dnl Both the paths are commonly unassigned to C/C++ compilers by default.
+AC_SUBST(AM_FC_MODINC,["${FC_MODINC}/usr/include ${FC_MODINC}/usr/local/include"])
+
+dnl Variables LIBM, LIBCFITSIO, LIBMINPACK and LIBOAKLEAF needs to be
+dnl defined to link ONLY to necessary libraries.
+dnl Else, C++ will add links against to uselles, Fortran, libraries and vice versa.
+dnl Autotools functions AC_*_LIB forms LIBS variable by such way.
+
+dnl math
+AC_CHECK_HEADERS([math.h])
+AC_SEARCH_LIBS([sqrt],[m],AC_SUBST(LIBM,[-lm]))
+
+dnl Perhaps, nsl and socket libraries are required for cfitsio by
+dnl section `2.3 Linking Programs ...' of CFITSIO User’s Reference Guide
+AC_SEARCH_LIBS([gethostbyname],[nsl])
+AC_SEARCH_LIBS([connect],[socket])
+
+dnl The mandatory libraries are: cfitsio, wcslib, minpack, and oakleaf.
+
+dnl cfitsio
+AC_CHECK_HEADERS([fitsio.h])
+AC_CHECK_LIB([cfitsio],[ffclos],AC_SUBST(LIBCFITSIO,[-lcfitsio]),[
+    echo
+    echo "configure: cfitsio library not found"
+    echo
+    echo "Please check installation of cfitsio and try again. Look at:"
+    echo "  https://heasarc.gsfc.nasa.gov/docs/software/fitsio/."
+    echo
+    echo "If you have cfitsio already instaled, check that a development"
+    echo "files (in libcfitsio-dev, cfitsio-devel,.. packages) are available."
+    echo  Try setting environment variables CFLAGS,LDFLAGS,etc.(./configure --help)."
+    echo
+    exit 1],
+    [-lm])
+
+dnl wcslib
+PKG_CHECK_MODULES([WCSLIB],[wcslib])
+AC_CHECK_LIB([wcs],[tans2x],[],[
+    echo
+    echo "configure: wcslib not found"
+    echo
+    echo "Please check installation of wcslib and try again. Look at:"
+    echo "  https://www.atnf.csiro.au/computing/software/wcs/"
+    echo
+    echo "If you have wcslib already instaled, check that a development"
+    echo "files (in wcslib-dev, wcslib-devel,.. packages) are available."
+    echo "Try setting environment variables CFLAGS,LDFLAGS,etc.(./configure --help)."
+    echo
+    exit 1])
+
+dnl minpack
+dnl AC_CHECK_HEADERS([minpack.h])
+AC_CHECK_LIB([minpack],[lmder_],AC_SUBST(LIBMINPACK,[-lminpack]),[
+    echo
+    echo "configure: minpack library not found"
+    echo
+    echo "Please check installation of Minpack and try again."
+    echo "Minpack is available at http://netlib.org/minpack/."
+    echo
+    echo "If you have Minpack already instaled, check that a development"
+    echo "files (in libminpack-dev, minpack-devel,.. packages) are"
+    echo "available by setting environment variables (./configure --help)."
+    echo
+    exit 1])
+
+
+dnl Oak Leaf
+dnl AC_CHECK_HEADER([oakleaf.mod])
+PKG_CHECK_MODULES([OAKLEAF],[oakleaf])
+AC_CHECK_LIB([oakleaf],[__robustmean_real64_MOD_rmean_real64],AC_SUBST(LIBOAKLEAF,[-loakleaf]),[
+    echo
+    echo "configure: Oak Leaf library not found"
+    echo
+    echo "Please check installation of Oak Leaf and try again."
+    echo "OakLeaf is available at https://integral.physics.muni.cz/oakleaf/."
+    echo
+    echo "If you have Oak Leaf already instaled, check that a development"
+    echo "files (in liboakleaf-dev, oakleaf-devel,.. packages) are"
+    echo "available by setting environment variables (./configure --help)."
+    echo
+    exit 1])
+
+dnl The options below enables/disables some parts of Munipack: if all of thems
+dnl are disabled, only the core processing routines are made, and wxWidgets are
+dnl no more required. The GUI requires plplot library.
+
+dnl Virtual observatory
+AC_ARG_ENABLE([vo],AS_HELP_STRING([--disable-vo],[disable Virtual Observatory support]),disable_vo=yes,disable_vo=no)
+
+dnl Command line interface: `munipack` command.
+AC_ARG_ENABLE([cli],AS_HELP_STRING([--disable-cli],[disable Command-line User Interface]),disable_cli=yes,disable_cli=no)
+
+dnl Graphical user interface: `xmunipack` command.
+AC_ARG_ENABLE([gui],AS_HELP_STRING([--disable-gui],[disable Graphic User Interface]),disable_gui=yes,disable_gui=no)
+
+if test "x$disable_cli" = "xno" -o "x$disable_vo" = "xno" -o "x$disable_gui" = "xno"; then
+
+  dnl wxWidgets
+  AM_OPTIONS_WXCONFIG
+  AM_PATH_WXCONFIG([3.0.0], [wxWin=1])
+
+  if test -z "$wxWin"; then
+
+    AC_MSG_WARN([
+
+      wxWidgets toolkit not found!
+
+      Continuing without wxWidgets.
+      These parts may be unavailable (even required on command-line):
+
+        * Both graphical and command-line interfaces
+        * Some functionality related to Virtual observatory
+
+      Otherwise:
+
+        Install wxWidgets on your system
+
+        Please check: wx-config is available in PATH, a directory
+        where wxWidgets libraries are installed (returned by
+        'wx-config --libs' command) is in LD_LIBRARY_PATH or
+        equivalent variable and appropriate wxWidgets version
+        is available.
+    ])
+
+  fi
+fi
+
+
+AC_ARG_VAR([GUI_CXXFLAGS],[C++ wxWidgets flags for GUI (wx-config --cxxflags)])
+AC_ARG_VAR([GUI_LIBS],[C++ wxWidgets libraries for GUI (wx-config --libs core,base,net,xml,adv,qa,html)])
+AC_ARG_VAR([CLI_CXXFLAGS],[C++ wxWidgets flags for CLI (wx-config --cxxflags base)])
+AC_ARG_VAR([CLI_LIBS],[C++ wxWidgets libraries for CLI (wx-config --libs base)])
+AC_ARG_VAR([VO_CXXFLAGS],[C++ wxWidgets flags for VO (wx-config --cxxflags base,net,xml)])
+AC_ARG_VAR([VO_LIBS],[C++ wxWidgets libraries for VO (wx-config --libs base,net,xml)])
+
+wxVO="no"
+wxGUI="no"
+wxCLI="no"
+
+if test "$wxWin" = 1; then
+
+  if test "x$disable_gui" = "xno"; then
+     wxGUI="yes"
+     AC_SUBST(XMUNIPACKDIR,[xmunipack])
+     AC_SUBST(MATPLOTDIR,[wxMathPlot])
+     PKG_CHECK_MODULES([PLplot],[plplot])
+     AC_SUBST(WX_CXXFLAGS_GUI,
+              [${GUI_CXXFLAGS:-`wx-config --cxxflags`}])
+     AC_SUBST(WX_LIBS_GUI,
+                  [${GUI_LIBS:-`wx-config --libs core,base,net,xml,adv,qa,html`}])
+  fi
+
+  if test "x$disable_cli" = "xno"; then
+     wxCLI="yes"
+     AC_SUBST(MUNIPACKDIR,[munipack])
+     AC_SUBST(WX_CXXFLAGS_CLI,[${CLI_CXXFLAGS:-`wx-config --cxxflags base,net,xml`}])
+     AC_SUBST(WX_LIBS_CLI,        [${CLI_LIBS:-`wx-config --libs base,net,xml`}])
+  fi
+
+  if test "x$disable_vo" = "xno"; then
+     wxVO="yes"
+     AC_SUBST(VODIR,[vo])
+     AC_SUBST(WX_CXXFLAGS_VO,
+                     [${VO_CXXFLAGS:-`wx-config --cxxflags base,net,xml`}])
+     AC_SUBST(WX_LIBS_VO,[${VO_LIBS:-`wx-config --libs base,net,xml`}])
+  fi
+fi
+
+dnl Support of Fortran's coarrays is optional
+AC_ARG_ENABLE([caf],
+AS_HELP_STRING([--disable-caf],[disable support for parallel processing in Fortran]),
+	 disable_caf=yes,disable_caf=no)
+
+if test "x$disable_caf" = "xno"; then
+   haveCAF="yes"
+AC_CHECK_LIB([caf_mpich],[_gfortran_caf_num_images],
+	AC_SUBST(CAF_FCFLAGS,["`pkg-config --cflags caf-mpich` -fcoarray=lib"])
+	AC_SUBST(CAF_LIBS,[`pkg-config --libs caf-mpich`]),
+	AC_SUBST(CAF_FCFLAGS,[-fcoarray=single])
+	AC_SUBST(CAF_LIBS,[-lcaf_single]),
+	[`pkg-config --silence-errors --libs caf-mpich`])
+AC_CHECK_LIB([caf_openmpi],[_gfortran_caf_num_images],
+	AC_SUBST(CAF_FCFLAGS,["`pkg-config --cflags caf-openmpi` -fcoarray=lib"])
+	AC_SUBST(CAF_LIBS,[`pkg-config --libs caf-openmpi`]),
+	AC_SUBST(CAF_FCFLAGS,[-fcoarray=single])
+	AC_SUBST(CAF_LIBS,[-lcaf_single]),
+	[`pkg-config --silence-errors --libs caf-openmpi`])
+AC_CHECK_PROGS([cafrun],[mpirun])
+AC_DEFINE([HAVE_CAF],1,[Have support of coarrays in Fortran])
+else
+AC_SUBST(CAF_FCFLAGS,[-fcoarray=single])
+AC_SUBST(CAF_LIBS,[-lcaf_single])
+fi
+
+AM_CONDITIONAL([CAF],[test x$disable_caf = xno])
+
+
+dnl clean precompiled modules of fortran
+AC_SUBST(MOSTLYCLEANFILES,[*.${FC_MODEXT}])
+
+AC_CONFIG_HEADERS([config.h])
+
+AC_CONFIG_FILES([lib/Makefile preprocess/Makefile astrometry/Makefile
+   photometry/Makefile kombine/Makefile artificial/Makefile
+   list/Makefile colouring/Makefile fits/Makefile vo/Makefile
+   munipack/Makefile wxMathPlot/Makefile xmunipack/Makefile
+   doc/Makefile dist/Makefile test/Makefile Makefile])
+
+AC_OUTPUT
+
+echo
+echo " Configured Munipack:"
+echo
+echo "                      Virtual Observatory support enabled: ${wxVO}"
+echo "                           Command line interface enabled: ${wxCLI}"
+echo "                         Graphical User Interface enabled: ${wxGUI}"
+echo "                     Have support for Coarrays in Fortran: ${haveCAF}"
+echo

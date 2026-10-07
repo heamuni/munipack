@@ -1,0 +1,167 @@
+
+
+Coloring utilities are intended for color processing.
+-----------------------------------------------------
+
+
+* coloring
+
+coloring utility creates a color FITS file. At least two single-color
+frames are stacked to an output file. The operation is practically
+only simple copy of data and adding of the color flag. For example, the
+color FITS can be created from two single-color exposures in two Landolt 
+filters.
+
+
+* ctrafo
+
+ctrafo transforms a color FITS to a different colorspace. The operation
+recompute its data according a transformation matrix. Typical
+usage is transformation of observation in astronomical filters
+to computer graphics colorspaces.
+
+
+
+Usage
+-----
+
+The utilities can be controlled by commands on standard input. There are
+no command line parameters. This property gives flexible and portable
+interface for various environments (cgi script, GUI,..).
+
+Control commands has the form:
+
+KEY = value
+
+where KEY (uppercase) is a control key and value is supplemented
+value. Values are of types: integer, real and string. The strings
+must be enclosed in apostrophes (to be readable by Fortran input
+edition in free format). Examples:
+
+# key   value
+NBAND = 3            # integer
+XXX   = 3.0          # real, none used
+COLORSPACE='XYZ'     # character, apostrophes are mandatory
+
+
+The parameters for stacked frames are placed at end of file (!)
+immediately following of NBAND key. The color-bands must be arranged
+from short to longer wave-lengths (as BVR are)! The value of NBAND 
+must corresponds to number of the records. Parameters gets form:
+
+# 'filename'                       black weight
+'/home/f/foto/colorCCD/m27_B.fits' 3700  0.6        # blue is first
+'/home/f/foto/colorCCD/m27_V.fits' 8700  1
+'/home/f/foto/colorCCD/m27_R.fits' 19700 1          # red is last
+
+The first string determines the file to be used. Numbers at end of 
+every line sets black and weight of every band. Both must be determined
+empirically. It is recommended for black to use level 1-sigma under 
+median for typical night sky images. The weight is proportional
+to recorded flux, so choose weight by the reciprocal relative ratio
+of exposure times.
+
+There are tree types of the records:
+
+ 1. for conversion to XYZ colorspace (example above)
+
+ 2. for general manipulation:
+
+# 'filename'                       extension
+'/home/f/foto/colorCCD/m27_B.fits' 'B'
+'/home/f/foto/colorCCD/m27_V.fits' 'V'
+'/home/f/foto/colorCCD/m27_R.fits' 'R'
+
+
+ 3. for transformation (black, weight has the same meaning)
+
+# index   black weight
+  1       3700  0.6
+  2       8700  1
+  3      19700  1
+
+  
+
+All FITS filenames can use of common FITS conventions,
+so it is possible to select extensions, subframes etc.
+The exclamation mark '!' indicates potentional file overwrite.
+
+The characted # starts comments.
+
+
+
+
+Examples of usage
+-----------------
+
+
+Usage:
+* save the text between --- lines to a file (m27-in)
+* apply by executing of the command:
+
+   $ coloring < m27-in
+
+* that's all
+
+
+
+Convert Landolt BVR to XYZ:
+
+----------------------------------
+OUTPUT='!x.fits'
+INPUTSPACE='Landolt BVR'
+COLORSPACE='XYZ'
+NBAND = 3
+'/home/f/foto/colorCCD/m27_B.fits' 3700 0.6
+'/home/f/foto/colorCCD/m27_V.fits' 8700 1
+'/home/f/foto/colorCCD/m27_R.fits' 19700 1
+-------------------------------------------
+
+
+Create a color FITS:
+
+----------------------------------------
+OUTPUT='!x.fits'
+INPUTSPACE='Landolt BVR'
+NBAND = 3
+'/home/f/foto/colorCCD/m27_B.fits' 'B'
+'/home/f/foto/colorCCD/m27_V.fits' 'V'
+'/home/f/foto/colorCCD/m27_R.fits' 'R'
+----------------------------------------
+
+
+Convert a color FITS to XYZ:
+
+-----------------------------------------
+OUTPUT='!xt.fits'
+INPUT='x.fits'
+COLORSPACE='XYZ'
+NBAND = 3
+1 3700 0.6
+2 8700 1
+3 19700 1
+----------------------------------------
+
+
+
+All possible colorspaces can be listed by command:
+
+$ echo 'INFO = colorspaces' | ctrafo
+
+
+
+
+
+List of keys
+
+See top of mcoloring.cpp and mctrafo.cpp.
+
+
+
+
+List of colosrpaces
+
+The known colorspaces are in ctable.dat (format is described
+in mcoloring.cpp). The file is a text file so it is possible
+to add any required transformations.
+

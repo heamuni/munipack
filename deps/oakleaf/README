@@ -1,0 +1,15 @@
+
+ Oakleaf is an implementation of robust statistical methods in Fortran
+
+ Documentation can be found in doc/ as well as at
+
+    https://integral.physics.muni.cz/oakleaf/
+
+
+ BUILD
+
+
+$ autoreconf -i -f
+$ ./configure FCFLAGS="-std=f2008 -Wall -g -p -no-pie -fcheck=all -fimplicit-none -fbacktrace -ffpe-trap=invalid,zero,overflow -fno-unsafe-math-optimizations -frounding-math -fsignaling-nans" --prefix=/scratch/opt
+$ make
+# make install

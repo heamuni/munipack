@@ -1,0 +1,236 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+
+<style>
+td { border: none; padding: 1em; vertical-align:top; width: 50%;}
+</style>
+
+<title>Munipack ‒ Description of Photometric Calibration</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+
+<h1 class="noindent">Description of Photometric Calibration</h1>
+<p class="abstract">
+<em>D R A F T</em>
+</p>
+
+
+<pre>
+
+
+Photometrical calibration with Munipack
+
+
+For theoretical background see the book
+
+Astronomy Methods: A Physical Approach to Astronomical Observations
+ by Hale Bradt.
+
+
+We are starting from that property of
+CCD detectors which are photon detectors.
+That mean that these detect and stores directly
+photons.
+
+A count of taken photons in a pixel can de direved
+directly from digital signal provided by the control
+electronics. These devices gives a signal in data numbes
+dn (sometimes in units ADU or DN). With knowledcke
+og gain factor of electonic, the count of captured
+photons cts is
+
+cts = dn [ADU] * gain [e-/ADU]  [e-, photons]
+
+Plack's proved that every photon carried energy
+
+ e = h ν  [J]
+
+and also we know that light are electromagnetics
+waves. Every wave is a sum of many of waves which
+the single wave carries also e= hν energy. The
+detected waves carries energy protoprtional
+of number of waves
+
+ E = c h ν [J]
+
+The beauty of photon detectors is that the c == cts
+and we can directly measure of the cts.
+
+Unfortunatelly the CCD are non-perfect detectors.
+Not every photon is captured nad detected, the
+optics is unperfect, we are observing via athmosthpehe,
+and the count of detected and passed to a 1m2 above
+athmostpehe will different about the efficiency
+
+ E = η c h ν   [J]
+
+where E is energy carried by elmag wave.
+
+The energy will depends on exposure time T,
+filter and area A of out relescope. For better
+comparison results and simply for that we know
+kalibration data in a normlaized form, the
+energy is unified on to flux rate
+
+ F = η c h ν / (T A)   [W/m2]
+
+Note that flux is generally vector and its
+direction is given by direction of wave.
+Here we using the flux magnitude only.
+
+
+The spectral sensitivity of a device (limited
+by a filter) is generally a peak with effective
+frequency (or wavelength) λeff and with
+half-with Δλ. The tabulated values of fluxes
+are given in a spectral flux normalized per
+unit frequency or wavelength
+
+  f0 [W/m2/Hz]
+
+
+Because, we are measure in a filter and we have
+a photon detector, it is better to compute
+effective number of photons at effective wavwelength
+(per unit time and area)
+
+  n = f0 * Δλ / (h λeff) = f0 * Δν / (h νeff)
+
+The ratio of
+
+   c / n = η    (0 ≤ η ≤ 1)
+
+and gives us the efficinecy of our aparature.
+
+The physical mean of the formula is that we are
+compute area included in filter and the area
+is recomputed on the unit frequency interval.
+The numbers of photons at λeff than corresponds
+to an effective energy oh photons passet througnout
+a filter.
+
+More importnat is that the efficinecy η can
+be appreciated also as the calibration factor
+from our instumental count of photons to
+a calibrated numbers of photons.
+
+From numerical pouint of view, the values of η
+will usually of order of tenths (or promiles
+for an extremly bad observation conditions)
+and the calibration will numericaly well determined.
+Also errors distributions will for the ratio
+simple.
+
+The calibration parameter will depend on many factors:
+
+* observation conditions (extinction)
+* CCD device
+* aparature (optical)
+
+Usually the extinction will reduce about 0.5,
+the CCD's eficinecy about 0.8 (80% quantum
+response) and about 0.5 for filter + optics.
+Therefore the value about 0.1 - 0.5 may be expected.
+
+
+
+Once we knows η, the derivation of calibrated quantities
+is easy. The calibrated photon flux from measured couns c:
+
+  c(cal) = 1/η(cal) c / (T A)    [photons/s/m2]
+
+and flux spectral density
+
+  f(cal) = c(cal)  (h νeff) / Δν   [W/m2/Hz]
+
+(note [W] = [J/s]). (add errors determination,
+c has Possion and othesr gaussian distributions).
+
+
+The flux is used to describe total flux of objects
+(point sources as stars or quasars are easy, but
+the total light of Sun, Moon or a galaxy can be
+important also). When teh source can be resolved,
+we could need also distribution of the light over
+an area. The quantity to describe it is the intensity
+I. Intensity is integral over cone Ω an therefore
+for elemental cones (areas of the sky)
+
+  F = I ΔΩ
+
+The calibrated intensity is
+
+  i(cal) = f(cal)/ΔΩ  [W/m2/Hz/sr]
+
+where the steradian [sr] is reccomened by SI.
+In astronomy the area of sky 57°x57° is unpractical
+and one square arcsecond is often used [W/m2/Hz/arcsec2].
+
+The realtion to traditional magnitudes m is for fluxes
+(the calibrated flux f0 corresponds to star of magnitude 0):
+
+ m = -2.5 log10(f(cal)/f0)
+
+and for intensity, surface magnitude μ is used:
+
+ μ = -2.5 log10(i(cal)/(f0/ΔΩ))
+
+
+
+
+
+
+The following FITS conventions are used by Munipack:
+
+* The T is determined by EXPTIME (EXPOSURE) keyword.
+  The A is determined by AREA keyword.
+
+* The filter is determined by FILTER keyword. The photometric
+  system is give by PHOTSYS. The keyword is used to search
+  provided tables and get values of Δν and νeff. Both
+  can be specified from command line.
+
+* The reference id of the photometric catalogue is given by EXTNAME
+  keyword in reference table. (optional, rewrite from coommand line).
+
+* The reference catalogui contains magnitudes, the fluxes are computed
+  as f = f0*10**(0.4*m) where f0 is flux per unit time, area and frequnecy
+  and the provided calibratuion tables are searched for f0.
+
+* The calibration parameter η(cal) is coded as FOTCAL
+  (photon-calibrate rather than flux-calibrate prefering greek
+   spelling).
+
+* The physical constatnts h and c are hardcoded as SI recomended quantities.
+
+* The transformation coeddfifients between instrumental and stantard
+  system can be provided as the table. When the table is missing, unit
+  matrix is used. The matrix can be determinedt by XXX utility or whatever
+  else. The format of the table with the matrix is described in XXX.
+
+* For determination of extiunction, the air mass is reqired. One is computed
+  from LATITUDE and LONGITUDE keywords of geographycal coordinates.
+  The astrometry is supposed by default.
+
+
+
+Add:
+
+* clibration of more filter simultaneously
+* add extinction
+* add color extinction
+* picture of spectra of typical stars konvoluted with photometric filters
+* Poiison statistics
+* application for calibrating Halpha filters with known width
+
+</pre>
+
+
+
+
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

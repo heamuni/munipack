@@ -1,0 +1,162 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Basics usage</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+
+<section>
+
+<h1 class="noindent">Basic Usage</h1>
+
+<p class="abstract">
+Munipack is designed with an easy-to-use user interface which
+wrapping of a powerful processing engine.
+</p>
+
+<h2>Invoking</h2>
+
+<ul>
+<li>Run Munipack from Applications menu:<br>
+<figure>
+<img class="figure" src="appbrowser.jpg" alt="appbrowser.jpg" title="Run from Applications">
+</figure>
+</li>
+
+<li>
+Run Munipack by right-clicking on file-browser menu
+of associated FITS file:<br>
+<figure>
+<img class="figure" src="menurun.jpg" alt="menurun.jpg" title="Run from Applications">
+</figure>
+</li>
+</ul>
+
+
+<h1>Graphical interface</h1>
+
+<h2>File Browser</h2>
+
+<p>
+The browser is a tool for handling of large collections of FITS files
+like a specialized file browser.
+Munipack's graphical user interface (GUI) can be invoked
+by running of following command (from a menu or by using a graphical terminal)
+</p>
+<pre>
+$ xmunipack
+</pre>
+
+<p>
+More details can be found in <a href="features.html">Features</a>.
+</p>
+
+<figure>
+<a href="Screenshot-Workplace.png" class="image" title="Screenshot of Workplace">
+<img class="figure" src="Screenshot-Workplace.png" alt="Browser"></a>
+<figcaption>Browser (click to zoom)</figcaption>
+</figure>
+
+
+
+<h2>File Viewer</h2>
+
+<p>
+File viewer works on a single FITS file.
+Any FITS file can be displayed directly by passing its name as an argument:
+</p>
+<pre>
+$ xmunipack IMG_5807.fits
+</pre>
+
+<figure>
+<a href="Screenshot-View.png" class="image" title="Screenshot of View">
+<img class="figure" src="Screenshot-View.png" alt="Viewer"></a>
+<figcaption>Viewer (click to zoom)</figcaption>
+</figure>
+
+
+<h2>Command-line interface</h2>
+
+<p>
+All functionality is also available without a graphical display.
+The command line tools are intended to be used in (non-interactive) batch
+processing.
+</p>
+
+<pre>
+$ munipack
+</pre>
+
+<figure>
+<a href="Screenshot-cli.png" class="image" title="Screenshot of CLI">
+<img class="figure" src="Screenshot-cli.png" alt="Terminal"></a>
+<figcaption>Dark frames averaging finished on terminal (click to zoom)</figcaption>
+</figure>
+
+
+<h2>See Also</h2>
+
+<ul>
+<li><a href="basic.html">Getting started</a></li>
+<li><a href="man_intro.html">Introduction for command-line utilities</a></li>
+<li><a href="guide.html">☺ User Guide</a></li>
+<li><a href="docs.html">◈ Documentation</a></li>
+</ul>
+
+
+
+
+<!--
+<h1>Concept</h1>
+
+<p>
+Munipack offers a set of computer routines as tools for various
+kinds of astronomical image processing. Currently there are
+only two user interfaces (graphical, command-line) but the system
+is designed to be more flexible. The routines can be easy
+available in the WWW or Virtual Observatory environments.
+</p>
+
+<p class="indent">
+All utilities are prepared as relative independent software utilities,
+whereas every utility is intended to done only one task.
+All operations should be done without any interaction with user,
+ so it is suitable for extensive
+batch processing. It is supposed that the utilities will be combined
+in a specific way to done required processing.
+</p>
+
+<p class="indent">
+From the computer point of view, Munipack offers set of shell
+utilities which uses the standard input, switches and the standard output
+as in the same manner as all other tools in system. Both input and
+output interaction is implemented via plain text or FITS files providing
+easy way to modify and use of results of computation. Every
+utility can be potentially replaced by an another one to better fit of
+a solved problem. Therefore, Munipack's routines should be a base for a derived
+package.
+</p>
+
+<p class="indent">
+There are two types of interface which may be used for data processing.
+A simple, but perhaps less general way, is offered by a graphical interface.
+The full functionality is provided by a set of command line utilities.
+</p>
+
+<h1>Classics edition</h1>
+<p>
+The command-line interface is the most visible changed part since
+the classic edition.
+Please, consult also <a href="cbasic.html">the basic documentation</a> for
+the classic edition.
+</p>
+-->
+
+</section>
+
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

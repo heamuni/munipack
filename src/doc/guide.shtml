@@ -1,0 +1,124 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ User guide</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<div class="content">
+
+<h1>User guide</h1>
+
+<p class="abstract">Guides with step by step tutorials and
+the definitive user manual.</p>
+
+<div class="twocolumn">
+  <div class="column">
+<!-- overviews and tutorials -->
+<h2 class="ttop">Topics</h2>
+<ul>
+<!--<li>Overview</li>-->
+<li><a href="basic.html">Getting started</a> <em>(start here)</em></li>
+<li><a href="features.html">Features</a></li>
+<li><a href="vobs.html">Virtual observatory</a></li>
+<!--<li>Image reductions</li>-->
+<li><a href="colourspace.html">Colour processing</a></li>
+<li><a href="itone.html">Intensity tone</a></li>
+<!--<li>Photometry</li>-->
+<!--<li>Image compositions</li>-->
+<!--<li>Introduction to stellar photometry ?</li>-->
+<li><a href="phoverview.html">Photometry calibration overview</a></li>
+<li><a href="astoverview.html">Astrometry overview</a></li>
+<li><a href="grow.html">Grow curve overview</a></li>
+<li><a href="artific.html">Artificial sky</a></li>
+<li><a href="flatfielding.html">Flat-fielding</a></li>
+<!--<li><a href="deka154.html">Scripting of DK154 pipeline</a></li>-->
+<!--<li><a href="fwhm.html">FWHM</a></li>-->
+</ul>
+
+<h2>Astronomical Tutorials</h2>
+<ul>
+<li><a href="colourimage.html">Colour image of Dumbbell</a></li>
+<!--<li><a href="colorcal.html">Color Calibration</a></li>-->
+<li><a href="colcal.html">Colour calibration</a></li>
+<li><a href="cmd.html">Colour — Magnitude diagram</a></li>
+<!--<li>Digital Photography</li>-->
+<li><a href="lctut.html">Light Curve of blazar</a></li>
+<li><a href="phcorrtut.html">Photometry corrections</a></li>
+<!--<li><a href="lcasteroid.html">Light Curve of Asteroid</a></li>-->
+<li><a href="kombitut.html">Frames composition</a></li>
+<li><a href="mosaics.html">Mosaics</a></li>
+<!--<li><a href="gaindet.html">Gain Determination</a></li>-->
+<li><a href="pererr.html">Periodic rrror</a></li>
+<li><a href="chart.html">Star charts</a></li>
+<!--<li><a href="shcripts.html">List of scripts</a></li>-->
+</ul>
+
+<!--
+<ul>
+<li><a href="faq.html">Frequently asked questions</a></li>
+</ul>
+-->
+</div>
+
+<!-- manual -->
+  <div class="column">
+<h2 class="ttop">Manual</h2>
+<ul>
+<li><a href="man_intro.html">Introduction</a></li>
+<li><a href="man_help.html">On-line help</a></li>
+<li><a href="man_setup.html">Setup</a></li>
+<li>Preprocessing
+<ul>
+<li><a href="man_bias.html">Averaged bias frame</a></li>
+<li><a href="man_dark.html">Averaged dark frame</a></li>
+<li><a href="man_flat.html">Averaged flat-field frame</a></li>
+<li><a href="man_phcorr.html">Photometry pre-corrections</a></li>
+</ul>
+</li>
+<li>Processing
+<ul>
+<li><a href="man_find.html">Find stars</a></li>
+<li><a href="man_aphot.html">Aperture photometry</a></li>
+<li><a href="man_gphot.html">Growth-curve photometry</a></li>
+<li><a href="man_astrometry.html">Astrometry calibration</a></li>
+<li><a href="man_phcal.html">Photometry calibration</a></li>
+<li><a href="man_phfotran.html">Photometry systems transformation</a></li>
+</ul>
+</li>
+<li>Products
+<ul>
+<li><a href="man_timeseries.html">Time series</a></li>
+<li><a href="man_kombine.html">Kombine</a></li>
+<li><a href="man_colouring.html">Colour compositions</a></li>
+</ul>
+</li>
+<li>Virtual observatory
+<ul>
+<li><a href="man_cone.html">Cone search</a></li>
+<li><a href="man_sesame.html">Sesame name resolver</a></li>
+</ul>
+</li>
+<li>Utils
+<ul>
+<li><a href="man_artificial.html">Artificial frames</a></li>
+<li><a href="man_fits.html">FITS file utility</a></li>
+<li><a href="man_votable.html">VOTable utility</a></li>
+<li><a href="man_cross.html">Cross-match utility</a></li>
+<!--<li><a href="man_list.html">Listing</a></li>-->
+</ul>
+</li>
+<li><a href="man_com.html">Common options</a></li>
+<li><a href="man_backup.html">Backup strategy</a></li>
+<li><a href="man_env.html">Environment variables</a></li>
+<li><a href="man_i18n.html">Internationalisation</a></li>
+</ul>
+</div>
+</div>
+
+</div>
+
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

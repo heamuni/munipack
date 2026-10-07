@@ -1,0 +1,9 @@
+OUTPUT = 'x.svg'
+TYPE = 'SVG'
+SORT = 'Va'
+PROJ ALPHA = 269.5
+PROJ DELTA = 4.5
+PROJ SCALE = 3e3
+MAG LIMIT = 15
+MAG KEY = 'Va'
+FILE = 'barn.xml'

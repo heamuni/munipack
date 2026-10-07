@@ -1,0 +1,256 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Aperture Photometry</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Aperture Photometry</h1>
+
+<p class="abstract">
+  Aperture photometry determines sum of counts from a star in a set of
+  predefined apertures.
+</p>
+
+<h2>Synopsis</h2>
+
+<code>
+munipack aphot [.. parameters ..] file(s)[,result(s)]
+</code>
+
+
+<p>Running of photometry adds a HDU extensions to the original frame
+as a table described in <a href="dataform_proc.html">Processing Format</a>.
+
+<h2>Algorithm</h2>
+
+<p>Aperture photometry is performed by the way:</p>
+
+<ul>
+<li>Read parameters (command-line and gain and LOBAD,HIBAD) and
+    list of detected stars (in FIND extension).
+</li>
+<li>
+For every detected star, the sum inside of the specified apertures
+as well as in sky determining ring is computed.
+</li>
+<li>
+The mean background in the ring is computed.
+</li>
+<li>
+The counts for all apertures are computed by subtracting of mean background.
+</li>
+</ul>
+
+<p>The pixels near the border are approximated by only a fraction covering
+the pixel inside.
+</p>
+
+<p>
+By defaults, twelve apertures is used. Aperture radii are computed
+as points of logarithmic spiral <i>r = r<sub>0</sub></i>exp <i>a φ</i>
+with the initial radius <i>r<sub>0</sub>=2</i> and pitch angle 8.9073°
+(to be compatible with DAOPHOT II).
+</p>
+
+<p>
+For a correct determination of photometry errors, the camera-specific
+parameters must by provided.
+</p>
+
+<p>
+Strictly speaking, for further processing just one aperture is required.
+The prepare of several apertures has profit in fast switching to another
+aperture without needs to do photometry again. More apertures can be also
+used in simultaneous use of ones for PSF of grow-curve photometry.
+</p>
+
+<p>
+The results of aperture photometry are stored in columns of a newly created
+APERPHOT extension.
+</p>
+
+<p>
+The photometry is performed for all detected stars (all stars in FIND extension)
+in all specified apertures. Sometimes it is impossible compute the sum,
+the case is indicated by a negative value (-1).
+Common situation are when the sum of counts with subtracted background
+is negative (sky is polluted by a bright source, background has a fast gradient)
+or the star is too near of border and summing pixels are out of area)
+or a star is saturated.
+</p>
+
+<p>
+The results of aperture photometry are stored to next PHOTOMETRY extension.
+In the extension, the results in a selected aperture (by <samp>-s</samp>)
+are selected. Just stars with valid (non-negative) values are presented here.
+</p>
+
+<h2>Data assumption</h2>
+
+<p>
+  Aphot does <b>assumtion</b>, that data represents actually detected
+  <b>counts</b>.
+</p>
+
+<p>
+  While common digital devices detects single photons, the cameras
+  does not report their true counts. Rather, they reports a digitised
+  value which is multiplied by some amplifier gain of the electronic device.
+  Moreover, the value has included bias to suppress a non-linearity of
+  the devices.
+</p>
+
+<p>
+  Therefore,
+  it is very <b>important</b> to pre-correct the data.
+  The relative precision of star determination is driven by
+  <a href="https://en.wikipedia.org/wiki/Poisson_distribution">Poisson
+    statistics</a>; if actually detected counts of photons is <i>N</i>,
+  the relative error will be <i>σ=√N/N</i>. However, data multiplied
+  by factor <i>g</i> gives <i>σ/√g</i> (for <i>N</i>=10000, <i>σ</i>=1/100,
+  while a choice <i>g</i>=4 leads to 1/50).
+</p>
+
+<p>
+  Aphot does not check the assumption.
+  Carefully handled parameters of <a href="man_phcorr.html">phcorr</a>
+  will prepare such correct data. The gain value can be checked
+  by <a href="man_flat.html">flat-field</a>.
+</p>
+
+
+<h2>Elliptic apertures</h2>
+
+<p>
+  Munipack improvement over the original DAOPHOT aperture photometry
+  implementation is possibility to use of elliptic apertures
+  enclosing trailed stars more tightly.
+  While this idea looks extremely attractive, the application
+  on real data shows minimal, if any, progress.
+  This is perhaps a dead way.
+</p>
+
+<p>
+  The implementation is pure experimental.
+  <a href="man_find.html">FIND</a> estimates both
+  eccentricity and inclination; the values are
+  used by this routine, if it is invoked with
+  <samp>--enable-ellipticity</samp>.
+  Elliptic apertures are missing intentionally in GUI.
+</p>
+
+
+<h2>Input And Output</h2>
+
+<p>
+On input, list of frames containing the table with already detected stars is expected.
+</p>
+
+<p>
+On output, tables with the aperture photometry and results from the selected column,
+represented by FITS extension, is added to all input images.
+</p>
+
+<h2>Parameters</h2>
+
+<dl>
+  <dt><samp>--apertures r1, r2, .. rmax</samp></dt>
+  <dd>define apertures radii (in pixels),
+    count and sizes are arbitrary,
+    must be specified in increasing
+    order and separated by commas
+  </dd>
+  <dt><samp>--ring ri,ro</samp></dt>
+  <dd> inner and outer sky ring radius in pixels,
+       the inner radius must be equal or bigger than the greater aperture
+  </dd>
+  <dt><samp>--enable-ellipticity</samp></dt><dd>
+    Apertures are ellipses; their actual
+    shape is determined by FITS parameter in FIND extension,
+    or specified by following command line options.
+  </dd>
+  <dt><samp>--eccentricity <i>e</i></samp></dt><dd>
+    Eccentricity of apertures by a contour
+    <a href="https://en.wikipedia.org/wiki/Ellipse">ellipse</a>:
+    <i>0 &le; e  &lt; 1</i>. The default value is <i>e=0</i> meaning
+    circular aperture.
+  </dd>
+  <dt><samp>--inclination <i>i</i></samp></dt><dd>
+    Inclination of major semi-axis of the
+    <a href="https://en.wikipedia.org/wiki/Ellipse">ellipse</a>
+    in degrees. Positive values of the angle are in mathematics sense
+    (counter-clockwise).
+  </dd>
+  <dt><samp>--coo "x1,y1 x2,y2..."</samp></dt>
+  <dd>
+    List of pixel rectangular coordinates: they are centroids of stars
+    to get photometry for. Their photometry processing, including accuracy
+    and robustness, is exactly the same as the canonical way.
+    FIND extension can not be presented in the FITS file.
+  </dd>
+
+</dl>
+
+<p>See <a href="man_com.html">Common options</a> for input/output filenames.</p>
+
+<h2>History</h2>
+
+<p>
+The routine is on base of original code of DAOPHOT II by P.B.Stetson
+(has been forked from Midas's implementation at 1996). Some additional
+enhancements has been done:
+</p>
+<ul>
+<li>Robust estimators replaces the original estimators of averadge.</li>
+<li>All processing is done in memory (no disc buffering is used).</li>
+<!--<li>Real numbers in double precision are implemented</li>-->
+<li>The magnitude output has been abandoned.</li>
+<li>Elliptic apertures can be choosed.</li>
+<li>FITS files for both input and output are used</li>
+<li>Log format is changed.</li>
+<li>Code is updated for Fortran 90 and 95 (and perhaps above).</li>
+</ul>
+
+<h2>Examples</h2>
+
+<p>
+Run aperture photometry:
+</p>
+<code>
+$ munipack find pleiades.fits
+$ munipack aphot pleiades.fits
+</code>
+
+<p>
+Select apertures and sky estimation by hand (as powers of 2):
+</p>
+<code>
+$ munipack aphot --apertures 1,2,4,8,16,32 --ring 16,32 pleiades.fits
+</code>
+
+<p>
+  List of total counts (aperture photometry) in default apertures
+  for star at <i>x = 666, y = 666</i>:
+</p>
+<code>
+$ munipack aphot --coo "666,666" pleiades.fits
+</code>
+
+
+
+<h2>See Also</h2>
+<p>
+<a href="grow.html">Growth Curve Overview</a>,
+<a href="man_find.html">Find Stars</a>,
+<a href="man_com.html">Common options</a>,
+<a href="dataform_photometry.html">Photometry Format</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

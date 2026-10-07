@@ -1,0 +1,33 @@
+
+                MUNIPACK
+
+
+is a general astronomical image processing software.
+It is contains a set of utilities for image reductions,
+coloring, etc. of the a lot of the CCD images.
+
+
+HOMEPAGE
+
+     https://munipack.physics.muni.cz/
+
+
+DOWNLOAD
+
+     https://integral.physics.muni.cz/ftp/munipack/
+
+
+SOURCE REPOSITORY
+
+     https://munipack.physics.muni.cz/hg/munipack/
+
+
+DOCS
+
+   The docpage/ directory contains doc in HTML.
+
+
+Filip Hroch
+hroch@physics.muni.cz
+Masaryk University, Brno
+March 2022

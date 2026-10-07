@@ -1,0 +1,29 @@
+# BEGIN HDU 0
+SIMPLE  =                    T / file does conform to FITS standard
+BITPIX  =                    8 / number of bits per data pixel
+NAXIS   =                    0 / number of data axes
+EXTEND  =                    T / FITS dataset may contain extensions
+COMMENT   FITS (Flexible Image Transport System) format is defined in 'Astronomy
+COMMENT   and Astrophysics', volume 376, page 359; bibcode: 2001A&A...376..359H
+END
+# END HDU 0
+# BEGIN HDU 1
+XTENSION= 'BINTABLE'           / binary table extension
+BITPIX  =                    8 / 8-bit bytes
+NAXIS   =                    2 / 2-dimensional binary table
+NAXIS1  =                   16 / 2*8, width of table in bytes
+NAXIS2  =                    3 / number of rows in table
+PCOUNT  =                    0 / size of special data area
+GCOUNT  =                    1 / one data group (required keyword)
+TFIELDS =                    2 / number of fields in each row
+EXTNAME = 'FOURIER '           / Reference, arbitrary name
+TTYPE1  = 'A       '           / A*cos
+TFORM1  = '1D      '           / data format of field: double (8 bytes)
+TTYPE2  = 'B       '           / B*sin
+TFORM2  = '1D      '           / data format of field: double (8 bytes)
+COMMENT Fourier data for 1 + 0.075*sin(2*pi*x) + 0.1*cos(2*2*pi*x)
+END
+1 0
+0 0.075
+0.1 0
+# END HDU 1

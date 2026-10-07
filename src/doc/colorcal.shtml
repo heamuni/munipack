@@ -1,0 +1,168 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Color Calibration Tutorial</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+
+<h1>Color Calibration of an Instrumental Photometric System</h1>
+
+<p>
+How to calibrate of an instrumental photometric system.
+</p>
+
+<h1>Open cluster M 67</h1>
+
+<p>
+Open cluster M 67 is an old galactic cluster with a differently
+evolved stars which covers wide range of color indexes.
+</p>
+
+<p>
+As the calibration stars, we are choose data
+which has been carefully measured by Arne Henden
+(<a href="http://binaries.boulder.swri.edu/binaries/fields/m67.html">M67 Standards Field</a>).
+</p>
+
+
+<h2>Sample Data</h2>
+
+<p>
+A sample data are available as
+<a href="https://integral.physics.muni.cz/ftp/munipack/munipack-data-m67.tar.gz">munipack-data-m67.tar.gz</a>. Use commands
+</p>
+<pre>
+$ cd /tmp
+$ tar zxf munipack-data-m67.tar.gz
+</pre>
+<p>
+to unpack it to a desired directory.
+We will assume that the sample data are unpacked to <samp>/tmp</samp> directory
+as <samp>/tmp/munipack-data-m67</samp>.
+</p>
+
+
+
+<h2>Photometry Calibration</h2>
+
+<p>
+The main goal of photometry calibration is
+to determine relations between instrumental fluxes
+(magnitudes) and fluxes (magnitudes) defined
+by a photometric system (with conventionally defined
+conditions, especially by transmission of filters).
+</p>
+
+<p>
+General relations can by derived as an approximation
+of a set of functions (instrumental filters) by another
+set functions (standard filters) as a linear transformations.
+A simple example is the calibration of instrumental
+v-filter by a standard V-filter:
+</p>
+<p>
+v - V = a + b*(V-R)
+</p>
+<p>
+The goal is to determine coefficients <i>a,b</i> by a fit
+of a linear function. The precision depends on coverage of
+color index V-R and that is why we use the evolved cluster.
+</p>
+
+
+<h2>Data Processing</h2>
+
+<p>
+There is an algorithm to get data for the calibration.
+</p>
+
+<ol>
+<li>Prepare images for photometric corrections as describes
+<a href="phcorrtut.html">Photometric Corrections Tutorial</a>.</li>
+<li>Stars detection and photometry
+<pre>
+$ munipack aphot M67_Green_*.fits
+$ munipack aphot M67_Blue_*.fits
+</pre>
+</li>
+<li>Search an astrometric catalogue (required for astrometric calibration)
+<pre>
+$ munipack cone -o m67cat.fits -r 0.1 132.75 11.8
+</pre>
+</li>
+<li>Astrometry calibration of all images
+<pre>
+$ munipack astrometry -c m67cat.fits M67_*.fits
+</pre>
+</li>
+<li>
+Sum of all images
+<pre>
+$ munipack kombine -o M67_Blue.fits M67_Blue_*.fits
+$ munipack kombine -o M67_Green.fits M67_Green_*.fits
+</pre>
+</li>
+<li>Aperture photometry of final frames
+<pre>
+$ munipack aphot -f 6 M67_Blue.fits M67_Green.fits
+</pre>
+</li>
+<li>
+Preparation of results in tables
+<pre>
+$ munipack phframe --table -q IMAG --naperture 7 M67_Green.fits,M67_Green_res.fits
+$ munipack phframe --table -q IMAG --naperture 7 M67_Blue.fits,M67_Blue_res.fits
+</pre>
+<p>
+The file M67_Green_res.fits contains the table:
+</p>
+<div class="table">
+<table>
+<tr><th>α [J2000]</th><th>δ [J2000]</th><th>instrumental magnitude</th><th>std. deviation</th></tr>
+<tr><td>132.8228301</td><td>11.7562805</td><td>7.62841</td><td>.00036</td></tr>
+<tr><td>…</td><td>…</td><td>…</td><td></td></tr>
+</table>
+</div>
+<p>
+The output table can be matched against to a standard field stars in
+equatorial coordinates. The calibration coefficients can be easy
+determined by the way.
+</p>
+<p>
+To match and visualize data, <a href="http://www.star.bris.ac.uk/~mbt/topcat/">topcat</a>
+(part of Virtual Observatory software) can be recommended.
+</p>
+</li>
+</ol>
+
+<figure>
+<img src="M67_Green-graph.png" alt="M67_Green-graph.png" title="M 67">
+<figcaption>M 67 calibration</figcaption>
+</figure>
+
+<figure>
+<img src="M67_Blue-graph.png" alt="M67_Blue-graph.png" title="M 67">
+<figcaption>M 67 calibration</figcaption>
+</figure>
+
+<h2>Notes</h2>
+
+<p>
+This example is illustrative only! The instrumental
+magnitudes are also affected by the atmospheric extinction
+and to get correct values, we need to determine extra-atmospheric magnitudes
+by observing of the field in different air masses and an extrapolation
+on null air mass.
+</p>
+
+<p>
+Please also don't be confused from filters designation and
+graphs. The used filters are RGB photographic filters for a color
+imaging. That's why the linear dependence doesn't exactly fit the data.
+</p>
+
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

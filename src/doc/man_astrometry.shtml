@@ -1,0 +1,717 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Astrometry</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Astrometry</h1>
+
+<p class="abstract">
+An astrometry calibration of FITS frames.
+</p>
+
+<h2>Synopsis</h2>
+
+<code>
+munipack astrometry [.. parameters ..] file(s)[,result(s)]
+</code>
+
+<h2>Description</h2>
+
+<p>
+Astrometry action derives astrometry calibration of FITS frames
+(<a href="astoverview.html">Overview</a>).
+</p>
+
+<p>
+Astrometry is naturally separated on two parts:
+</p>
+<ul>
+<li>Matching where the correspondence between stars on frame
+    and in catalogue is established. The matching can be done
+    without knowledge of any transformation, when very general
+    presumptions are supposed (the coordinates are Euclidean).
+</li>
+<li>
+Astrometry transformation is computed by using of robust algorithms.
+</li>
+</ul>
+
+<h3>Reccomendations</h3>
+
+<p>The matching process is searching for a mutual correspondece
+  in two list of coordinates. The mathcing is generaly slow and
+  complex process. To increase of its reliability and speed,
+  is is important to compare (and prepare) the list by such way
+  so that the coordinates as well as magnitues overlaps.
+  The overlap in coodinates means to use of catalogues selection
+  with very similar centre and radius as the frames. Also
+  magnitude overlap must corresponds with non-saturated (and non-faint)
+  stars on images. (If both the conditions will not meet, the
+  matching will probbaly also sucessufll.)
+</p>
+
+<p>
+  There two ways how to realise. The coordinate correspondece
+  can be make with known object position and field of view (FOV)
+  of telescope (it means angular diameter of the cone on sky)
+  in degress. If the telescope has FOV 0.5 deg and the observed
+  objects is Crab nebulae than the optimal selection from
+  UCAC4 cataloguje is:
+</p>
+<pre>
+  munipack cone -r 0.2 -- 83.63 22.01
+</pre>
+
+<p>
+  The magnitude selection is simliar. It depends on all telescope,
+  exposure time and filter. The mathcing (as well as photometry)
+  will sucesfull only with non-saturated bright stars. If we have
+  an experinece that the stars are saturated at 12, than
+  the catalogue selection can be improved (syntax is
+  column_name=[some constrain]):
+</p>
+<pre>
+  munipack cone -r 0.2 --par 'f.mag=>12' -- 83.63 22.01
+</pre>
+
+<p>
+  Alternatively, the <a href="https://heasarc.gsfc.nasa.gov/docs/software/fitsio/c/c_user/node97.html">filtration capabailities</a> of FITSIO can be used
+</p>
+<pre>
+  munipack astrometry -c 'cone.fits[1][$f.mag$>12]' crab.fits
+</pre>
+<p>
+  We are selecting only non-saturated stars fainter than magnitude 12
+  in column f.mag. The usual linear range of 16-bit CCD cameras is
+  about 3-5 magnitudes.
+</p>
+
+<p>
+  Parameter --maxmatch slices the catalogue on parts with similar
+  magnitudes (magnitudes in certain range). This is due to sorting
+  of both catalpogue and frame by magnitudes.
+  </p>
+
+<p>
+  Parameter --minmatch sets minimal length of match sequence
+  which is supposet to by complete (sucesfull match). For sparse
+  fileds, the defaults are usually satisfactyory, but very dense
+  fields like SMC, LMC needs increase this parameters. Munipack
+  sets the default of 5. If the mean surface density exceeds
+  the limit (?), the parameter is increased. The small values
+  on crowded fiedls can produce false match (because probability
+  of miss-match is getting appreciable).
+  </p>
+
+
+<div class="table">
+<table>
+<caption>Suitable parameters for astrometric calibration</caption>
+<tr><th>Case</th><th>Solution</th></tr>
+<tr><td>sparse field,  &lt; 1 m telescope</td><td>defaults</td></tr>
+<tr><td>crowded field, &lt; 1 m telescope</td><td>--minmatch=7, --maxmatch=44</td></tr>
+<tr><td>sparse field, &gt; 1 m telescope</td><td>-c 'cone.fits[1][$f.mag$&gt;14]'</td></tr>
+<tr><td>crowded field, &gt; 1 m telescope</td><td><samp>--minmatch=7, --maxmatch=44, -c 'cone.fits[1][$f.mag$&gt;14 .and. $f.mag$&lt;20]'</samp></td></tr>
+</table>
+</div>
+
+
+
+
+<h2>Algorithm</h2>
+
+<p>
+Lets we denote the reference star coordinates as the catalogue and
+coordinates of detected stars as the frame.
+</p>
+
+<p>
+The following algorithm is used for matching:
+</p>
+<ul>
+<li>Catalogue coordinates are projected to rectangular. The projection
+    can be set with <samp>-p,--projection</samp> switch. As the centre
+    of projection all stars computed as arithmetical mean is selected.
+</li>
+<li>
+Frame coordinates are pre-scaled to lie in interval 0 .. 1 and to have origin
+in centre of frame (the projected and measured coordinates has similar
+scale and origin after this transformation to improve numerical precision).
+</li>
+<li>
+Twines of stars in catalogue and in frame are get as the starting step
+of matching algorithm.
+</li>
+<li>
+To get a next star in sequence, the following
+function (in a meta-language) illustrates the principle:
+<pre>
+Function Sequence for next star
+  For all unused stars in catalogue:
+     Compute u1,v1
+     For all unused stars on image:
+        Compute u2,v1
+        Is Acceptable and distance({u1,u2} and {v1,v2}) &lt; limit?
+            Has the sequence required length?
+              Got Solution!
+            Call Sequence for next+1 star
+            Did fail the Sequence?
+              Skip the star
+End function Sequence
+</pre>
+Variables u1,v1 and u2,v2 are coordinates of in a triangle space
+of a triplet of stars. The distance is distance in triangle space.
+</li>
+<li>
+Implemented algorithm includes additional tests to be sequence acceptable:
+<ul>
+<li>the sequence length and limit for objects used to matching
+     can be changed by <samp>--minmatch, --maxmatch</samp> parameters</li>
+<li>The limit is set via <samp>--sig</samp> parameter which sets <i>σ</i>
+    expected error in the coordinates of stars. The parameter is also
+    used for estimation of tolerances of angles.</li>
+<li>Angles computed between all stars in a real space must be inside
+    tolerance.
+</li>
+
+<li>the sequence must have first and last stars connected (all implemented
+     tests must be passed).</li>
+<li>To prevent use of degenerated triangles (for sides <i>a+b≈c</i>),
+    only triangles with the <i>v > 1 + σ - u</i> are used.
+</ul>
+</li>
+<li>
+The first sequence, which is successful found, stops matching. When
+<samp>--full-match</samp> is used, it is scan throughout
+all possible twines. In this case, the sequence with the best
+parameters is used. The full scan can take a lot of time.
+</li>
+</ul>
+
+<p>
+An alternative sequence can be constructed from known transformation
+and the astrometry is just more precise.
+</p>
+
+
+<p>
+The known sequence of stars can be used to determine astrometry transformation:
+</p>
+<ul>
+<li>The coordinates of catalogue stars are corrected for its proper motion
+    (only when <samp>--col-pm-ra, --col-pm-dec</samp>) is set</li>
+<li>Initial estimation of parameters is computed by minimising of absolute
+    deviations.</li>
+<li>The corresponding stars in catalogue and frame are found by searching
+    for stars in close neighbourhood (practically, the <samp>--match nearly</samp>
+    is performed.</li>
+<li>The transformation is determined with all possibles stars by the robust
+    minimisation.</li>
+</ul>
+
+<p>
+The matching needs at least of tree stars (to construct of a triangle. The
+astrometry algorithm needs at least 5 stars (for 4 parameters) but
+has lower-count alternative with minimum of two stars. Generally,
+the astrometry has recommended minimum of 7 stars, but ideal is over 20.
+Any modern (like Munipack default UCAC5) catalogue has more reference
+objects on medium crowded fields.
+</p>
+
+<h2>Prerequisites</h2>
+<p>
+The calibration needs both detected stars and instrumental photometry.
+</p>
+
+<h2>Input And Output</h2>
+
+<p>
+On input, list of frames containing the table with already detected stars
+and photometry is expected.
+</p>
+
+<p>
+On output, the WCS calibration in the header of primary FITS is created
+(or updated) for all input images.
+</p>
+
+<h2>Parameters</h2>
+
+<h3>Modes of Calibration:</h3>
+<dl>
+  <dt><samp>-m, --mode [=mode]</samp></dt><dd>Mode of calibration:
+    <ul>
+      <li><samp>match</samp> (default),</li>
+      <li><samp>cross</samp></li>
+      <li><samp>sequence</samp></li>
+      <li><samp>manual</samp></li>
+    </ul>
+  </dd>
+</dl>
+
+
+<h3>Reference sources:</h3>
+<dl>
+  <dt><samp>-c, --cat file.fits</samp></dt><dd>reference catalogue in FITS format,
+    if none of <samp>-c, -r, -R</samp> is presented, the default
+    <samp>cone.fits</samp> is used as
+    -c cone.fits</dd>
+<dt><samp>-r, --ref file.fits</samp></dt><dd>reference frame (already calibrated frame)</dd>
+<dt><samp>-R, --rel file.fits</samp></dt><dd>relative to the reference frame (no projection)</dd>
+  <dt><samp>--col-ra label</samp></dt><dd>Right Ascension column in catalogue,
+  default: <samp>RAJ2000</samp></dd>
+  <dt><samp>--col-dec label</samp></dt><dd>Declination column in catalogue,
+    default: <samp>DEJ2000</samp></dd>
+  <dt><samp>--col-pm-ra label</samp></dt><dd>Proper motion in Right Ascension
+    column in catalogue, default: <samp>pmRA</samp></dd>
+  <dt><samp>--col-pm-dec label</samp></dt><dd>Proper motion in Declination column
+    in catalogue, default: <samp>pmDE</samp></dd>
+  <dt><samp>--col-mag label</samp></dt><dd>Magnitude-like column in catalogue,
+    default: <samp>f.mag</samp></dd>
+</dl>
+
+<h3>Manual Calibration Parameters:</h3>
+<dl>
+  <dt><samp>-p, --projection [=type]</samp></dt><dd>projection:
+        <ul>
+	  <li>none,</li>
+	  <li>gnomonic (default)</li>
+	</ul>
+  </dd>
+<dt><samp>--xcen xxx.y</samp></dt><dd>centre of projection on chip [pix] (default: width/2)</dd>
+<dt><samp>--ycen xxx.y</samp></dt><dd>centre of projection on chip [pix] (default: height/2)</dd>
+<dt><samp>--rcen ddd.ddd</samp></dt><dd>centre of projection in Right Ascension [deg]</dd>
+<dt><samp>--dcen ddd.ddd</samp></dt><dd>centre of projection in Declination [deg]</dd>
+<dt><samp>--scale ssss.s</samp></dt><dd>scale [deg/pix]</dd>
+<dt><samp>--angle aa.aaa</samp></dt><dd>angle of rotation [deg], clockwise positive</dd>
+<dt><samp>--reflex</samp></dt><dd>set whatever the frame is reflected</dd>
+<dt><samp>--radesys</samp></dt><dd>the reference coordinate frame (default: ICRS)</dd>
+<dt><samp>--epoch</samp></dt><dd>the reference epoch like 2000.0</dd>
+</dl>
+
+<h3>Parameters For Fit:</h3>
+<dl>
+  <dt><samp>--fit [=fit]</samp></dt><dd>method used for fitting of star positions:
+    <ul>
+      <li>squares (standard least-squares),</li>
+      <li>robust (by default).</li>
+    </ul>
+  </dd>
+</dl>
+
+<h3 id="matchpar">Parameters For Matching:</h3>
+<dl>
+<dt><samp>--sig xxx.y</samp></dt><dd>mean uncertainty in coordinates of objects
+                                on frames in pixels,default is 1 pixel</dd>
+<dt><samp>--sigcat ddd.ddd</samp></dt><dd>mean uncertainty in coordinates of objects
+                                in catalogue in degrees, default is 1 arcsec</dd>
+<dt><samp>--flxmin </samp></dt><dd>the lower range of flux ratios</dd>
+<dt><samp>--flxmax </samp></dt><dd>the upper range of flux ratios,
+    the ranges depends on the relative accuracy of photometry and strongly
+    affects match speed. If catalogue or frame is taken in the same filter
+    range 0.8 -- 1.3 is enough, but for different filters the default 0.5 -- 2 should
+by prefered.</dd>
+<dt><samp>--minmatch n</samp></dt><dd>Sets count of objects in match sequence.
+Default is 5. Crowded fields will require increase the value on 7 or more. The extremely
+sparse fields with a few stars only will enough 3-5. To use match algorithm minimal
+length is 3. Upper limit is given by <samp>--maxmatch</samp>.</dd>
+<dt><samp>--maxmatch n</samp></dt><dd>Set maximum count of objects
+    in match sequence.
+    The default is 42 or count of objects in catalogue or in frame.
+    There is no upper limit, but values over hundredth are probably unusable.
+    The recommended value for crowded field is 30 - 50.</dd>
+<dt><samp>--maxstar n</samp></dt><dd>Set maximum count of objects for matching.
+    The default is 250 or count of objects in catalogue or in frame.
+    There is no upper limit, but values over hundredth are probably unusable.
+    </dd>
+<dt><samp>--luckymatch n</samp></dt><dd>Set the number which is added to
+    value given by <samp>--minmatch</samp> and supposed to indicate
+    a reliable sequence. For instance, <samp>--minmatch 5</samp>
+    and <samp>--luckymatch 3</samp> indicates good match when result
+    has at least 8 successful matches. The default value is 3.
+</dd>
+<dt><samp>--disable-lucky-match</samp></dt><dd>
+    Finish at first success match when <samp>--minmatch</samp>
+    is reached. Alias for <samp>--luckymatch 0</samp>
+    </dd>
+<dt><samp>--disable-flux-check</samp></dt><dd>To improve speed and reliability
+of matching, fluxes are used as the additional independent quantity
+for checking. This switch disables flux check completely. A possibility
+of mismatching will increase, especially on crowded fields.
+</dd>
+<dt><samp>--disable-rms-check</samp></dt><dd>Normally, RMS (in pixels) is smaller that
+xsig*dig (in pixels) for successful fit and one is on condition for the calibration. This
+option disables the test and must be used very carefully. Useful in cases when
+statistical errors are insignificant to  systematical ones (due to an improper
+projection).</dd>
+</dl>
+
+<h3>Miscellaneous:</h3>
+<dl>
+  <dt><samp>--units</samp></dt><dd>output units: deg, arcmin, arcsec, mas, pix
+    and auto (default)</dd>
+<dt><samp>--disable-save</samp></dt><dd>disable save of calibration to header</dd>
+<dt><samp>--remove</samp></dt><dd>remove calibration from FITS header
+    (keywords like CTYPE, CRPIX, CRVAL, .. and the detailed log)</dd>
+  <dt><samp>--report</samp></dt><dd>add a FITS extension with a reporting of
+    the astrometry fitting</dd>
+<dt><samp>--show-defaults</samp></dt><dd>show default values of parameters</dd>
+</dl>
+
+<p>See <a href="man_com.html">Common options</a> for
+input/output filenames.</p>
+
+
+<div class="table">
+<table>
+<caption>Following combinations of mode and options are possible</caption>
+<tr><th>Mode</th><th>Options</th></tr>
+<tr><td><samp>match</samp></td><td><samp>-c, -r, -R,</samp> <a href="#matchpar">Parameters for Matching</a></td></tr>
+<tr><td><samp>sequence</samp></td><td><samp>--seq1, --seq2, -c, -r, -R</samp></td></tr>
+<tr><td><samp>manual</samp></td><td><samp>--projection, --xcen, --ycen, --rcen,
+--dcen, --scale, --angle, --reflex</samp></td></tr>
+</table>
+</div>
+
+<p>
+For manual calibration, use <samp>--projection, --xcen, --ycen, --rcen,
+--dcen, --scale, --angle</samp> and don't use <samp>-c, -r, -R</samp>.
+The parameters are just interpreted in WCS framework and
+stored to FITS header.
+</p>
+
+<p>
+  If an astrometry calibration is already presented in processed header,
+  one is updated.
+</p>
+
+<h2>Caveats</h2>
+
+<p>
+Any distortions, including atmospheric refraction,
+are not implemented yet.
+</p>
+
+
+<h2>Examples</h2>
+
+<h3>Sources Of Astrometric Catalogues</h3>
+
+<p>
+Virtual Observatory (VO) is intended as the main source
+of catalogues. The following example uses cone search
+capability of VO to list part of
+<a href="http://vizier.u-strasbg.fr/viz-bin/VizieR?-source=I%2F340">UCAC5</a>
+catalogue
+</p>
+<pre>
+munipack cone -c UCAC5 -o 0716cat.fits -r 0.1 -- 110.25 71.34
+</pre>
+<p>
+UCAC5 is the recommended astrometric catalogue (default). We must provide
+coordinates of centre of frame (use coordinates of assumed object)
+and the cone radius (else a catalogue default will be used).
+Note parameter -s (sort by a column). The sorting requires
+knowledge of catalogue structure but strongly affects speed and
+success rate of matching.
+</p>
+
+
+<h2>Manual Calibration</h2>
+
+<p>Manual calibration is designed with its properties:</p>
+<ul>
+<li>The proper calibration is known.</li>
+<li>No catalogue and objects detection on images is required.</li>
+</ul>
+
+<p>
+To save a calibration to FITS header, find the parameters by hand and
+adjust the example
+</p>
+<pre>
+$ munipack astrometry -m manual -p TAN --rcen=110.471 --dcen=71.351
+            --scale=5.64e-04 --angle=0.0 0716_1R.fits
+</pre>
+
+<p>
+This is an example for blazar
+<a href="http://www.lsw.uni-heidelberg.de/projects/extragalactic/charts/0716+714.html">0716+71</a>
+which observation is in FITS file 0716_1R.fits included to
+<a href="https://integral.physics.muni.cz/ftp/munipack/munipack-data-blazar.tar.gz">munipack-blazar.tar.gz</a>.
+</p>
+
+<p>
+The calibration parameters are left untouched. There are are no limits and
+no any checks.
+</p>
+
+<div class="table">
+<table>
+<caption>Parameters for manual calibration<sup><a href="#manual">[a]</a></sup></caption>
+<tr><th>Parameter</th><th>Description</th><th>Units</th></tr>
+<tr><td>-p</td><td>Type of spherical projection</td><td></td></tr>
+<tr><td>--rcen</td><td>Right Ascension of centre of the projection <i>α</i><sub>c</sub> (CRVAL1)<sup><a href="#tw">[b]</a></sup></td><td>degrees</td></tr>
+<tr><td>--dcen</td><td>Declination of centre of the projection <i>δ</i><sub>c</sub> (CRVAL2)<sup><a href="#tw">[b]</a></sup></td><td>degrees</td></tr>
+<tr><td>--xcen</td><td>Reference point on a chip <i>x</i><sub>c</sub> (CRPIX1)<sup><a href="#tw">[b]</a></sup></td><td>pixels</td></tr>
+<tr><td>--ycen</td><td>Reference point on a chip <i>y</i><sub>c</sub> (CRPIX2)<sup><a href="#tw">[b]</a></sup></td><td>pixels</td></tr>
+<tr><td>--scale</td><td>Scale of projection <i>c</i></td><td>degrees/pixel</td></tr>
+<tr><td>--angle</td><td>Angle of rotation around centre <i>φ</i></td><td>degrees</td></tr>
+<tr><td>--reflex</td><td>Reflected frame</td><td>degrees</td></tr>
+<tr><td><samp>file</samp></td><td>a file to calibrate<sup><a href="#fl">[c]</a></sup></td><td></td></tr>
+</table>
+</div>
+
+<div class="notes">
+<p id="manual">
+<sup><a href="#manual">[a]</a></sup>
+The manual calibration is invoked when <samp>-m manual</samp> is presented.
+</p>
+
+<p id="tw">
+<sup><a href="#tw">[b]</a></sup>
+Twines of parameters <samp>--xcen, --ycen</samp> and <samp>--rcen, --dcen</samp>
+must be specified together.
+</p>
+
+<p id="fl">
+<sup><a href="#fl">[c]</a></sup>
+This manual calibration works only on a single file. Others types of calibrations
+on a list of files.
+</p>
+</div>
+
+<h2>Matching And Sequence Calibration</h2>
+
+<p>Astrometric calibration is designed with its properties:</p>
+<ul>
+<li>High precision as possible.</li>
+<li>Minimum of manually provided parameters</li>
+</ul>
+
+<h3>Prerequisites</h3>
+
+<p>
+  Astrometry calibration requires detected stars
+  (see <a href="man_find.html">find</a>),
+  aperture photometry (see <a href="man_aphot.html">aphot</a>) and an astrometry
+  catalogue (<a href="man_cone.html">cone search</a>).
+</p>
+
+
+<p>
+At the start, astrometry calibration itself can be done, a star table (list)
+of objects on an image must be prepared.
+</p>
+
+<p>
+The object detection (as a side effect is the aperture photometry)
+is relative straightforward (detected objects are stored
+to another HDU with label FIND):
+</p>
+<pre>
+$ munipack find -f 2 -t 5  0716_1R.fits
+$ munipack aphot 0716_1R.fits
+</pre>
+
+<p>A catalogue with reference stars can be got with help of
+<a href="vobs.html">Virtual Observatory</a>:
+</p>
+<pre>
+$ munipack cone -o 0716_cat.fits -r 0.2 -- 110.25 71.34
+</pre>
+<p>
+Selected astrometric stars in radius 0.2° around centre
+α = 110.25° and δ = 71.34° are saved to the FITS table
+0716_cat.fits.
+</p>
+
+<p>
+Note selection of catalogue UCAC4. The objects in the output file are
+sorted by magnitude designed as 'f.mag'. You must known catalogue structure
+before
+use of -s (simply get catalogue without -s option, look for structure and
+than use -s with the given magnitude column label).
+Sorting significantly increase speed and probability of matching.
+</p>
+
+<h3>Invoking of Matching</h3>
+
+<p>
+In case of matching, when your are a lucky user, following command would
+give you the excellent job:
+</p>
+<pre>
+$ munipack astrometry -c 0716_cat.fits  0716_1R.fits
+</pre>
+
+<h3>Invoking of Sequence</h3>
+
+
+<pre>
+  $ munipack astrometry -m SEQUENCE \
+     --seq1 5,6,9,16,17,18,19,21,23,22,24,26,27,29,28,30,32 \
+     --seq2 1,2,3,5,4,8,11,13,7,10,6,12,9,18,14,19,17 \
+     -c 0716_cat.fits  0716_1R.fits
+</pre>
+
+
+
+<div class="table">
+<table>
+<caption>Parameters for astrometric calibration</caption>
+<tr><th>Parameter</th><th>Description</th></tr>
+<tr><td>-p</td><td>Spherical projection</td></tr>
+<tr><td>-c</td><td>Reference astrometry catalogue<sup><a href="#cm">[‡]</a></sup></td></tr>
+<tr><td>-r</td><td>Reference already calibrated frame<sup><a href="#cm">[‡]</a></sup></td></tr>
+<tr><td>-R</td><td>Reference frame for relative astrometry (no projection)<sup><a href="#cm">[‡]</a></sup></td></tr>
+<tr><td>--col-ra</td><td>Label of Right Ascension column</td></tr>
+<tr><td>--col-dec</td><td>Label of Declination column</td></tr>
+<tr><td>--col-pm-ra</td><td>Label of proper motion of Right Ascension column</td></tr>
+<tr><td>--col-pm-dec</td><td>Label of proper motion of Declination column</td></tr>
+<tr><td>--minmatch</td><td>match sequence minimal length<sup><a href="#nm">[†]</a></sup></td></tr>
+<tr><td>--maxmatch</td><td>match sequence length<sup><a href="#nm">[†]</a></sup></td></tr>
+<tr><td><samp>file</samp></td><td>a file to calibrate</td></tr>
+</table>
+</div>
+
+<div class="notes">
+<p id="cm">
+<sup><a href="#cm">[‡]</a></sup>
+Parameters -c, -r and -R are exclusive mutual.
+</p>
+
+<p id="nm">
+<sup><a href="#nm">[†]</a></sup>
+Parameters --minmatch and --maxmatch affects both speed (larger is slower)
+and chance of matching (lower is worse). The recommended values
+for --minmatch are 5 - 10 (default is 5) and --maxmatch 20 - 200 (default 33).
+</p>
+</div>
+
+<h2>Tips For Usage</h2>
+
+
+
+<h3>Successful Matching</h3>
+
+<p>
+Matching needs at least <samp>--minmatch</samp> common stars
+on frame and catalogue as selected <samp>--maxmatch</samp>.
+When matching is failed, check all centre, radius and proper
+reference catalogue.
+</p>
+
+<p>
+As the best diagnostics tool is the astrometry in xmunipack
+(Tools->Astrometry).
+</p>
+
+
+<h3>Fine Tune Of Calibration</h3>
+
+<p>
+The matching of the reference catalogue with detected stars is
+extremely complicated procedure. Therefore, there are tun-able
+parameters for both matching and fitting algorithms.
+In doubts, check ones:
+</p>
+<ul>
+<li>The sorting of the table with astrometric stars.
+Stars would be sorted from the most brighter to faintness ones
+(parameter -s of the cone search,
+tables of detected objects are sorted by default)</li>
+<li>The search region is overlapping of the field of view of
+matched pictures.</li>
+<li>Try
+increase number of stars used for matching (--maxmatch)
+and a match sequence length (--minmatch). Large values of both
+parameters slow-downs matching.</li>
+</ul>
+
+<h3>Tracing</h3>
+
+It is always possible to get detailed log of processing
+invoking of <samp>--verbose</samp> parameter.
+
+The usual log will like
+
+<pre>
+$ munipack astrometry --verbose 0716_006V.fits
+Debug: Launching `astrometry' ...
+Debug: VERBOSE = T
+Debug: COL_RA = 'RAJ2000'
+Debug: COL_DEC = 'DEJ2000'
+Debug: COL_PMRA = 'pmRA'
+Debug: COL_PMDEC = 'pmDE'
+Debug: COL_MAG = 'f.mag'
+Debug: CAT = 'cone.fits'
+Debug: FILE = '0716_006V.fits' '0716_006V.fits~' ''
+ Selecting catalogue stars in rank:           1          33
+ Matching... #: {seq1} -> {seq2} | scale,r: sq.(angle, scale, flux) &lt; Xi2(0.95)
+ Astrometry calibration of `0716_006V.fits'.
+17: 5 6 9 16 17 18 19 21 23 22 24 26 27 29 28 30 32 ->  1 2 3 5 6 4 13 10 7 11 12 9 8 18 14 21 16 | 1767.5  4.53:   1.36  .669E-001  15.7 &lt; 26.0
+17: 28 29 5 6 9 16 17 18 19 21 23 22 24 26 27 30 32 ->  14 18 1 2 3 5 6 4 13 10 7 11 12 9 8 21 16 | 1767.5  4.53:   .553  .710E-001  15.7 &lt; 26.0
+ === Parameters estimation ===
+# estim init scale [pix/deg]:     1767.6       0.1
+# estim init reflexion:    1.
+# estim init angle [deg]:    0.549   0.011
+# estim init offset [deg]:      0.01313     0.10040     0.00001     0.00001
+ === Absolute deviations fitting ===
+# ifault   mad     acen         dcen       offset[pix]    s[pix/deg] rot[deg]
+Debug: MuniProcess elapsed time: 00h 00m 08.945s
+Debug: MuniProcess::OnFinish: 24466 0.
+ 1 2  3.16E-05  110.50989   71.29578    24.        92.        1767.4    0.6
+ 2 2  3.17E-05  110.46739   71.34808   0.61E-03  -0.11E-03    1767.4    0.5
+ 3 0  3.13E-05  110.46739   71.34808  -0.90E-02  -0.11E-02    1767.6    0.5
+ 4 0  3.13E-05  110.46740   71.34807  -0.18E-05  -0.83E-05    1767.6    0.5
+ 5 0  3.13E-05  110.46740   71.34807    0.0        0.0        1767.6    0.5
+# absfit sign test (total, positive ra,dec):      17      9      8
+# absfit final:   31.32E-06    1.768E+03     0.5  110.46740   71.34807  1.0
+# astrofit   mad=.313E-004 deg  .113 arcsec
+# astrofit stars to fit: 43
+ === Robust fitting ===
+Likelihood solution: status=0 (evaluations=2383), log L =   -819.
+# info    s       acen         dcen        offset[pix]       [pix/deg] rot[deg]
+ 0 0  3.98E-05  110.46740   71.34807   0.267E-01   0.927E-02    1767.4    0.5
+ 1 2  3.98E-05  110.46740   71.34807   0.253E-01   0.704E-02    1767.4    0.5
+ 2 2  3.97E-05  110.46736   71.34808  -0.355E-05  -0.311E-05    1767.4    0.5
+ 3 2  3.97E-05  110.46736   71.34808    0.00        0.00        1767.4    0.5
+# Hessian at minimum:
+#     36.000         0.0000        -311.66       -0.35596
+#     0.0000         31.000         572.02        0.43994
+#    -311.66         572.02        0.10717E+07     90.344
+#   -0.35596        0.43994         90.344        0.29904
+# Covariance matrix (no regularisation):
+#    0.28150E-01   -0.56872E-03    0.57410E-05    0.32610E-01
+#   -0.56872E-03    0.33159E-01   -0.14053E-04   -0.45214E-01
+#    0.57410E-05   -0.14053E-04    0.96456E-06   -0.26390E-03
+#    0.32610E-01   -0.45214E-01   -0.26390E-03     3.5291
+# Correlation matrix:
+#    1.000   -0.019    0.035    0.103
+#   -0.019    1.000   -0.079   -0.132
+#    0.035   -0.079    1.000   -0.143
+#    0.103   -0.132   -0.143    1.000
+# solution:      0.000E+00    0.000E+00    5.658E-04    8.862E-03    3.975E-05
+# deviations:     5.65E-06     6.13E-06     3.31E-08     6.33E-05    -1.00E+00
+# s0,rms:   4.42E-08  3.41E-05 [deg]    .123 [arcsec]
+# s:   3.97E-05 [deg]    .143 [arcsec]
+# sign test (total, RA+, Dec+):      43/21.5   17+-2.1   21+-2.3
+....
+</pre>
+
+
+<h2>See Also</h2>
+<p><a href="astoverview.html">Astrometry Overview</a>,
+<a href="dataform_astrometry.html">WCS Header</a>
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

@@ -1,0 +1,626 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Changelog of Munipack</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+  <h1>Changelog</h1>
+
+<p class="abstract">A comprehensive summary of the recent development.</p>
+
+<h2>Changelog of 0.6.2 (The robust mean) release</h2>
+
+  <p>Release date: 13. February 2025. </p>
+  <p>This release adopts the recent implementation of the robust mean
+    by the <span style="color: #83991a;">☘</span>&nbsp;<a href="https://integral.physics.muni.cz/oakleaf/">Oakleaf</a> library.</p>
+
+<h3>Improvements:</h3>
+<ul>
+  <li>The robust mean procedures with weights removed:
+    in flat and daosky (considered useless),
+    and in find for centroids (replaced by filtering).</li>
+  <li>In artificial: the gnoise parameter included; in kombine: the check of filters,
+    the warning about geographic coordinates suppressed.</li>
+  <li><a href="man_kombine.html">Kombine</a> adds extensions to FITSes with
+    the standard errors and the maximal deviations to detect anomalies.</li>
+  <li>Gaia DR3 catalogue added.</li>
+  <li>The <a href="man_backup.html">backup</a> strategy revised.</li>
+  <li>Tutorials, and related scripts reviewed.</li>
+  <li>A parallel compilation of C++ programs is possible.</li>
+  <li>Bugs corrected: VOCatConf, phcal, making random names of scratch files.
+    GUI does not pop-up notify windows when focused;
+    it handles NaN and ±Inf pixels, and the intensity scaling for flat-fields.</li>
+</ul>
+
+
+
+<h2>Changelog of 0.6.1 (On the new way with errata) release</h2>
+
+  <p>Release date: 2. October, 2022. </p>
+  <p>This release includes minor improvements.</p>
+
+<h3>Improvements:</h3>
+<ul>
+  <li>It can be build with wxWidgets 3.2 (a tiny little minor bug).</li>
+  <li>cFITSIO wrappers of Fortran 2008 has added: rows deletion,
+    2D and 3D image convenience routines, cleanup.</li>
+  <li>PSF of point sources for artificial images can be specified
+    by an external file.</li>
+  <li>The code for making of elliptical galaxies
+    handles the ellipticity parameter correctly.</li>
+  <li>autoconf machinery has a little bit simpler design.</li>
+</ul>
+
+<h2>Changelog of 0.6.0 (On the new way) release</h2>
+
+  <p>Release date: 6. March, 2022. </p>
+  <p>This release brings the deep redesign of GUI.
+  </p>
+
+  <h3>Principal changes:</h3>
+  <p>I changed my mind; build principles has been revised
+    to create more handy GUI.</p>
+<ul>
+  <li>There is a new, highly optimised, multi-threaded, display engine.
+    The engine is designed as a software render maintainable
+    for long time period unlikely to HW ones.
+    Critical parts follows C paradigm rather then slow C++ recipes.
+  </li>
+  <li>New algorithms for colour manipulations has been developed.</li>
+  <li>View, the image display, has deep revision. By the new way approach,
+    unfinished parts (tools) are (temporary) removed  to prevent any
+    user confusion.</li>
+  <li>Browser, the file collection browser, has been redesigned.
+    I will follow the way, if the new GUI will be evinced.</li>
+  <li>Tune toolbox has been re-implemented from a scratch.</li>
+</ul>
+
+<h3>Improvements:</h3>
+<ul>
+  <li>New tune options, and functions are implemented. The panel
+    uses PLplot with Cairo driver to made high quality graphs.</li>
+  <li>Magnifier and zoom mini-windows are inspired by SAOImage/ds9.
+    The boring implementation via scroll-bars is abandoned.</li>
+  <li>FITS files are loaded as a stream and a current state is
+    transparently indicated.</li>
+  <li>Kombine has been revised to suppress fringing patterns.</li>
+  <li>The development repository of Munipack has changed installation manner
+    to reflect latest security recommendations for GNU/Debian.</li>
+  <li>Artificial sky tool supports models of elliptical galaxies.</li>
+  <li>Export in View supports shrinking of output files.</li>
+  <li>Implemented basic preferences in GUI</li>
+  <li>Developed a new coordinate grid.</li>
+  <li>Xmunipack has moved config file into <samp>$HOME/.config/</samp> by
+    <a href="https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html">XDG recommendations</a>.
+    The obsolete config in
+    <samp>$HOME/.xmunipack/</samp> is abandoned, and can be safety removed.</li>
+</ul>
+
+<h3>Possible directions:</h3>
+<ul>
+  <li>Tools for Image analysis in GUI</li>
+  <li>Robust photometry calibration</li>
+  <li>GUI wrappers for common functions</li>
+</ul>
+
+
+<h2>Changelog of 0.5.14 (Bullseye) release</h2>
+
+<p>Release date: 4. February, 2021. </p>
+<p>A bugfix release of previous release.</p>
+
+<h3>The bugfix</h3>
+  <p>
+    The interface, introduced in latest release, caused run-time crashes
+    under all i386, armhf, armel architectures in Debian nomenclature.
+    An inspection revealed that C_LONG has been associated with C_LONG_LONG,
+    and vice versa, for some routines. It looks like the 32-bit platforms
+    distinguish the types; 64-bit platforms does not.
+    The malfunction has not been detected during previous tests.
+  </p>
+  <p>
+    The confusion became as result of my blind following of API in the
+    manual (even obsolete), and missing double check against C headers.
+  </p>
+
+
+<h3>Other improvements:</h3>
+<ul>
+  <li>Munipack web pages, and CSS, has responsive html/css façade. </li>
+  <li>Web pages, and archive, has been secured. All pages are available
+    via both http and https protocols. The tar archive is signed by me.
+  </li>
+  <li>
+    Phcorr has included bug-fix for case than corrections are applied sequentially:
+    If the flat correction has been applied on an image with dark or bias
+    already subtracted, the result FITS has no HDU with the corrected frame
+    included, and std.err.frames has been doubled. Now, the first image
+    extension is replaced by the corrected frame, and any std.err. HDU
+    are replaced by a new one. The malfunction has been reported by Majda.
+  </li>
+  <li>File system watcher (the utility reloading files on-the-fly) has been made
+    optional. One requires a notification daemon which is missing on GNU Hurd,
+    one from the Debian architectures (revealed by Debian QA).
+  </li>
+</ul>
+
+
+<h2>Changelog of 0.5.13 (Bullseye) release</h2>
+
+<p>Release date: 21. December, 2020. </p>
+<p>An interface of cfitsio library for modern Fortran has been developed
+  in this release.
+</p>
+
+<h3>The improvement:</h3>
+
+  <p>
+    Autopkgtest
+    (<a href="https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=977559">#977559</a>)
+    has reported an issue under arm64 (aarch64) platform for version 3.49 of
+    cfitsio library, whilst amd64 port is unaffected.
+    An incompatibility in passing of integer numerical types between C and Fortran
+    has been revealed for the array argument NAXES of
+    <a href="https://heasarc.gsfc.nasa.gov/docs/software/fitsio/c/f_user/node51.html">ftgisz()</a> which wraps
+    <a href="https://heasarc.gsfc.nasa.gov/docs/software/fitsio/c/c_user/node40.html">ffgisz()</a>. The calling of C functions from Fortran, and vice versa,
+    is a complex problem, requiring resourceful C macros and functions,
+    and varying on a specific software platform.
+    </p>
+    <p class="indent">
+    I resolved the issue by building of an interface of
+    cfitsio library for modern Fortran. The interface fully replaces
+    the wrapping parts of cfitsio, and utilises C/C++ interoperability,
+    a part of Fortran standard since 2003 revision.
+    </p>
+    <p class="indent">
+    As the side effect, a speed of I/O operations has significantly increased.
+    I had improved also reading of tables by slicing columns: tables are read
+    in rows-major order, rather than in column-major, according to recommendations in
+    <a href="https://heasarc.gsfc.nasa.gov/docs/software/fitsio/c/c_user/node125.html">cfitsio manual</a> (13.2 Optimization Strategies, paragraph 3).
+    There are new implementations of the file handling, and the backup.
+    </p>
+
+<h3>Minor changes:</h3>
+<ul>
+  <li>Added Gaia EDR3 catalogue.</li>
+  <li>Reformatted web pages.</li>
+</ul>
+
+
+<h2>Changelog of 0.5.12 (Bullseye) release</h2>
+
+<p>Release date: 30. November, 2020. </p>
+<p>This release takes a snapshot of latest improvements
+  for the incoming Debian release.</p>
+
+<h3>Improvements:</h3>
+<ul>
+  <li>The estimate of aperture photometry errors is implemented in accordance
+    to DAOPHOT.</li>
+  <li>The sky level estimation in FIND, APHOT has increased
+    maximum of source pixels on a few millions
+    (only ten thousands pixels has been used previously).</li>
+  <li>The sign convention of geographical longitude is changed
+    (now: +east, -west).</li>
+  <li>Fluxes has units eV/s/m2 rather then W/m2. Fluxes are used in
+    photometry calibrated images and tables (results of <samp>phcal</samp>).
+    This choice brings more human friendly numbers for quantities (photons-like for
+    optical bands).
+    By default, flam, fnu, stmag and abmag are no longer included
+    into the tables; they are available via --quantity option.</li>
+  <li>Elliptical apertures are implemented in APHOT. This improvement
+    looks mostly useless; the accuracy improvement of prolonged stars is
+    disputable.</li>
+  <li>Kombine includes of geographic coordinates into FITS headers.</li>
+  <li>Main View frame redesigned: the redesign includes complete look change,
+    a new implementation of the display, and a new zoom tool. One adds a caption
+    at bottom (like to figure captions in regular articles).
+    All prints uses a human-like formatting with pre- and suffixes to units.</li>
+  <li>The old-school looking help removed; one is replaced by a call
+    of a regular Web browser. wxWebView gives a poor user experience.</li>
+  <li>CSS style, layout, html in doc/ are updated to be suitable for small
+    screens, and compatible with latest web standards.</li>
+  <li>File properties dialog improved by Gnome GUI guidelines.</li>
+  <li>Sesame resolver implemented (CLI, in Cone search GUI).</li>
+  <li>Cone search has a new façade.</li>
+  <li>GUIs has been developed for FIND, APHOT</li>
+  <li>A file system watcher has been implemented: a FITS file opened in View
+    is monitored, and re-loaded immediately following a modification.</li>
+  <li>Bug for small icons in the tune window has been fixed;
+    one caused crash due division by zero.</li>
+  <li>The backups implementation is simplified, also
+    <samp>--no-clobber</samp> renamed to <samp>--overwrite.</samp></li>
+  <li>The bug leading to the "Malformed input record" error report is solved.
+    "Interrupted system call" warnings are supresses as much as possible.
+    Module implementing sub-processes handling updated.</li>
+  <li>FITSIO related bugs has been corrected:
+    in fitsio wrapper (Debian bug #920426),
+    <samp>ftpclj</samp> (programming mistake) replaced by <samp>ftpcll</samp>
+    in <samp>fits_write_col_logical()</samp>; the bug stops compilation under
+    recent gfortran (versions ≥10).</li>
+  <li>A support for wxGTK3 toolkit added. Sources are fully compatible
+    with wxGTK2. There was some issues with their parallel presence.</li>
+  <li>I fixed use of c_str(). Description of details can be found in Changelog
+    of wx-3.0.x series.</li>
+</ul>
+
+
+
+<h2>Changelog of 0.5.11 (Oak Leaf) release</h2>
+
+<p>Release date: 22. January, 2019. </p>
+<p>This release is the milestone in develop of robust statistical methods.</p>
+
+<h3>Important changes:</h3>
+<ul>
+  <li>The core part of robust statistical library initiated founding of
+    <a href="https://integral.physics.muni.cz/oakleaf/">Oak Leaf library</a>.
+  </li>
+</ul>
+
+
+<h3>Improvements:</h3>
+<ul>
+
+  <li>In both accuracy and reliability of
+    <a href="man_phcal.html">phcal</a> estimates:
+    to hold Poisson distribution, star counts and
+    their errors are re-scaled by the reference; routine for
+    estimates has been rewritten (now part of Oak Leaf),
+  </li>
+  <li>In <a href="man_cone.html">cone</a>: the reliable HTTP client
+    implementation, added magnitude selection limit in convenience parameters,
+    included transformation of UCAC4 Gunn's ri to Johnson RI magnitudes
+    (the external ucac_jmuc.py is unnecessary).</li>
+  <li>Redesigned VOTable source code to be more flexible,</li>
+  <li>Routine fitsut has been renamed to <a href="man_fits.html">fits</a>,
+    the command line interface updated, added new keywords, and
+    copy capability,</li>
+  <li>In <a href="man_find.html">find</a>, the complex code,
+    related to memory buffers, is replaced by easy to use of internal files,
+    sky is estimated by using of significantly larger amount data points
+    </li>
+  <li><a href="man_aphot.html">aphot</a> has corrected
+	potential crash condition for stars near edges:
+	the output star list has an initialisation.
+  </li>
+  <li>Major revision of the pre-correction code: phcorr, flat, dark.
+    All the code has been updated to Fortran 2008 (with modern classy look
+    including classes), it has deeply redesigned both control flow and
+    re-arrangement of routines, the flat-fielding part is updated
+    (preserving compatibility, but simpler and with more reliable estimate
+    of the gain), added new masking method by the median.
+  </li>
+  <li><a href="man_kombine.html">Kombine</a> major revision includes:
+    complete redesign in Fortran 2008, also redesign of
+    interpolation core, new interpolation method has been added,
+    command line interface is updated.</li>
+  <li><a href="man_timeseries.html">Timeseries</a> major revision:
+    complete redesign in Fortran 2008, listing of keywords, filenames,
+    some command line interface changes, added horizontal coordinates
+    and airmass.</li>
+  <li><a href="man_colour.html">Colour</a> processing major revision:
+    code re-designed, removed ctrafo,
+    added white balance by photometry calibration, by a white spot, by a star,
+    and by hand. Updated colour transformation tables. The colour
+    processing is energy oriented now, rather than photon-based,
+    to get better correspondence with human perception.
+  </li>
+  <li>
+    xmunipack major revision of View window: it has updated look,
+    the display engine is rewrittem, pre-scaling and zooming.
+    Itt has removed some intensity profiles, generally Itt has
+    lost importance in behalf of the pre-scaling. New intensity
+    scaling engine has been developed, including new initial scaling setup.
+    Both colour tuning, and nite view, has been improved,
+    code re-designed: processing in CIE Luv is replaced by Lab.
+    PNG save code updated, tune panel update,
+    coordinates and values has added the optical (energy) intensity in eV.
+    Corrected bugs: zooming synchro of source drawings, Tune panel (reset),
+    looking glass window works correctly on edges, an offset of value and
+    cross-hair has gone. And also, many of bugs has been added.
+  </li>
+  <li>Fixed bug which cause of Improper input (for long input lists).
+  <li>
+    Altered FITS file <a href="man_backup.html#backup">backup strategy</a>.
+  </li>
+  <li>Minpack library has been removed from source tree.</li>
+  <li>Improved command-line processing.</li>
+  <li>
+    Updated bootstraping to be compatible with Debian
+    <a href="https://wiki.debian.org/ReproducibleBuilds">reproducible</a>
+    builds.
+  </li>
+  <li>Updated Autotools machinery (configure and Makefiles). </li>
+<li>Initiated to develop of Fortran 95+ interface to cfitsio:
+  it causes of savage simplification of a plenty of source lines,
+  as well as improves quality of code, at least for valgrind.
+  </li>
+</ul>
+
+<h2>Changelog of 0.5.10 (Flat-fielding) release</h2>
+
+<p>Release date: 16. January, 2018. </p>
+<p>This release is focused on improving of already
+  developed features.</p>
+
+<h3>Improvements:</h3>
+<ul>
+  <li>Developed new flat-field approach which is mostly like
+    onto photometry calibration than a plain averaging.
+    I believes the implementation is correct, from different
+    points of view, for the first time.</li>
+  <li>Astrometry has faster lucky-match option, input stars are
+    sliced by brightness, has enhanced robust algorithms (estimate
+    of scale, stability, reliability) and some bug-fixes.</li>
+  <li>Estimation of the photometry calibration is regularised which
+    leads to more precise and reliable results of photometry,
+    flat-fielding, etc.</li>
+  <li>Kombine implements averaging of input frames and the
+    result frames might be rotated.</li>
+  <li>Improved estimation of std.errors for aperture photometry
+    leading to better photometric precision as well as conversion
+    of some photometric quantities.</li>
+  <li>All robust algorithms has updated their estimate of scale.</li>
+  <li>Improved artificial features: background in magnitudes per
+    square arcsecond, documentation.
+  <li>Bug-fixes in utilities: phcorr, artificial, votable, list and
+    the graphical  interface.</li>
+</ul>
+
+
+<h2>Changelog of 0.5.9 (Artificial Sky) release</h2>
+
+<p>Release date: 18. July, 2017. </p>
+<p>This release is bugfix release of previous 0.5.8 (Artificial Sky).</p>
+
+
+<h2>Changelog of 0.5.8 (Artificial Sky) release</h2>
+
+<p>Release date: 14. July, 2017. </p>
+<p>This release is mostly focused on an artificial sky
+  and related affairs.</p>
+
+<h3>New features:</h3>
+<ul>
+  <li>The creation of artificial sky as the testing framework.</li>
+</ul>
+
+<h3>Improvements:</h3>
+<ul>
+  <li>Robust statistical methods are implemented by more reliable
+    algorithms.</li>
+  <li>Flat-fielding problem is fully solved.</li>
+  <li>Added UCAC5 catalogue. UCAC4 is still default due wider
+    (photometry) completness.</li>
+</ul>
+
+
+<h2>Changelog of 0.5.7 (Growth Curve) release</h2>
+
+<p>Release date: 25. October, 2016. </p>
+<p>This release is mostly focused on growth curve photometry.</p>
+
+<h3>New features:</h3>
+<ul>
+  <li>Growth curve method is implemented for general radial profiles
+    of stars by using a stable and flexible algorithm. Main goal is
+    photometry calibration
+    of total fluxes (one is superior to aperture correction,
+    independent on seeing) for absolute calibration.
+    A subjective choice of aperture radius is no more
+    need and results are more reliable and less noisy.</li>
+  <li>Statistical estimates of data scatter are on base of minimise
+    of entropy rather on maximum-likelihood method. Results
+    has the most minimal dispersion possible and limited mostly
+    by photon statistics.</li>
+</ul>
+
+<h3>Improvements:</h3>
+<ul>
+  <li>More efficient approach and defaults for astrometry.</li>
+  <li>New astrometry core, better estimation of limits on base of statistical tests.</li>
+  <li>Implemented astrometry for reflected frames.</li>
+  <li>Many important gfortran run-time exceptions (zero division, overflow) bugfixed.</li>
+  <li>A correct estimation of Hessian (also errors of parameters) in robust
+      optimalisation.</li>
+  <li>An inverse matrix implemented also for singular case.</li>
+  <li>The output photometry format is changed: implemented new keywords and features,
+      only results are saved by default.</li>
+</ul>
+
+
+<h2>Changelog of 0.5.6 (Photon Calibration) release</h2>
+
+<p>Release date: January 05, 2015. </p>
+<p>This release is mostly focused on the precise photometry calibration.</p>
+
+<h3>Improvements:</h3>
+<ul>
+<li>Developed new approach for colour transformations and photometry calibration.</li>
+<li>Robust algorithms improved (precise estimation of statistical errors, initial
+    estimates and better convergence).</li>
+<li>Developed a new flat-fielding algorithm (with precision of up to second
+order, side product is estimation of gain from series of flats). </li>
+<li>Regular system of packaging is preferred (DEB and RPM builders prepared).
+    Bundle installation is obsolete now. </li>
+<li>Changed structure of photometry files. Removed frameconv utility
+(merged to phcal).</li>
+<li>Bugfixes: phcorr (saturation, null output),
+    timeseries (reports missing values as undefined) and
+    using of compressed FITSes.</li>
+<li>Docs are generated along with full package.</li>
+<li>Plplot replaced by wxMathPlot. Removed dependency on Plplot
+(which drops dependency on exact version of wxWidgets). </li>
+</ul>
+
+
+
+<h2>Changelog of 0.5.5 (Nights Without Convergence) release</h2>
+
+<p>Release date: April 1, 2014. </p>
+<p>This release is mostly focused on running tests of improved robust algorithms.</p>
+
+<h3>New feature:</h3>
+<ul>
+<li>Robust method uses joint estimator of location and scale which
+    reduces scatter.</li>
+</ul>
+
+<h3>Improvements:</h3>
+<ul>
+<li>Gain is proper photometry correction like flat-field since now.</li>
+<li>Cone search supports selection of mirrors of VizieR servers and supports
+    network timeout recovering.</li>
+<li>Preliminary implementation of a general cross-match utility.</li>
+<li>Preliminary attempt for PSF.</li>
+<li>Google code site is planed for shutdown. Its content has been merged
+    with homepage to prevent confusing of users.</li>
+<li>A final test of astrometry calibration can be suppressed to allow calibrate
+    with a low-precision (without knowledge of the exact projection for wide-fields).</li>
+<li>Bugfix: DATE-OBS set by environment variables, undefined values in conversion
+           VOTable to FITS, flat-field scaling, </li>
+<li>Default photometry system is renamed from Landolt to Johnson (older designations
+    is incorrect).</li>
+<li>Clear code for: command-line interface, conventions for negative declinations,
+  exit codes of command-line utilities.</li>
+<li>Clean-up of unused and obsolete parts.</li>
+<li>Updated for wxWidgets 3.0. Planed replace of Plplot by wxMathPlot.</li>
+</ul>
+
+
+<h2>Changelog of 0.5.4 (Photon Rain) release</h2>
+<p>Release date: July 31, 2013. </p>
+<p>This release is mostly focused on the photometric calibration. </p>
+<h3>New features:</h3>
+<ul>
+<li>Transformation between photometric systems. </li>
+<li>Full photometric calibration. </li>
+<li>Developed format for light-curve storage. </li>
+</ul>
+<h3>Improvements:</h3>
+<ul>
+<li>In astrometry matching (speed-up, robustness, brightness as next comaprison atributte, closed path). </li>
+<li>In astrometry (proper motion, UCAC4 as default catalogue). </li>
+<li>New approach on photometry pre-corrections (bias, dark, flat-field). </li>
+<li>FITS header edition. </li>
+<li>Default values for long options. </li>
+<li>Changed structure of FITS tables. </li>
+<li>Building supports system-wide configuration. </li>
+<li>GUI updated to match modern desktops. </li>
+<li>Huge expansion of documentation. </li>
+</ul>
+
+<h2>Changelog of 0.5.3 (New Generation) release</h2>
+<p>Release date: June 29, 2012. </p>
+<p>This release is mostly focused on the astronomical engine: photometry, astrometry, listing and kombine. </p>
+<h3>New features:</h3>
+<ul>
+<li>New astrometry, photometry and cone search dialogs. </li>
+<li>Tutorials for all basic astronomical tasks. </li>
+<li>New implementations: listing (light curves, catalogues, use astrometry calibration) and kombine (spherical projections, geometrical transformations, mosaicking). </li>
+<li>Backup methods uses GNU conventions (suppresed cfitsio&#x27;s !clobbers) </li>
+<li>Konve and picko has been removed and ones are provided as externals. </li>
+<li>New image display algorithm in View. </li>
+<li>Atom-feed. </li>
+</ul>
+<h3>Improvements:</h3>
+<ul>
+<li>Docs converted to HTML5. </li>
+<li>Docs has been restructured and extended for description of completed features and tutorials </li>
+<li>Improved astrometry algorithms (new back-tracking core, abs+rob-fitting code, added least squares, complete update of astrometry code, tuning of parameters and methods on data) </li>
+<li>Improvements in robust estimations (core, precision and stability) </li>
+<li>Implemented astrometry of reference and relative frame. </li>
+<li>Locales-friendly changes </li>
+<li>Improved Tuning: new contrast, color band parameters. </li>
+<li>Updated for new compilers g++/gfortran </li>
+<li>tuning of distribution (used -rpath, clean-ups). </li>
+<li>Implemented exposure mask for kombine </li>
+</ul>
+
+<h2>Changelog of 0.5.2 (Astrometry) release</h2>
+<p>Release date: Oct. 19, 2011. </p>
+<p>This release is mostly focused on astrometry. </p>
+<h3>New features:</h3>
+<ul>
+<li>Developed GUI and fitting engine for astrometry. </li>
+<li>CLI utilities for astrometry, photometry and listing. </li>
+<li>Initial support for VO (cone-search, VOTable). </li>
+<li>Now, objects and photometry are stored as HDU tables in FITS files. </li>
+<li>New match algorithm on base of back-tracking. </li>
+<li>Code for WCS in FITS. </li>
+<li>Implemented splashing and resume panels. </li>
+<li>Binary builders (and distribution packages) for DEB and RPM based distributions. </li></ul>
+<h3>Improvements:</h3>
+<ul>
+<li>Config files moved to ~/.xmunipack/ directory. </li>
+<li>Updated homepage (added pages for new utilities, design). </li>
+<li>Adapted for latest wxWidgets (important support for event-driven in without GUI - crutial for run of external utilities, main reason for update to latest wxWidgets, support for floats in spin buttons,..). </li>
+<li>Portable implementations for external processes, CLI parameters parsing. </li>
+<li>Reimplementation of interface to launching of external processes (portable support of pipelining including chained comands and I/O data passing, very important improvement). </li>
+<li>Reimplemented original utilities (classic edition) for new architecture. </li>
+<li>Redesigned GUI for display of images (added right panel). </li>
+<li>Replacement for side panel (for HDU selection is used combo-box). </li>
+<li>Improvemnets of icon (file operation) handling in Browser. </li>
+<li>Reimplemented image tunning. </li>
+<li>Removed bottom toolbars. </li>
+<li>Reimplemented color fits. </li>
+<li>FITS header to single window. </li>
+<li>Enhanced code for displaing, reimplemented zooming and scrolling of images. </li>
+<li>Clean code for threading start/stop, conditional variables (more stability). </li>
+<li>Support of different column types in FITS tables. </li>
+</ul>
+<p>The reimplementation of Color FITS is extremely important step. The backward compatibility is broken. External utilities (rawtran and fitspng) are required in versions above 0.3. </p>
+<h2>Changelog of 0.5.1 (Coloring) release</h2>
+<p>Release date: Oct, 17, 2010. </p>
+<p>This release is mostly focused on color processing. </p>
+<h3>Improvements in color processing:</h3>
+<ul>
+<li>added coloring utility (create of natural color images from a set of single-band ones) </li>
+<li>added color space transformation utility (XYZ, Luv, BVR, Scotopic) </li>
+<li>added tuning of colors: saturation, hue, white point (Luv is used as the base transformation color space) </li>
+<li>advanced GUIs for coloring </li>
+</ul>
+<h3>Improvements in GUI:</h3>
+<ul>
+<li>exporting of FITS headers, images and tables in View to another format (png,jpg for images, txt for header and tables) </li>
+<li>rewrote archive and list implementation for speed, efficiency and fashion </li>
+<li>support for clipboard and DnD, a simple XML serialization </li>
+<li>GUI for corrections and averaging </li>
+<li>added Console and Preferences </li>
+<li>GUI class reimplementation for floating windows (detail, tune,..) </li>
+<li>plotting via plplot library </li>
+<li>enhanced all functions in browser (list types, icons, labels and arrange) </li>
+<li>drop shadow and highlighting icons in browser </li>
+<li>started use of updateUI events, custom dialogs and validator (thx to wxWidget bible) </li>
+<li>improved speedup in archive, list and image display </li>
+<li>reimplemented launching of external utilities in GUI </li>
+<li>added GUI for import of RAW pictures </li>
+<li>implemented search in metadata in Browser </li>
+<li>design improvements </li>
+<li>enhancements in display and tune dialogs </li>
+<li>significant improvements in image displaying </li>
+</ul>
+<h3>Improvements in command line utilities:</h3>
+<ul>
+<li>corrections for dark,flat and bias </li>
+<li>averaging of dark (biases) and flats </li>
+<li>adapted meandark, autoflat, darkbat and flatbat to a new fashion </li>
+<li>founded munipack CLI interface (we&#x27;re on the way to use only xmunipack and munipack binaries) </li>
+</ul>
+<h3>and finally:</h3>
+<ul>
+<li>in docpage, forked classic edition, improvements of homepage design </li>
+<li>new doc pages: color FITS specification, color processing, tune  </li>
+<li>reimplemented linux installer (very very hard work!) </li>
+<li>bugfixes (see issues) </li>
+</ul>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

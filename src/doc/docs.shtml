@@ -1,0 +1,147 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Documents</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<div class="content">
+
+<h1 class="noindent">Documents</h1>
+
+<p class="abstract">Detailed documentation of data products, methods and
+software base.
+</p>
+
+
+<div class="twocolumn">
+<div class="column">
+<h2 class="ttop">Installation and download</h2>
+<ul>
+<li><a href="download.html">Download</a></li>
+<li><a href="install.html">Installation</a></li>
+<li><a href="appimage.html">AppImage</a></li>
+<li><a href="SourceInstallation.html">Source code</a></li>
+</ul>
+
+<h2>Development</h2>
+<p>
+Current status, explanations of features, problems, etc.
+</p>
+
+<ul>
+<li><a href="changes.html">Recent Changes</a></li>
+<li><a href="version.html">Versioning</a></li>
+<li><a href="https://integral.physics.muni.cz/pelican/tag/munipack.html">Blog</a></li>
+<li><a href="modules.html">Modules</a> ‒ package architecture</li>
+<!--<li><a href="credits.html">Credits</a></li>-->
+<li><a href="history.html">Time-line (history)</a></li>
+<!--<li><a href="phcalibration.html">Photometric calibration</a></li>-->
+</ul>
+
+
+<h2>Software base</h2>
+
+<ul>
+<li><a href="https://integral.physics.muni.cz/oakleaf/">Oakleaf</a>
+  ‒ robust statistic library,</li>
+<li><a href="https://en.wikipedia.org/wiki/MINPACK">Minpack</a>
+  ‒ non-linear optimalisation,</li>
+<li><a href="https://www.wxwidgets.org">wxWidgets</a>
+    ‒ user interfaces,</li>
+<li><a href="http://www.plplot.org/">PLplot</a>
+    ‒ graphs,</li>
+<li><a href="http://people.sc.fsu.edu/~jburkardt/index.html">John Burkardt Software Collection</a>,</li>
+<li><a href="https://heasarc.gsfc.nasa.gov/fitsio/">FITSIO</a>
+    ‒ FITS files input/output library.</li>
+<li><a href="external.html">External Utilities</a></li>
+<li><a href="https://integral.physics.muni.cz/rawtran/">Rawtran</a> and
+    <a href="https://www.dechifro.org/dcraw/">dcraw</a>
+    ‒ import of raw photos.</li>
+</ul>
+
+
+<h2>Related software</h2>
+
+<p>
+Links to related software tools.
+</p>
+
+<ul>
+<li><a href="http://www.ivoa.net/astronomers/applications.html">Virtual Observatory Software</a></li>
+<li><a href="http://astrometry.net/">http://astrometry.net/</a></li>
+<li><a href="http://www.astromatic.net/">http://www.astromatic.net/</a></li>
+<li><a href="http://ds9.si.edu/">SAOImage DS9</a></li>
+<li><a href="http://astro.dur.ac.uk/~pdraper/gaia/gaia.html">Gaia</a></li>
+<li><a href="http://heasarc.gsfc.nasa.gov/docs/software/ftools/fv/">Fv: The Interactive FITS File Editor</a></li>
+<li><a href="http://www.astrosurf.com/buil/us/iris/iris.htm">IRIS</a></li>
+<li><a href="http://gcx.sourceforge.net/">GCX</a></li>
+</ul>
+
+</div>
+
+<div class="column">
+
+<h2 class="ttop">Data formats</h2>
+<p>
+Definitions and descriptions
+</p>
+
+<ul>
+<li><a href="dataform_astrometry.html">Astrometry Header</a></li>
+<!--<li><a href="dataform_biasdark.html">Bias and Dark File</a></li>
+<li><a href="dataform_flat.html">Flat-field File</a></li>-->
+<li><a href="dataform_proc.html">Processing File</a></li>
+<li><a href="dataform_photometry.html">Photometric Calibration</a></li>
+<li><a href="dataform_tmseries.html">Time Series Tables</a></li>
+<li><a href="dataform_photosys.html">Photometry Systems Definition</a></li>
+<li><a href="dataform_phfotran.html">Photometry Systems Transformation</a></li>
+<li><a href="dataform_growrep.html">Grow-Curve Report</a></li>
+<li><a href="dataform_artgalaxy.html">Artifical galaxy catalogue</a></li>
+<li><a href="dataform_artpsf.html">Artifical PSF</a></li>
+<li><a href="colourfits.html">The specification of colour FITS</a></li>
+</ul>
+
+
+<h2>White papers</h2>
+<ul>
+<li><a href="http://adsabs.harvard.edu/abs/1998stel.conf...30H">Hroch, F.: Computer Programs for CCD Photometry</a> (obsolete)</li>
+<li><a href="http://monoceros.physics.muni.cz/~hroch/amachine.pdf">On Machine Astrometry</a> (talk)</li>
+<li><a href="http://monoceros.physics.muni.cz/~hroch/phcount.pdf">Calibration of Photon Counting Detectors</a> (talk)</li>
+
+</ul>
+
+<h2>Books</h2>
+<ul>
+<li><a href="http://www.cambridge.org/gb/knowledge/isbn/item2713446/">To Measure the Sky </a> by F. R. Chromey</li>
+<li><a href="http://www.cambridge.org/gb/knowledge/isbn/item1150743/">Astronomy Methods</a> by H.Bradt</li>
+<li><a href="http://link.springer.com/book/10.1007/978-3-540-76583-7/page/1">Electronic Imaging in Astronomy</a> by Ian S. McLean</li>
+</ul>
+
+<h2>Classic edition</h2>
+<p>
+Obsolete description of obsolete Munipack.
+</p>
+<ul>
+<li><a href="classics.html">Classics Edition</a></li>
+</ul>
+
+<h2>License</h2>
+<div style="float: left;">
+<img src="gplv3-88x31.png" alt="GPL" width="88" height="31" style="float: left; padding-right: 1em; padding-bottom: 0.1em;">
+</div>
+<p>
+Munipack is <a href="https://www.gnu.org/philosophy/free-sw.html">free software</a>
+licensed under the <a href="https://www.gnu.org/licenses/gpl.html">GNU General Public License</a>.
+This gives you the freedom to use and modify Munipack to suit your needs.
+</p>
+
+</div>
+</div>
+
+</div>
+
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+  <!-- #include "meta.shtml" -->
+<body>
+  <!-- #include "head.shtml" -->
+
+<h1>Quantil mean</h1>
+
+  <h2>Synopsis</h2>
+
+<pre class="fortran">
+
+use oakleaf
+
+subroutine <span class="subroutine">qmean</span>(data,mean,stderr,stdsig,sortby,sigby,flag)
+   real, dimension(:), intent(in) :: data
+   real, intent(out) :: mean
+   real, intent(out), optional :: stderr,stdsig
+   character(len=*), intent(in), optional :: sortby,sigby
+   logical, intent(in), optional :: verbose
+   integer, intent(out), optional :: flag
+end subroutine qmean
+</pre>
+
+   <h2>Description</h2>
+
+  <p>
+    This routine estimates both averadge and standard deviation
+    of a data set on base of the
+    <a href="https://en.wikipedia.org/wiki/Order_statistic">order statistics</a>,
+    i.e.  <a href="https://en.wikipedia.org/wiki/Quantile_function">quantiles.</a>
+    The median, the <i>Q(0.5)</i> quantile, is claimed as the (robust) mean.
+  </p>
+  <p>
+    The standard deviation (and consequently the standard error)
+    is estimated preferably
+    by the <i>Q<sub>n</sub></i>-estimator due Rousseeuw & Croux;
+    one is more durable on
+    highly contamined samples, yet additional memory space is required.
+    In other cases (<i>N &lt; 3</i> or <i>N &gt; 2**16</i>),
+    the deviations is determined as <i>MAD/0.6745</i>,
+    where <i>MAD</i> is the median of absolute deviations.
+  </p>
+
+<p>
+  Both the median and the <i>Q<sub>n</sub>,MAD</i> are robust estimators,
+  however they
+  are generally incompatible to least-square estimates, as being
+  granulated and deviated for contamined data.
+  </p>
+
+<p>
+  The <a href="https://en.wikipedia.org/wiki/Quicksort">quick sort</a> algorithm
+  is used for small samples <i>N &le; 42</i>;
+  one requires <i>N</i> log <i>N</i> operations.
+  The larger samples are estimated by the quick median which needs
+  <i>2N</i> operations
+  (Wirth,D.: Algorithm and data structures, chapter Finding the Median).
+  The <i>Q<sub>n</sub></i>-estimator requires <i>N**2/2</i> elements.
+</p>
+
+  <h2>Parameters</h2>
+
+  <h3>On input:</h3>
+  <dl>
+    <dt>data</dt><dd> array of data</dd>
+  </dl>
+
+  <h3>On output:</h3>
+  <dl>
+    <dt>mean</dt><dd> mean by median</dd>
+    <dt>stderr</dt><dd>(optional) standard error</dd>
+    <dt>stdsig</dt><dd>(optional) standard deviation by MAD</dd>
+    <dt>sorby</dt><dd>(optional) methods of sorting: "qmed" (default), "qsort"
+    <dt>sigby</dt><dd>(optional) standard deviation's method: "MAD" (default), "byQ"
+    <dt>verbose </dt><dd> (optional) print a detailed information
+      about the calulations.</dd></dt>
+    <dt>flag</dt><dd>(optional) a flag,
+      see <a href="status.html">the status codes</a>.</dd>
+  </dl>
+
+  <h2>Example</h2>
+
+  <p>
+    Save the program to the file <samp>example.f08</samp>:
+  </p>
+  <pre>
+program example
+
+   use oakleaf
+
+   real, dimension(5) :: data = [ 1, 2, 3, 4, 5 ]
+   real :: mean,stderr,stdsig
+
+   call qmean(data,mean,stderr,stdsig)
+   write(*,*) 'qmean:',mean,' stderr:',stderr,'stdsig:',stdsig
+
+end program example
+  </pre>
+  <p>
+    Than compile and run it:
+  </p>
+  <pre>
+$ gfortran -I/usr/include example.f08 -L/usr/lib -loakleaf -lminpack
+$ ./a.out
+ qmean:   3.00000000      stderr:  0.992554188     stdsig:   2.21941876
+  </pre>
+
+<!--
+  <h2>Median and MAD estimates</h2>
+
+  <p>This routine estimates the averadge by
+    <a href="https://en.wikipedia.org/wiki/Median">median</a>
+    and the standard deviation by the median of absolute deviations (MAD).
+  </p>
+
+  <pre>
+    subroutine <span class="subroutine">madmed(x,t,s)</span>
+    subroutine <span class="subroutine">madwmed(x,dx,t,s,d)</span>
+
+       real(kind), dimension(:),intent(in) :: x, dx
+       real(kind), intent(out) :: t,s
+    end subroutine qmean
+
+ <b>On input:</b>
+      x - array of data values to be estimated
+      dx (optional) - array of the data errors
+
+ <b>On output</b> are estimated:
+      t - median
+      s - standard deviation as MAD/Q50
+
+  </pre>
+
+  -->
+
+<!--
+<p style="margin:2em; text-align: center;">☘</p>
+
+<h1>Auxiliary tools</h1>
+
+    <h2>Empirical CDF</h2>
+
+<p>
+        The following routine construct	the
+	<a href="https://en.wikipedia.org/wiki/Empirical_distribution_function">
+	  Empirical cumulative distribution function</a> (CDF)
+	from data.</p>
+
+  <pre>
+subroutine <span class="subroutine">ecdf(data,x,p)</span>
+    real, dimension(:), intent(in) :: data
+    real, dimension(:), intent(out) :: x,p
+end subroutine ecdf
+  </pre>
+
+  <h3>On input:</h3>
+  <dl>
+    <dt>data</dt><dd> an array of data values to be estimated</dd>
+  </dl>
+
+  <h3>On output:</h3>
+  <dl>
+    <dt>x</dt><dd> coordinates of absicca of steps</dd>
+    <dt>p</dt><dd> step values</dd>
+  </dl>
+
+    <h2>Quantiles</h2>
+
+  <p>The estimates <a href="https://en.wikipedia.org/wiki/Quantile_function">
+    Q-quantiles</a> by a linear interpolation of empirical CDF
+  between discrete CDF steps.
+  This is the inverse function of the empirical CDF.
+  </p>
+
+  <pre>
+function <span class="subroutine">quantile(q,x,y) result(t)</span>
+   real, intent(in) :: q
+   real, dimension(:), intent(in) :: x,y
+end function quantile
+  </pre>
+
+  <h3>On input:</h3>
+  <dl>
+    <dt>q</dt><dd> quantile as fraction (0 &le; q &le; 1)</dd>
+    <dt>x,y</dt><dd> the empirical CDF</dd>
+  </dl>
+
+  <h3>Result:</h3>
+  <p>
+  The lineary interpolated value of <i>x</i> abscicca for the given quantile.
+  </p>
+
+  <h2>An example</h3>
+  <p>
+    Save following program listing to the file <samp>example.f08</samp>:
+  </p>
+  <pre>
+program example
+
+   use oakleaf
+
+   real, dimension(5) :: data = [ 1, 2, 3, 4, 5 ]
+   real, dimension(5) :: xcf, ycdf
+
+   call ecdf(data,xcdf,ycdf)
+   write(*,*) 'Q(0.75):',quantile(0.75,xcdf,ycdf)
+
+end program example
+  </pre>
+  <p>
+    Than compile and run it:
+  </p>
+  <pre>
+$ gfortran -I$HOME/scratch/opt/include q.f08 -L$HOME/scratch/opt/lib -loakleaf -lminpack
+$ ./a.out
+ Q(0.75):   4.500000000
+  </pre>
+
+-->
+
+  <h2>References</h2>
+
+<p>
+  Wirth,D.: Algorithm and data structures,
+  Prentice-Hall International editions (1986)
+</p>
+
+<p>Rousseeuw, Peter J and Croux, Christophe:
+  Alternatives to the median absolute deviation,
+  Journal of the American Statistical association vol. 88, 1273--1283 (1993)
+</p>
+
+
+<!-- #include "foot.shtml" -->
+</body>
+</html>

@@ -1,0 +1,189 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Find Stars</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Find Stars</h1>
+
+<p class="abstract">
+Detects stars on frames. The stars are supposed to be a Gaussian-like peaks
+with FWHM provided by user. Additional parameters are used to reject false
+detection due to various defects.
+</p>
+
+<h2>Synopsis</h2>
+
+<code>
+munipack find [.. parameters ..] file(s)[,result(s)]
+</code>
+
+<h2>Description</h2>
+
+<p>
+Fully automatic detection of stars on frames is very important
+and also difficult. Munipack uses an algorithm developed by P.B.Stetson
+for DAOPHOT II with small changes. The algorithm is very robust,
+insensitive to wide range of defects including hot pixels or cosmic-ray
+events. One also detect stars on varying background (Moon shine, in
+galaxies etc).
+</p>
+
+<p class="indent">
+Stars are detected on base of their shapes. One supposes
+that second moments of stars are similar in vertical and horizontal
+axes with value nearly to FWHM. We also suppose that PSF of stars
+is not too sharp. The limits of parameters can be tuned
+(while it is not needed frequently): round and sharp parameters are
+in detail described in <a href="http://adsabs.harvard.edu/abs/1987PASP...99..191S">DAOPHOT - A computer program for crowded-field stellar photometry by P.B.Stetson</a>.
+</p>
+
+<h2>Algorithm</h2>
+
+<p>
+Stars detection algorithm:
+</p>
+<ul>
+<li>As the preparation step, the background level with the noise <i>B,σ</i>
+    of image is determined on a grid covering full frame.</li>
+<li>As the first step, the image is convoluted with Gaussian hat with
+    FWHM provided by user. The convolution has effect of a digital filter
+    which emphasizes star-like objects and suppress point defects or
+    large-scale gradients.</li>
+<li>The convoluted image is searched for local peaks. For every peak,
+    a maximum value is determined. A star candidate has the value
+    above threshold level <i>B+tσ</i> (parameter <i>t</i>
+    corresponds to <samp>--th</samp> switch) and below saturation <i>S</i>
+    limit (given by <samp>--saturate</samp>)</li>
+<li>The parameters <samp>round</samp> and <samp>sharp</samp> are determined
+    for every candidate.
+    When both parameters lies inside acceptable intervals (tune it via
+    <samp>--rndlo,--rndhi,--shrplo,--shrphi</samp> options), the candidate
+    is stored and classified as a star.
+    </li>
+<li>Rectangular coordinates and peak ratio are determined for every star.</li>
+</ul>
+
+<p class="indent">
+The data under level <i>B-uσ</i> (where parameter <i>u</i> corresponds
+to <samp>--lothresh</samp>) are not used during the detection process.
+</p>
+
+<p class="indent">
+This routine adds a FIND extensions to original frames
+as a table, its is described in <a href="dataform_proc.html">Find Format</a>.
+</p>
+
+
+<h2>Relation to DAOPHOT II</h2>
+
+<p>
+The routine is on base of original code of DAOPHOT II by P.B.Stetson
+(has been forked from Midas's implementation at 1996). Some additional
+enhancements has been done:
+</p>
+<ul>
+<li>Robust estimators replaces the original estimators of averages.</li>
+<li>All processing is done in memory (no disc buffering is used).</li>
+<!--<li>Real numbers in double precision are implemented</li>-->
+<!--<li>The output of magnitudes has been abandoned.</li>-->
+<li>FITS files for both input and output are used</li>
+<li>Log format is changed.</li>
+<li>Seldom bugs are corrected.</li>
+<li>Code is updated for Fortran 95 (and perhaps above).</li>
+</ul>
+
+<h2>Input And Output</h2>
+
+<p>
+On input, list of frames with already applied photometric pre-calibrations is expected.
+</p>
+
+<p>
+On output, a table with detected stars, represented by FITS extension, is added
+to all input images.
+</p>
+
+<p>
+  Warning. The saturation and the read-noise parameters can be specified;
+  their values are kept in header of the new FITS extension. If the same values
+  are also included in the original image header, they will be untouched
+  having consequence that the values will be distinct.
+  Munipack next processing (mainly photometry) will get the new values.
+</p>
+
+
+<h2>Parameters</h2>
+
+<h3>Important:</h3>
+<dl>
+<dt><samp>-f</samp></dt><dd>Set FWHM in pixels. The value is set by default to 3 pixels
+    which will satisfactory for small telescopes. Hubble space telescope requires
+    values below 1 pixel and a well sampled image has FWHM between 5 - 10 pixels.</dd>
+<dt><samp>-th</samp></dt><dd>Threshold in sigmas above background.
+    One affects how much and how faint stars will be detected.
+    Common values are about 5-10.
+    Brigh stars detection only requires the threshold above 10 and the
+    dim stars (and many defect) is under 1. Checking values below sky noise is not
+    recommended.
+</dd>
+<dt><samp>--saturate</samp></dt><dd>Saturation in ADU. The value is determined
+    from FITS header using <a href="man_env.html">SATURATE</a> key,
+    when the keyword is not found
+    the upper-limit of float numbers in single precision is supplied
+    (approximate 10<sup>38</sup>). The value will usually not
+    satisfactory because the
+    saturation is primary given by electrical capacity of pixels
+    (device manufacturers supplies theirs values as the full well
+    capacity) and one is usually not related to a numerical range.</dd>
+</dl>
+
+
+<h3>Searching Limits:</h3>
+<dl>
+<dt><samp>--lothresh</samp></dt><dd> lower for threshold in sigmas</dd>
+<dt><samp>--rndlo</samp></dt><dd> lower for round</dd>
+<dt><samp>--rndhi</samp></dt><dd> higher for round</dd>
+<dt><samp>--shrplo</samp></dt><dd> lower for sharp</dd>
+<dt><samp>--shrphi</samp></dt><dd> higher for sharp</dd>
+</dl>
+
+<h3>Additional:</h3>
+<dl>
+<dt><samp>--read-noise</samp></dt><dd>Read noise in ADU. A value from
+    frame header is used by default. Use this option when the value is missing or
+    needs correction. Read noise is important for determining of photometry errors.</dd>
+</dl>
+
+<p>See <a href="man_com.html">Common options</a> for input/output filenames.</p>
+
+  <p>
+    When options for the saturation or read noise are specified, FITS header
+    is updated according to the passed value.
+  </p>
+
+
+<h2>Examples</h2>
+
+<p>
+Detect stars on image:
+</p>
+<pre>
+$ munipack find -f 2 -th 10 pleiades.fits
+</pre>
+
+<h2>See Also</h2>
+<p>
+<a href="man_aphot.html">Aperture photometry</a>,
+<a href="man_com.html">Common options</a>,
+<a href="dataform_proc.html">Processing file</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

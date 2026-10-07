@@ -1,0 +1,99 @@
+
+                   Created by   Filip Hroch <hroch@physics.muni.cz>
+
+ wxWidgets
+ ---------
+
+  xmunipack and munipack interfaces are build on top of wxWidgets
+  library (http://wxwidgets.org). Author is very grateful to all
+  wxWidgets developers and users for their excelent work and advices.
+
+
+ cFITSIO
+ -------
+
+  All FITS I/O are released via cFITSIO library
+  (http://heasarc.nasa.gov/fitsio/fitsio.html).
+
+
+ wxMathPlot
+ ----------
+
+  xmunipack plotting routines uses wxMathPlot library
+ (http://wxmathplot.sourceforge.net/). Author is very grateful
+  to all wxMathPlot developers for their excelent work.
+
+
+  P.B.Stetson & MIDAS developers
+  -----------------------------
+
+Copyright Notice for DAOPHOT II:
+
+
+C @(#)daophot.for       10.1.1.2 (ES0-DMD) 12/18/95 18:51:46
+C===========================================================================
+C Copyright (C) 1995 European Southern Observatory (ESO)
+C
+C This program is free software; you can redistribute it and/or
+C modify it under the terms of the GNU General Public License as
+C published by the Free Software Foundation; either version 2 of
+C the License, or (at your option) any later version.
+C
+C This program is distributed in the hope that it will be useful,
+C but WITHOUT ANY WARRANTY; without even the implied warranty of
+C MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+C GNU General Public License for more details.
+C
+C You should have received a copy of the GNU General Public
+C License along with this program; if not, write to the Free
+C Software Foundation, Inc., 675 Massachusetss Ave, Cambridge,
+C MA 02139, USA.
+C
+C Corresponding concerning ESO-MIDAS should be addressed as follows:
+C       Internet e-mail: midas@eso.org
+C       Postal address: European Southern Observatory
+C                       Data Management Division
+C                       Karl-Schwarzschild-Strasse 2
+C                       D 85748 Garching bei Muenchen
+C                       GERMANY
+C
+
+For all used:
+
+daosky.for, find.for, fotometr.for, dtasubs.for, iodat.for,mathsubs.for,
+daophot.for, sort.for
+
+
+
+ CONTRIBUTORS
+ ------------
+
+  * P.Pravec, M.Velen
+  * Gilles Duvert <duvert@obs.ujf-grenoble.fr>
+  * miroslav.broz@usa.net
+  * Munipack's logo inspired by ideas of of Rudolf Novák <exebece@gmail.com>
+  * Magog White 11 (Gnome icon theme) by Andrea Bonanni,
+    http://gnome-look.org/content/show.php/Magog+White?content=113785
+  * Mac4Lin icon theme by Anirudh Acharya <anirudh.dj@gmail.com>,
+    http://gnome-look.org/content/show.php/Mac4Lin?content=108481 (obsolete)
+  * Moon phases by glunarclock: http://glunarclock.sourceforge.net/
+
+  J. Burkardt
+  -----------
+
+  Nelder-Mead algorithm, Splines:
+
+  Thx to J. Burkardt http://people.sc.fsu.edu/~burkardt/index.html
+  http://people.sc.fsu.edu/~burkardt/f_src/asa047/asa047.html
+  http://people.sc.fsu.edu/~jburkardt/f_src/pppack/pppack.html
+
+
+  FMM
+  ---
+
+   http://www.netlib.org/fmm/
+
+  PPPack
+  ------
+
+   http://www.netlib.org/pppack/

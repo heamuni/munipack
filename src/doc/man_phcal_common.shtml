@@ -1,0 +1,64 @@
+<h2>Prerequisites</h2>
+<p>
+Needs both astrometry and instrumental photometry of frames.
+</p>
+
+<p>
+Headers would contain all the exposure time, filter, telescope area and photometry
+system keywords. 
+</p>
+
+<p>
+Specify photometric system (a conventional
+set of filters). Default is used value from frame header, use it when value is missing 
+or needs correction. The option is important while determining of photometry calibration.
+</p>
+
+<p>
+Specify filter. Default is used value from frame header, use it when value is missing or needs correction. The filter
+ is important while determining of photometry calibration.
+</p>
+
+<p>
+When calibrated frame contains FWHM parameter, the first aperture larger
+then the radius is used. When the parameter missing, the first aperture or user
+provided aperture is used.
+</p>
+
+
+<p><b>Important.</b>
+<p>
+The exposure time, filter, gain, area and an instrumental photometry system 
+are absolutely necessory for calibration and none of them can not be omitted. 
+At first, all values are obtained by reading of headers of FITS files. 
+If at least one is not found, the calibration 
+process is stopped (a wrong calibration which looks as valid is much more worse 
+than any fail).
+</p>
+<p>
+The situation can be solved by the ways:
+</p>
+<ul>
+<li>The values can be provided by editing of input files with help
+    of <samp>fits</samp> module:
+<pre>
+$ munipack fits --key-update AREA=1,'[m] telescope area' huge.fits
+</pre>
+for all missing parameters.
+ </li>
+<li>
+Also convenience options for most frequent missing parameters are
+provided: area and instrumental photosystem:
+<pre>
+$ munipack phcal ... --area 1 --photsys-instr 'MONTEBOO' ... frames.fits
+</pre>
+The convenience options doesn't supply common keywords (exptime, filter
+and gain) which can be usually found in frames.
+</li>
+</ul>
+
+<p>
+While common values of exposure times, filters etc. are included to every
+header, the keywords can differ from Munipack's defaults. In the case,
+set ones via <a href="man_env.html">environment variables</a>.
+</p>

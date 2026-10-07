@@ -1,0 +1,56 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Sesame</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Sesame</h1>
+
+<p class="abstract">
+  Sesame searches an object by its name in Virtual observatory directories.
+  If the name is recognised, Sesame returns ICRS coordinates
+  (Right Ascension, Declination) of the object in degrees.
+</p>
+
+<h2>Command</h2>
+
+<pre>
+munipack sesame [.. options ..] "object name"
+</pre>
+
+<h2>Description</h2>
+
+<p>
+  Sesame is a resolver of astronomical objects names under Virtual Observatory.
+  This utility sends a HTTP query to a Virtual observatory server,
+  and returns the coordinates by parsing of the answer.
+</p>
+
+<p>
+  The official Web interface for Sesame is provided by
+  <a href="http://simbad.u-strasbg.fr/simbad/sim-fbasic">SIMBAD: basic query</a>.
+</p>
+
+<h2>Examples</h2>
+
+<p>
+  The command resolves coordinates of β Perseii:
+</p>
+<pre>
+  $ munipack sesame "beta per"
+    47.04221856 40.95564667
+</pre>
+
+<h2>See Also</h2>
+<p><a href="vobs.html">Virtual Observatory</a>,
+<a href="http://vizier.u-strasbg.fr/vizier/doc/sesame.htx">sesame documentation</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

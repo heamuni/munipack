@@ -1,0 +1,89 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<!--
+<style type="text/css">
+div.questions { float:left; width:32%; padding-right: 1em;}
+div.answers { margin-left:32%; padding-left: 1em;}
+div.answers li { width: 50%; }
+</style>
+-->
+<title>Munipack ‒ Frequently Asked Questions</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>FAQ</h1>
+
+<p class="abstract">
+Frequently Asked Questions
+</p>
+
+<!-- questions -->
+<h1>Questions</h1>
+
+<h2>General</h2>
+<ol>
+<li><a href="#what">What's Munipack?</a></li>
+<li><a href="#license">What's the license of Munipack?</a></li>
+</ol>
+<h2>FITS Format</h2>
+<ol>
+<li><a href="#fits">What's FITS format ?</a></li>
+<li><a href="#whyfits">Why FITS, why not xxx JPG, PNG, etc.. ?</a></li>
+<li><a href="#keyword">My frames has set the keyword XXX (for temperature, object identification,...) and seems to by unused by Munipack.</a></li>
+</ol>
+
+<div style="padding: 2em;"></div>
+
+<!-- answers -->
+<h1>Answers</h1>
+
+<h2>General</h2>
+<ol>
+<li><h4 id="what">What's Munipack?</h4>
+<p>Munipack is a general astronomical image processing software.</p>
+<p>Munipack is primary intended for any astronomical image processing.</p>
+</li>
+<li>
+<h4 id="license">What's the license of Munipack?</h4>
+<p>Munipack is licensed under <a href="https://www.gnu.org/licenses/gpl.html">GPL version 3.</a> This mean it is freely for any usage, modifications, redistributions etc. </p>
+</li>
+</ol>
+<h2>FITS Format</h2>
+<ol>
+<li><h4 id="fits">What's FITS format ?</h4>
+<p>FITS (Flexible Image Transfer System) is a computer format
+intended to store astronomical data for simple and powefull data interchange.
+FITS has been initially used for radiotelescope data.</p>
+<p>See also: <a href="http://fits.gsfc.nasa.gov/">The FITS Support Office</a>,
+<a href="https://en.wikipedia.org/wiki/FITS">FITS on Wikipedia</a>.
+</p>
+</li>
+<li>
+<h4 id="whyfits">Why FITS, why not JPEG, PNG, etc.. ?</h4>
+<p>FITS offers such properties which are absolutelly necessory to store
+any raw (measured) data. While JPEG or PNG formats are primary intended
+for simple and flexible image storage and displaying.
+</p>
+<p>FITS has important advantages over usual computer data formats:</p>
+<ul>
+<li>Sophisticated method for storing numerical data types.</li>
+<li>Sophisticated store of optional parameters in headers.</li>
+<li>Support for 4 and 8-bit integers as well as floats.</li>
+<li>Multi-parts images (one file can contains more images/tables).</li>
+<li>Tables can be stored as well as.</li>
+</ul>
+</li>
+<li>
+<h4 id="kewords">Different keywords</h4>
+<p>See man_env.html to set the right name. (dodelat!!)</p>
+</li>
+</ol>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

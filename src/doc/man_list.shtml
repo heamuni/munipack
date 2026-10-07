@@ -1,0 +1,113 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Manual Page</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+
+<h1>Listing</h1>
+
+<p class="abstract">
+Advanced listing of various quantities from processed FITS files.
+</p>
+
+<h2>Command</h2>
+
+<code>
+munipack list [...] file(s)
+</code>
+
+<h2>Description</h2>
+
+<p>
+This utility is prepared for listing of non-trivial quantities from FITS files
+like the light curve, where some special operations (time determining,
+magnitude difference, spherical coordinates) are required. Use manual
+for <a href="man_fits.html">fits utility</a> to direct access of FITS
+files.
+</p>
+
+<p>
+Listing can be used in following modes:
+</p>
+<ul>
+<li>star catalogue</li>
+<li>light curve</li>
+</ul>
+
+<p>
+Star catalogue mode prints all objects on a single frame for which photometry is available.
+The star coordinates are defaulted to sphericals.
+</p>
+
+<p>
+Light mode curve prints light curve (time and flux or magnitude) for a specified
+object on a set of images.
+</p>
+
+
+<h2>Parameters</h2>
+
+<ul>
+<li><samp>-c</samp> print cat (star catalogue), lc (light curve, default)</li>
+<li><samp>-s</samp> spherical coordinates (default)</li>
+<li><samp>-p</samp> Cartesian coordinates (pixels)</li>
+<li><samp>--col</samp> column(s) name(s) to list</li>
+<li><samp>--key</samp> select header keyword(s)</li>
+<li><samp>--mag</samp> output in magnitudes instead counts</li>
+<li><samp>--flux</samp> output in fluxes instead counts</li>
+<li><samp>--instr</samp> instrumental magnitudes (when --mag)</li>
+<li><samp>--zero</samp> zero magnitude (in conjunction with --mag)</li>
+<li><samp>--epoch</samp> reference Julian date for proper motion</li>
+<li><samp>--aperture</samp> radius of aperture [pix], interpolated when needed</li>
+<li><samp>--tol</samp> search radius [deg]</li>
+<li><samp>--print-filename</samp> print filenames</li>
+</ul>
+
+
+<h2>Catalogue Listing</h2>
+
+<div class="table">
+<table>
+<caption>Summary of parameters and quantities</caption>
+<tr><th>parameters</th><th>Output</th></tr>
+<tr><td>none</td><td>List measured counts <i>c</i></td></tr>
+<tr><td>--mag</td><td>List instrumental magnitudes from counts
+                      <i>m = 25 - 2.5 log10(c)</i> </td></tr>
+<tr><td>--flux</td><td>List instrumental fluxes as counts per second and square meter
+                       <i>f = c/(T A)</i></td></tr>
+<tr><td>--mag --calibr</td><td>List magnitudes from counts using calibration
+                      <i>m = 0 - 2.5 log10(fc0*c/TA)</i> </td></tr>
+
+<tr><td>--flux --calibr</td><td>List fluxes using calibration in Watts per second and square meter
+                       <i>f = fc0*c/(T A)</i></td></tr>
+</table>
+</div>
+
+<h2>Examples</h2>
+
+<p>
+Print a catalogue from the file:
+</p>
+<code>
+$ munipack list -c cat --mag --col apflux3,apflux3_err  M67_Blue.fits
+</code>
+
+<p>
+Print a light curve from files:
+</p>
+<code>
+$ munipack list 256,156 258,88 0716_*R.fits
+</code>
+
+
+
+<h2>See Also</h2>
+<p><a href="lctut.html">Light Curve</a>, <a href="cmd.html">Color — Magnitude Diagram</a>,
+<a href="man_com.html">Common options</a></p>
+
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

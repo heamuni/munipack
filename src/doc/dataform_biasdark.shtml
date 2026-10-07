@@ -1,0 +1,28 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Bias and Dark File</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1 class="noindent">Bias and Dark File</h1>
+<p class="abstract">
+Description of the FITS structure file commonly used to store of averadged
+bias and dark frames.
+</p>
+
+
+
+<h2>See Also</h2>
+<p>
+<a href="man_bias.html">Bias</a>,
+<a href="man_dark.html">Dark</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

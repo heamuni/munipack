@@ -1,0 +1,334 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Time series</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Time series</h1>
+
+<p class="abstract">
+This routine is a general purpose utility to list of selected
+data from FITS files, especially with calibration included.
+The most important instance of time-series are light curves.
+</p>
+
+<h2>Command</h2>
+
+<code>
+munipack timeserie [...] file(s)
+</code>
+
+<h2>Description</h2>
+
+<p>
+  This utility is designed for listing of various
+  quantities from a set of already processed frames
+  to create of time-series. Both instrumental and calibrated data
+  can be used. Full calibrated data including astrometry and photometry
+  calibration are preferred.
+</p>
+
+<p>
+  By listing of a set of processed files, this tool creates a time dependence
+  of a required quantity. The quantity is selected as a FITS-table column name
+  and stored in a time series table.
+  The time series of a light-like quantity is referenced as a light curve (LC).
+</p>
+
+<p>
+The utility can be used to derive various kinds of times-like quantities.
+</p>
+
+<h2>Time</h2>
+
+<p>
+The time can be specified for reference points:
+</p>
+
+<dl>
+<dt>At Middle (--time-stamp=MID)</dt>
+<dd>The time specifies exactly at middle of exposure duration. Computed
+as begin time plus half of exposure. This is default.</dd>
+<dt>At Begin (--time-stamp=BEGIN)</dt>
+<dd>The time specifies exactly at begin of exposure.</dd>
+<dt>At End (--time-stamp=END)</dt>
+<dd>The time specifies exactly at end of exposure.</dd>
+</dl>
+
+<p>
+Following types of time can be specified (<a href="https://en.wikipedia.org/wiki/Julian_day">Julian day on wiki</a>):
+</p>
+
+<dl>
+<dt>Julian date (-T JD)</dt>
+<dd>The time is specified in Julian dates in UT by default.</dd>
+<dt>Modified Julian date (-T MJD)</dt>
+<dd>The time is specified in modified Julian dates (JD − 2400000.5) in UT.</dd>
+<dt>Heliocentric Julian date (-T HJD)</dt>
+<dd>The time is specified in Julian dates at barycenter of solar system in UT.</dd>
+<dt>Phase (-T PHASE)</dt>
+<dd>The time is specified as phase in UT. The phase φ is computed from
+a reference epoch <i>e<sub>0</sub></i> given by --epoch in Julian days and
+period <i>P</i> given by --period in days: <i>φ = {(t - e<sub>0</sub>)/P}</i>
+(where <i>{.}</i> operator provides fractional part (see
+<a href="https://en.wikipedia.org/wiki/Floor_and_ceiling_functions">Floor and ceiling functions</a>).</dd>
+</dl>
+
+See also detailed description at
+<a href="dataform_tmseries.html#tmtable">description of output table</a>.
+
+
+<h2>Prerequisites</h2>
+<p>
+  Needs astrometry and photometry. To get calibrated fluxes or magnitudes,
+  needs the photometry calibration.
+</p>
+
+<h2>Input And Output</h2>
+
+<p>
+  On input, list of frames containing both astrometric and photometric
+  information is expected.
+</p>
+
+<p class="indent">
+  On output, the FITS table representing the time series is created.
+  All quantities can be also print on standard output.
+</p>
+
+<p class="indent">
+  This utility requires to identify both time and duration
+  of exposures. By default, standard FITS keywords <samp>DATE-OBS</samp>
+  and <samp>EXPTIME</samp> are used. They can be redefined
+  with help of <a href="man_env.html">environment variables</a>
+  <samp>FITS_KEY_DATEOBS</samp> and <samp>FITS_KEY_EXPTIME</samp>.
+</p>
+
+<p class="indent">
+  There is also possibility to decode of times in legacy two-item
+  format. In this case, date of form YY/MM/DD is included as
+  <samp>FITS_KEY_DATEOBS</samp> while time HH:MM:SS is identified
+  by keyword <samp>FITS_KEY_TIMEOBS</samp> which set to
+  <samp>TIME-OBS</samp> by default.
+</p>
+
+
+<h2>Parameters</h2>
+
+<dl>
+  <dt><samp>-c, --coo "α,δ ... "</samp></dt><dd>
+    Coordinates of all object(s) to list as twices separated by
+    comma (like <samp>25.3,0.6</samp>) or semicolon
+    (like <samp>25,3;0,6</samp>) as depends on your locale language
+    convention.  It is treated as a single program argument,
+    more objects can be specified as twices separates by spaces
+    (or <samp>|</samp> in doubts) and enclosed
+    in aphostrophes or quotes  (like <samp>"25.3,0.6 23.5,6.0"</samp>).
+  </dd>
+  <dt><samp>-cat file</samp></dt><dd>Coordinates of objects are
+    given by the FITS file (see below). It is less convenient,
+    but specification of proper motion is possible (it can be
+    important for rapid flying rocks) as well as many objects.
+  </dd>
+  <dt><samp>-l, --col</samp></dt><dd>Output label(s) to list (must exactly
+    match names of column(s) in files on input).
+    <!--
+    By default, all columns
+    from third to last are listed (photons, fluxes and magnitudes
+    including errors).
+      -->
+  </dd>
+  <dt><samp>-K, --keys</samp></dt><dd>Values of the keywords(s)
+    in FITS header to list. If any key is presented in more extensions,
+    the first successful match is listed only.
+  </dd>
+  <dt><samp>-T, --time-type</samp></dt><dd>JD − Julian date (default),
+    MJD − modified JD, HJD − heliocentric JD, PHASE
+  </dd>
+  <dt><samp>--time-stamp</samp></dt><dd>reference time point: mid (default),
+    begin, end</dd>
+  <dt><samp>--lc-epoch</samp></dt><dd>reference time point of light curve
+    elements in JD</dd>
+  <dt><samp>--lc-period</samp></dt><dd>period light curve elements in days</dd>
+  <dt><samp>--coo-type</samp></dt><dd>Specifies of type of coordinates
+    as RECT (rectangular) or DEG (spherical) given by <samp>-c,--coo</samp>.
+    The value is used for computation of distance during object searching.
+  </dd>
+  <dt><samp>--coo-col</samp></dt><dd>column(s) of quantities used as
+         coordinates. RAJ2000,DEJ2000 are used by default.</dd>
+  <dt><samp>--tol</samp></dt><dd>search radius for object identification
+    in degrees</dd>
+  <dt><samp>--extname</samp></dt><dd>An identifier of FITS-extension,
+    a first table extension is selected by default.</dd>
+  <dt><samp>--stdout</samp></dt><dd>results print also to standard output.</dd>
+  <dt><samp>--enable-filename</samp></dt>
+  <dd>results print contains also filenames</dd>
+  <dt><samp>--enable-horizon</samp></dt>
+  <dd>computes also horizontal coordinates: azimuth and zenith distance</dd>
+  <dt><samp>--disable-timetype</samp></dt>
+  <dd>disable print of time-type quantity</dd>
+</dl>
+
+<!--
+<p>
+When <samp>--l, --col</samp> or <samp>--coocol</samp> are not specified,
+the structure of the first file on input is discovered.
+The coordinates are recognised automatically as rectangular
+(equivalent to <samp>--coocol X,Y</samp>) or spherical
+(<samp>--coocol RA,DEC</samp>). All other columns (except coordinates)
+are listed by default
+(usually as <samp>-c COUNT,COUNTERR</samp>, <samp>-c PHOTON,PHOTONERR</samp>,
+<samp>-c MAG,MARERR</samp>, etc.).
+</p>
+-->
+
+<p>
+  Note. Some parameters (<samp>-l, -col, -c, -coo, -coocol</samp>)
+  has been changed during Spring 2018.
+</p>
+
+
+<h2>Stars Selection And Catalogue</h2>
+
+<p>
+By default, all stars on all frames are processed and stored to the output file.
+To select stars, there are two ways:
+</p>
+
+<ul>
+<li>specify coordinates on the command-line</li>
+<li>use a catalogue</li>
+</ul>
+
+<p>
+For a few stars request, the simpler way is specification of coordinates on the
+command line. Use twices of equatorial coordinates (Right Ascension and
+Declination)
+in degrees separated by commas (or semicolon).
+For example:
+</p>
+<pre>
+$ munipack timeseries -c "330.689,42.2765 330.667,42.2860" file.fits
+</pre>
+
+<p>More general way is use of a table with coordinates. Important
+advantages over command line:
+</p>
+<ul>
+<li>Very useful for passing of many stars and to use it repeatedly.</li>
+<li>Proper motion can be specified. The file header can provide additional
+    information (reference epoch) and units for all coordinates (complex
+    info is crucial reason for use file).</li>
+</ul>
+
+<p>
+The proper motion can be important for near and moving stars and should
+by used for flying rocks.
+</p>
+
+<h2>Catalogue For Stars Selection</h2>
+
+<p>
+Format of the catalogue is very restrictive and must be carefully
+followed. One is stored in FITS file with a just one table extension
+(EXTNAME doesn't matter). The header must contain keyword EPOCH which
+denotes the reference time <i>t</i><sub>0</sub> in Julian days for object coordinates.
+The current positions at <i>t</i> are computed from reference coordinates
+<i>α</i><sub>0</sub>, <i>δ</i><sub>0</sub>
+and proper motions <i>μ</i><sub><i>α</i>0</sub>, <i>μ</i><sub><i>δ</i>0</sub> (in
+degrees per century) as:<br>
+&nbsp; α = <i>α</i><sub>0</sub> + <i>μ</i><sub><i>α</i>0</sub> /(<i>t</i> - <i>t</i><sub>0</sub>) / <i>T</i><br>
+&nbsp; δ = <i>δ</i><sub>0</sub> + <i>μ</i><sub><i>δ</i>0</sub> /(<i>t</i> - <i>t</i><sub>0</sub>) / <i>T</i><br>
+where <i>T</i> is the time unit given by TUNITS keywords in header.
+One is one for deg/day and 365.25 for arcsec/year.
+</p>
+
+<p>
+The most simple way how to create the catalogue,
+<a href="timeserie_cat.lst">timeserie_cat.lst</a> can be directly used
+as example and edited. The FITS file timeserie_cat.fits is created as
+</p>
+<pre>
+$ munipack fits --restore timeserie_cat.lst
+</pre>
+
+
+<div class="table">
+<table>
+<caption>Table structure</caption>
+<tr><th>Column</th><th>Description</th><th>Units</th></tr>
+<tr><td>RAJ2000</td><td>Right ascension <i>α</i><sub>0</sub></td><td>degrees</td></tr>
+<tr><td>DEJ2000</td><td>Declination <i>δ</i><sub>0</sub></td><td>degrees</td></tr>
+<tr><td>pmRA</td><td> proper motion in RA <i>μ</i><sub><i>α</i>0</sub></td><td>arcsec/year or deg/day<sup><a href="#pmu">[†]</a></sup></td></tr>
+<tr><td>pmDE</td><td>proper motion in DE <i>μ</i><sub><i>δ</i>0</sub></td><td>arcsec/year or deg/day<sup><a href="#pmu">[†]</a></sup></td></tr>
+</table>
+</div>
+
+<div class="notes">
+<sup><a href="pmu">[†]</a></sup>
+The only string 'arcsec/year' or 'deg/day' must be present and specified
+exactly via TUNIT3 and TUNIT3 keywords. Setting of proper motions to zeros will
+usually satisfactory (except really fast moving objects like Barnard star
+or asteroids).
+</div>
+
+<h2>Caveats</h2>
+
+<p>
+This utility is primary indented and designed for working with low
+amount of data. The typical usage is listing of light curves
+or positions of motion of objects during a night. Another example can be study
+of any instrumental quantity. This routine is generic analysing tool.
+</p>
+
+<p>
+Use on large archives of observations is not recommended.
+Spidering over a complicated directory structure would be really
+slow. To work with a large data archive, use Munipack to create
+tables with photometry and astrometry data and keep the results in a database.
+Much more better idea should be to import the data into some
+Virtual Observatory engine. Popular VO-engines are
+<a href="http://ia2.oats.inaf.it/vo-services/vo-dance">VO-Dance</a>,
+<a href="http://saada.unistra.fr/saada/">Saada</a> or
+<a href="http://docs.g-vo.org/DaCHS/">GAVO DaCHS</a>.
+</p>
+
+
+
+<h2>Examples</h2>
+
+<p>
+  Light curve in magnitudes for stars at given coordinates
+  listing all R-filter (by filename) files:
+</p>
+<code>
+$ munipack timeseries -c "47.0422,40.9560 46.2941,38.8403" -l MAG,MAGERR 0716_*R.fits
+</code>
+
+
+
+<h2>Historical note</h2>
+
+<p>
+  Timeseries has been designed by format
+  <a href="http://dotastro.org/simpletimeseries/">SimpleTimeseries</a>
+  (dead link) due J. Bloom which is abandoned now. Therefore the format
+  of data is adapted for Munipack purposes and it should be changed
+  in future.
+</p>
+
+
+<h2>See Also</h2>
+<p>
+<a href="dataform_tmseries.html">Data format for timeseries</a>,
+<a href="lctut.html">Light Curve Tutorial</a>,
+<a href="man_com.html">Common options</a>.</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

@@ -1,0 +1,10 @@
+
+wxMathPlot
+----------
+
+This fork from 0.1.2 version of wxMathPlot is used by Munipack.
+
+The original code has been updated for recent wxWidgets and compilers.
+
+I added autoconf/automake specific Makefile. The original cmake
+tools are unused at all.

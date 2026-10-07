@@ -1,0 +1,106 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Photometric Systems Transformation Table</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1 class="noindent">Photometric Systems Transformation Table</h1>
+<p class="abstract">
+Definition of a FITS table providing the transformation between
+photometric systems.
+</p>
+
+<p>
+The table is created by <samp>munipack phfotran</samp> action
+and used by <samp>phcal</samp> action.
+</p>
+
+<p>
+This specification has been developed for internal use in Munipack
+and backward compatibility is not guarantied.
+</p>
+
+<h2>File Structure</h2>
+
+<p>
+The file has first HDU dummy without any machine-readable information
+and just a short description and reference in comments.
+</p>
+
+<div class="table">
+<table>
+<caption>FITS file structure</caption>
+<tr><th>HDU</th><th>EXTNAME</th><th>Description</th></tr>
+<tr><td>0</td><td></td><td>Dummy<sup></sup></td></tr>
+<tr><td>1</td><td>FOTRAN</td><td>The transformation table</td></tr>
+</table>
+</div>
+
+<p>
+The second HDU is a table with the transformation matrix.
+EXTNAME is set to FOTRAN.
+The header contains identifiers of input (instrumental) and output
+(standard) photometry systems in keywords PHOTSYS1 and PHOTSYS2.
+Amount of both columns and rows will generally variable and non-equal.
+</p>
+
+<div class="table">
+<table>
+<caption>FOTRAN extension keywords</caption>
+<tr><th>Keyword</th><th>Value</th><th>Description</th></tr>
+<tr><td>EXTNAME</td><td>FOTRAN</td><td>mandatory extension identifier</td></tr>
+<tr><td>PHOTSYS1</td><td></td><td>instrumental photometry system</td></tr>
+<tr><td>PHOTSYS2</td><td></td><td>standard photometry system</td></tr>
+<tr><td>FILTER<i>i</i></td><td></td><td><i>i</i>-th standard filter</td></tr>
+</table>
+</div>
+
+<p>
+Columns of the table are named as instrumental filters. Rows
+are equivalent filters. Lets elements of tables are <i>C<sub>i,j</sub></i>
+than the values in the standard system (PHOTSYS2) are derived
+from the instrumental system (PHOTSYS1) as
+</p>
+<p>
+<p>
+<i>
+c'<sub>i</sub> = Σ<sub>j</sub> C<sub>ij</sub> c<sub>j</sub>
+</i>
+</p>
+<p>
+where <i>i,j = { B,V ...}</i> points on all available filters.
+</p>
+
+<div class="table">
+<table>
+<caption>Photometric System Transformation HDU Table</caption>
+<tr><th>Column</th><th>Type</th><th>Description</th></tr>
+<tr><td>FILTER</td><td>12A</td><td>Filter designation</td></tr>
+<tr><td><i>C<sub>i1</sub></i></td><td>D</td><td>a coefficient</td></tr>
+<tr><td><i>C<sub>i2</sub></i></td><td>D</td><td>a coefficient</td></tr>
+<tr><td>..</td><td>D</td><td>a coefficient</td></tr>
+<tr><td><i>C<sub>ij</sub></i></td><td>D</td><td>a coefficient</td></tr>
+<tr><td>..</td><td>D</td><td>a coefficient</td></tr>
+<tr><td><i>C<sub>iN</sub></i></td><td>D</td><td>a coefficient</td></tr>
+</table>
+</div>
+
+<p>
+The table can be created by hand, but the structure must be respected
+and all identifiers included.
+</p>
+
+<h2>See Also</h2>
+<p>
+<a href="man_phfotran.html">Photometric System Transformation</a>,
+<a href="man_phcal.html">Photometric Calibration</a>
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

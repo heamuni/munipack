@@ -1,0 +1,74 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ External Helper Utilities</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1 class="noindent">External utilities</h1>
+
+<p class="abstract">
+Munipack source codes does not includes some usefull utilities
+which can be used independently. Only graphical user interfaces
+are provided.
+</p>
+
+<h1>Rawtran and dcraw</h1>
+
+<p><a href="https://integral.physics.muni.cz/rawtran/">Rawtran</a>
+is a conversion utility of raw photos produced by
+digital cameras (.CR2, .RAW) to FITS format. One produces
+files suitable for astronomical image processing (photometry,
+astrometry, …).
+</p>
+
+<p class="indent">
+By operation, rawtran is just only a wrapper around
+<a href="https://www.dechifro.org/dcraw/">dcraw</a>.
+Rawtran offers improved functionality over recommended utilities
+in conversion of output of dcraw to FITS format.
+Dcraw is not part of Munipack distribution and should be installed
+separately. Fortunately, dcraw is included in many Linux distributions
+(also one is easy to compile).
+</p>
+
+
+<h1>Fitspng</h1>
+
+<p>
+<a href="https://integral.physics.muni.cz/fitspng/">Fitspng</a> is
+a conversion utility from images stored in FITS to images in PNG format.
+One produces PNG images which can be directly displayed by standard
+desktop tools and edited in usual manner. Fitspng can be very usefull for
+batch processing or preview of FITS files on Web.
+</p>
+
+<p class="indent">
+Fitspng take advantage of the high dynamical range
+naturally provided by FITS format.
+The conversion applies
+advanced types of both luminosity or color conversions, scaling, etc.
+to get visually satisfactory results in widelly spreaded
+but restricted RGB color spaces.
+</p>
+
+<h1>Konve</h1>
+<p>
+<a href="https://integral.physics.muni.cz/konve/">Konve</a> is
+a conversion utility from legacy SBIG ST-x format to FITS format. The
+utility and the format itself are now obsolete (21. century).
+</p>
+
+<h1>Picko</h1>
+<p>
+<a href="https://integral.physics.muni.cz/picko/">Picko</a> is
+a conversion utility from Christian Buil's PIC format to FITS format.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

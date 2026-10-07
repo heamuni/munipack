@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+  <!-- #include "meta.shtml" -->
+<body>
+  <!-- #include "head.shtml" -->
+
+  <h1>Building of the Oakleaf library</h1>
+
+  <p>
+    The Oakleaf library is distributed in the form of the source code,
+    and must be compiled prior to use.
+  </p>
+
+  <p>
+    It is also pre-packaged in GNU/Debian and Ubuntu. The install is, by the way:
+  </p>
+  <pre>
+    # [sudo] apt install liboakleaf1 liboakleaf-dev liboakleaf-doc
+  </pre>
+
+  <h2>Prerequisites</h2>
+  <p>
+    A modern <a href="https://gcc.gnu.org/fortran/">Fortran 2008+ compiler</a> and
+    <a href="https://en.wikipedia.org/wiki/MINPACK">Minpack</a> are required.
+    Minpack should be installed in the development version, the package is
+    <samp>minpack-dev</samp>.
+  </p>
+
+  <h2>Getting sources</h2>
+
+  <p>
+    <a href="http://integral.physics.muni.cz/ftp/oakleaf/">Download</a>
+    the source archive, and unpack it:
+  </p>
+  <pre>
+    $ wget https://integral.physics.muni.cz/pub/oakleaf/oakleaf-2.0.0.tar.gz
+    $ tar zxf oakleaf-2.0.0.tar.gz
+  </pre>
+
+  <h2>The package build</h2>
+
+  <p>
+    The Oakleaf library should to be build in the following steps:
+  </p>
+  <pre>
+    $ cd oakleaf-2.0.0/
+    $ ./configure FCFLAGS="-O2 -ffpe-trap=invalid,zero,overflow"
+    $ make
+    # make install    # as root, or sudo
+  </pre>
+
+  <p>
+    It can be later un-installed, if the build directory
+    still exists, by command
+  </p>
+  <pre>
+    $ cd [some directory]/oakleaf-2.0.0/
+    # make uninstall    # as root
+  </pre>
+
+  <p>
+    The building can be customised via optional parameters of the configure.
+    The optimisation by the parameter <samp>"-O2"</samp> is reccomended,
+    as well as <samp>"-ffpe-trap=invalid,zero,overflow"</samp> which
+    reports serious numerical problems and omits irrelevant ones.
+    The library is installed under <samp>/usr/local</samp> by default
+    (see <samp>configure --help</samp>).
+  </p>
+  <p>
+    If Minpack is not found, although installed, by <samp>./configure</samp>,
+    try to add <samp>LDFLAGS="-L/usr/local/lib"</samp>
+    (adjust the path) and check presence of <samp>libminpack.a</samp>.
+  </p>
+
+  <h2>Smoke tests</h2>
+
+  <p>
+    The Oakleaf package has included a verification.
+    Basic tests can be executed as:
+  </p>
+  <pre>
+    $ make check
+  </pre>
+
+  <p>
+  The advanced testing, under a high voltage, is performed by
+  </p>
+  <pre>
+    $ VOLTAGE=high make check
+  </pre>
+
+  <h2 id="placement">The placement</h2>
+
+  <p>By default, the library is placed under <samp>/usr/local</samp>
+    according to the switch <samp>--prefix=</samp> of <samp>./configure</samp>.
+    A program is compiled as
+  </p>
+  <pre>
+    gfortran -I/usr/local/include ... -L/usr/local/lib -loakleaf
+  </pre>
+
+  <p>If the library is installed by a packaging system,
+    <samp>--prefix=/usr</samp> is used.
+    For GNU/Debian, as well as derivatives like Ubuntu or Mint, compilation
+    requires <samp>-I/usr/include</samp>, but <samp>-L/usr/lib</samp>
+    can be omited:
+  </p>
+  <pre>
+    gfortran -I/usr/include ... -loakleaf
+  </pre>
+  <p>
+    The library can be found in <samp>/usr/lib/&lt;arch&gt;</samp>,
+    where the arch <samp>x86_64-linux-gnu</samp> is just an example.
+  </p>
+
+<!-- #include "foot.shtml" -->
+</body>
+</html>

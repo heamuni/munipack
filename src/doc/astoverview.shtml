@@ -1,0 +1,240 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Astrometry Overview</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Astrometry Overview</h1>
+
+<p class="abstract">
+  Astrometry calibration establishes mutual mapping between
+  sky's coordinates and coordinates on frames.
+  Astrometry is essential for any additional processing like photometry
+  or frame composition.
+</p>
+
+<p>
+  Usage of a command line astrometry tool
+  can be found in <a href="man_astrometry.html">Astrometry</a> manual page.
+</p>
+
+
+<h2>Introduction</h2>
+
+<p>
+  Astronomical instruments works as devices which projects
+  spherical coordinates (Right Ascension α or Declination δ)
+  onto rectangular coordinates of imaging devices. The projection
+  establishes an unique mapping for all objects (pixels).
+  The mapping is usually complicated (nonlinear) because
+  projected images of sky may be deformed. The calibration can
+  be considered as the two step procedure:
+</p>
+<ul>
+<li>
+  spherical coordinates are projected
+  (by <a href="https://en.wikipedia.org/wiki/Gnomonic_projection">gnomonic</a>
+  or another projection) on to auxiliary rectangular coordinates,
+</li>
+<li>
+  and
+  <a href="https://en.wikipedia.org/wiki/Affine_transformation">affine mapping</a>
+  (including rotation, shift, scaling and reflection) is applied to get
+  the mutual transformation between the auxiliary projected and
+  current on-chip coordinates.
+</li>
+</ul>
+
+<p>
+The calibration can be stored in FITS frame header as
+<a href="http://fits.gsfc.nasa.gov/fits_wcs.html">WCS
+  (world-coordinate system) calibration</a> which is
+described at reference <a href="dataform_astrometry.html">Astrometry</a> header
+page.
+</p>
+
+<div class="screenshots">
+<figure>
+<img class="figure" src="astrocoo.png" alt="screenshot">
+<figcaption>Panel with the coordinate indicator</figcaption>
+</figure>
+</div>
+
+
+
+<h2>How To Describe Of Astrometry Mapping</h2>
+
+<p>
+To describe of the astrometry calibration, Munipack uses
+carefully selected set of parameters. Parameters
+are easy for use (change in a single parameter doesn't affects others)
+and supports robust fitting.
+</p>
+
+<dl>
+<dt>Projection</dt>
+  <dd>The type of projection of spherical coordinates onto rectangular. </dd>
+<dt>Reference point on images <i>x</i><sub>c</sub>, <i>y</i><sub>c</sub></dt>
+<dd>The reference point of rectangular coordinates,
+  the image is rotated around the point, normally, centre of the image. </dd>
+<dt>Centre of spherical projection <i>α</i><sub>c</sub>, <i>δ</i><sub>c</sub></dt>
+  <dd>It's a centre of projection of spherical coordinates.
+      One simply gives coordinates of the centre of captured field.
+</dd>
+<dt>Scale <i>c</i></dt>
+  <dd>Scale of image in degrees per pixels.</dd>
+<dt>Angle of rotation <i>φ</i></dt>
+  <dd>It's an angle of the image rotation around the reference point
+      <i>x</i><sub>c</sub>, <i>y</i><sub>c</sub>.
+      The value increases in counterclockwise direction (according to
+      mathematical sense) and with its origin on <i>x</i>-axis (on 3-th hour direction).
+</dd>
+<dt>Reflection</dt>
+  <dd>Mutual reflection</dd>
+</dl>
+
+<p>
+<b>All angles are in degrees.</b>
+Also don't try use fractions like arcsecs or don't interchange degrees and radians.
+</p>
+
+
+<h2>Modes Of Astrometry Calibration</h2>
+
+<p>
+Munipack provides following modes of the calibration of FITS frames:
+</p>
+<h3>Match</h3>
+<p>Stars, detected on frames, are identified in an astrometric catalogue
+  by matching. The parameters are estimated by fitting of the transformation.
+  Matching is intended for general use.
+</p>
+
+<h3>Sequence</h3>
+<p>
+User provides a sequence of identified stars and the transformation
+is derived from coordinates of the stars by fitting. It can be useful
+when matching has failed.
+</p>
+
+
+<h3>Manual</h3>
+<p>
+  Manual mode just save a calibration in WCS conventions using of parameters
+  <i>α</i><sub>c</sub>, <i>δ</i><sub>c</sub>, <i>c</i>, <i>φ</i> and
+  possible reflection
+  provided by user. Any other information (detection of objects, catalogues)
+  are not required. It can be useful when astrometry is already known.
+</p>
+
+
+
+<h2>Sources Of Reference Stars</h2>
+
+<p>
+These sources can be used as a references of the coordinates.
+</p>
+<dl>
+<dt>Catalogue</dt><dd>Stars selected from an astrometric catalogue are
+used as the reference.</dd>
+<dt>Reference frame</dt><dd>Stars detected on already calibrated frame are
+used as the reference.</dd>
+<dt>Relative frame</dt><dd>Stars detected on a reference frame are
+used as reference. A projection is not applied. There is only relative
+calibration. Useful when a right projection is not available or possible.</dd>
+</dl>
+
+<p>
+Note that the types of calibrations using catalogues and frames
+requires detected objects (see <a href="man_aphot.html">aperture photometry</a>).
+</p>
+
+<h2>Projection</h2>
+
+<p>
+  Projection maps spherical coordinates and rectangular coordinates.
+  Their implementation is based on <a herf="https://www.atnf.csiro.au/computing/software/wcs/">WCSLIB</a> and supports all projections mentioned in
+  <a href="https://www.aanda.org/articles/aa/abs/2002/45/aah3860/aah3860.html">
+    Greisen, E.W. &amp; Calabretta, M.R., 2002, Astronomy &amp; Astrophysics, 395, 1061-1075.</a> The common parameter <samp>-p, --projection<samp> use
+      the codes introduced in the paper.
+</p>
+
+<!--
+<p>
+No projection is useful for relative matching of frames.
+</p>
+-->
+
+
+<h2>Matching</h2>
+
+<p>
+Matching between objects on reference (catalogue) and calibrated frames
+is developed on base of a kind
+of <a href="https://en.wikipedia.org/wiki/Backtracking">backtracking</a>
+algorithm. All possible combinations of triplets are generated from
+data and grouped to sequences. Sequences of catalogue and observed
+data is searched for minimal distance in the triangle space
+(an application of triangle similarity, one from basic triangle rules,
+known from first school years).
+</p>
+
+<p>
+The backtracking is affected by parameters: --minmatch
+(minimal lenght of match sequence, --maxmatch (maximum length of match sequence),
+--sig sets a typical deviation of coordinates
+and --fsig is the dispersion in fluxes.
+Ones are important for fitting (and successful calibration).
+</p>
+
+<p>
+An another method for matching can be also used by setting --match NEARLY.
+In this case, the correspondence between object's list is established
+by looking for nearest stars. An initial transformation
+needs to be known. The parameter --sig sets coordinate uncertainty.
+</p>
+
+
+<h2>Fitting</h2>
+
+<p>
+The matched stars are used for fitting of a transformation
+(fit of scale, rotation) and projection (fit of centre of projection).
+The standard least-squares and robust methods can be used (--fit).
+</p>
+
+
+<h2>Reference Catalogue</h2>
+
+<p>
+The catalogue is a FITS table with coordinates of objects.
+The table is usually a list of selected stars from a catalogue
+provided by a Virtual Observatory server.
+</p>
+
+<p>
+The coordinates are arranged to a columns (defaulted to
+RA, DEC). Catalogue columns with coordinates can be selected
+with --col-ra, --col-dec parameters.
+</p>
+
+
+
+<h2>See Also</h2>
+
+
+<p>
+Manuals:
+<a href="man_astrometry.html">Astrometry</a>,
+Data Formats:
+<a href="dataform_astrometry.html">Astrometry Header</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

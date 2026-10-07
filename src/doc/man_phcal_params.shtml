@@ -1,0 +1,103 @@
+<h2>Parameters</h2>
+
+<h3>Reference Catalogue:</h3>
+<dl>
+<dt><samp>-C,--cal</samp></dt><dd>The calibration is specified by
+an exterior entity. The values are saved to a PHOTOMETRY extension
+header and counts are converted to photons for both image and table
+values.
+</dd>
+<dt><samp>-c,--cat</samp></dt><dd>Reference photometric catalogue. A fits table with
+coordinates and magnitudes of reference stars. One can be a selection from a "real"
+catalogue or a table prepared by oneself.
+See section <a href="man_phcal.html#prep">Preparation of Photometric Catalogue</a>,
+how create this table by hand.
+</dd>
+<dt><samp>-r,--ref</samp></dt><dd>Reference frame is used. The reference frame
+usually created by <samp>-c,-C</samp> options. Useful for relative photometry.</dd>
+<dt><samp>-f,--filters</samp></dt><dd>Filters used for calibration. </dd>
+<dt><samp>-F,--filter-ref</samp></dt><dd>Reference filter for calibration.</dd>
+<dt><samp>--col-ra</samp></dt><dd>Right Ascension column. Default is RAJ2000.</dd>
+<dt><samp>--col-dec</samp></dt><dd>Declination column. Default is DEJ2000.</dd>
+<dt><samp>--col-mag</samp></dt><dd>Magnitude column(s). Default is the filter
+    (-f option) with 'mag' suffix like <samp>-f V --col-mag Vmag</samp> (?).</dd>
+<dt><samp>--col-magerr</samp></dt><dd>Magnitude std. error column(s) (no default).
+    If this parameter is omited, errors are estimated
+    as the square of photons derived from magnitudes.</dd>
+<dt><samp>--tol</samp></dt><dd>search radius for object identification in degrees
+                               (default 5*FWHM) </dd>
+</dl>
+
+<h3>Calibration specific:</h3>
+<dl>
+<dt><samp>--photsys-ref</samp></dt><dd>reference (standard) photometric system
+          (catalogue)</dd>
+<dt><samp>--photsys-instr</samp></dt><dd>instrumental photometric system (frames)</dd>
+<dt><samp>-q, --quantity</samp></dt><dd>
+     calibrated quantities by default: PHRATE, FLUX, FNU, FLAM, MAG, ABMAG, STMAG
+                 (<a href="dataform_photometry.html#phquantities">see description</a>),
+            multiple quantities can be used, separated by colon</dd>
+</dl>
+
+<h3>Photometric system:</h3>
+<dl>
+<dt><samp>--tratab</samp></dt><dd>Table describing conversion from instrumental
+  to reference photo-system. Usually product of <a href="man_phfotran.html">
+phfotran</a>.</dd>
+<dt><samp>--phsystab</samp></dt><dd>A table with photometric system definitions
+(<a href="dataform_photosys.html">specification</a>)</dd>
+<dt><samp>--list</samp></dt><dd>Lists available photometric systems. Their identifiers
+                                are names of extensions in
+(<a href="dataform_photosys.html">photometric system definitions</a>) file.</dd>
+</dl>
+
+<h3>Common:</h3>
+
+<dl>
+  <dt><samp>-th, --threshold</samp></dt><dd>Select stars on both reference
+    and calibrated frames (not applied on catalogues) with its stellar
+    flux to a sky noise (signal to noise) ratio greater then
+    the threshold value. Both the values are determined in the same aperture.
+    The proper
+    choice is crucial for photometry precision because it helps to select
+    only bright stars with minimal pollution by the sky noise. The default
+    value 5 is very conservative setup. It is suitable for bad conditions
+    (like urban or a full moon light observations). Standard and good
+    conditions will allow lower ratios. In an ideal case, it can be
+    under one for best results.
+     </dd>
+  <dt><samp>-e, --maxerr</samp></dt><dd>Select stars on both reference
+    and calibrated frame (not applied on catalogues) with its relative
+    flux error smaller than the error limit. The value does not limits
+    the final precision, but limits fluency of noisy data.
+    The default value 0.1 (ten percents, about tenth of magnitude)
+    will also include relative imprecise stars into both calibration and
+    calibrated set. The values under 0.01 and lower will select
+    only precise and suitable calibration stars.
+     </dd>
+<dt><samp>--area</samp></dt><dd>Area of telescope aperture in square meters [m2].</dd>
+<dt><samp>--saper</samp></dt><dd>selects appropriate aperture from PHOTOMETRY
+    extension. By default, flux in infinite aperture is used.</dd>
+  <dt><samp>--apcorr</samp></dt><dd>sets the aperture correction.
+    This correction converts fluxes in an aperture to the total flux
+    (infinite aperture). The value of correction should be obtained
+    by <a href="man_gphot.html">gphot</a>.</dd>
+
+<dt><samp>--advanced</samp></dt><dd>Advanced format. Additional extensions
+                    (results of star find, photometry and residuals) are included.
+                    This format is not used by default because result FITS
+                    is twice or more bigger.
+                  </dd>
+</dl>
+
+
+<p>See <a href="man_com.html">Common options</a> for input/output filenames.</p>
+
+  <p>
+    When options for the area and the reference and instrumental systems are used,
+    FITS header is updated according to provided values.
+  </p>
+
+<p>
+Default values for coordinates will be usually unsatisfactory.
+</p>

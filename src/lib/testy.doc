@@ -1,0 +1,26 @@
+
+Testy provedene na MMM.
+
+V souboru d1.dat jsou data s normalnim rozdelenim N(0,1) - 1000 bodu.
+Overeno K-S testem.
+
+Vypis z f90 verze:
+ n= 10000 mean= -0.0113524748 median= -0.0179227926 mode= -0.0310634281
+  sig=  1.0113076 skew=  0.0194905624
+time:  
+  real    0m12.655s
+  user    0m12.480s
+  sys     0m0.150s
+  
+  
+Vypis z f77 verze je naprosto totozny:
+ n= 10000 mean= -0.0113524748 median= -0.0179227926 mode= -0.0310634281
+  sig=  1.0113076 skew=  0.0194905624
+time:  
+  real    0m12.398s
+  user    0m12.210s
+  sys     0m0.170s
+     
+  ocekavane zrychleni se tedy nedostavilo.
+  
+  

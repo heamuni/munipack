@@ -1,0 +1,86 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Manual Page</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Run-time Environment</h1>
+
+<p class="abstract">
+Setting of run-time environment can be used to modify of global parameters.
+</p>
+
+
+<h2 id="fitsenv">FITS environment variables</h2>
+
+<p>
+  FITS environment variables are commonly used to redefine a value of keywords
+  of a FITS header.
+For instance, FITS_KEY_FILTER - redefines FILTER keyword, etc. Other variables available
+(sometimes required
+  during processing) are listed in <a href="man_setup.html">table</a>.
+  For example, when your local conventions
+stores the exposure time in record labeled by EXPOSURE keyword
+</p>
+<pre>
+...
+EXPOSURE =               20.000 / [s] Exposure time
+...
+</pre>
+<p>
+use FITS_KEY_EXPTIME="EXPOSURE". Variables can be preset as:
+</p>
+<pre>
+$ FITS_KEY_DATEOBS="DATE-BEG"
+$ export FITS_KEY_DATEOBS
+</pre>
+
+<p>
+For convenience, these variables can be set under Unixes as system-wide
+in /etc/profile (or /etc/bash.profile, /etc/bashrc or etc.) or on per-user base in $HOME
+directory: $HOME/.profile (or $HOME/.profile or $HOME/.bashrc or etc).
+</p>
+
+
+<p>
+  The identifiers (following prefix FITS_KEY_) should be
+  unlike to FITS keywords. That conversion
+  suppress confusion of the minus sign character (-) inside shell scripts.
+</p>
+
+<p>
+The area of detector is <i>π(R<sup>2</sup>-r<sup>2</sup>)</i> for Newtonian reflector,
+where <i>R</i> is radius of a primary mirror and <i>r</i> is radius of projection
+of secondary mirror (of secondary shadow). The area of detector will be used
+for photometry calibration.
+</p>
+
+
+<h2>Run-time</h2>
+
+<code>
+MUNIPACK_LIBEXEC, MUNIPACK_BIN
+</code>
+<p>
+  Set path(s) for executable Munipack's <a href="modules.html">modules</a>.
+  The values are set during installation and used very rarely, perhaps
+  for testing purposes.
+</p>
+
+<code>
+MUNIPACK_CATCONF_PATH
+</code>
+<p>
+A path pointing to the local configuration file for Virtual Obseravtory
+catalogues.
+</p>
+
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

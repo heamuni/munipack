@@ -1,0 +1,73 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Backup strategy</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1 id="backup">Backup Strategy</h1>
+
+<p>Munipack modifies the backup strategy of FITS files.
+  Both the Unix philosophy, as well as common FITS conventions,
+  are modified.
+</p>
+
+<h2>The declaration</h2>
+<ul>
+  <li>All observed data are highly valuable original.
+      They are untouchable.</li>
+  <!--
+  <li>All operations on newly created HDU, like their adding or removing,
+    are considered as a reversible action. </li>
+  -->
+  <li>Any file, created by a processing, can be overwritten without caution.</li>
+</ul>
+
+<h2>Practical implications:</h2>
+<ul>
+  <li>All actions which can potentially modify original image data
+    (currently only <samp>phcorr</samp>) refuses actions on its by default.
+    The rule can be supressed by <samp>--enable-overwrite</samp> switch
+    for <samp>phcorr</samp>, yet strongly discouraged!
+  </li>
+  <li>
+    All processing should be done under a dedicated working directory.
+    The file handling is proposed by the way
+    (see <samp>-t destination_dir</samp> on the current <samp>"-t ."</samp>
+    directory):
+    <pre>
+$ ls /obs/archive/*.fits
+$ mkdir work/
+$ cd work/
+work$ munipack phcorr [...] -t . /obs/archive/*.fits
+    </pre>
+  </li>
+  <li>
+    By default, the label <samp>_proc</samp> is included in filenames
+    when the output directory, by <samp>-t</samp> switch, is not specified.
+    This is common for <samp>phcorr, astrometry, find, aphot, gphot</samp>.
+  </li>
+  <li>
+    The outputs of <samp>phcal</samp> are expected to be included
+    in the working directory so the label <samp>_cal</samp> is added
+    to original filenames by default.
+  </li>
+  <li>
+    All newly created files by <samp>bias, dark, flat, cone, kombine,
+      colouring, votable, cross, artifical </samp> are silently overwritten
+    for convenience. Perhaps, some processing time can only be lost.
+  </li>
+</ul>
+
+<p>The backup strategy has been changed between versions 0.5.10 and
+  0.5.11 (January 2018), revised in 0.5.13 (November 2020)
+  and 0.6.2 (January 2025).
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

@@ -1,0 +1,134 @@
+#!/bin/sh
+#
+# Bootstrap initialises configure.ac, and related matter, for autotools
+# machinery. There are two alternatives implemented: the development build
+# (default) is intended as a snapshot of a current state, while the regular
+# release is the second way. Both alternatives differs in a version number
+# format and description.
+#
+# Usage:
+#   $ ./bootstrap [--dev|--release VERSION]
+#
+#
+# Bootstrap for development (not for release):
+#   * Version number is derived from Mercurial identificator of the changeset
+#
+# Recommended usage for developing will switch-on all possible check and
+# warning flags (all the flags are considered important).
+#
+# $ ./bootstrap --dev
+# $ ./configure FCFLAGS= ... (see below) ..
+#
+#
+# Bootstrap for release (not for development):
+#   * Version number is set by hand (command-line parameter)
+#
+# Recommended usage for releases:
+#
+# $ ./bootstrap --release VERSION
+# $ ./configure
+#
+#
+# This bootstrap file has been inspired by Bootstraping chapter
+# in Autobook by Vaughan, Elliston, Tromey and Taylor.
+# http://sources.redhat.com/autobook/
+#
+
+# Test whatever Mercurial is available.
+if [ -x "$(command -v hg)" ]; then
+    HG=hg
+else
+    HG=""
+fi
+
+set -e
+
+# Command line parameters processing
+if [ $# -eq 0 ]; then
+    echo "Usage: $0 --release VERSION"
+    echo "       $0 --dev [$VERSION_DEV]"
+    exit 0
+fi
+
+if [ "$1" = "--release" ]; then
+    DEVELOPMENT=no
+    VERSION=$2
+else
+    DEVELOPMENT=yes
+    if [ "$2" ]; then
+	VERSION=$2
+    else
+	if [ "$HG" ]; then
+	    VERSION=$(hg tags | awk -F'[: ]+' '{if(FNR==1) h=$2; \
+  	              if(FNR==2) v=$1; } END { print v "+hg" h; }')
+	else
+	    VERSION="unknown"
+	fi
+    fi
+fi
+export VERSION DEVELOPMENT
+
+echo -n "Bootstraping with VERSION=$VERSION and DEVELOPMENT=$DEVELOPMENT "
+
+# The section does setup of configure.ac: the file is created by
+# including of the generated piece of code into the template.
+ACINC=configure.inc
+cat >$ACINC <<EOF
+AC_INIT([Munipack],[${VERSION}],[hroch@physics.muni.cz],
+ 	[munipack],[https://munipack.physics.muni.cz])
+EOF
+if [ "$DEVELOPMENT" = "yes" ]; then
+cat >>$ACINC <<EOF
+AC_DEFINE(DEVELBUILD,[1],[development build])
+AC_DEFINE_UNQUOTED(DATEBUILD,[`date +'"%F %R %Z"'`],[bootstrap time])
+EOF
+fi
+awk -v acinc=${ACINC} '{ if($0~/AC_INCLUDE/) {while(getline<acinc) print;} else {print;}}' < configure.templ > configure.ac
+
+
+# The file does setup of the version string for Fortran libraries.
+cat >lib/fversion.inc <<EOF
+  character(len=*), parameter, private :: VERSION = "${VERSION}"
+EOF
+
+echo -n "."
+
+# make changelogs for autoconf
+if [ "$HG" ]; then
+    hg log --style changelog > ChangeLog
+else
+    echo "CHANGES" > ChangeLog
+fi
+
+echo -n "."
+
+
+# list images for Makefile in doc/ and xmunipack/
+( cd doc && sh genthumb.sh )
+echo -n "."
+
+( cd xmunipack && sh image_list.sh )
+
+# add -I for localy installed wxwin.m4 (or add its parent directory as
+#                                      the first command-line argument)
+# example:
+# $ export ACLOCAL_PATH="-I $1"
+# $ ./bootstrap
+
+# autoreconf $ACLOCAL_PATH -i
+
+echo " done."
+
+echo
+echo "Recommended setup for configure, make and install Munipack"
+echo "(adjust by your needs):"
+echo
+echo " $ autoreconf -i"
+if [ "$DEVELOPMENT" = "yes" ]; then
+    echo ' $ ./configure FCFLAGS="-Wall -g -p -no-pie -fcheck=all -fimplicit-none -fbacktrace -ffpe-trap=invalid,zero,overflow -fno-unsafe-math-optimizations -frounding-math -fsignaling-nans -I/scratch/opt/include" CFLAGS="-Wall -g -p"  CXXFLAGS="-D__WXDEBUG__ -g -p -Wall -fbounds-check" LDFLAGS="-L/scratch/opt/lib" PKG_CONFIG_PATH=/scratch/opt/lib/pkgconfig --prefix=/scratch/opt'
+else
+    echo ' $ ./configure FCFLAGS="-O2 -ffpe-summary=invalid,zero,overflow -fno-unsafe-math-optimizations -frounding-math -fsignaling-nans" CFLAGS="-O2 -DNDEBUG" CXXFLAGS="-O2 -DNDEBUG"'
+fi
+echo " $ make"
+echo " $ make install"
+echo

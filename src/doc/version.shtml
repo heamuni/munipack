@@ -1,0 +1,71 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+
+<title>Munipack ‒ Versioning</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1 class="noindent">Versioning</h1>
+
+<p class="abstract">
+Description of versions of Munipack.
+</p>
+
+<h2>Munipack Versioning</h2>
+
+<p>
+Munipack versioning follows the conventions:
+</p>
+<ul>
+<li>Regular release has a human name (tag), and a number by the schema 0.5.X.</li>
+<li>“Randomly” issued pre-releases are numbered as 0.5.X+hgN</li>
+<li>Next branch will 0.6.X and will be issued when a breakthrough
+  feature will be prepared.</li>
+<li> Branch 1.0 will be reached at some time in the future (a big party
+     in a night club in Brno will be announced 😎, of course).</li>
+</ul>
+
+<p>
+Munipack is developed under stable branch of
+<a href="https://www.debian.org/">Debian</a> GNU/Linux which fits
+my requirement of both stable and actual software.
+</p>
+
+
+<h2>Pre-releases</h2>
+<p>
+ Pre-releases are issued occasionally,
+ when an important feature is developed, in meantime of regular releases.
+The development snapshots are public available;
+the naming schema is <samp>munipack-0.X.Y+hgN</samp>.
+</p>
+
+<p>
+Pre-releases are usually well usable and can be useful for anybody,
+but there is something which blocks a next release (we are in the testing phase,
+a proper documentation is not finished, additional features are not implemented yet
+or author is just busy).
+</p>
+
+<p>
+  Pre-releases are available as a Debian packages
+  (see <a href="install.html#development">Development repository</a>):
+</p>
+<p class="download">
+  <a href="https://munipack.physics.muni.cz/devel/">https://munipack.physics.muni.cz/devel/</a>
+</p>
+
+<h2>See Also</h2>
+<p>
+<a href="download.html">Download</a>,
+   <a href="install.html">Install</a> and <a href="changes.html">Recent Changes</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

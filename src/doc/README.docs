@@ -1,0 +1,31 @@
+
+This directory contains 'sources' for homepage.
+
+The output html files are created by processing of
+sources in .shtml format (a plain html format with
+#include directives, inspired by SSI of Apache
+http://httpd.apache.org/docs/current/howto/ssi.html).
+
+Run, by typing
+
+  $ make
+
+The make calls `awk -f include.awk' which replaces the
+#include directives by listing of a content of appropriate files.
+
+There is a possibility to generate the news feed in Atom.
+Install webhelpers for python and run:
+
+  $ make feed
+
+All content of homepage is pretty static (no cgi-processing
+engine is required).
+
+
+# Sometimes, this directory can be clean-up:
+# list of image references
+for A in *.jp*g *.png *.svg; do
+  echo -ne "$A \t";
+  (for S in *.shtml; do fgrep -c $A $S; done) | \
+     awk 'BEGIN {s=0;} {s = s + int($1);} END {print s;}';
+done

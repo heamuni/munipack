@@ -1,0 +1,17 @@
+syntax: glob
+*~
+*.o
+*.mod
+*.Po
+*.in
+*.m4
+lib*.a
+autom4te.cache/*
+configure.aux/*
+config.*
+compile
+depcomp
+configure
+*/Makefile
+install-sh
+gmon.out

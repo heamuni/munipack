@@ -1,0 +1,503 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack - Colour FITS</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1 class="noindent">Colour FITS</h1>
+
+<p class="abstract">
+A draft of a technical description
+of FITS format specification to store of colour images
+in exactly defined colour spaces.
+</p>
+
+<h2>Introduction</h2>
+
+<p>
+<a href="http://fits.gsfc.nasa.gov/">FITS format</a>
+(<a href="http://www.rfc-editor.org/rfc/rfc4047.txt">image/fits</a>)
+is one from the most flexible data storage formats. Unfortunately,
+there is no widely accepted convention for storing of colour pictures.
+For practical purposes of colour processing in Munipack, the specification
+described here is used.
+</p>
+
+<p class="indent">
+The term "colour" may have different meaning for an ordinary man
+and an astronomer.
+</p>
+
+<p class="indent">
+  In the astronomical terminology, the term "in colours" designates any
+  measurement or frames taken at more spectral bands, or "in colours"
+  by a dialect. The spectral bands are commonly realised by some
+  filters having distinct spectral sensitivity than human eye;
+  their colours are false (unnatural) or instrumental colours.
+  A single band frames are known as monochromatic, grey, or black and white.
+</p>
+
+<p class="indent">
+  In contrast with this, common term "in colours" means
+  colour frames displaying scenes with all colours like red, orange, …
+  included. By more specific, kids has colouring books with drawings;
+  the drawings are transformed from monochromatic to colour by
+  its painting by colour pens.
+</p>
+
+<p>
+Colour pictures in astronomy are usually grouped as:
+</p>
+<ul>
+<li>false colour pictures</li>
+<li>natural colour pictures</li>
+</ul>
+<p>
+The first group colourises images by a number of ways:
+</p>
+<ul>
+  <li>A gray image is colourised by mapping of colours onto values
+    (by colour tables), highlighting of pale details. </li>
+  <li> A set of colour images is colourized by the way: all single exposures are
+  colorized by a (randomly) selected color and result image is composed from
+  the pictures. It is frequently used to opposite multi-wavelength
+  images. An example is composite image in X-ray, optical and radio.</li>
+</ul>
+
+<p>
+The color composition does no care about true colors of images.
+The colors are still false without try to do authentic representation
+of natural colors. That means, that humans will precipitate the colors
+differently than the colors visible by own eyeball (with help
+of a powerful telescope or a spacecraft).
+</p>
+
+<p>
+The representation of natural colors is little bit complicated
+opposite to false colors because we must exactly known transitivity
+of filters and a transformation from the transitivity filters to
+a spectral sensitivity of human eye. Than we can reconstruct
+natural colors and the colors in pictures will close to colors
+as can be visible by own eyeball.
+Note that natural color imaging is limited on optical part of spectra.
+</p>
+
+<p>
+The field of usage of both groups is complimentary. They are
+useful in different situations.
+</p>
+
+
+<p>
+The color specification is not included in <a href="http://fits.gsfc.nasa.gov/fits_registry.html">FITS conventions registry.</a>
+
+</p>
+
+<h1>The Specification</h1>
+
+<p class="indent">
+Munipack's specification of colour FITS format is fully compatible
+with FITS specification itself. A colour set specification is
+on base of a FITS header keyword. Color FITS specification
+must satisfy all following conditions:
+</p>
+<ul>
+<li><i>The image is fully stored in a single primary image HDU.</i></li>
+<li><i>CSPACE header record is presented.  A valid string
+specifies of the color space of the stored data.</i></li>
+<li><i>The HDU contains 3D cube data:
+    first two dimensions are space-like coordinates,
+    the last dimension contains color bands in wavelengths
+    increasing order.</i></li>
+</ul>
+
+<p>
+This specification is relative restrictive. We can store just only
+2D color images. The images are required to have unified world coordinates.
+</p>
+
+<p>There is no limit to number of color bands.</p>
+
+<p>The HDU header can contain both calibrated data or
+  data without any calibration. The
+  , or partly or nothing astrometrical,
+  spectroscopical
+and photometrical calibration. The astrometrical calibration
+is bounded on the first two dimensions and must contain keyword
+WCSAXES set to value 2. The spectroscopical calibration can
+be provided as standard (by formula or table in an additional HDU),
+but also as the list of bands (see bellow in Calibration).
+There is a preferred way to calibrate a few bands by list of keywords
+and a many of by a formula). Any support to additional tables HDU
+is not planed. The photometric calibration is done separately
+for every band. Note that the calibration information is not used
+during color processing because CSPACE must contain the colorspace
+identifiers (filters designation).
+<p>
+
+
+<h2>Description</h2>
+<p>
+FITS format offers more flexibility over conventional image formats.
+The crucial feature is possibility to store several bands (colours)
+into a single file. The property is widely used in high-energy astrophysics
+where data from single channels are stored in a FITS file (also
+additional auxiliary images are frequently included). The property can be
+also used for creating colour pictures storing frames into a single container
+The number of color bands is not limited.
+</p>
+
+<p class="indent">
+FITS format also has no limits on machine representation of numbers.
+Therefore, it is
+contra-productive to deform data by a some non-linear transformation
+and it is preferred to store the original data.
+</p>
+
+<p class="indent">
+As the key identification sign has been choose the record CSPACE which offers
+possibility to recognize an storing color space and provides
+an information for additional processing.
+</p>
+
+<h2>Color space representation in Color FITS</h2>
+
+<pre>
+CSPACE = 'Johnson BVR'
+CTYPE3 = 'BAND-SET'
+CNAME3 = 'Color-space'
+CSBAND1 = 'Johnson B'
+CSBAND2 = 'Johnson V'
+CSBAND2 = 'Johnson R'
+</pre>
+
+<div class="table">
+<table>
+<tr><th>Key</th><th>Needs</th><th>Description</th></tr>
+<tr><td>CSPACE</td><td>mandatory</td><td>Colorspace of stored images</td></tr>
+<tr><td>CTYPE3</td><td>optional</td><td>Type of color part in 4-3 notation</td></tr>
+<tr><td>CNAME3</td><td>optional</td><td>Description</td></tr>
+<tr><td>CSBANDi</td><td>optional</td><td>Color bands</td></tr>
+</table>
+</div>
+
+<p>
+Rules:
+</p>
+<ul>
+<li>NAXES = 3</li>
+<li>WCSAXES = 2</li>
+<li>NAXIS3 &ge; 2, index in CSBANDi is 1 &lt; i &le; NAXIS3</li>
+<li>All keywords (CSPACE, CTYPE3 and a set CSBANDs) are type of character.</li>
+</ul>
+
+
+<p>
+A calibration coded-in to FITS headers suppose
+a unique mapping between pixels and a physical
+quantities. The single-valued function between
+two sets of numbers (usually integers and floats).
+The coding of colorspace requires mapping between
+different objects. Between a pixel and a filter.
+Note that a filter (the general approximation at least)
+is not a number but this is a function. From mathematical
+point of view, a function is a element of function
+set. The filter can be represented by a mathematical
+function like Gaussian with a parameters like center,
+half-width and height or as a a wavelength-transmisivity
+table. Therefore the filters can be difficulty identified
+by a float number like their wavelengths but the use of
+a human-readable string is preferred (indexes can be used too
+but they will more complicated for understand and will
+need additional look-up table). The processor must have
+additional information (from data tables) to render a image
+by the right way.
+</p>
+
+
+<h2>Advantages</h2>
+<ul>
+<li>More simple processing. Corrections, any operations
+and calibration data can be used directly and simply.
+Including of color transformation table is possible
+</li>
+<li>
+The store of data of images taken at the same time is more
+logically consistent.
+</li>
+<li>
+Using of data cube saves some storage space. Every HDU
+contains at least 2880 bytes in header. For a few bands
+the space is negligible, but for 3D spectroscopy with
+hundredth of channels the stored place can take significant
+space with no additional information.
+</li>
+</ul>
+
+<h2>Disadvantages</h2>
+<ul>
+<li>
+The data used in color cube must be homogenized by to
+recomputing on the same world coordinates.
+There is no possibility to directly use of images with offset.
+</li>
+
+<li>
+The unification would be also used for any photometric
+information. Multi-band images are probably more worse represented
+(principally).
+</li>
+
+<li>
+From physical point of view, the mixing of different quantities
+is correct. Just only a appropriate constant must be used to
+convert quantities to common units.
+</li>
+</ul>
+
+<p>
+The separation of data on tree distinguishing physical parts
+requires more
+memory for processing against to (standardly used) interlaced (RGBRGBRGB...)
+data storage. The wavelength-like (or analogical quantity)
+separation is preferred with respect to a specific data storage.
+However, an interlaced data store would break the harmony of FITS world.
+</p>
+
+<p class="indent">
+Color FITS processors needs to be advanced tools.
+Complex algorithms must be available.
+They also requires more powerful processors for rendering of images.
+</p>
+
+<h2>Data Input/Output</h2>
+
+<p>
+A sample Fortran code is pretty simple:
+</p>
+
+<pre>
+character(len=80) :: cspace
+real,dimension(:,:,:),allocatable :: ccd
+
+call ftnopn(25,'color.fits',0,status)
+call ftgkys(25,'CSPACE',cspace,buf,status)
+call ftghpr(25,naxis,simple,bitpix,naxis,naxes,pcount,gcount,extend,status)
+width = naxes(1)
+height = naxes(2)
+nbands = naxes(3)
+allocate(ccd(width,height,nbands))
+call ftg3de(25,1,minvalue,width,height,width,height,nbands,ccd,anyf,status)
+call ftclos(25,status)
+</pre>
+
+<p>
+More complex (and complicated) example of a general multi-HDU FITS
+in C/C++ can be found in source code of <samp>xmunipack/fits.cpp</samp>
+(constructor of FitsFile).
+</p>
+
+<p>
+The main advantage of the choosed format is its very simple usage.
+The code is very close to a code for 2D images.
+</p>
+
+
+<h2>Color Rendering</h2>
+<p>
+The CSPACE keyword has been choosed in analogy of the
+<samp>color_type</samp> key of
+<a href="http://www.libpng.org/pub/png/">PNG format</a>.
+The value specifies a color space of the stored data. An output color space
+is not specified. It is supposed that the image processor will convert
+the input colors to a color space of a display device.
+</p>
+
+<p>
+Frequently used color spaces are:
+</p>
+<dl>
+<dt>sRGB or AdobeRGB</dt>
+<dd>
+The standard RGB or AdobeRGB. Colors can be directly displayed. The
+tune of colors, luminance, etc. is strongly limited.
+</dd>
+<dt>CIE 1931 XYZ</dt>
+<dd>
+Preprocessed colors. Colors are partially limited in color space
+appropriate to human eye. Colors can be relative freely tuned.
+</dd>
+<dt>Landolt UBVRI, Johnson UBVRI, ubvy, ....</dt>
+<dd>
+A general (astronomical) color space. To be displayed, additional
+transformation to CIE 1931 XYZ (or any RGB)
+ is required. Relative sophistical algorithm
+is required. Parameters are highly tunable. This is preferred format
+due to preserving of the photometric information.
+</dd>
+</dl>
+
+<p>
+Color spaces are mutually convertible. Unfortunately,
+the conversion of RGB to/from XYZ is strongly nonlinear and
+an important part of the photometric information is lost.
+Therefore, use of RGB is not recommended. The XYZ format is useful for
+a rapid tuning.
+The preferred color space is carefully defined photometric
+system like Landolt's UBVR or the surface spectrophotometry (3D
+spectroscopy).
+</p>
+
+<p class="indent">
+The color bands can be also prescaled to reflect exposure times,
+different instruments, sky levels in different filters, etc.
+</p>
+
+<p class="indent">
+The additional information for displaying of a general color space
+is a projection matrix from the color space to XYZ. The information
+would take form of an external table. The original information
+is separated from specific displaying device (eye, LCD).
+The same way is widely used for Web environment as method for
+formatting of HTML code by using CSS also LaTeX uses styles etc.
+</p>
+
+<p class="indent">
+There are technical difficulties of including the transformation matrix
+to color images. The transformation can be included as table to the first
+HDU. The way violates standard use of FITS tables with first dummy HDU.
+The adding of conversion table to the header records is possible
+but not too elegant way. Use a table HDU following the image data
+complicates adding of everything others.
+</p>
+
+<p>
+The color processing is in detail described on
+<a href="colorspace.html">Color space</a> page.
+</p>
+
+<h1>An obsolete specification</h1>
+
+<p>
+The description of the obsolete specification is just only for
+documentation purposes <i>to show a wrong way.</i>
+</p>
+
+<ul>
+<li>The first HDU is a primary image HDU. It contains no data.
+ The record with keyword COLORTYP is presented with a string value
+specifying of the color space of the stored data.</li>
+<li>It has at least two additional image extensions with images
+in different spectral bands. The extensions are sorted
+in wavelength increase order.</li>
+</ul>
+
+<p>
+As one can see, that codding operations are relative complicated. Therefore,
+more simple specification can be developed.
+</p>
+
+<p class="indent">
+Note that there is no a dirrect connection between the colorspace and
+the HDU image. There is no an identifier which connect the proper
+HDUs.
+</p>
+
+
+<h2>Data Input/Output</h2>
+<p>
+To give an illustration of code for color FITS load, the
+relevant simplified part of code is presented:
+</p>
+<pre>
+character(len=80) :: cspace
+real,dimension(:,:,:),allocatable :: ccd
+
+call ftnopn(25,'color.fits',0,status)
+call ftthdu(25,nbands,status)
+call ftmahd(25,1,hdutype,status)
+call ftgkys(25,'COLORTYP',cspace,buf,status)
+
+do i = 1, nbands
+
+  call ftmahd(25,i+1,hdutype,status)
+  call ftghpr(25,naxis,simple,bpix,n,naxes,pcount,gcount,extend,status)
+
+  if( i == 1 ) then
+     width = naxes(1)
+     height = naxes(2)
+     allocate(ccd(width,height,nbands-1))
+  endif
+
+  call ftg2de(25,1,minvalue,width,width,height,ccd(:,:,i),anyf,status)
+  ! just only for information, rather use 2D buffer
+enddo
+call ftclos(25,status)
+</pre>
+
+<p class="indent">
+Note that the format will very difficult to parse for any home-made
+FITS reader. In the example,
+<a href="http://heasarc.gsfc.nasa.gov/fitsio/">cfitsio</a> library has
+been used.
+Note that the color processing is of course the same as
+above.
+</p>
+
+
+<h2>Advantages</h2>
+<ul>
+<li>The specification is pretty compatible to other applications.</li>
+<li>It is possible to provide single-image specific information for
+every HDU.</li>
+</ul>
+
+
+<h2>Disadvantages</h2>
+
+
+<p class="indent">
+The band by band FITS storage has significant disadvantages for post-processing.
+Their complex structure affects algorithms and also strongly complicates
+addition of another HDUs.
+<p>
+<ul>
+<li>The storage of another calibration data as dark frames is relative
+    complicated because a full list of bands needs to be stored by n-times.
+</li>
+<li>
+Any elemental operations leads to extensive computations.
+</li>
+<li>
+The principial difficulty is storing of at a time (single exposure)
+images as a serie of bands (for example, digital camera or 3D spectroscopy
+images). The separation on single HDUs is highly artificial.
+On the other side, it is natural for images separated by time or
+by another reasons.
+</li>
+</ul>
+
+
+<h2>References</h2>
+
+<p>
+<a href="http://www.hdfgroup.org/">HDF (Hierarchical Data Format)</a>
+is a format similar to FITS.
+</p>
+
+<p>
+<a href="http://ds9.si.edu/ref/file.html#FITSRGB">ds9</a>
+also implements RGB pictures. Ones can be stored by both described
+alternatives (as cube or in separated HDUs). The false colors imaging
+is just supported.
+</p>
+
+<!-- #include virtual="/foot.shtml" -->
+
+</section>
+</body>
+</html>

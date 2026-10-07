@@ -1,0 +1,347 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ HDR Rendering</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1 class="noindent">HDR Rendering</h1>
+
+<p class="abstract">
+A mapping of high dynamical range of astronomical images
+to limited range of display devices is crucial for
+best user visual experience. There are described rendering methods used
+by Munipack.
+</p>
+
+<p>
+<a href="https://integral.physics.muni.cz/ftp/munipack/munipack-data.tar.gz" class="download">Sample data</a>
+</p>
+
+<h2>Introduction</h2>
+
+<p>
+The dynamical range of a standard CCD camera is over 65 thousand.
+When any taken image is processed or single exposures are composed,
+its range can be expanded. Also frequently the images can be calibrated
+to a physical quantities. Therefore the range of images must be
+supposed to be unlimited (usually in interval zero to positive infinity).
+Moreover, a typical processed image has dynamical range spread over many orders.
+Unfortunately, the display range of conventional device is just only
+256 levels (limits by both display devices and by software).
+Methods for mapping of an principially unlimited dynamical range
+to a limited range are discussed here.
+</p>
+
+<p class="indent">
+By method, it is possible to use global or local mapping techniques.
+The global mapping stretch full range to a predefined range by a global
+transformation function (acting on all pixels equivalently).
+The local mapping adapts the transformation according to values actual
+pixels. The local technique would remove large structures
+from image and shows only local rapid changes.
+Local techniques simulates perception of human eye. Munipack
+currently implements only global techniques.
+</p>
+
+<h1>Linear mapping</h1>
+
+<p>
+The linear mapping simply converts a wide range (represented
+usually by numbers from the real set) to a limited interval
+with linear scaling and cut-off. The linear scaling is represented by
+</p>
+<p>
+<i>i = B + S · I,</i>
+</p>
+<p>
+where <i>i</i> is a display intensity, <i>I</i> is an original intensity.
+The parameter <i>B</i> (black level) sets the intensity level
+in an original picture corresponding to black colour on the display. The slope
+<i>S</i> determines the intensity range which will be displayed.
+The intensities out of display range are cut-offed. Lower intensities
+to black and higher ones to white.
+</p>
+
+<p class="indent">
+The parameters are not orthogonal. The change of both will brighten
+or darken the picture but the results will be different. There is no
+known widely used orthogonal set of parameters.
+</p>
+
+
+<div class="twocolumn">
+  <div class="column">
+    <figure>
+      <img src="tone11.png" alt="tone11" style="width:382px;" class="figure">
+      <figcaption><i>B=0, S=1/4096</i></figcaption>
+    </figure>
+    <figure>
+      <img src="tone12.png" alt="tone12" style="width:382px;" class="figure">
+      <figcaption><i>B=0, S=1/16384</i></figcaption>
+    </figure>
+    <figure>
+      <img src="tone13.png" alt="tone13" style="width:382px;" class="figure">
+      <figcaption><i>B=0, S=1/65536</i></figcaption>
+    </figure>
+  </div>
+  <div class="column">
+    <figure>
+      <img src="tone21.png" alt="tone21" style="width:382px;" class="figure">
+      <figcaption><i>B=2048, S=1/1024</i></figcaption>
+    </figure>
+    <figure>
+      <img src="tone22.png" alt="tone22" style="width:382px;" class="figure">
+      <figcaption><i>B=3072, S=1/1024</i></figcaption>
+    </figure>
+    <figure>
+      <img src="tone23.png" alt="tone23" style="width:382px;" class="figure">
+      <figcaption><i>B=4096, S=1/1024</i></figcaption>
+    </figure>
+  </div>
+</div>
+
+
+<h2>Relation to contrast/luminosity</h2>
+
+<p>
+The direct use of <a href="https://en.wikipedia.org/wiki/Contrast_(vision)">contrast/luminosity</a> parameters for adjusting of range is not possible
+due to principal difference of both operations.
+</p>
+
+<p class="indent">
+There is an weak analogy between black and slope parameters and widely
+known contrast and brightness parameters. The black corresponds to
+brightness and contrast corresponds to slope. The formal definition
+and usage of both twines of parameters is different.
+On the other side, the practical usage of both parameters is similar.
+</p>
+
+
+
+<h2>Estimation of black and slope parameters</h2>
+
+<p>
+Munipack has included empirical estimate of parameters on base of
+descriptive statistics.
+</p>
+
+<p>
+Lets median of selected pixels of an image is
+</p>
+<p>
+ <i>D</i><sub>med</sub> = med <i>D<sub>ij</sub>,</i>
+</p>
+<p>
+and median of absolute deviations of the image is
+</p>
+<p>
+<i>D</i><sub>mad</sub>=  med |<i>D<sub>ij</sub> - D</i><sub>med</sub>|,
+</p>
+<p>
+than the parameters are initially estimated to
+</p>
+<p>
+<i>B = D</i><sub>med</sub> - <i>k D</i><sub>mad</sub>,<br>
+<i>S = 1 / w D</i><sub>mad</sub>.
+</p>
+<p>
+Ones are choose to <i>k = 0, w = 30</i>.
+</p>
+
+<p class="indent">
+The estimator and parameters has been determined empirically by visually
+comparing
+of set of images with different parameters. The algorithm perfectly
+works on images with Gaussian-like histogram. The prototype of the images
+can be a sparse stars sky field. The
+histogram is mostly composed from the noise of the sky. Stars have just
+only marginally importance. Images with non-Gaussian histogram
+are estimated poorly by the way.
+</p>
+
+<p class="indent">
+The estimator uses just only a few thousands of pixels in selected
+regular grid covering of full frame. The median is used as estimator
+of mean. The use of arithmetical mean
+does not work at all because one is too sensitive to outliners.
+</p>
+
+<figure>
+<img class="figure" alt="tone.png" src="tone.png">
+<figcaption>
+<i>B=2936, slope=1/780,</i> <i>S</i><sub>med</sub> = 2936,
+<i>S</i><sub>mad</sub>= 26.
+</figcaption>
+</figure>
+
+<h1>Non-linear mapping</h1>
+
+<p>
+The values prescaled by the above linear transformation can be directly
+used in more general transformation:
+<p>
+<i>  i' = f<sub>0</sub> · f(i) + z,</i>
+</p>
+<p>
+where <i>f<sub>0</sub></i> and scales and <i>z</i> vertically shifts
+the function. Available functions are:
+</p>
+
+<div class="table">
+<table>
+<caption>Tone functions <i>f(i)</i></caption>
+<tr><th>Function</th><th>Description</th></tr>
+<tr><td>asinh</td><td>Wide range without background noise. Intended for general usage. Suggested by <a href="http://adsabs.harvard.edu/abs/2004PASP..116..133L">Lupton et al. (2004)</a></td></tr>
+<tr><td>log</td><td>Simulates magnitudes. Emphasizes details on
+background. On high levels similar to asinh.</td></tr>
+<tr><td>sqrt</td><td>Similar to log. Inspired by ds9 (saoimage).</td></tr>
+<tr><td>gamma</td><td>Gamma function with power 1/4.2 (as in sRGB). Just only for comparison.</td></tr>
+<tr><td>normal</td><td>Normal ‒ Gaussian ‒ distribution function (integral of Gaussian hat). As the simulation of gradation curve of classical photography.</td></tr>
+<tr><td>logistic</td><td>Logistic function. The similar usage as for normal</td></tr>
+<tr><td>atan</td><td>Arc tan. The similar usage as for normal</td></tr>
+<tr><td>square</td><td>Square has opposite curvature to all others. Emphasizes low-contrast details in noise background.</td></tr>
+</table>
+</div>
+
+<div class="twocolumn">
+  <div class="column">
+    <figure>
+      <img src="tone.png" alt="tone" style="width:382px;" class="figure">
+      <figcaption>linear</figcaption>
+    </figure>
+    <figure>
+      <img src="tone2.png" alt="tone2" style="width:382px;" class="figure">
+      <figcaption>log</figcaption>
+    </figure>
+    <figure>
+      <img src="tone4.png" alt="tone4" style="width:382px;" class="figure">
+      <figcaption>gamma</figcaption>
+    </figure>
+    <figure>
+      <img src="tone6.png" alt="tone6" style="width:382px;" class="figure">
+      <figcaption>logistics</figcaption>
+    </figure>
+    <figure>
+      <img src="tone8.png" alt="tone8" style="width:382px;" class="figure">
+      <figcaption>square</figcaption>
+    </figure>
+  </div>
+  <div class="column">
+    <figure>
+      <img src="tone1.png" alt="tone1" style="width:382px;" class="figure">
+      <figcaption>asinh</figcaption>
+    </figure>
+    <figure>
+      <img src="tone3.png" alt="tone3" style="width:382px;" class="figure">
+      <figcaption>sqrt</figcaption>
+    </figure>
+    <figure>
+      <img src="tone5.png" alt="tone5" style="width:382px;" class="figure">
+      <figcaption>normal</figcaption>
+    </figure>
+    <figure>
+      <img src="tone7.png" alt="tone7" style="width:382px;" class="figure">
+      <figcaption>atan</figcaption>
+    </figure>
+  </div>
+</div>
+
+
+<h1>Gamma correction</h1>
+
+<p>
+Mostly (all) widely used displays are using the gamma correction. The correction
+transforms already mapped <i>i</i> so response on linear stimulus
+in input intensity is linear response (humans perception).
+</p>
+<p>
+The gamma correction takes the form
+</p>
+<p>
+<i>
+ i'  = i<sup>1/γ</sup>,
+</i>
+</p>
+<p>
+where <i>γ</i> is 4.2 for sRGB and 4.0 for AdobeRGB display. Without
+the correction, images appears too dim.
+</p>
+
+
+<figure>
+<img class="figure" alt="nogamma" src="tone-nogamma.png">
+<figcaption>
+How looked images in deep dark ages when gamma correction has not been discovered yet.
+</figcaption>
+</figure>
+
+<h1>Colour images</h1>
+
+<p>
+In case of colour images, the scaled component is not more directly
+the intensity but the <i>L</i> component of
+<a href="https://en.wikipedia.org/wiki/CIELUV_color_space">CIE Luv color
+space</a>:
+</p>
+<p>
+<!--L' =  Itt(L).-->
+<i>I ≡ L = 116 Y<sup>1/3</sup> - 16.</i>
+</p>
+<p>
+The colours itself are untouched. The scaled value <i>I'</i> and colour is than
+transformed back to
+<a href="https://en.wikipedia.org/wiki/CIE_1931_color_space">CIE XYZ.</a>
+The reason of the technique is saving of colours. Without
+the transformation colours are deformed and does not corresponds to
+human perception.
+</p>
+
+<div class="twocolumn">
+  <div class="column">
+    <figure>
+      <img src="toneC1.png" alt="toneC1" style="width:382px;" class="figure">
+      <figcaption><i>B=0, S=1/1024</i></figcaption>
+    </figure>
+    <figure>
+      <img src="toneC3.png" alt="toneC3" style="width:382px;" class="figure">
+      <figcaption><i>B=0, S=1/16384</i></figcaption>
+    </figure>
+  </div>
+  <div class="column">
+    <figure>
+      <img src="toneC2.png" alt="toneC2" style="width:382px;" class="figure">
+      <figcaption><i>B=0, S=1/4096</i></figcaption>
+    </figure>
+    <figure>
+      <img src="toneC4.png" alt="toneC4" style="width:382px;" class="figure">
+      <figcaption><i>B=0, S=1/65536</i></figcaption>
+    </figure>
+  </div>
+</div>
+
+
+<h1>Graphical controls</h1>
+
+<p>
+Full access to tone tuning is available via a graphical interface.
+</p>
+
+<figure>
+  <img alt="controls" src="Screenshot-m27_R.png">
+</figure>
+
+<h1>The algorithm</h1>
+
+<p>
+The algorithm as is implemented in <samp>xmunipack/fitsimage.cpp.</samp>
+</p>
+
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

@@ -1,0 +1,115 @@
+
+% lualatex oakleaf && biber oakleaf && lualatex oakleaf
+
+\documentclass[12pt,a4paper,twoside]{book}
+
+\usepackage[a4paper]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[cmintegrals,cmbraces]{newtxmath}
+\usepackage{ebgaramond-maths}
+\usepackage{fontspec}
+\usepackage{adforn}
+\usepackage{xfrac}
+\usepackage{mathtools}
+
+\usepackage[plain,chapter]{algorithm}
+\usepackage{algpseudocode}
+\algrenewcommand\algorithmicdo{}
+\algrenewcommand\algorithmicthen{}
+\algrenewcommand\algorithmiccomment{}
+\algrenewcommand\textproc{\textsf}
+
+\usepackage{listings}
+
+\usepackage{xcolor}
+\definecolor{oakgreen}{HTML}{83991A}
+
+\usepackage{fancyhdr}
+\setlength{\headheight}{15.2pt}
+
+%\chapterstyle{southall}
+\usepackage{titlesec}
+\titleformat{\chapter}[block]
+{\normalfont\normalsize\rmfamily}
+{\huge \thechapter \hspace{3ex} }
+{0pc}
+{\filright
+  \vspace{1ex}
+  \huge
+}[\titlerule]
+\titlespacing*{\chapter}{0pt}{0pt}{7em}
+\titleformat{\section}[hang]
+{\normalfont\normalsize\rmfamily}
+{\large \thesection}
+{.5em}
+{\large}
+\titleformat{\subsection}[hang]
+{\rmfamily}
+{\thesubsection}
+{.5em}
+{}
+
+
+\usepackage{polyglossia}
+\setdefaultlanguage{english}
+%\setotherlanguages{czech}
+\usepackage{csquotes}
+
+\usepackage[style=nature,citestyle=authoryear,backend=biber,language=english,autolang=other]{biblatex}
+\addbibresource{oakleaf.bib}
+
+\newcounter{example}[chapter]
+\renewcommand{\theexample}{\thechapter.\arabic{example}}
+
+\newenvironment{example}[1] {
+  \par\vspace{\baselineskip}\noindent
+  \refstepcounter{example}
+  \emph{Example \theexample} \hspace{0.5em} #1
+  \par\vspace{\baselineskip}\noindent\ignorespaces
+%  \begin{minipage}{0.9\textwidth}
+}
+{
+%  \end{minipage}
+  {} \hfill $\diamond$
+  \par\vspace{\baselineskip}
+  \noindent\ignorespacesafterend
+}
+
+\DeclareMathOperator{\sign}{sign}
+\DeclareMathOperator{\maxloc}{maxloc}
+\newcommand{\mdx}[2]{#1{:}#2}
+%\newcommand{\mcolon}[2]{#1 \mathop{:} #2}
+
+\begin{document}
+
+\pagestyle{fancy}
+\renewcommand{\chaptermark}[1]{\markboth{#1}{}}
+\renewcommand{\sectionmark}[1]{\markright{#1}}
+\fancyhead[LE]{\thepage}
+\fancyhead[RE]{\leftmark}
+\fancyhead[LO]{\rightmark}
+\fancyhead[RO]{\thepage}
+\fancyfoot{}
+
+\frontmatter
+\include{titlepage}
+\include{intro}
+
+\pagestyle{fancy}
+\renewcommand{\chaptermark}[1]{\markboth{Chapter~\thechapter. {} #1}{}}
+\renewcommand{\sectionmark}[1]{\markright{\thesection. {} #1}}
+\fancyhead[LE]{\thepage}
+\fancyhead[RE]{\leftmark}
+\fancyhead[LO]{\rightmark}
+\fancyhead[RO]{\thepage}
+\fancyfoot{}
+
+\mainmatter
+
+\include{qr}
+
+\backmatter
+
+\include{fdl-1.3}
+
+\end{document}

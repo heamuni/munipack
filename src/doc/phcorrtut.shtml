@@ -1,0 +1,298 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Photometric Corrections Tutorial</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<!-- TODO:
+    * update commands (synchro with actual dataset)
+-->
+
+<h1>Photometric Corrections</h1>
+
+<p class="abstract">
+Description for photometric pre-processing of images.
+How to create of averaged biases, darks or flat-field frames
+and how to apply ones on scientific images.
+</p>
+
+<h2>Introduction</h2>
+
+<p>
+The preprocessing is image is absolutely
+necessary for any correct photometry work. The application
+corrects unwanted fluency of devices as zero offset, dark
+current or light responsibility.
+</p>
+
+<p>
+More detailed description of the corrections is included
+in pages:
+<a href="man_bias.html">Averaged bias frame</a>,
+<a href="man_dark.html">Averaged dark frame</a>,
+<a href="man_flat.html">Averaged flat-field frame</a> and
+<a href="man_phcorr.html">Photometric corrections</a>.
+</p>
+
+<p>
+As an excellent introduction for preprocessing, the textbook
+<a href="http://www.cambridge.org/gb/knowledge/isbn/item2713446/">
+To Measure the Sky</a> by F. R. Chromey would be recommended.
+</p>
+
+<h2>Sample Data</h2>
+
+<p>
+A sample data are available as
+<a href="https://integral.physics.muni.cz/ftp/munipack/munipack-data-blazar.tar.gz">munipack-data-blazar.tar.gz</a>.
+Use commands
+</p>
+<pre>
+$ cd /tmp/
+$ tar zxf munipack-data-blazar.tar.gz
+</pre>
+<p>
+ to unpack it to a desired directory.
+We will assume that the sample data are unpacked to <samp>/tmp</samp> directory
+as <samp>/tmp/munipack-data-blazar</samp>.
+</p>
+
+<p>
+The sample dataset includes an observation of this blazar together
+with correction frames (flat-fields and dark-frames).
+</p>
+
+<div class="table">
+<table>
+<caption>An overview</caption>
+<tr><th>Description</th><th>Filemask</th><th>Exposure</th></tr>
+<tr><td>scientific images</td><td style="text-align:right;"><samp>0716_[1-9]R.fits</samp></td><td style="text-align:right;">120 sec</td></tr>
+<tr><td>dark-frames of scientific images</td><td style="text-align:right;"><samp>d120_[1-7].fits</samp></td><td style="text-align:right;">120 sec</td></tr>
+<tr><td>flat-fields</td><td style="text-align:right;"><samp>f10_[1-9]R.fits</samp></td><td style="text-align:right;">10 sec</td></tr>
+<tr><td>dark-frames of flat-fields</td><td style="text-align:right;"><samp>d10_[1-9].fits</samp></td><td style="text-align:right;">10 sec</td></tr>
+</table>
+</div>
+
+<h2>Working directory</h2>
+
+<p>
+As a first important step, we will create a working directory. For example,
+create directory <samp>/tmp/munipack-data-blazar</samp> and switch to by the command:
+</p>
+<pre>
+$ mkdir /tmp/work
+</pre>
+<p>
+The name does not matter. It is highly recommended to use
+a new empty directory to prevent any lost of data
+(especially of original images!).
+</p>
+
+<h2>Preparation</h2>
+<p>
+Some functionality of preprocessing tools requires correct
+setting of FITS header keywords. The keywords are preset,
+but sometimes local conventions are different. Therefore there
+are available some <a href="man_env.html">environment variables</a>
+for individual tuning.
+</p>
+
+<p>
+It is recommended to set the variables by the way in your
+bash shell as the initial step (modify by your needs):
+</p>
+<pre>
+$ FITS_KEY_FILTER='FILTER'
+$ FITS_KEY_EXPTIME='EXPTIME'
+$ FITS_KEY_TEMPERATURE='TEMPERAT'
+$ FITS_KEY_DATEOBS='DATE-OBS'
+$ MUNIPACK_TEMPERATURE_TOLERANCE=1 # Celsius degree
+$ MUNIPACK_EXPTIME_TOLERANCE=1e-6  # seconds
+$ export FITS_KEY_FILTER FITS_KEY_EXPTIME FITS_KEY_TEMPERATURE FITS_KEY_DATEOBS
+$ export MUNIPACK_TEMPERATURE_TOLERANCE MUNIPACK_EXPTIME_TOLERANCE
+</pre>
+
+<p>
+To avoid need of repeated typing of the keywords, add these commands
+to your ~/.bashrc profile.
+</p>
+
+
+<h2>Average Of Dark Frames</h2>
+<p>
+To create an average dark frame for scientific exposures, run the command:
+</p>
+<pre>
+$ cd /tmp/work
+$ munipack dark -o d120.fits /tmp/munipack-data-blazar/d120_*.fits
+$ ls d120.fits
+d120.fits
+</pre>
+<p>
+Munipack is invoking the module <samp>dark</samp> intended
+to average of images specified as the last argument.
+The asterisk matches all images begins with <samp>d120_</samp>
+together and ending with the suffix <samp>.fits</samp>.
+The processed mean is stored as <samp>d120.fits</samp>.
+
+</p>
+
+<p class="indent">
+Averaging uses a robust mean method by default.
+It reduces of fluency of cosmic-rays and similar single-frame defects on
+final products. On other side, it requires much more computer resources
+than simple averaging by the arithmetical mean (switch <samp>-a</samp>)
+</p>
+
+<p class="indent">
+Note that, this step can be omitted (a single dark frame can
+be used only), but one is preferred from a statistical point
+of view. The result image is frequently called as master-dark.
+</p>
+
+<figure>
+<img class="figure" src="d120_1.png" alt="d10_1.png" title="A dark image">
+<figcaption>
+A randomly selected dark image.
+</figcaption>
+</figure>
+
+<figure>
+<img class="figure" src="d120.png" alt="d120.png" title="Mean of dark-frames">
+<figcaption>
+Mean of dark-frames (master-dark).
+</figcaption>
+</figure>
+
+
+<h2>Average Of Flat-Fields</h2>
+
+<p>
+Because flat-fields are light frames similar to scientific frames,
+ones needs similar preprocessing. Especially, we must correct
+its for dark frames.
+</p>
+
+<p>
+  So, the first step is preparation of the dark with 10 s of exposure
+  times for flats
+</p>
+<pre>
+$ munipack dark -o d10.fits /tmp/munipack-data-blazar/d10_*.fits
+</pre>
+<p>
+The exposure times must be exactly the same for both darks and flats.
+</p>
+
+<p>
+With this dark we can easy create the averaged flat as:
+</p>
+<pre>
+$ munipack flat -o f_R.fits -dark d10.fits /tmp/munipack-data-blazar/f10_*R.fits
+</pre>
+<p>
+The internally corrected
+flat-fields are scaled by its mean intensity and its dispersion to
+a unified output level. A robust mean is made on the uniform scaled flats
+and an output flat is stored as <samp>f_R.fits</samp>.
+</p>
+
+<p class="indent">
+The key feature of <samp>flat</samp> is the scaling and a robust mean of single
+flats. The procedure is pretty effective for short series of the twilight
+sky's exposures when brightness rapidly decrease. Also, a long over-night series
+of non-identical fields (like many blazar fields) will produce excellent
+results.
+</p>
+
+<figure>
+<img class="figure" src="f10_1.png" alt="f10_1.png" title="A flat-field image">
+<figcaption>
+A randomly selected flat-field image.
+</figcaption>
+</figure>
+
+<figure>
+<img class="figure" src="autoflat.png" alt="autoflat.png" title="A scaled robust mean of flats">
+<figcaption>
+A scaled robust mean of flat-fields (master-flat).
+</figcaption>
+</figure>
+
+
+<h2>Dark And Flat-Field Corrections</h2>
+<p>
+Original scientific images can be corrected for dark-frames by running:
+</p>
+<pre>
+$ munipack phcorr -t . -dark d120.fits /tmp/munipack-data-blazar/0716_*R.fits
+</pre>
+<p>
+<samp>phcorr</samp> action subtracts, the previously created mean-dark
+<samp>d120.fits</samp> given as a first non-optional argument,
+from every scientific exposures of 0716+71 and newly created images
+will be stored in
+the current working directory (given by option -t . (tee and dot!)
+with image names identical to original ones.
+</p>
+
+<figure>
+<img class="figure" src="0716_original.png" alt="0716_original.png" title="An original image">
+<figcaption>
+A randomly selected scientific exposure of blazar 0716+714.
+</figcaption>
+</figure>
+
+<figure>
+<img class="figure" src="0716_dark.png" alt="0716_dark.png" title="An original image with the dark-frame subtracted">
+<figcaption>
+A randomly selected scientific exposure of blazar 0716+714 with the d120 dark-frame subtracted.
+</figcaption>
+</figure>
+
+<p>
+By analogy of dark correction, scientific images (subtracted for dark)
+can be corrected for flats by
+</p>
+<pre>
+$ munipack phcorr -t . -flat f_R.fits /tmp/munipack-data-blazar/0716_*R.fits
+</pre>
+<p>
+We can see that the current directory images are used.
+</p>
+
+<figure>
+<img class="figure" src="0716_final.png" alt="0716_final.png" title="A fully corrected scientific exposure">
+<figcaption>
+A randomly selected, fully corrected (dark and flat), image of blazar 0716+714.
+</figcaption>
+</figure>
+
+
+
+<p>
+For convenience, both correction can be appplied together
+</p>
+<pre>
+$ munipack phcorr -t . -flat f_R.fits -dark d120.fits /tmp/munipack-data-blazar/0716_*R.fits
+</pre>
+
+
+<h2>See Also</h2>
+
+<p>
+Manuals:
+<a href="man_bias.html">Bias</a>,
+<a href="man_dark.html">Dark</a>,
+<a href="man_flat.html">Flat-field</a>,
+<a href="man_phcorr.html">Photometric corrections</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

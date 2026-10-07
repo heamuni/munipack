@@ -1,0 +1,41 @@
+# BEGIN HDU 0
+SIMPLE  =                    T / file does conform to FITS standard
+BITPIX  =                    8 / number of bits per data pixel
+NAXIS   =                    0 / number of data axes
+EXTEND  =                    T / FITS dataset may contain extensions
+COMMENT   FITS (Flexible Image Transport System) format is defined in 'Astronomy
+COMMENT   and Astrophysics', volume 376, page 359; bibcode: 2001A&A...376..359H
+COMMENT My coordinates and proper motions definitions for timeserie
+END
+# END HDU 0
+# BEGIN HDU 1
+XTENSION= 'BINTABLE'           / binary table extension
+BITPIX  =                    8 / 8-bit bytes
+NAXIS   =                    2 / 2-dimensional binary table
+NAXIS1  =                   32 / width of table in bytes
+NAXIS2  =                    4 / number of rows in table
+PCOUNT  =                    0 / size of special data area
+GCOUNT  =                    1 / one data group (required keyword)
+TFIELDS =                    4 / number of fields in each row
+EXTNAME = 'BL Lac  '           / Reference
+TTYPE1  = 'RAJ2000 '           / Right Ascension in degrees
+TFORM1  = '1D      '           / data format of field: double (8 bytes)
+TUNIT1  = 'deg     '           / physical unit of field
+TTYPE2  = 'DEJ2000 '           / Declination in degrees
+TFORM2  = '1D      '           / data format of field: double (8 bytes)
+TUNIT2  = 'deg     '           / physical unit of field
+TTYPE3  = 'pmRA    '           / Proper motion in Right Ascension
+TFORM3  = '1D      '           / data format of field: double (8 bytes)
+TUNIT3  = 'arcsec/year'        / <-- units for pm of stars
+TTYPE4  = 'pmDE    '           / Proper motion in Declination
+TFORM4  = '1D      '           / data format of field: double (8 bytes)
+TUNIT4  = 'deg/day '           / <-- units for pm of solar system bodies
+EPOCH   = 2451545.0            / [JD] reference epoch of proper motion
+COMMENT A description of my catalogue ...
+END
+330.6803 42.2776 0 0
+330.689 42.2765  0 0
+330.667 42.2860  0 0
+330.636 42.2798  0 0
+330.650 42.2816  0 0
+# END HDU 1

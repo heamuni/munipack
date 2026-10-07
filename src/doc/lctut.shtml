@@ -1,0 +1,510 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Light Curve Tutorial</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Light Curve</h1>
+
+<p class="abstract">
+How to extract
+a light curve (a time dependence of magnitude) of a variable source.
+</p>
+
+
+<h1>Blazar 0716+714</h1>
+
+<p>
+<a href="https://en.wikipedia.org/wiki/Blazar">Blazar</a>
+<a href="http://simbad.u-strasbg.fr/simbad/sim-basic?Ident=pks+0716%2B71&amp;submit=SIMBAD+search">0716+714</a>
+is a bright quasi-stellar extra-galactic object in Camelopardalis.
+The observed light has origin in a
+<a href="https://en.wikipedia.org/wiki/Synchrotron_radiation">synchrotron radiation</a>
+emitted by relativistics electrons forming a jet.
+The jet is oriented directly to the Earth.
+A non-periodic light variations can be observed. The origin of the
+variations is only partially
+<a href="https://en.wikipedia.org/wiki/Relativistic_beaming">understood</a>.
+</p>
+
+
+<h2>Sample Data</h2>
+
+<p>
+A sample data are available as
+<a href="https://integral.physics.muni.cz/ftp/munipack/munipack-data-0716.tar.gz">munipack-data-0716.tar.gz</a>.
+</p>
+
+<p>
+We are preparing working directory and downloading of data.
+It is highly recommended to use
+a new empty directory to prevent any losts
+(especially of original images!).
+Use commands
+</p>
+<pre>
+$ mkdir ~/tmp
+$ cd ~/tmp
+$ wget ftp://munipack.physics.muni.cz/pub/munipack/munipack-data-0716.tar.gz
+$ tar zxf munipack-data-0716.tar.gz
+</pre>
+<p>
+to unpack it to a desired directory in your home.
+We will assume that the sample data are unpacked to <samp>~/tmp</samp>
+(the name does not matter) directory
+as the subdirectory <samp>munipack-data-0716/</samp>.
+This tutorial will take about 2GB of disk space.
+</p>
+
+<p>
+The sample dataset includes an observation of this blazar together
+with correction frames (flat-fields and dark-frames). The data has
+been acquired at MonteBoo Observatory by Lucie Sixtová.
+</p>
+
+<div class="table">
+<table>
+<caption>Data overview</caption>
+<tr><th>Description</th><th>Filemask</th><th>Exposure</th></tr>
+<tr><td>scientific images</td><td style="text-align:right;"><samp>0716_*[VR].fits</samp></td><td style="text-align:right;">120 sec</td></tr>
+<tr><td>dark-frames of scientific images</td><td style="text-align:right;"><samp>d120_*.fits</samp></td><td style="text-align:right;">120 sec</td></tr>
+<tr><td>flat-fields</td><td style="text-align:right;"><samp>f30_*[VR].fits</samp></td><td style="text-align:right;">30 sec</td></tr>
+<tr><td>dark-frames of flat-fields</td><td style="text-align:right;"><samp>d30_*.fits</samp></td><td style="text-align:right;">30 sec</td></tr>
+</table>
+</div>
+
+<h2>Photometry Pre-processing</h2>
+
+<p>
+Prepare corrected data as is described in
+<a href="phcorrtut.html">Photometric Corrections Tutorial</a>.
+</p>
+<pre>
+$ munipack dark -o d30.fits d30_*.fits
+$ munipack dark -o d120.fits d120_*.fits
+$ munipack flat -o f_V.fits -dark d30.fits f30_*V.fits
+$ munipack flat -o f_R.fits -dark d30.fits f30_*R.fits
+$ munipack phcorr -dark d120.fits -flat f_V.fits 0716_*V.fits
+$ munipack phcorr -dark d120.fits -flat f_R.fits 0716_*R.fits
+</pre>
+
+
+<h2>Detection of Stars And The Aperture Photometry</h2>
+<p>
+For detection and photometry, run the commands:
+</p>
+<pre>
+$ munipack find -f 3 0716_*.fits
+$ munipack aphot 0716_*.fits
+</pre>
+
+<p>
+  This routines detect stars on all frames and prepares both aperture
+  and growth-curve photometry.
+  Results are stored in FITS files with images as an additional part
+  (extension).
+Backups of original frames are saved with the tilde (~) filename suffix.
+</p>
+
+<p>
+Stars are modelled as peaks with near-Gaussian profile and the full width
+at half of maximum (FWHM) given as a parameter -f. The default value
+is suitable for usual optical images.
+</p>
+
+<p>
+The number of detected stars is affected by <samp>-th</samp> parameter designed as
+a threshold over the sky level in sigma-sky values. Default value will
+detect faint stars but not the most faint stars. Values under -th 1 will
+implicate detection of defects.
+</p>
+
+<p>
+By default, the first aperture with radius greater than FWHM is used
+for subsequent processing.
+</p>
+
+<h2>Astrometry Calibration</h2>
+<p>
+The astrometry calibration will be done with
+</p>
+<pre>
+$ munipack cone --Johnson-patch --magmax 15 -r 0.2 -- 110.5 71.3
+$ munipack astrometry -c cone.fits 0716_*.fits
+</pre>
+
+<p>
+It will run for a while. The routine use detected stars
+to determine mutual association (match) between stars on
+images and in the catalogue (result of default run of cone
+is sample from UCAC4 catalogue). The set of stars establishes
+transformation from pixel coordinates to sky coordinates
+which is the astrometry calibration.
+</p>
+
+<p>
+For particular frame, the match sometimes has failed.
+This commonly indicates these source of problems: clouds, bad frame, etc.
+For example, the processing will report (see affected frames to understand why):
+</p>
+<pre>
+...
+=C> Mutual match for files `0716_145R.fits' and `cone.fits' failed.
+...
+</pre>
+
+<!--
+add chapter: where I get the coordinates ?
+  * by objects name in Simbad
+  * by FITS header
+  * Astrometry.net
+-->
+
+
+<!--
+<h2>Instrumental Magnitudes</h2>
+
+<p>
+Results of photometry is a table added to original frames. The table
+contains number of counts determined from every star and  instrumental
+magnitudes. To list of the values, use <samp>timeseries</samp>
+action. The table contains all detected stars. If one is interested just
+in selected stars, the coordinates of sources must be given.
+</p>
+
+<pre>
+$ munipack timeseries 110.473,71.343 110.389,71.322 110.468,71.305 \
+           \-\-stdout 0716_*R_MAG.fits
+  2453759.2507523149        20947.582031250000        144.81892395019531        36699.714843750000        191.63452148437500
+   2453759.2523263888        21080.164062500000        145.27471923828125        36913.777343750000        192.19430541992188
+
+</pre>
+
+<p>
+The table with
+Julian days and instrumental magnitudes (and theirs statistical
+errors) are final light curves. One will also
+print on screen (due <samp>\-\-stdout</samp>) and saved defaulty
+to file <samp>timeseries.fits</samp> including detailed  description of quantities.
+</p>
+-->
+
+
+<h2>Photometry Calibration</h2>
+
+<p>Photometry calibration is essential for valuable results of light curves.
+Photometry precision will be demonstrated on these
+<a href="man_phcal.html">calibration methods</a>:
+</p>
+
+<ul>
+<li>Manual calibration.</li>
+<li>Calibration on base of known photometric sequence.</li>
+<li>Calibration on base of a photometry catalogue.</li>
+<li>Calibration on base of already calibrated frame.</li>
+</ul>
+
+<!--<h4>Description Of Common Parameters</h4>-->
+
+<p>
+<span class="par">Description Of Common Parameters</span>
+There are some important parameters which will commonly used:
+</p>
+
+<dl>
+<dt><samp>--photsys-ref Johnson</samp></dt><dd> Identifier
+  of our photometric system must be provided because it is used
+  for computation of <a href="phoverview.html">reference photons</a>.
+  In real, used filters are only an good approximation.
+</dd>
+<dt><samp>-f, --filters</samp></dt><dd> The option sets filter
+  of the calibrated frame.
+</dd>
+<dt><samp>--area 0.3</samp></dt><dd>An approximation of input area
+   of the telescope.
+</dd>
+<dt><samp>-O --mask '\1_cal.\2'</samp></dt><dd>This magic option
+   adds suffix to input frame name and set the new name as output.
+   The input filename is split
+   on part preceding (referenced as \1) and following (\2) the dot.
+   We are insert the string _cal between the first and final parts.
+   For example, filename <samp>0716_666R.fits</samp> will produce
+   \1=0716_666R, \2=fits, so output will be <samp>0716_666R_cal.fits</samp>.
+   For details, see <a href="man_com.html#advanced">Advanced Output Filenames</a>.
+</dd>
+</dl>
+
+<!--<h4>Processing Large Dataset</h4>-->
+
+<p>
+<span class="par">Processing Large Dataset</span>
+Photometry calibration is implemented for single frames only.
+Because typical observation run produces a lot of frames,
+shell scripting can help very much. We will use loops
+which are coded with command for. Following loop shows
+how to print all fits frames in current directory:
+</p>
+<pre>
+for A in *.fits; do
+   echo $A
+done
+</pre>
+
+
+<h3>Manual Calibration</h3>
+
+
+<p>
+Manual calibration means, that we are specifying directly the
+constant <i>r</i> (see <a href="phoverview.html#calibration">Photometry
+Calibration</a>). Manual calibration uses provided value without
+any changes and computes output quantities like photons.
+That mean that user is fully responsible for input values
+which affects also results.
+</p>
+
+<p>
+We will use this method to provide "instrumental quantities"
+which has been used by our photometry predecessors. The instrumental magnitudes
+will be produced by setting of <i>r</i>=1 (no absolute calibration).
+Another choice can approximately fit absolute magnitudes.
+For instance, as we will see later, the <i>r</i> is approx 20
+and area of telescope is 0.3 m² so <i>r</i>=20/0.3 = 60 will give
+approximate good absolute magnitudes.
+</p>
+
+<pre>
+$ FILTER=V   # also set R
+$ for A in 0716_*${FILTER}.fits; do
+    munipack phcal -C 1 --photsys-ref Johnson -f ${FILTER} \
+        -O --mask '\1_mancal.\2' $A;
+  done
+</pre>
+<p>
+(Frames with no astrometry are reported again.)
+</p>
+
+<p>
+The result instrumental values are not calibrated at all. We will
+use it only to construct differential magnitudes.
+</p>
+
+
+<h3>Standard Field As A Catalogue</h3>
+
+<p>
+Instrumental magnitudes can be considered as an intermediate product. If
+we are preferring calibrated magnitudes, the photometry calibration
+must be performed. The calibration determines <i>r</i>
+(see <a href="phoverview.html#calibration">Photometry Calibration</a>)
+from a set of calibration stars.
+</p>
+
+<figure>
+<img class="figure" src="0716_map.png" alt="0716+71 map" title="0716+71 identifications">
+<figcaption>
+Identification chart for stars on field of 0716+71.
+</figcaption>
+</figure>
+
+<p>
+Already calibrated stars must be known before. The most typical situation
+is known calibration sequence which had been measured by our predecessors.
+For the purpose, we are get the calibration sequence from
+<a href="http://www.lsw.uni-heidelberg.de/projects/extragalactic/charts/0716+714.html">Finding Charts for AGN</a> by <a href="http://www.lsw.uni-heidelberg.de/">Landessternwarte Heidelberg-Königstuhl</a> and prepared the file <a href="0716+71.lst">0716+71.lst</a>.
+(see also <a href="http://adsabs.harvard.edu/cgi-bin/nph-data_query?bibcode=2001AJ....122.2055G&amp;db_key=AST&amp;link_type=ABSTRACT&amp;high=51e5cff9e708211">González-Pérez et al (2001)</a>). The photometry input catalogue can be created as
+</p>
+<pre>
+$ munipack fits --restore 0716+71.lst
+</pre>
+
+<p>
+The calibration stars can be used to calibrate of our frames:
+</p>
+
+<pre>
+$ FILTER=V   # also set R
+$ for A in 0716_*${FILTER}.fits; do
+      munipack phcal \
+        --photsys-ref Johnson --area 0.3 \
+        -f ${FILTER} --col-mag ${FILTER}mag --col-magerr e_${FILTER}mag  \
+        -c 0716+71.fits
+        -O --mask '\1_catcal.\2'
+        $A;
+  done
+</pre>
+<p>
+Note, that we are supposed that the filters are exactly in Johnson UBVR(..)
+system (<samp>--photsys-ref Johnson</samp>). If the filters are significantly
+different, the <a href="colcal.html">transformation table</a> must be applied
+on instrumental data.
+</p>
+
+<h3>UCAC4 As A Catalogue</h3>
+
+<p>
+  There is only one catalogue which covers whole sky with photometry
+  measurements in magnitudes in BV (Johnson) and gri (Bessel) filters:
+ <a href="http://cdsarc.u-strasbg.fr/viz-bin/Cat?I/322">UCAC4</a> catalogue.
+</p>
+
+<p>
+There is way how to use UCAC4 on calibration:
+</p>
+<pre>
+$ FILTER=V   # also set R
+$ for A in 0716_*${FILTER}.fits; do
+     munipack phcal \
+       --photsys-ref Johnson --area 0.3 \
+       -f ${FILTER} --col-mag ${FILTER}mag --col-magerr e_${FILTER}mag  \
+       -c cone.fits \
+       -O --mask '\1_ucacal.\2' \
+       $A;
+  done
+</pre>
+
+
+
+<h3>Reference Frame</h3>
+
+<p>
+As the reference, we are using our frame. The approach will give
+the most precise results for relative photometry. An systematic
+offsets can be supposed in absolute calibration.
+</p>
+
+<pre>
+$ FILTER=V   # also set R
+$ for A in 0716_*${FILTER}.fits; do \
+      munipack phcal \
+        --photsys-ref Johnson --area 0.3 \
+        -f ${FILTER}  \
+        -r 0716_006${FILTER}_catcal.fits -O --mask '\1_refcal.\2' $A;
+  done
+</pre>
+
+
+
+<h2>Light Curves</h2>
+
+
+<p>
+The frames are calibrated in photons. The standard magnitudes can be get
+with different choices of filters V,R and calibration types (manual,
+catalogue,reference frame):
+</p>
+<pre>
+$ munipack timeseries -c "110.473,71.343 110.389,71.322 110.468,71.305" \
+            -l MAG,MAGERR -o mancal_R.fits  0716_*R_mancal.fits
+</pre>
+
+<figure>
+  <img class="figure" src="lc0716_V.svg" alt="Light Curve of 0716+71"
+       title="Light Curve of 0716+71">
+<figcaption>
+Light curve of 0716+71 determined by various methods.
+Ones for standard field and UCAC4 are shifted for ±0.1 magnitude.
+</figcaption>
+</figure>
+
+<figure>
+<img class="figure" src="comp0716_V.svg" alt="Light Curve of a comparison star"
+     title="Light Curve of a comparison star">
+<figcaption>
+Light curve of calibration star A (difference is plotted for A and B
+     with added constant).
+Ones for standard field and UCAC4 are shifted for ±0.1 magnitude.
+</figcaption>
+</figure>
+
+<h2>Conclusions</h2>
+
+<p>
+Light curves of 0716+71 exhibits these properties:
+</p>
+<ul>
+<li>Instrumental calibration, by using of a constant, produces
+results strongly depending on observation conditions.
+In the graph, the offset 4.5 was added (which is equivalent to
+use of <samp>-C 20 --area 0.3</samp>, see CTPH keyword in FITS files *_catcal).
+This calibration can't be reccomended for additional processing by any way.
+</li>
+<li>Other kinds of calibrations gives consistent results
+    within their statistical errors. Features:
+    0.25-0.5 (brightnening of blazar), 0.42, 0.57, above 0.65 (clouds).</li>
+<li>Light curve with minimal noise is produced by (carefully) selecting
+of reference frame.</li>
+<li>The precision of UCAC4 is significantly lower than both the reference
+frame and the standard field.</li>
+<li>Points with large differences are due to clouds and other instrumental
+problems (inspect the frames visually).</li>
+</ul>
+
+
+<p>
+Light curves of calibration stars exhibits another properties:
+</p>
+<ul>
+<li>The differential magnitude successfully suppress large
+changes in extinction due to clouds because both the stars are
+attenuated by the similar way.</li>
+<li>The reference frame again offers the best results because
+one much more better suppress potential deviations (clouds, flat-fields
+imperfections, etc.) thansk to averaging more objects. Some trends,
+perhaps due to colour extinction, are still visible </li>
+<li>The variations in light curves on level of a few hundredth
+are significant. The change in blazar flux can be declared as real.</li>
+<li>The strongly deviated measurements are due seriously
+bad frames.</li>
+</ul>
+
+
+<h2>Tips</h2>
+<ul>
+<li>
+The approach can be generalized for any objects exhibiting similar light variations
+as variable stars, exoplanets, etc
+</li>
+<li>Object coordinates can be specified also in
+    a <a href="man_timeseries.html">table</a>.</li>
+<li>
+Parameter <samp>-T phase --epoch 2453759 --period 1.0</samp> can be used to generate
+phase curve.
+</li>
+<li>
+The best way to get calibrated magnitudes is to prepare
+own photometry catalogue as the average of all frames.
+</li>
+</ul>
+
+<h2>See Also</h2>
+
+<p>
+Manuals:
+<a href="man_timeseries.html">Timeseries</a>,
+<a href="man_astrometry.html">Astrometry</a>,
+<a href="man_aphot.html">Aperture Photometry</a>,
+<a href="man_phcal.html">Photometry Calibration</a>,
+<a href="man_phcorr.html">Photometric corrections</a>.
+Data Formats:
+<a href="dataform_tmseries.html">Time Serie Tables</a>.
+</p>
+
+<p>
+<a href="lctut.sh">lctut.sh</a> is a bash script summarizing
+of this tutorial,
+<a href="ucac_jmuc.py">ucac_jmuc.py</a> is Python utility (requires
+<a href="http://www.astropy.org/">Astropy</a>) which converts UCAC4
+r,i magnitudes in Gunn to R,I Johnson photometry system
+(an equivalent of <samp>--Johnson-patch</samp>).
+</p>
+
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

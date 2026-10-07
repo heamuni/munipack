@@ -1,0 +1,266 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Processing File</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1 class="noindent">Processing File</h1>
+<p class="abstract">
+Description of the FITS structure file used to store of processing of instrumental
+data ("proc" format). Proc-files are the essential core of data formats in Munipack.
+Processing actions keeps their results in the extensions of this kind of file.
+All other actions uses proc-file as input.
+</p>
+
+<p>
+Proc-file is not created by only one action, but the extensions
+are created by various ones.
+Objects detection and aperture photometry is provided
+by <samp>munipack find, munipack aphot</samp> modules.
+The astrometry calibration
+is determined by <samp>munipack astrometry</samp>.
+The photometry calibration
+is determined by <samp>munipack phcal</samp>.
+</p>
+
+<p>
+Proc-file specification has been developed for internal use in Munipack
+and follows rules introduced by original DAOPHOT.
+Any backward compatibility is not guarantied.
+</p>
+
+<h1>File Structure</h1>
+
+<p>
+  The primary data array is followed by FIND, APERPHOT and GROWCURVE extensions.
+  The order of the extensions can vary (use the name rather then index
+  to access required extension).
+</p>
+
+<div class="table">
+<table>
+<caption>FITS file structure including photometry</caption>
+<tr><th>HDU</th><th>EXTNAME</th><th>Description</th><th>Action</th></tr>
+<tr><td>0</td><td></td><td>Primary array (frame)</td><td></td></tr>
+<tr><td>1</td><td>FIND</td><td>Table of detected objects</td><td>find</td></tr>
+<tr><td>2</td><td>APERPHOT</td><td>Aperture Photometry table</td><td>aphot</td></tr>
+<tr><td>3</td><td>GROWCURVE</td><td>Growth curve table</td><td>aphot</td></tr>
+</table>
+</div>
+
+
+<h2>Primary Array</h2>
+
+<p>Data in primary array is untouched during objects detection (find)
+and aperture photometry phase. GAIN, READNS and SATURATE keywords may by
+modified on user request.
+</p>
+
+
+<h1>Object Detection Table: FIND</h1>
+
+<p>
+The table contains detected objects.
+</p>
+
+<div class="table">
+<table>
+<caption>Keywords</caption>
+<tr><th>Keyword</th><th>Description</th><th>Units</th></tr>
+<tr><td>EXTNAME</td><td>FIND as the identifier of this table</td><td></td></tr>
+<tr><td>FWHM</td><td>typical full width at half of maximum for a detected object</td><td>pixels</td></tr>
+<tr><td>THRESH</td><td>threshold for detection of peak of stars in sigmas of sky above sky mean level in a region</td><td></td></tr>
+<tr><td>LOBAD</td><td>Lower good datum</td><td>ADU</td></tr>
+<tr><td>HIBAD</td><td>Higher good datum</td><td>ADU</td></tr>
+<tr><td>RNDLO</td><td>Round low</td><td></td></tr>
+<tr><td>RNDHI</td><td>Round high</td><td></td></tr>
+<tr><td>SHRPLO</td><td>Sharp low</td><td></td></tr>
+<tr><td>SHRPHI</td><td>Sharp high</td><td></td></tr>
+</table>
+</div>
+
+<h2>Header Comments</h2>
+
+<p>
+Header contains additional information in more human-readable format.
+</p>
+
+<pre>
+Star detection parameters:
+ Gain (e-/ADU)=   [..]      (see primary HDU)
+ Saturation (ADU)=  [..]      (see primary HDU)
+ Read noise (ADU)=   [..]      (see primary HDU)
+ Lower threshold (sigma)=   [..]
+ Levels range (ADU) =   [..]     ..   [..]
+ Round range =  -1.00000000     ..   1.00000000
+ Sharp range =  0.200000003     ..   1.00000000
+ Approximate sky value =   [sky]     +-   [skysig]
+ Pixels used for sky determination =       10000
+</pre>
+
+<div class="table">
+<table>
+<caption>Object detection table</caption>
+<tr><th>Column</th><th>Description</th><th>unit</th></tr>
+<tr><td>X</td><td>Horizontal coordinate</td><td>pix</td></tr>
+<tr><td>Y</td><td>Vertical coordinate</td><td>pix</td></tr>
+<tr><td>SHARP</td><td>sharp parameter</td><td></td></tr>
+<tr><td>ROUND</td><td>round parameter</td><td></td></tr>
+<tr><td>PEAKRATIO</td><td>Ratio of peak to background (sky level)</td><td></td></tr>
+</table>
+</div>
+
+<p>
+The table is sorted by PEAKRATIO column in decrease order (with bright stars on top).
+</p>
+
+<h1 id="aperphot">Aperture Photometry Table: APERPHOT</h1>
+
+<p>
+This extension contains aperture photometry of all object in a given set
+of apertures. Also a sky level measured in a ring shaped neighbourhood of
+every star is estimated.
+</p>
+
+<h2>Header Keywords</h2>
+
+<div class="table">
+<table>
+<caption>Keywords</caption>
+<tr><th>Keyword</th><th>Units</th><th>Description</th></tr>
+<tr><td>EXTNAME</td><td></td><td>APERPHOT as the identifier of this table</td></tr>
+<tr><td>HWHM</td><td></td><td>HWHM estimated by momentum method</td></tr>
+<tr><td>NAPER</td><td></td><td>Count of apertures</td></tr>
+<tr><td>APER<i>i</i></td><td>pix</td><td>Radius of <i>i</i>-th aperture, <i>i</i> = 1..NAPER</td></tr>
+<tr><td>ANNULUS1</td><td>pix</td><td>inner sky annulus radius in pixels</td></tr>
+<tr><td>ANNULUS2</td><td>pix</td><td>outer sky annulus radius in pixels</td></tr>
+</table>
+</div>
+
+<!--
+<p>Keyword CALIBR denotes calibration level. One can be potentially
+expanded. For example onto more fine calibration, multinight-calibration, etc.
+If the keyword is not presented, default is set to 'none'.
+</p>
+
+<p>
+FOTOSYS designates the photometric system (Landolt UBVRI, Bessel ubvri,..).
+The used filter of the system is indicated in FILTER keyword of primary header.
+ZEROMAG is complete optional and is useful just only for magnitudes.
+</p>
+-->
+
+
+<h2>Table</h2>
+
+<p>
+The aperture photometry table.
+</p>
+
+<div class="table">
+<table>
+<caption>Object detection table</caption>
+<tr><th>Column</th><th>Description</th><th>unit</th></tr>
+<tr><td>X</td><td>Horizontal coordinate<sup><a href="#prim">[§]</a></sup></td><td>pix</td></tr>
+<tr><td>Y</td><td>Vertical coordinate<sup><a href="#prim">[§]</a></sup></td><td>pix</td></tr>
+<tr><td>SKY</td><td>counts</td><td>Sky level</td></tr>
+<tr><td>SKYERR</td><td>counts</td><td>Sky level error</td></tr>
+<tr><td>APCOUNT<i>i</i></td><td>counts</td><td>Sum of counts in <i>i</i>-th aperture<sup><a href="#neg">[*]</a></sup></td></tr>
+<tr><td>APCOUNTERR<i>i</i></td><td>counts</td><td>Statistical error of APCOUNT<i>i</i></td></tr>
+</table>
+</div>
+
+<div class="notes">
+<p id="prim">
+<sup><a href="#prim">[§]</a></sup>
+This column is a direct copy of one from FIND extension.
+</p>
+<p id="neg">
+<sup><a href="#neg">[*]</a></sup>
+Negative values means impossibility to determine the value.
+Common reasons are: the high sky background level (for faint stars)
+or a large aperture radius exceeding frame boundary (for stars near an edge)
+or saturation (for very bright stars).
+</p>
+</div>
+
+
+<h1>Growth-Curve Photometry Table: GROWPHOT</h1>
+
+<p>
+  This extension contains results of growth-curve
+  photometry for all stars in APERPHOT table.
+</p>
+
+
+<h2>Header Keywords</h2>
+
+<div class="table">
+<table>
+<caption>Keywords</caption>
+<tr><th>Keyword</th><th>Units</th><th>Description</th></tr>
+<tr><td>EXTNAME</td><td></td><td>GROWCURVE as the identifier of this table</td></tr>
+<tr><td>HWHM</td><td>pix</td><td>HWHM estimated by growth curve in pixels</td></tr>
+<tr><td>RADFLX90</td><td>pix</td><td>Radius containing 90% of energy</td></tr>
+</table>
+</div>
+
+<h2>Table</h2>
+
+<div class="table">
+<table>
+<caption>GROWPHOT extension</caption>
+<tr><th>Column</th><th>Description</th><th>unit</th></tr>
+<tr><td>X</td><td>Horizontal coordinate</td><td>pix</td></tr>
+<tr><td>Y</td><td>Vertical coordinate</td><td>pix</td></tr>
+<tr><td>SKY</td><td>Sky level<sup><a href="#sky">[^]</a></sup></td><td>count</td></tr>
+<tr><td>SKYERR</td><td>Statistical error of sky level</td><td>count</td></tr>
+<tr><td>GCOUNT</td><td>Growth curve estimated total sum of counts for an infinite
+    aperture<sup><a href="#neg">[*]</a></sup></td><td>count</td></tr>
+<tr><td>GCOUNTERR</td><td>Statistical error of APCOUNT</td><td>count</td></tr>
+<tr><td>GROWFLAG</td><td>Classification: used (0), not used (1) for construction of
+    growth-curve, non-stellar object (2).</td><td></td></tr>
+</table>
+</div>
+
+<div class="notes">
+<p id="sky">
+  <sup><a href="#sky">[^]</a></sup>
+  Values of sky will generall differ from those from the aperture photometry
+  table APERPHOT. Growth-curve photometry gives corrections to the sky.
+</p>
+</div>
+
+<h1>Growth-Curve Table: GROWCURVE</h1>
+
+<p>
+  This extension saves growth curve and derived radial profile
+  in selected apertures.
+</p>
+
+<div class="table">
+<table>
+<caption>GROWCURVE extension</caption>
+<tr><th>Column</th><th>Description</th><th>unit</th></tr>
+<tr><td>R</td><td>Radius of the aperture</td><td>pix</td></tr>
+<tr><td>GROWCURVE</td><td>growth curve value at R</td><td></td></tr>
+<tr><td>GROWCURVEERR</td><td>Statistical error of growth curve</td><td></td></tr>
+<tr><td>RADIALPROFILE</td><td>Radial profile at R</td><td></td></tr>
+</table>
+</div>
+
+<h2>See Also</h2>
+<p>
+<a href="man_find.html">Detection of Stars</a>,
+<a href="man_aphot.html">Aperture Photometry</a>,
+<a href="grow.html">Growth Curve Overview</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

@@ -1,0 +1,219 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Virtual Observatory</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+
+<section>
+
+<h1 class="noindent">Virtual Observatory</h1>
+
+<p class="abstract">
+How to get an information about astronomical objects by using of Virtual Observatory.
+</p>
+
+<h2>Introduction</h2>
+<p>
+<a href="https://en.wikipedia.org/wiki/Virtual_Observatory">Virtual observatory</a>
+(VO) is a network infrastructure developed by astronomers which standardizes access
+for observational data, object catalogs and bibliographic sources.
+Any astronomical data (as images, spectra, catalogs, …) are directly accessible
+from VO without filling of web forms in browsers or hardly understanding data
+stored in a home-made format. Moreover,
+the data access should be easy automatized, the data can be preprocessed,
+different network sources could be merged, etc.
+</p>
+
+<p>
+VO is using <a href="http://www.ivoa.net/Documents/VOTable/">VO Table</a>
+for data exchange (for
+data list, data serialization and as a control data). The VOTable
+is basically <a href="https://en.wikipedia.org/wiki/XML">XML</a>
+with exactly defined structure, keywords, status
+codes etc. VOTables are mutually convertible to FITS tables.
+VOTable is primary designed as a machine to a machine communications
+format.
+</p>
+
+<p>
+<em>Have in mind:</em> Munipack support for VO is unfinished and also unmatured.
+Just only cone search and limited VO table parsing is implemented.
+</p>
+
+<h2>Cone search</h2>
+
+<p>
+Cone search is a simple search in a catalog around specified
+point in spherical coordinates in a given solid angle.
+</p>
+
+<p>
+The functionality is activated when <samp>cone</samp> is passed as
+an argument. Equatorial spherical coordinates are specified as <samp>ra,dec</samp> and
+search radius by <samp>-r</samp> switch.  All quantities must be specified
+in degrees (sexadecimal notation or radians are not supported).
+The ICRS is used as the coordinate frame.
+</p>
+
+<p>
+The simplest form is search specified catalgue passing just only angular
+coordinates Right Ascension
+and Declination in degrees separated by colon: the example below shows
+query for Pleiades on roughly coordinates α = 92.4°, δ = 24.1°.
+The objects are scanned within cone (radius) of 0.2° around the position.
+</p>
+<pre>
+$ munipack cone -c Hipparcos -r 0.2 92.4 24.1
+$ xmunipack cone.fits
+</pre>
+
+<p>
+The switch <samp>-o</samp> can be used to store output in another
+named file and the switch <samp>-t</samp> chooses format of the output
+file (see details <a href="#votable">below</a>).
+</p>
+
+<p>
+The sort of output table by a column can be useful when we got
+a lot of data. The most common example is the astrometry, where it is
+convenient put
+bright stars on begin of the table. The sort option requires an exact column
+designation. The designation is (cataloue) site-specific and there is no way
+how to get the designations before a part of a table is transferred.
+</p>
+
+<h3>Data sources</h3>
+
+<p>
+When cone search (or another VO request) is performed, the default source
+(<a href="http://simbad.u-strasbg.fr/simbad/">Simbad</a>)
+is connected. Another sources can be selected with <samp>--cat</samp> switch
+for a set of predefined catalogs or <samp>--url</samp> and <samp>--par</samp> switches
+for any available cone-search capable service.
+</p>
+
+<p>
+Available
+data catalogs can be listed by using <samp>--list</samp> option:
+</p>
+<pre>
+$ munipack cone --list
+Available catalogues  (use --url to specify another):
+ Alias  URL --------------------------
+UCAC5  http://vizier.u-strasbg.fr/viz-bin/votable/-A?-source=I/340&
+...
+</pre>
+<p>
+Just for example, the astrometric catalog UCAC5 is selected by
+</p>
+<pre>
+$ munipack --cat=UCAC5 cone 92.4 24.1
+...
+</pre>
+
+
+<p>
+Any cone-search service must support CGI get method, parameters for
+coordinates and (optionally) some site-specific parameters. Generally,
+the cone search has the form
+</p>
+<pre>
+http://some.place.suffix/dir/cone-script.cgi?RA=92.4&amp;DEC=24.1&amp;parX=X
+</pre>
+<p>
+where the first part (up to question mark <samp>?</samp>) points to Internet
+address of the service along with a service script and the second part
+specifies parameters for the search. More detailed description offers
+<a href="http://www.ivoa.net/Documents/latest/ConeSearch.html">Cone Search
+specification</a> document.
+</p>
+
+<p>
+To access of an arbitrary cone-search server, simply set <samp>--url</samp>
+switch to a value, as here:
+</p>
+<pre>
+$ munipack --url="http://some.place.suffix/dir/cone-script.cgi?" cone 92.4 24.1
+</pre>
+<p>
+Note use of quotes (or apostrophes) to prevent a possible shell expansion
+and ending URL with question mark <samp>?</samp>. The cone search position
+and radius are added, to the query, automatically.
+</p>
+
+<p>
+Some services supports generic parameters for the search. Usually
+ones sets limits for number of object search, limiting magnitude, etc.
+The parameters can be passed as <samp>--par</samp> (multiple parameters are allowed):
+</p>
+<pre>
+$ munipack --par="max=666" cone 92.4 24.1
+</pre>
+
+
+
+
+<h2><a id="votable">VOTable</a></h2>
+
+<p>
+VOTable is a basic format for data provided by VO. The VOTable
+is supposed to be internal format for any data exchange. Therefore
+any manipulation with data in VOTable is non-trivial (requires
+XML parser). Munipack offers utility for conversion of VOTables
+to another formats which ones can find useful.
+</p>
+
+<p>
+Available formats for conversion:
+</p>
+<ul>
+<li><samp>fits</samp> table</li>
+<li><samp>csv</samp> (comas separated) for spreadsheet applications</li>
+<li><samp>txt</samp> for both human or machine processing</li>
+<li><samp>svg</samp> for drawing of star charts</li>
+<li><samp>xml</samp> just reformat of its input</li>
+</ul>
+
+<p>
+A plain text representation of VOTable is generated as
+</p>
+<pre>
+$ munipack votable -t txt pleiades.xml
+</pre>
+<p>
+The similar way can be used for conversion to FITS and CVS formats.
+</p>
+
+<p>
+The convert to SVG is the most useful for drawing of star charts
+from VOTable (see <a href="ngc637.svg">output</a>).
+</p>
+<pre>
+$ munipack votable -t svg -pa 92.4 -pd 24.1 -ps 500 -ml 2 -mk R
+           -o pleiades.svg pleiades.xml
+</pre>
+
+<h2>Advanced features</h2>
+
+<p>
+The cone search is implemented as a simple HTTP downloader with additional
+VOTable processing. Alternative to the way is downloading by the hand with
+an utility like wget or cURL followed by using of the votable
+to process of their output.
+</p>
+
+<h2>See Also</h2>
+
+<ul>
+<li><a href="man_votable.html">VOTable</a></li>
+<li><a href="man_cone.html">Cone Search</a></li>
+</ul>
+
+</section>
+
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

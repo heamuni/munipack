@@ -1,0 +1,47 @@
+# BEGIN HDU 0
+SIMPLE  =                    T / file does conform to FITS standard
+BITPIX  =                   16 / number of bits per data pixel
+NAXIS   =                    0 / number of data axes
+EXTEND  =                    T / FITS dataset may contain extensions
+COMMENT   FITS (Flexible Image Transport System) format is defined in 'Astronomy
+COMMENT   and Astrophysics', volume 376, page 359; bibcode: 2001A&A...376..359H
+HDUNAME = 'ARTGALAXY'          / this table ID
+AUTHOR  = 'Munipack doc'       / change the value when updates any entry
+COMMENT Description: https://munipack.physics.muni.cz/dataform_artgalaxy.html
+END
+# END HDU 0
+# BEGIN HDU 1
+XTENSION= 'BINTABLE'           / binary table extension
+BITPIX  =                    8 / 8-bit bytes
+NAXIS   =                    2 / 2-dimensional binary table
+NAXIS1  =                   56 / width of table in bytes
+NAXIS2  =                    3 / number of rows in table
+PCOUNT  =                    0 / size of special data area
+GCOUNT  =                    1 / one data group (required keyword)
+TFIELDS =                    7 / number of fields in each row
+EXTNAME = 'ELLIPTICAL'         / Type of galaxy
+TTYPE1  = 'RAJ2000 '           / Right Ascension [deg]
+TFORM1  = '1D      '           / IEEE double precision
+TUNIT1  = 'deg     '           /
+TTYPE2  = 'DEJ2000 '           / Declination [deg]
+TFORM2  = '1D      '           /
+TUNIT2  = 'deg     '           /
+TTYPE3  = 'MUEFF   '           / Surface magnitude in Reff [mag/arcsec2]
+TFORM3  = '1D      '           /
+TUNIT3  = 'mag/arcsec2'        /
+TTYPE4  = 'REFF    '           / Effective radius [deg]
+TFORM4  = '1D      '           /
+TUNIT4  = 'deg     '           /
+TTYPE5  = 'PA      '           / Position Angle [deg]
+TFORM5  = '1D      '           /
+TUNIT5  = 'deg     '           /
+TTYPE6  = 'E      '            / Eccentricity b/a
+TFORM6  = '1D      '           /
+TTYPE7  = 'SERSIC  '           / Sersic exponent
+TFORM7  = '1D      '           / 4-byte REAL
+COMMENT M 59 galaxy field
+END
+190.5097  11.6469  23.5 0.035  15  0.5 6
+190.6108  11.7411  24.5 0.003  -5  0.3 2
+190.5413  11.7547  24   0.01    0  1   4
+# END HDU 1

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<!-- #include "meta.shtml" -->
+<body>
+  <!-- #include "head.shtml" -->
+
+  <h1>Oakleaf</h1>
+
+  <p style="margin-bottom:2em; margin-right: 2em;
+            font-style: italic; text-align: right;">
+    Robustness signifies insensitivity to small deviations
+    from assumptions.<br> – Peter J. Huber
+  </p>
+
+  <p>
+    Oakleaf is a computer library implementing
+    robust statistical methods.
+    Oakleaf is developed for <a href="http://munipack.physics.muni.cz">Munipack</a>,
+    yet designed for a general use.
+    Currently, estimators of the robust mean and the robust regresion
+    are ready to use.
+    <!--
+    The estimators of the robust mean based on the order statistic
+    and M-estimates are included.
+    The regression and photon rates are being prepared.
+    -->
+  </p>
+  <p class="indent">
+    Oakleaf is an open source project available under
+    <a href="https://www.gnu.org/licenses/lgpl.html">LGPLv3</a>.
+    One is developed in modern Fortran with regard to both reliability
+    and efficiency.
+    Interfaces to other programming and scripting languages are planned.
+  </p>
+
+  <p>
+    The documentation for Fortran programmers:
+  </p>
+  <ul>
+    <li><a href="fortran.html">Overview</a></li>
+    <li><a href="rmean.html">M-estimates</a></li>
+    <li><a href="order.html">The order statistics</a></li>
+    <li><a href="bfgs.html">BFGS method</a></li>
+    <li><a href="huberfit.html">Huber's robust regression</a></li>
+    <!--
+    <li><a href="c++.html">C/C++</a></li>
+    <li><a href="r.html">R</a></li>
+    <li><a href="python.html">Python</a></li>
+    -->
+  </ul>
+
+  <p>
+    References:
+  </p>
+  <ul>
+    <li>
+      <a href="https://integral.physics.muni.cz/pub/oakleaf/oakleaf-1.0.1.tar.gz">
+	Source package – oakleaf-1.0.1.tar.gz</a></li>
+    <li><a href="build.html">Build instructions</a></li>
+    <li><a href="changes.html">Changelog</a></li>
+  </ul>
+
+<!-- #include "foot.shtml" -->
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Colour images tutorial</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Colour images</h1>
+
+<p>
+How to create of images in natural colours with standard photometric filters.
+</p>
+
+<h1>Dumbbell nebula in colours</h1>
+
+<p>
+  <a href="https://en.wikipedia.org/wiki/Dumbbell_Nebula">Dumbbell nebula</a>
+  (M 27) is a planetary nebula in Saggita constellation. Dumbbell is
+  one from favourite objects for small telescopes, although its colours are
+  too dim for visual observers.
+</p>
+
+
+<h2>Sample Data</h2>
+
+<p>
+A sample data are available as
+<a href="https://integral.physics.muni.cz/ftp/munipack/munipack-data-m27.tar.gz">munipack-data-m27.tar.gz</a>.
+Save it to arbitrary directory (for example <samp>/tmp/</samp>) like:
+</p>
+<pre>
+$ cd /tmp
+$ tar zxf munipack-data-m27.tar.gz
+$ cd munipack-data-m27/
+</pre>
+<p>
+  The directory <samp>munipack-data-m27/</samp> contains exposures in
+  the instrumental colour system (nearly Johnson) in BVR filters and
+  corresponding dark frames. B filter exposures has duration 60 seconds.
+  Both V and R filter exposures has 40 seconds. Flat-fields frames
+  are not available.
+</p>
+
+<h2>Data Processing</h2>
+
+<p>
+  There is a complete list of Munipack's commands
+  for composing of colour frame of Dumbbell nebula.
+  This part prepares frames:
+</p>
+
+<h3>Corrections</h3>
+  <p>
+    Prepare correction frames and pre-correct object's frames.
+  </p>
+<pre>
+$ munipack dark -o d60.fits d60_*.fits
+$ munipack phcorr -dark d60.fits m27_*B.fits
+$ munipack dark -o d40.fits d40_*.fits
+$ munipack phcorr -dark d40.fits m27_*[VR].fits
+</pre>
+
+<h3>Stars detection and photometry</h3>
+<pre>
+$ munipack find m27_*.fits
+$ munipack aphot m27_*.fits
+</pre>
+<p>To check detected stars and its preliminary photometry, run xmunipack:</p>
+<pre>
+$ xmunipack m27_01R.fits
+</pre>
+
+<h3>Catalogue</h3>
+<p>
+  Search the reference astrometry catalogue around Dumbbell's position
+  (required for astrometry calibration) in Virtual Observatory:
+</p>
+<pre>
+$ munipack cone -r 0.1 --magmin 10 --magmax 13 -- 299.87 22.71
+</pre>
+
+<h3>Astrometry</h3>
+<p>Prepare the astrometric calibration of images</p>
+<pre>
+$ munipack astrometry m27_*.fits
+</pre>
+
+<h3>Stack images</h3>
+<p>Specify centre of projection of the output image. A good choice is
+a point near of centre of object; also the centre of a selected frame
+can be recommended. We has chooses <i>α</i>=299.9° and <i>δ</i>=22.72°.
+The specification of the common centre of projection (--rcen, --dcen)
+for all frames is important for correct alignment of all particular frames.
+</p>
+<p>
+We are merging all images in single filter to get a deeper exposure:
+</p>
+<pre>
+$ munipack kombine -o m27_B.fits --rcen 299.9 --dcen 22.72 m27_*B.fits
+$ munipack kombine -o m27_V.fits --rcen 299.9 --dcen 22.72 m27_*V.fits
+$ munipack kombine -o m27_R.fits --rcen 299.9 --dcen 22.72 m27_*R.fits
+</pre>
+
+<h3>Photometry calibration</h3>
+<p>
+  To get proper colours, the final frames must be calibrated
+  (this adds suffix <samp>_cal</samp> to original filenames):
+</p>
+<pre>
+  $ munipack find m27_?.fits
+  $ munipack aphot m27_?.fits
+  $ for F in B V R; do
+      munipack phcal --verbose  --photsys-ref Johnson --area 0.2 -c cone.fits \
+                 -f $F --col-mag ${F}mag --col-magerr e_${F}mag m27_${F}.fits
+    done
+</pre>
+
+
+<h2>Colouring</h2>
+
+<p>
+  Once data are kombined into a deep exposure frames, everything
+  is prepared for colouring.
+</p>
+
+<p>
+  A direct way to compose a frame in natural colours is to select
+  a white star, the star with its colour index near zero:
+  our suitable white star is at pixel coordinates (391,54):
+</p>
+<pre>
+  $ munipack colouring --white-star 391,54 m27_B.fits m27_V.fits m27_R.fits
+</pre>
+<p>
+  It leaves frame in <samp>colouring.fits</samp>. Be carefull, result
+  does depends on proper choice of the white star. Option
+  <samp>--white-radius</samp>, and <samp>--backs</samp>
+  can be used for fine tuning.
+</p>
+
+<p>
+  More simple way is offered by calibrated frames:
+</p>
+<pre>
+  $ munipack colouring m27_B_cal.fits m27_V_cal.fits m27_R_cal.fits
+</pre>
+<p>
+  The photometry calibration of frames does job for us,
+  the calibrated frames has balanced the white, by definition.
+</p>
+
+<div class="twocolumn">
+  <div class="column">
+    <figure>
+      <img class="figure" src="color-best.png" alt="M27.png" title="Dumbell in Colours">
+      <figcaption>Dumbbell nebula presented in natural colours</figcaption>
+    </figure>
+  </div>
+  <div class="column">
+    <figure>
+      <img class="figure" src="color-scotopic.png" alt="M27.png" title="Dumbell in Night">
+      <figcaption>Dumbbell nebula shown in grayscales simulating perception
+	by a visual observer adapted to	low-light conditions.</figcaption>
+    </figure>
+  </div>
+</div>
+
+<h2>Astrophysical background</h2>
+<p>
+  The output image nicely shows regions where radiation by forbidden lines
+  dominates (green) and Hα regions heated by shock-waves (red).
+</p>
+
+<p>
+  Also, try how this image would be visible by human vision at night,
+  when colour vision receptors (rods) is not activated.
+  The appearance will be similar to visual sights.
+  Use xmunipack and Tune->Colour_menu, or try helper utility:
+</p>
+<pre>
+$ fitspng -l 100,7e3 m27.fits
+$ fitspng -l 100,7e3 -n 1e9,1e3 m27.fits
+</pre>
+<p>
+  The image, by scotopic vision, is near to the pictures drawn
+  by observers from the past, and looks more like a dumbbell.
+</p>
+
+<h2>See Also</h2>
+
+<p>
+Manuals:
+<a href="man_colouring.html">Colouring</a>,
+<a href="man_kombine.html">Kombine</a>,
+<a href="man_astrometry.html">Astrometry</a>,
+<a href="man_aphot.html">Aperture Photometry</a>,
+<a href="man_phcorr.html">Photometry pre-corrections</a>.
+</p>
+
+<p>
+Tutorial:
+<a href="kombitut.html">Image Compositions</a> and
+the shell script <a href="m27.sh">m27.sh</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

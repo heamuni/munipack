@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Photometry</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+
+<h1 class="noindent">Photometry</h1>
+
+* zacit se snimky oblohy
+* uvest plosnou vs. bodovou fotometrii
+
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

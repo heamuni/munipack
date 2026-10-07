@@ -1,0 +1,137 @@
+# BEGIN HDU 0
+SIMPLE  =                    T / file does conform to FITS standard
+BITPIX  =                   16 / number of bits per data pixel
+NAXIS   =                    0 / number of data axes
+EXTEND  =                    T / FITS dataset may contain extensions
+COMMENT   FITS (Flexible Image Transport System) format is defined in 'Astronomy
+COMMENT   and Astrophysics', volume 376, page 359; bibcode: 2001A&A...376..359H
+HDUNAME = 'PHOTOSYS'           / this table ID
+AUTHOR  = 'Munipack'           / change the value when updates any entry
+COMMENT Description: http://munipack.physics.muni.cz/dataform_photosys.html
+END
+# END HDU 0
+# BEGIN HDU 1
+XTENSION= 'BINTABLE'           / binary table extension
+BITPIX  =                    8 / 8-bit bytes
+NAXIS   =                    2 / 2-dimensional binary table
+NAXIS1  =                   36 / width of table in bytes
+NAXIS2  =                    5 / number of rows in table
+PCOUNT  =                    0 / size of special data area
+GCOUNT  =                    1 / one data group (required keyword)
+TFIELDS =                    7 / number of fields in each row
+EXTNAME = 'Johnson '           / Photometric system definition
+TTYPE1  = 'FILTER  '           / label for field   1
+TFORM1  = '12A     '           / data format of field: ASCII Character
+TTYPE2  = 'LAM_EFF '           / effective wavelength
+TFORM2  = 'E       '           / 4-byte REAL
+TUNIT2  = 'm       '           / in SI
+TTYPE3  = 'LAM_FWHM'           / passband FWHM
+TFORM3  = 'E       '           / 4-byte REAL
+TUNIT3  = 'm       '           / in SI
+TTYPE4  = 'NU_EFF  '           / effective frequency
+TFORM4  = 'E       '           / 4-byte REAL
+TUNIT4  = 'Hz      '           / in SI
+TTYPE5  = 'NU_FWHM '           / passband FWHM
+TFORM5  = 'E       '           / 4-byte REAL
+TUNIT5  = 'Hz      '           / in SI
+TTYPE6  = 'FNU_REF '           / spectral density flux per Hz for zero magnitude
+TFORM6  = 'E       '           / 4-byte REAL
+TUNIT6  = 'W/m2/Hz '           / in SI
+TTYPE7  = 'FLAM_REF'           / spectral density flux per nm for zero magnitude
+TFORM7  = 'E       '           / 4-byte REAL
+TUNIT7  = 'W/m2/nm '           / in SI, computed by FH
+FILTREF = 'V'                  / reference filter
+REFID   = 'Bessel(1992)'       / reference
+COMMENT   Bessel(1992): in Astronomy & Astrophysics Encyklopedia
+COMMENT LAM_EFF, LAM_FWHM, FLAM_REF has been derived from HST
+COMMENT calibration data for Vega
+COMMENT Megessier(1995) determined flux in V for Vega: (3.56+-0.01)e-11
+END
+'U' 353.4e-9  42.3e-9 817e12 147e12 1780e-26 3.73e-11
+'B' 443.8e-9  70.2e-9 688e12 148e12 4000e-26 6.93e-11
+'V' 553.8e-9  75.0e-9 550e12  89e12 3600e-26 3.54e-11
+'R' 694.3e-9 150.9e-9 470e12 102e12 3060e-26 1.82e-11
+'I' 877.8e-9 171.9e-9 376e12  71e12 2420e-26 8.60e-12
+# END HDU 1
+# BEGIN HDU 2
+XTENSION= 'BINTABLE'           / binary table extension
+BITPIX  =                    8 / 8-bit bytes
+NAXIS   =                    2 / 2-dimensional binary table
+NAXIS1  =                   36 / width of table in bytes
+NAXIS2  =                    4 / number of rows in table
+PCOUNT  =                    0 / size of special data area
+GCOUNT  =                    1 / one data group (required keyword)
+TFIELDS =                    7 / number of fields in each row
+EXTNAME = 'Gunn'               / Photometric system definition
+TTYPE1  = 'FILTER  '           / label for field   1
+TFORM1  = '12A     '           / data format of field: ASCII Character
+TTYPE2  = 'LAM_EFF '           / effective wavelength
+TFORM2  = 'E       '           / 4-byte REAL
+TUNIT2  = 'm       '           / in SI
+TTYPE3  = 'LAM_FWHM'           / passband FWHM
+TFORM3  = 'E       '           / 4-byte REAL
+TUNIT3  = 'm       '           / in SI
+TTYPE4  = 'NU_EFF  '           / effective frequency
+TFORM4  = 'E       '           / 4-byte REAL
+TUNIT4  = 'Hz      '           / in SI, computed by FH
+TTYPE5  = 'NU_FWHM '           / passband FWHM
+TFORM5  = 'E       '           / 4-byte REAL
+TUNIT5  = 'Hz      '           / in SI, computed by FH
+TTYPE6  = 'FNU_REF '           / spectral density flux per Hz for zero magnitude
+TFORM6  = 'E       '           / 4-byte REAL
+TUNIT6  = 'W/m2/Hz '           / in SI
+TTYPE7  = 'FLAM_REF'           / spectral density flux per nm for zero magnitude
+TFORM7  = 'E       '           / 4-byte REAL
+TUNIT7  = 'W/m2/nm '           / in SI, computed by FH
+FILTREF = 'g'                  / reference filter
+REFID   = 'Schneider,Gunn,Hoessel(1983)' / reference
+END
+'g' 0.52e-6 0.14e-6 5.76e+14 1.55e+14 3730e-26 4.1355e-11
+'r' 0.67e-6 0.14e-6 4.47e+14 9.35e+13 4490e-26 2.9986e-11
+'i' 0.79e-6 0.16e-6 3.79e+14 7.69e+13 4760e-26 2.2865e-11
+'z' 0.91e-6 0.13e-6 3.29e+14 4.71e+13 4810e-26 1.7413e-11
+# END HDU 2
+# BEGIN HDU 3
+XTENSION= 'BINTABLE'           / binary table extension
+BITPIX  =                    8 / 8-bit bytes
+NAXIS   =                    2 / 2-dimensional binary table
+NAXIS1  =                   36 / width of table in bytes
+NAXIS2  =                    6 / number of rows in table
+PCOUNT  =                    0 / size of special data area
+GCOUNT  =                    1 / one data group (required keyword)
+TFIELDS =                    7 / number of fields in each row
+EXTNAME = 'Stromgren'          / Photometric system definition
+TTYPE1  = 'FILTER  '           / label for field   1
+TFORM1  = '12A     '           / data format of field: ASCII Character
+TTYPE2  = 'LAM_EFF '           / effective wavelength
+TFORM2  = 'E       '           / 4-byte REAL
+TUNIT2  = 'm       '           / in SI
+TTYPE3  = 'LAM_FWHM'           / passband FWHM
+TFORM3  = 'E       '           / 4-byte REAL
+TUNIT3  = 'm       '           / in SI
+TTYPE4  = 'NU_EFF  '           / effective frequency
+TFORM4  = 'E       '           / 4-byte REAL
+TUNIT4  = 'Hz      '           / in SI, computed by FH
+TTYPE5  = 'NU_FWHM '           / passband FWHM
+TFORM5  = 'E       '           / 4-byte REAL
+TUNIT5  = 'Hz      '           / in SI, computed by FH
+TTYPE6  = 'FNU_REF '           / spectral density flux per Hz for zero magnitude
+TFORM6  = 'E       '           / 4-byte REAL
+TUNIT6  = 'W/m2/Hz '           / in SI
+TTYPE7  = 'FLAM_REF'           / spectral density flux per nm for zero magnitude
+TFORM7  = 'E       '           / 4-byte REAL
+TUNIT7  = 'W/m2/nm '           / in SI, computed by FH
+FILTREF = 'y'                  / reference filter
+REFID   = 'Fiorucci,Munari (2003)' / 
+COMMENT http://ulisse.pd.astro.it/Astro/ADPS/ADPS2/FileHtml/index_f010.html
+COMMENT zero-fluxes by Sterken,Manfroid(1992)
+COMMENT zero fluxes for Hbeta have been lineary-interpolated between b,y
+END
+'u'      3451e-10 349e-10 8.687e+14 8.785e+14 1.29e-23  3.25e-11
+'v'      4108e-10 210e-10 7.298e+14 3.731e+13 4.04e-23  7.18e-11
+'b'      4669e-10 190e-10 6.421e+14 2.613e+13 4.22e-23  5.81e-11
+'y'      5478e-10 237e-10 5.473e+14 2.368e+13 3.70e-23  3.70e-11
+'Hbetan' 4856e-10  32e-10 6.174e+14 4.068e+12 4.2e-23   5.3e-11
+'Hbetaw' 4883e-10 143e-10 6.140e+14 1.798e+13 4.2e-23   5.3e-11
+# END HDU 3
+

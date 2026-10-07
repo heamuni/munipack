@@ -1,0 +1,94 @@
+.TH fitshead 1 "November 2009" Munipack
+.SH NAME
+fitshead \- list, add, modify and remove records of FITS header
+.SH SYNOPSIS
+fitshead [options] file
+.SH DESCRIPTION
+This utility is designed to do any manipulation with records in FITS 
+header. All general
+information about FITS file as dimensions or a date of exposure
+are included in FITS headers as 80-character text records. Every record
+begins with 8-character keyword followed by the equal sign (=) and
+some value. A description (comment) can follow the value and they must be
+separated by slash (/). The values can be of logical, integer, real
+and character type (see any FITS for an example). The records have no
+terminating characters (like \\r, \\n,..).
+.PP
+Any logical value must be specified as T (true) or F (false).
+Any integer values must be specified by a number(s) without period (.).
+Any real number must be specified by a numbers including period.
+Any character value must be enclosed to apostrophes ('). 
+.PP
+By another word. The utility recognise integer and real numbers
+by the period. The number 123 is not equivalent to 123.0 because
+first is integer whilst second is real.
+.PP
+There are special keywords COMMENT and HISTORY which contains only
+a comment without value.
+.PP
+The utility operates in two modes. The read mode is a basic and 
+a safe operation and lists of all or specified records by its keywords. 
+.PP
+The write mode, which is really DANGEROUS, has possibility
+to modify already existing record and add or delete records in FITS header.
+.PP
+The options are as follows:
+.TP
+\fB\-k\fR
+Specify a keyword. Use CAPITAL letters.
+.TP
+\fB\-a\fR
+Add record specified by a new keyword in -k.
+.TP
+\fB\-e\fR
+Modify (update) a value with keyword specified by -k.
+.TP
+\fB\-l\fR
+Rename an keyword specified by -k to a new value.
+.TP
+\fB\-d\fR
+Delete a record with keyword specified by -k.
+.TP
+\fB\-c\fR
+Add an optional comment (description). In cases: -a,-e.
+.TP
+\fB\-w\fR
+Add a perfectly formated FITS record(s) reading of standard input.
+.TP
+\fB\-h,--help,-V,--version\fR
+Print help or version.
+.PP
+.SH EXAMPLES
+List all keywords:
+.PP
+fitshead file.fits
+.PP
+List selected keywords:
+.PP
+fitshead -k DATE-OBS,OBJECT file.fits 
+.PP
+Modify a selected record:
+.PP
+fitshead -k OBJECT -e 'Sirius' file.fits
+.PP
+Add a new record:
+.PP
+fitshead -k IDENTIFIER -a 'MCG+02-60-010' file.fits
+.PP
+Delete a selected record:
+.PP
+fitshead -k IDENTIFIER -d file.fite
+.PP
+Add COMMENT (also HISTORY)  record:
+.PP
+fitshead -k COMMENT -a 'Modified by fitshead.' file.fits
+.SH ADVANCED USAGE
+fitshead -k OBJECT file.fits | sed 's/sirius/M31/' | fitshead -w - fits.fits
+.SH BUGS
+None of modify operations does not check presence of previously existing
+keywords. Therefore, some records can be presented repeatery, leading to
+violate FITS standard.
+.SH SEE ALSO
+http://integral.physics.muni.cz/munipack
+.SH AUTHORS
+F.Hroch <hroch@physics.muni.cz>

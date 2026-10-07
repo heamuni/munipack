@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2021 Filip Hroch <hroch@physics.muni.cz> -->
+<component type="desktop-application">
+  <id>cz.muni.physics.munipack.xmunipack</id>
+
+  <name>Munipack</name>
+  <summary>An astronomical image processing software</summary>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0+</project_license>
+
+  <description>
+    <p>
+      Munipack is a free open source tool for
+      an advanced scientific processing of astronomical images.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">xmunipack.desktop</launchable>
+  <screenshots>
+    <screenshot type="default">
+      <caption>View</caption>
+      <image>https://integral.physics.muni.cz/~hroch/GUI-Detail.png</image>
+    </screenshot>
+  </screenshots>
+
+  <url type="homepage">https://munipack.physics.muni.cz</url>
+
+</component>
+<!--
+# metadata: https://freedesktop.org/software/appstream/docs/chap-Quickstart.html
+# result of AppStream MetaInfo Creator:
+# Install this file as /usr/share/metainfo/cz.muni.physics.munipack.xmunipack.metainfo.xml
+# You can validate this metadata locally by running: appstreamcli validate cz.muni.physics.munipack.xmunipack.metainfo.xml
+
+also validate .desktop:
+
+desktop-file-validate xmunipack.desktop
+-->

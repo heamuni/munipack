@@ -1,0 +1,668 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ FITS file utility</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>FITS file utility</h1>
+
+<p class="abstract">
+An utility manipulating with files in FITS format.
+</p>
+
+<h2>Command</h2>
+
+<code>
+munipack fits [.. parameters ..] file(s)[,file(s)]
+</code>
+
+
+<h2>Description</h2>
+
+<p>
+  <a href="http://fits.gsfc.nasa.gov/fits_documentation.html">FITS</a> format
+  is a native format of Munipack as well as rest of astronomical softwares.
+  Munipack stores all data as FITS images. Moreover related processing
+  products, like tables with aperture photometry or calibration data
+  are also included in the files.
+</p>
+
+<p>
+Following operations on FITS file(s) are available:
+</p>
+<ul>
+<li>List of global structure of a FITS file</li>
+<li>On header:
+  <ul>
+  <li>Print of values (all records or selected by a keyword)</li>
+  <li>Edit, remove and add of records</li>
+  </ul>
+<li>Print values of image pixels</li>
+<li>Print tables with filtering</li>
+<li>Remove extensions.</li>
+<li>Dump whole FITS contents to a plain (human readable) text file</li>
+<li>Restores (creates) whole FITS contents from a plain text file</li>
+</ul>
+
+<p>
+Important part of functionality is just a shell wrapper of
+<a href="http://heasarc.gsfc.nasa.gov/fitsio/">(c)fitsio library</a> functions.
+</p>
+
+<h2>Input and output</h2>
+
+<p>
+On input, the only one or more files is expected depending on operation.
+</p>
+
+<p>
+Results depends on selected operation.
+</p>
+
+<p>
+  Many utilities prints results to standard output (usually connected to
+  terminal). It is desired for (short) informative messages. Large blocks
+  of data or results intended to be kept can be redirected to a text file
+  specifying of &gt; operator.
+</p>
+
+
+<h2>Parameters</h2>
+
+<dl>
+<dt><samp>-lh, --header</samp></dt><dd>list header</dd>
+<dt><samp>-lt, --table</samp></dt><dd>list table</dd>
+<dt><samp>-li, --image</samp></dt><dd>list image</dd>
+<dt><samp>-K, --keys key[,key,..]</samp></dt>
+<dd>Print header values by the keyword(s). Multiple keywords
+  can be specified. Values are printed in FITS header order.</dd>
+<dt><samp>--shell</samp></dt>
+<dd>shell-friendly output format for keyword prints,
+           only usefull with <samp>-K</samp> option</dd>
+<dt><samp>--value</samp></dt><dd>print only values (without keywords
+    and comments) for the keyword print option</dd>
+<dt><samp>--update</samp></dt><dd>Indicates to add or to update
+    operation on FITS header. Usefull with <samp>--key, --val, --com</samp>
+    options. Only single record can be add or update during a single run.</dd>
+<dt><samp>--key keyword</samp></dt><dd>specify keyword of updated record</dd>
+<dt><samp>--val value</samp></dt><dd>specify value of updated record</dd>
+<dt><samp>--com comment</samp></dt><dd>specify comment of updated record</dd>
+<dt><samp>--templ file</samp></dt><dd>update records in header by this file.
+    The option in mutual to --key. The file must confirm rules of
+    <a href="https://heasarc.gsfc.nasa.gov/docs/software/fitsio/c/c_user/cfitsio.html">FITS templates</a>.</dd>
+<dt><samp>--remove-keys key[,key,..]</samp></dt>
+<dd>remove header's records by keyword(s)</dd>
+<dt><samp>--remove-extension extension[,extension,..]</samp></dt>
+<dd>remove the specified extension(s)</dd>
+<dt><samp>--dump</samp></dt><dd>dump FITS to plain text</dd>
+<dt><samp>--restore</samp></dt><dd>restore FITS from plain text</dd>
+<dt><samp>--cat</samp></dt><dd>cat (copy) input on output.</dd>
+</dl>
+
+<p>Also see <a href="man_com.html">Common options</a></p>
+
+<p>
+  Any listing invoked by <samp>-lt</samp> and <samp>-li</samp> will print
+  full data. One can be limited by using of <a href="#extended">extended
+    filename syntax</a>.
+</p>
+
+
+
+
+<h2>List structure of a FITS file</h2>
+<p>
+Any FITS file may by composed from multiple parts (HDUs — header data units)
+of three types: dummy, image or table. Every HDU must contain header
+with proper parameters (dimensions, bitpix, …). Multiple
+HDUs would be used for storing of related information. For example,
+Munipack adds a table with photometry results to processed images.
+</p>
+<p>
+The structure of a FITS file is listed when no arguments are used:
+</p>
+<pre>
+$ munipack fits spln.fits
+#    EXTNAME       TYPE BITPIX SIZE
+1                 IMAGE    -32 200x200x4
+2 'u5ct.c0h.tab'  ASCII_TBL    4x49
+</pre>
+
+<p>
+In this example, the FITS file consist from two parts (HDU). The unnamed first
+is an 3D image 200 × 200 × 4 pixels and the second is an table. The image can be
+also accessed as <samp>spln.fits[0]</samp> and the table as
+<samp>spln.fits[1]</samp>.
+</p>
+
+<h2>List of header: -lh</h2>
+<p>
+Every HDU contains parameters carrying additional information's (meta-info)
+about included data. The mandatory parameters are specifying dimensions
+of an image or a table, data representation (and some technical records)
+and must be included in any valid HDU. Other parameters are optional and may
+give a time, exposure conditions or band specifications for images (and
+many related info).
+Header of a table must include dimensions and the standardized descriptions
+of columns. Headers frequently contains some calibration data as the astrometry
+data. <a href="http://fits.gsfc.nasa.gov/fits_dictionary.html">FITS keyword
+    dictionaries</a> summarizes commonly used optional parameters as are used by
+various astronomical communities.
+</p>
+<p>
+The argument <samp>-lh</samp> (or <samp>--header</samp>) invokes listing
+of full header.
+</p>
+<pre>
+$ munipack fits -lh spln.fits
+SIMPLE  =                    T / file does conform to FITS standard
+BITPIX  =                  -32 / number of bits per data pixel
+NAXIS   =                    3 / number of data axes
+NAXIS1  =                  200 / length of data axis 1
+...
+</pre>
+<p>
+These records are directly copied-out from FITS header without any formatting.
+</p>
+
+<h2>List of header using keywords: -K</h2>
+<p>
+  Only selected records may be listed by using of specified keywords
+  with <samp>-K</samp> (or <samp>--print-keys</samp>) argument.
+</p>
+<pre>
+$ munipack fits -K NAXIS1,NAXIS2 spln.fits
+NAXIS1  =                  200 / length of data axis 1
+NAXIS2  =                  300 / length of data axis 2
+</pre>
+<p>
+There is also possibility to print a record in machine-oriented
+(for further processing) format <samp>KEYWORD=VALUE</samp>. To activate the
+mode, use the switch <samp>--shell</samp>:
+<pre>
+$ munipack fits -K NAXIS spln.fits
+NAXIS   =                    3 / number of data axes
+$ munipack fits -K NAXIS --shell spln.fits
+NAXIS=3
+</pre>
+<p>
+  Tip. Shell scripts can use the output to set variables by using of eval
+  function:
+</p>
+<pre>
+$ A=$(munipack fits -K NAXIS --shell spln.fits)
+$ echo $A
+NAXIS=3
+$ eval "$A"
+$ echo $NAXIS
+3
+</pre>
+
+<p>
+  The value itself can be extracted from a header by passing option
+  <samp>--value</samp>:
+</p>
+<pre>
+A=$(munipack fits -K NAXIS --value spln.fits)
+echo $A
+3
+</pre>
+
+
+<h2>Remove in header using keywords: --remove-keys</h2>
+
+<p>
+Any keyword can be removed from header. For illustration, the command removes
+an object identifier (with keyword OBJECT):
+</p>
+<pre>
+$ munipack fits --remove-keys OBJECT spln.fits
+</pre>
+
+<h2>Add or update in header using keyword: --update, --key, --val, --com</h2>
+
+<p>
+A new record as well as already existing record can be added
+or modified as
+</p>
+<pre>
+$ munipack fits --update --key OBJECT --val 'Spln' spln.fits
+</pre>
+
+<p>
+  The main purpose of this option is adding new keywords and values
+  to FITS headers or modification of already presented records.
+</p>
+
+<p>
+This option has been designed for the properties:
+</p>
+<ul>
+<li>Just only one record is modified during a single run.</li>
+<li>The switch <samp>--update</samp> initiates the update mode,
+  while <samp>--key, --val, --com</samp> provides values for
+  all the items.</li>
+<li>The values are passed to fits_update_key (a low-level procedure of
+  <a href="http://heasarc.gsfc.nasa.gov/fitsio/fitsio.html">cfitsio
+    library</a>). Please, respect FITS conventions (mainly: use only
+  UPPERCASE letters and numbers for all keywords, start any keyword
+  with a character, do not include spaces and non-ASCII characters).</li>
+<li>Any value containing space must be enclosed in apostrophes. Characters
+  outside usual ASCII range (in decimal 32-127) are not allowed.</li>
+<li>Type of the value is determined according to following rules (FITS, Fortran
+    conventions):
+<ul>
+<li>Uppercase character T or F means logical (Boolean) type with the appropriate
+    value "true" and "false".</li>
+<li>An integer number is recognized as a number without a period and
+  an exponent part (meaning one or more 0-9 characters). One must be readable
+  by "(I)" Fortran edition ("%d" in C/C++).</li>
+<li>A real number is a number with a period (floating point) or an exponent
+  character (e,E) readable by "(F)" Fortran edition ("%f" in C/C++).</li>
+<li>A string is a sequence of any characters enclosed in apostrophes
+  or quotes. When
+    the apostrophe is a part of string, one is encoded as double apostrophe
+    (<samp>'Barnard''s star'</samp> will be recognized as
+    <samp>Barnard's star</samp>.
+    Both apostrophes and quotes are getting special handle on a command line.
+    Ones are
+    removed before passing ('X' is passed as X, not 'X' as one can expect).
+    To prevent the modification, enclose strings in quotes ("'X'" is
+    recognized as 'X') or escape its (\'X\').</li>
+<li>Any other (unrecognized) string is considered as an invalid type or
+  value. </li>
+</ul>
+</li>
+</ul>
+
+<p>
+Examples (get look to distinguish between integer and real numbers):
+</p>
+<pre>
+$ munipack fits --update --key EXPTIME --val 30 spln.fits             # integer
+$ munipack fits -K EXPTIME spln.fits
+EXPTIME =                   30
+
+$ munipack fits --update --key EXPTIME --val 30.0 spln.fits           # real
+$ munipack fits -K EXPTIME spln.fits
+EXPTIME =                  30.
+
+$ munipack fits --update --key EXPTIME --val "'30'" spln.fits         # string
+$ munipack fits -K EXPTIME spln.fits
+EXPTIME = '30      '
+
+$ munipack fits --update --key EXPTIME --val F spln.fits              # logical
+$ munipack fits -K EXPTIME spln.fits
+EXPTIME =                    F
+
+$ munipack fits --update --key EXPTIME --val 30.0 --com "[s] exposure time" spln.fits
+$ munipack fits -K EXPTIME spln.fits
+EXPTIME =                  30. / [s] exposure time
+</pre>
+
+<p>
+The last one demonstrates a bit complex, but preferred format.
+</p>
+
+
+<h2>Add or update header by a template file: --update, --templ</h2>
+
+<p>
+  A header can be modified also with a
+  <a href="https://heasarc.gsfc.nasa.gov/docs/software/fitsio/c/c_user/cfitsio.html">template file</a>.
+  The approach can provide way for more flexible updates
+  of header or update of multiple records during one run.
+</p>
+
+<p>
+A new record as well as already existing record can be added
+or modified as
+</p>
+<pre>
+$ munipack fits --update --templ templ spln.fits
+</pre>
+<p>
+  where an auxliary template file <samp>templ</samp> can contain:
+</p>
+<pre>
+EXPTIME = 666 /[s] exposure time
+OBJECT = 'Fool Moon' / object name
+</pre>
+
+
+<h2>List of image values: -li</h2>
+<p>
+The argument <samp>-li</samp> (or <samp>--image</samp>) switch-on listing of intensity values contained
+in an image.
+</p>
+<p>
+The output listing is in the format: indexes in all axes followed by a value
+itself:
+</p>
+<pre>
+i1 i2 i3 ... value
+</pre>
+<p>
+Use of <a href="#extended">extended filename syntax</a> is recommended.
+See the example:
+</p>
+<pre>
+$ munipack -li fits spln.fits
+1 1 321
+2 1 310
+...
+</pre>
+
+
+<h2>List of table values: -lt</h2>
+<p>
+The argument <samp>-lt</samp> (or <samp>--table</samp>) switch-on listing of
+values contained
+in a table.
+</p>
+<p>
+Use of <a href="#extended">extended filename syntax</a> is recommended. See the example:
+</p>
+<pre>
+$ munipack -lt fits spln.fits
+B        330.460300000000        42.0238720000000 S
+...
+</pre>
+
+
+<h2><a id="extended">Extended FITS file syntax</a></h2>
+<p>
+The syntax is commonly used for selecting of an embedded part of FITS file
+or a certain part of an image or a table.
+The extended filenames contains brace index selector in addition to
+usual file names. Ones considerably benefits from
+<a href="http://heasarc.gsfc.nasa.gov/docs/software/fitsio/filters.html">FITS file extended syntax.</a></p>
+
+<p>
+<strong>Important</strong> note: The extended syntax infers with shell syntax.
+Therefore it is recommended to enclose extended filenames in apostrophes.
+</p>
+
+<p>
+The second part of a FITS file (indexed from zero) will be selected as
+</p>
+<pre>
+$ munipack fits -lh 'spln.fits[1]'
+XTENSION= 'TABLE   '           / Ascii table extension
+BITPIX  =                    8 / 8-bits per 'pixels'
+NAXIS   =                    2 / Simple 2-D matrix
+NAXIS1  =                  796 / Number of characters per
+...
+</pre>
+
+<p>
+A sub-image of a whole image can be accessed as
+</p>
+<pre>
+$ munipack fits -li 'spln.fits[666:676,100:103]'
+1 1 321
+2 1 310
+...
+</pre>
+
+<p>
+Analogically we selected objects with positive fluxes in a table
+with extension MUNIPACK:
+</p>
+<pre>
+$ munipack fits -lt 'spln.fits[MUNIPACK][APER1>=0]'
+12.335
+12.339
+...
+</pre>
+
+<h2>Remove any FITS extension</h2>
+
+<p>
+Any FITS extension can be removed like the example:
+</p>
+<pre>
+$ munipack fits --remove-extensions MUNIPACK,XXX spln.fits
+</pre>
+
+
+
+<h2>FITS file dump/restore</h2>
+
+<p>
+The content of a FITS file should be dumped to a plain text file. Also,
+a FITS file can be created from a plain text file. The functionality can
+be important when above options are not satisfying needs, or to create
+a new FITS file or when we need a text version of FITS file.
+</p>
+
+<p>
+The basic usage of the command for dump is
+</p>
+<code>
+$ munipack fits --dump file.fits
+</code>
+<p>
+The output is stored to <samp>file.lst</samp> file. The file can be
+directly inspected by any text tool (editor). There is no way to
+dump on the standard output (terminal) which is incompatible with processing
+of more files together.
+</p>
+
+<p>An inverse operation, creating of FITS file from a text template,
+is similar:</p>
+<code>
+$ munipack fits --restore file.lst
+</code>
+
+<p>
+FITS file and text names are derived mutually with rule: *.fits -> *.lst
+(and vice verso). The behaviour can be changed using <a href="man_com.html">Advanced
+Output Filenames</a>. For example:
+</p>
+<code>
+munipack fits -O --pattern '(.+)\.fits' --mask '\1.list' --dump file.fits
+</code>
+
+<p>
+The contents of a FITS file is generally accessible from many other tools.
+Munipack is using directly cfitsio library. One is also accessible
+from <a href="http://docs.astropy.org/en/stable/io/fits/index.html">Python</a>
+Similar functionality is offered by <a href="http://heasarc.gsfc.nasa.gov/lheasoft/ftools/futils.html">ftools</a>.
+ </p>
+
+<h2>Format of dump/restore file</h2>
+
+<p>
+The dump/restore format for FITS file must comply these rules:
+</p>
+<ul>
+<li>All FITS guidelines must be strictly satisfied.</li>
+<li>Single HDU unit must be introduced by <samp># BEGIN HDU</samp>
+    on single line and finished with <samp># END HDU</samp></li>
+<li>The header begins on a single line immediately following  <samp># BEGIN HDU</samp>
+    and is finished with keyword <samp>END</samp> on a single line.</li>
+<li>The type of data is determined from the header.</li>
+<li>The table data must be in Fortran free format (strings in 'apostrophe''s',
+    numbers as usual and separated by spaces or commas).</li>
+</ul>
+
+<p>
+The template is:
+</p>
+<pre>
+# BEGIN HDU 0
+ ... ( header ) ....
+END
+ ... ( data - optional ) ...
+# END HDU 0
+# BEGIN HDU 1
+ ... ( header ) ...
+END
+ ... ( data - optional ) ...
+# END HDU 1
+ ...
+</pre>
+
+<p>Example:</p>
+<pre>
+# BEGIN HDU 0
+SIMPLE  =                    T / file does conform to FITS standard
+BITPIX  =                   16 / number of bits per data pixel
+NAXIS   =                    0 / number of data axes
+EXTEND  =                    T / FITS dataset may contain extensions
+END
+# END HDU 0
+# BEGIN HDU 1
+XTENSION= 'BINTABLE'           / binary table extension
+BITPIX  =                    8 / 8-bit bytes
+NAXIS   =                    2 / 2-dimensional binary table
+NAXIS1  =                   28 / width of table in bytes
+NAXIS2  =                    4 / number of rows in table
+PCOUNT  =                    0 / size of special data area
+GCOUNT  =                    1 / one data group (required keyword)
+TFIELDS =                    5 / number of fields in each row
+TTYPE1  = 'name    '           / label for field   1
+TFORM1  = '12A     '           / data format of field: ASCII Character
+TTYPE2  = 'RA      '           / label for field   2
+TFORM2  = 'E       '           / data format of field: 4-byte REAL
+TUNIT2  = 'deg     '           / physical unit of field
+TTYPE3  = 'DEC     '           / label for field   3
+TFORM3  = 'E       '           / data format of field: 4-byte REAL
+TUNIT3  = 'deg     '           / physical unit of field
+TTYPE4  = 'MAG     '           / label for field   4
+TFORM4  = 'E       '           / data format of field: 4-byte REAL
+TTYPE5  = 'MAGERR  '           / label for field   5
+TFORM5  = 'E       '           / data format of field: 4-byte REAL
+HISTORY This FITS file was created by the FCREATE task.
+HISTORY fcreate3.2e at 2012-12-10T00:00:51
+DATE    = '2012-12-10T00:00:51' / file creation date (YYYY-MM-DDThh:mm:ss UT)
+END
+'B'        330.689        42.2765        11.9300      0.0500000
+'C'        330.667        42.2860        13.6900      0.0300000
+'H'        330.636        42.2798        13.6000      0.0300000
+'K'        330.650        42.2816        14.8800      0.0500000
+# END HDU 1
+</pre>
+
+<p>
+When the structure of a table is changed (count of rows or columns),
+it is important to change NAXIS2 (count of rows), TFIELDS (count
+of columns) and NAXIS1 for which total length of a row must be computed as
+sum: length of character (12 bytes in our example), 4 bytes per integer
+value with I flag in TFORM., 4 bytes per single floating value with E flag
+(4*4 bytes) and 8 bytes for double floating value with D flag (sum is
+12+4*4 = 28 in NAXIS1).
+</p>
+
+<p>
+The text can be directly pasted to a file <samp>blcal.lst</samp> and
+output FITS file <samp>blcal.fits</samp> should be restored:
+</p>
+<code>
+$ munipack fits --restore blcal.lst
+</code>
+
+<p>
+It is recommended to test of a restored FITS by using of
+<a href="http://fits.gsfc.nasa.gov/fits_verify.html">FITS File Verifier</a>.
+</p>
+
+<h2>Cat (copy) FITS input on FITS output</h2>
+
+<p>
+  This option looks useless but it has very powerfull capability.
+  The common usage is filtering of images end tables.
+  </p>
+
+<code>
+  $ munipack fits --cat 'in.fits[1:10,1:10]',out.fits
+</code>
+
+<p>
+  Cat is clone of <a href="https://heasarc.gsfc.nasa.gov/docs/software/fitsio/cexamples/fitscopy.c">fitscopy</a> utility by cFITSIO.
+  <a href="http://heasarc.gsfc.nasa.gov/docs/software/fitsio/filters.html">FITS file extended syntax</a>
+  and <a href="https://heasarc.gsfc.nasa.gov/docs/software/fitsio/cexamples.html">FITS tools</a> gives more examples.
+
+</p>
+
+
+<h2>Advanced usage</h2>
+<p>
+The fits action gives a good support for usage in shell scripts and
+other machine processing tools.
+</p>
+
+<p>
+The simple usage of the action for listing of some parameters from
+all FITS files in a directory shows following example.
+</p>
+<pre>
+$ for A in *.fits; do
+    B=$(munipack fits --shell -K DATE-OBS,FILTER  "$A[0]" | \
+     awk -F "=" '{ printf "%s ",$2; }');
+     echo $A $B;
+  done
+...
+hp29716_48R.fits '2011-02-07T20:50:18.822' 'R'
+hp29716_49R.fits '2011-02-07T20:51:36.610' 'R'
+hp29716_50R.fits '2011-02-07T20:52:54.345' 'R'
+hp29716_51R.fits '2011-02-07T20:54:11.962' 'R'
+hp29716_52R.fits '2011-02-07T20:55:29.588' 'R'
+...
+</pre>
+
+<p>
+A similar effect can be implemented with the code:
+</p>
+<pre>
+$ for A in *.fits; do
+    B=$(munipack fits --shell -K DATE-OBS,FILTER  "$A[0]" | sed 's/^DATE\-OBS/DATEOBS/');
+    for C in $B; do eval export "$C"; done
+    echo $A $DATEOBS $FILTER;
+  done
+...
+hp29716_48R.fits 2011-02-07T20:50:18.822 R
+hp29716_49R.fits 2011-02-07T20:51:36.610 R
+hp29716_50R.fits 2011-02-07T20:52:54.345 R
+hp29716_51R.fits 2011-02-07T20:54:11.962 R
+hp29716_52R.fits 2011-02-07T20:55:29.588 R
+...
+</pre>
+<p>
+The code <samp>for C in $B; do eval export "$C"; done</samp> split
+array of variables and sets their values. One is equivalent to:
+</p>
+<pre>
+$ munipack fits --shell -K NAXIS file.fits
+NAXIS=2
+$ export NAXIS=2
+$ echo $NAXIS
+2
+</pre>
+
+<p>
+Important for use in a shell is the code <samp>sed 's/^DATE\-OBS/DATEOBS/'</samp>
+which transforms invalid variable DATE-OBS (meaning a difference) to an ordinary
+variable identifier.
+When DATE-OBS is not required, the calling of the piece of code can be omitted.
+</p>
+
+
+
+<h2>See also</h2>
+<p><a href="man_com.html">Common options</a>,
+<a href="http://docs.astropy.org/en/stable/io/fits/index.html">astropy.io.fits</a>
+(for Python, very general, flexible and ideal for scripting),
+<a href="http://heasarc.gsfc.nasa.gov/lheasoft/ftools/futils.html">ftools</a>
+(futils are more general and matured).
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

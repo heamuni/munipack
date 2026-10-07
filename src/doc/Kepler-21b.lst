@@ -1,0 +1,70 @@
+# BEGIN HDU 0
+SIMPLE  =                    T / file does conform to FITS standard
+BITPIX  =                    8 / number of bits per data pixel
+NAXIS   =                    0 / number of data axes
+EXTEND  =                    T / FITS dataset may contain extensions
+COMMENT   FITS (Flexible Image Transport System) format is defined in 'Astronomy
+COMMENT   and Astrophysics', volume 376, page 359; bibcode: 2001A&A...376..359H
+END
+# END HDU 0
+# BEGIN HDU 1
+XTENSION= 'BINTABLE'           / binary table extension
+BITPIX  =                    8 / 8-bit bytes
+NAXIS   =                    2 / 2-dimensional binary table
+NAXIS1  =                   16 / 2*8, width of table in bytes
+NAXIS2  =                   41 / number of rows in table
+PCOUNT  =                    0 / size of special data area
+GCOUNT  =                    1 / one data group (required keyword)
+TFIELDS =                    2 / number of fields in each row
+EXTNAME = 'Kepler-21b'         / Reference, arbitrary
+TTYPE1  = 'PHASE   '           / time - phase
+TFORM1  = '1D      '           / data format of field: double (8 bytes)
+TTYPE2  = 'FLUX    '           / relative flux
+TFORM2  = '1D      '           / data format of field: double (8 bytes)
+COMMENT Kepler-21b data: https://phys.org/news/2011-11-planet-kepler-21b.html
+COMMENT Data get by hand with help of g3data utility.
+COMMENT The time coordinate t is transformed as f = (t + 10)/20.
+COMMENT The amplitude of flux f is scaled by factor 1e4: flux := 1+1e4*(flux-1)
+END
+0 1.00714
+0.0245776 1.00714
+0.0506912 0.953571
+0.0768049 1.03393
+0.101382 0.948214
+0.12596 0.975
+0.152074 1.07143
+0.176651 1.03929
+0.201229 0.958929
+0.22427 0.969643
+0.253456 0.996429
+0.274962 1.00714
+0.301075 0.921429
+0.330261 1.02321
+0.351767 0.964286
+0.376344 1.0125
+0.40553 0.964286
+0.428571 0.525
+0.450077 0.348214
+0.477727 0.251786
+0.505376 0.273214
+0.528418 0.428571
+0.554531 0.439286
+0.580645 0.680357
+0.602151 1.14107
+0.628264 1.03929
+0.654378 1.04464
+0.678955 1.03393
+0.705069 1.02321
+0.728111 1.09286
+0.75576 1.08214
+0.780338 1.06607
+0.803379 1.02321
+0.829493 1.07143
+0.857143 1.05536
+0.88172 1.08214
+0.906298 1.0875
+0.929339 1.05536
+0.956989 1.00714
+0.981567 1.10357
+1.00922 1.10357
+# END HDU 1

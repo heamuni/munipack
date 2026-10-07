@@ -1,0 +1,105 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Manual Page</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+<h1>Internationalisation</h1>
+
+<p>Important notes about running Munipack in a localised environment.</p>
+
+<h2>I18n</h2>
+
+<p>
+  There is effort to made Munipack locale-friendly;
+  unfortunately, FITS world is, and will be forever,
+  strictly ASCII-oriented and omiting any support of locales.
+</p>
+
+<p>
+  <em>Never</em> use:
+</p>
+<ul>
+  <li>any local characters, like "čů", in FITS keywords, and </li>
+  <li>coma "," as floating-point separator.</li>
+</ul>
+
+<p>
+  You can also consider to avoid spaces, and local characters,
+  in file names. The space character separates words in sentences
+  and in scripts. That means the command
+</p>
+<pre>
+$ munipack fits Horse nebula.fits    # wrong
+</pre>
+<p>
+  is passing two arguments, which is not what you are expecting.
+  The difficulty can be solved by using apostrophes, or by escapes:
+</p>
+<pre>
+$ munipack fits 'Horse nebula.fits'
+$ munipack fits Horse\ nebula.fits
+</pre>
+<p>
+  But, the best solution is to avoid using blank characters.
+  If it takes a place naturally, prefer the underscore:
+</p>
+<pre>
+$ munipack fits Horse_nebula.fits
+</pre>
+
+<p>
+  Be also nice to foreigners and colleagues over the world. The non-ASCII
+  characters can be difficult to write and understand in their environments.
+</p>
+
+
+
+<h2>Locales</h2>
+
+<p>
+Any locale setting will surprisingly interfere with both FITS
+and Virtual Observatory pragmatic conventions
+where non-Ascii characters are forbidden. The limitations
+is sometimes much worse, in cases, when
+just only <a href="https://en.wikipedia.org/wiki/ASCII">ASCII</a>
+32 - 125 (in decimals) characters are allowed (FITS headers).
+</p>
+
+<p>
+There are situations when use of locale-specific conventions
+must be respected:
+</p>
+<ul>
+<li>Virtual Observatory supports just the dot as the floating-point separator.</li>
+<li>Values in header and table of FITS must use dot as the floating-point separator.</li>
+<li>FITS extended filenames (separation of dimensions by comma)</li>
+</ul>
+
+<p>
+Typical encountered problems are decimal-point related.
+Commas can be used both for separation of fractions
+and separations of numbers each other. To prevent the
+difficulty, one replaces <samp>X,Y</samp> to
+<samp>"X Y"</samp> (comma is replaced by a space and enclosed
+to apostrophes or quotes).
+</p>
+
+<p>
+In doubts, it is recommended switch-off locales by the setup
+</p>
+<pre>
+$ LC_ALL=C; export LC_ALL
+</pre>
+<p>
+which will leave rest of your system unaffected.
+</p>
+
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

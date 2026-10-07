@@ -1,0 +1,284 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Photometry Calibration</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Photometry Calibration</h1>
+
+<p class="abstract">
+A photometry calibration.
+</p>
+
+<!--
+<p>
+The calibration can be applied on both single- and
+multi-filter observations.
+</p>
+-->
+
+<h2>Synopsis</h2>
+
+<code>
+munipack phcal [.. parameters ..] file(s)[,result(s)]
+</code>
+
+<h2>Description</h2>
+
+<p>
+Purpose of this routine is the photometry calibration
+of CCD frames. The calibration establish
+an exact relation between observed
+instrumental counts and expected amount of photons
+by using a (small) set of known calibration stars.
+On base of the calibration, all known objects
+and the image itself should be transformed from
+instrumental counts to aboslute fluxes of photons,
+energy or magnitudes.
+</p>
+
+<h2>Detailed Description</h2>
+
+<p>Every single picture elements exposed by light for a time period
+is collecting electrons created due to photo-electric effect
+from photons. Counts of the electrons is digitised and stored
+in output images. One can be directly used for additional light analysis.
+We will use term (instrumental) count(s) for their calculated amount
+(widely used by astronomers).
+</p>
+
+<p>
+For a non-ideal detector, amount of digitised electrons will less
+than for photons. These counts will depends on the instrumental equipment
+(quality of optical path, lenses, mirrors, weather, quantum efficiency
+of CCD camera, etc). As consequence of the measurement process,
+the counts is unique per an apparatus and observation conditions.
+Two telescopes equipped with the same instrumentation will not product
+the same counts due to atmospheric conditions. The different apparatus
+(filters, detectors) generally produces different counts. To compare
+and to process observations from different observatories, we need
+unify all observations to same scales. Traditionally, in various
+parts of physics, the calibration is done with setting of calibration
+scale on a priory known calibrated sources. The sources are calibration
+stars for astronomers. The scale is relation between observed counts and
+produced photons.
+</p>
+
+<p>
+More detailed description of the calibration can be found in
+<a href="phoverview.html">Photometry Overview</a>.
+</p>
+
+<p>
+The calibration implemented by Munipack follows these steps:
+</p>
+<ul>
+<li>Detected stars are merged using of coordinates
+   against to a reference photometric catalogue.</li>
+<li>With known filter and photometry system,
+    expected count of photons is determined from magnitudes
+    in the catalogue.</li>
+<li>Instrumental counts are transformed
+    from an instrumental to a standard (photometry system)
+    filter using of provided transformation
+    matrix. (This step is optional.)</li>
+<li>By using of a telescope area, gain and exposure time are
+    observed counts normalised on count rates.</li>
+<li>The calibration itself is determined as the ratio of
+    reference amount of photons and observed rates.</li>
+</ul>
+
+<p>
+Image data values are converted on a physical quantity
+(like photons, fluxes, magnitudes). The conversion is applied
+on frame data as well as on photometric tables. The conversion
+requires known astrometry and photometry calibration.
+</p>
+
+<p>
+The conversion is very useful for converting observed quantities
+to a derived ones. One is ideal for construction of multi-spectral
+pictures of objects.
+</p>
+
+<h2>Algorithm</h2>
+
+<p>
+The calibration is computed by the way:
+</p>
+<ul>
+<li>Reference catalogue and frames are merged in spherical coordinates
+and by search in close neighbourhood.</li>
+<li>From known filter and photometry system, from catalogue magnitudes
+photon fluxes are computed. </li>
+<li>Observed counts are normalised to rates by knowing of telescope
+area and exposure time.</li>
+<li>The calibration ratio between expected photons and observed counts
+    is determined by a robust method.</li>
+<li>All values in frames and tables are recomputed on photons.</li>
+</ul>
+
+<p>When photometry transformation table from instrumental to
+standard system is available <samp>--tratab</samp>, the counts
+are transformed from instrumental to a relative standard counts
+and the calibration is performed on the kind of counts.
+</p>
+
+
+<h2 id="modes">Operational modes</h2>
+
+<p>
+Photometry calibration is a very complex task so various
+ways are implemented:
+</p>
+
+<dl>
+<dt>Reference Catalogue</dt><dd>Reference sources are stars provided
+as a table. The table can be prepared by hand or a photometrical
+catalogue can be used. Precision of calibration is given by quality
+of the catalogue and also by true colour transformation of instrumental
+to the catalogue. Usually, the calibration has small systematical
+offsets but larger random errors.</dd>
+<dt>Reference Frame</dt><dd>Reference stars are pulled from previsouly
+calibrated frame. Relative precision is generally better than in previous
+case because no colour transformation is required.</dd>
+<dt>Manual Calibration</dt><dd>The calibration values are provided
+by an user.</dd>
+</dl>
+
+<p>The choice suitable for specific situation would be very difficoult.
+</p>
+
+<!-- #include virtual="/man_phcal_common.shtml" -->
+
+<h2>Results</h2>
+
+<p>
+Output calibrated fits frames contains a new extension
+described in <a href="dataform_photometry.html">Photometry Calibrated File</a>.
+Its table contains coordinates of stars on frames and various
+photometric quantities.
+</p>
+
+
+<!--
+<h2>Input And Output</h2>
+
+<p>
+On input, list of frames with valid astrometry and containing the table with
+photometry is expected.
+</p>
+
+<p>
+On output, a new list of FITS files is created from input files.
+</p>
+-->
+
+<!-- #include virtual="/man_phcal_params.shtml" -->
+
+<p>See <a href="man_com.html">Common options</a> for input/output filenames.
+If advanced parameters <samp>-O</samp> are not set, default
+<samp>-O --mask '!\1_XXX.\2'</samp> is used according to some selected quantity.
+For example, <samp>-q MAG</samp> and the input file <samp>blazar_01R.fits</samp>
+will produce the output file <samp>blazar_01R_MAG.fits</samp>. Be warned, that
+output files are overwritten in any case by default.</p>
+
+
+<!--
+<h2>Filters Selection</h2>
+<p>
+The correspondence between filter in reference catalogue and
+frames is selected just only on base of their order: first specified
+label (via \-\-col-mag) correspond do first image, etc.. The designations
+in catalogue and filter in FITS frame are not compared by any
+way.
+</p>
+
+<p>
+For example, bands in reference table
+are labelled as Bmag, Vmag and filters as B,V (filters
+are for clarity included also in FITS names, but unchecked):
+</p>
+<pre>
+$ munipack phcal ... \-\-col-mag Bmag,Vmag frame_B.fits frame_V.fits
+</pre>
+-->
+
+
+<h2 id="prep">Preparation Of Photometry Catalogue</h2>
+
+<p>
+The table is a fits table and must contains columns with Right Ascension,
+Declination, reference magnitudes (and optionally with standard errors
+of the magnitudes). The column naming is by default RA, DEC, MAG and can
+be changed with --col-* options.
+</p>
+
+<p>
+The table may be prepared by any standard FITS utility (for example
+<a href="http://heasarc.gsfc.nasa.gov/lheasoft/ftools/fhelp/fcreate.txt">fcreate</a>
+utility of
+<a href="http://heasarc.gsfc.nasa.gov/docs/software/lheasoft/ftools/">FTOOLS</a>).
+</p>
+
+<p>
+To save the time, you can just edit file <samp>mtable.lst</samp> in
+Munipack distribution (carefully handle with NAXIS1 and NAXIS2, etc.)
+and create a table
+</p>
+<pre>
+$ munipack fits --restore mtable.lst
+</pre>
+<p>
+The output in mtable.fits can be used to a right frame as
+</p>
+<pre>
+$ munipack phcal -c mtable.fits frame.fits
+</pre>
+
+<h2>A Low-Precision Calibration</h2>
+<p>
+We are using just one filter. No transformation matrix is used.
+</p>
+
+<h2>A High-Precision Calibration</h2>
+<p>
+We are using multiple filters. Transformation matrix is used,
+we get the maximum possible precision.
+</p>
+
+
+<h2>Examples</h2>
+
+<p>
+Calibrate against to UCAC5 catalogue:
+</p>
+<pre>
+$ munipack cone -c UCAC5 -o 0716cat.fits -r 0.1 110.47 71.34
+$ munipack phcal -c 0716cat.fits --col-ra RAJ2000 --col-dec DEJ2000 \
+  --col-mag Gmag  --photosys Johnson 0716_?R.fits
+$ munipack phcal -c T_Phe.fits --tratab phfotran.fits  --col-mag B,V,R,I \
+   TPhe_B.fits,b.fits TPhe_V.fits,v.fits TPhe_R.fits,r.fits TPhe_I.fits,i.fits
+</pre>
+
+<pre>
+munipack phcal --verbose -r grb140423-2_C_0002_cal.fits --photsys-ref Johnson  grb140423-2_C_0003.fits
+</pre>
+
+
+<h2>See Also</h2>
+<p>
+<a href="man_phfotran.html">Photometic System Transformation</a>,
+<a href="man_com.html">Common Options</a>,
+<a href="dataform_photometry.html">Photometry Format</a>,
+<a href="phoverview.html">Photometry Overview</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

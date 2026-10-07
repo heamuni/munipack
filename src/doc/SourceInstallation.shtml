@@ -1,0 +1,279 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Building of Munipack from source code</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+  <h1>Building of Munipack from source code.</h1>
+
+<p class="abstract">Building Munipack from a source code</p>
+
+<h2>Introduction</h2>
+<p>This page describes how to build Munipack from source codes. This is
+  most portable way, but certain computer skills are required.
+  A fine tune fitting is possible. A packaging system is unused.
+  More convenient way to get Munipack offers the <a href="install.html">install</a>
+  page.
+</p>
+
+<h3>The AppImage script</h3>
+
+  <p>
+    The script <samp>dist/appimage.sh</samp>
+    described by <a href="appimage.html">AppImage</a>
+    makes a complete local installation.
+    It can be considered as a guideline or be adjusted for a particular case.
+  </p>
+
+
+<h2>Summary</h2>
+<p>There is a short summary of installation steps which
+  will install the latest stable release (replace X.Y by an appropriate
+  number):</p>
+<pre>
+$ mkdir ~/src/
+$ cd ~/src
+$ wget https://integral.physics.muni.cz/ftp/munipack/munipack-0.X.Y.tar.gz
+$ tar zxf munipack-0.X.Y.tar.gz
+$ cd munipack-0.X.Y
+$ ./configure
+$ make
+# [sudo] make install  # as root
+</pre>
+<p>
+More detailed description is below.
+</p>
+
+
+<h1>Source building</h1>
+
+
+<p>The building takes phases:</p>
+<ul>
+<li>preparing helper tools </li>
+<li>getting sources </li>
+<li>initialisation </li>
+<li>configure </li>
+<li>compile </li>
+</ul>
+  <p>At the moment, Munipack can be compiled under GNU/Linux, g++, gfortran
+    and wxWidgets ver. 3.0.0 (and above) only.
+  </p>
+
+  <p>Munipack is designed to be pretty much portable and multi-platform,
+    however, unusual combinations of compilers, operating systems, etc. should
+    require some additional tuning.
+  </p>
+
+
+<h2>Download</h2>
+  <p>Munipack's source is distributed as a tarball which
+    contains the latest stable  version. </p>
+
+<p>Download: <a href="https://integral.physics.muni.cz/ftp/munipack/">https://integral.physics.muni.cz/ftp/munipack/</a> </p>
+<p>To get source tree, download archive and unpack the tarball as: </p>
+<pre>
+# cd $HOME/src
+# wget https://integral.physics.muni.cz/ftp/munipack/munipack-0.6.X.tar.gz
+# gzip -dc munipack-0.6.XXX.tar.gz | tar -xf -
+</pre>
+
+  <p>The preferred path for placing sources is <samp>$HOME/src</samp>
+    for the per-user installation
+    If you have root privileges, use <samp>/usr/src</samp>
+    and replace all references by <samp>$HOME/src</samp>
+    in this text.</p>
+
+
+<h2>Prerequisites</h2>
+<p>Following tools are required for compiling of Munipack: </p>
+<ul>
+<li>Any Unix-like system (GNU/Linux, *BSD, etc.)</li>
+<li>Fortran 2008+ and C++ compilers </li>
+<li>Autoconf and automake (optional)</li>
+<li><a href="http://heasarc.gsfc.nasa.gov/docs/software/fitsio/fitsio.html">cfitsio</a> library </li>
+<li><a href="https://integral.physics.muni.cz/oakleaf/">Oakleaf</a> library</li>
+<li><a href="http://www.netlib.org/minpack/">minpack</a> library</li>
+<li><a href="http://www.plplot.org/">PLplot</a> library including Cairo driver</li>
+<li><a href="http://www.wxwidgets.org/">wxWidgets</a> library (ver. &gt;= <strong>3.0.0</strong>) </li>
+<li><a href="http://www.opencoarrays.org/">OpenCoarrays</a> (optional)</li>
+</ul>
+  <p><strong>All libraries must be available in the development version.</strong>
+    Common package systems contains development libraries as -dev (-devel)
+    packages.</p>
+
+  <p>The requirement for 3+ version of wxWidgets is the support of
+    the event handling system, which is necessary for command-line applications.
+    The instructions for wxWidgets installation can be found on wiki:
+    <a href="https://wiki.wxwidgets.org/Prerequisites">http://wiki.wxwidgets.org/Prerequisites</a>. </p>
+
+  <p>
+    The necessary tools can be, under GNU/Debian, Ubuntu and derivatives, installed by
+  </p>
+  <pre>
+    apt install libcfitsio-dev libwxgtk3.2-dev minpack-dev liboakleaf-dev \
+                pkg-config libplplot-dev libcoarrays-dev libcoarrays-openmpi-dev
+  </pre>
+
+  <p>
+    PLPlot is necessary for plotting. Cairo is the default driver;
+    it provides high quality graphs, supports of the  anti-aliasing and
+    the alpha transparency.
+    If the driver is unsuitable, user is prompted; an alternative driver
+    can be selected in <samp>xmunipack/plplot.cpp</samp>.
+  </p>
+
+  <p>
+    Parallel processing by
+    <a href="https://en.wikipedia.org/wiki/Coarray_Fortran">Coarrays in Fortran (CAF)</a>
+    is provided by
+    <a href="http://www.opencoarrays.org/">OpenCoarray library</a>
+    (<a href="https://github.com/sourceryinstitute/OpenCoarrays/blob/main/INSTALL">INSTALL</a> instructions)
+    which requires <a href="https://www.open-mpi.org/">OpenMPI</a>
+    or <a href="https://www.mpich.org/">MPICH</a>.
+    If Coarrays are not detected by <samp>configure</samp>,
+     processing continues in
+    <a href="https://gcc.gnu.org/wiki/CoarrayLib">single image</a> mode.
+  </p>
+
+<p>
+  Autoconfig is required for bootstrap (the <samp>configure</samp> script generation), and left unused if the code is build unmodified.
+</p>
+
+<h2>Initialisation</h2>
+  <p><strong>Required only if the sources are taken directly from
+      the Mercurial repository.</strong>
+    The repository is not public available now as
+    humans behind robots losing respect to other humans.</p>
+
+<p>Initialisation requires:</p>
+<ul>
+<li>Working installation of Autotools (automake, autoconf). </li>
+</ul>
+<p>Munipack building is on base of Autotools which is most widely portable way working under common computer systems. The initialisation of building framework is required. </p>
+<p>The building is controlled by configure.ac (top) and set of Makefile.am-s (all building directories). </p>
+<p>This phase creates <samp>configure.ac</samp> and other auxiliary files:  </p>
+<pre>
+$ ./bootstrap --dev
+</pre>
+<p>
+  Next step is to activate Autotools, and to make Makefiles by processing of the
+  control files:
+</p>
+<pre>
+$ autoreconf -i
+</pre>
+
+
+<h2>Configure and install</h2>
+<p>The initialised source is ready for compilation. This can be done quite easy on Linux based distributions, same as other Unix&#x27;s systems. The configuration, compilation and installation is provided by the standard GNU way. Simply, run the following sequence of commands: </p>
+<pre>
+$ ./configure
+$ make
+$ make install
+</pre>
+<p>Munipack will check available tools and will be installed by default under tree <samp>/usr/local</samp>. </p>
+<p>The phase will work under any supported system. C++ and Fortran compilers and appropriate development libraries needs to be installed, of course. </p>
+<p>There is possibility to fit the installation according to your needs. Running of the command </p>
+<pre>
+./configure --help
+</pre>
+  <p>will display possible switches to fine tuning of building.  </p>
+
+  <p>
+    The recommended setup is:
+  </p>
+<pre>
+  ./configure FCFLAGS="-O2 -ffpe-summary=invalid,zero,overflow \
+              -fno-unsafe-math-optimizations -frounding-math -fsignaling-nans" \
+              CFLAGS="-O2 -DNDEBUG" CXXFLAGS="-O2 -DNDEBUG"
+</pre>
+
+<p>Certain setting of the environment variables affects of the compilation process. For example, more progressive optimisation of the output code for 32-bit machines (64-bit machines are optimised on the level by default) and GNU compilers (g++, gfortran) is provided by <samp>FCFLAGS</samp> and <samp>CFLAGS</samp> variables </p>
+<pre>
+  $ ./configure CXXFLAGS=&quot;-march=i686 -O2&quot; FCFLAGS=&quot;-march=i686 -O2&quot;</pre>
+
+  <p>If the default installation <samp>/usr/local</samp> is not enough,
+    place it into another directory:
+  </p>
+  <pre>
+    ./configure [..] --prefix=$HOME/opt
+  </pre>
+  <p>
+    and modify your search path like <samp>PATH=$PATH:$HOME/opt/bin</samp>.
+  </p>
+
+<p>The installation under FreeBSD would work with parameters: </p>
+<pre>csh:&gt; ./configure LDFLAGS=-L/usr/local/lib CPPFLAGS=-I/usr/local/include
+</pre>
+<p>The installation under Fedora/RHEL will require </p>
+<pre>./configure CXXFLAGS=-I/usr/include/cfitsio</pre>
+
+<p>On finish, the configure command will print the summary: </p>
+<pre>
+Configured Munipack:
+
+                      Virtual Observatory support enabled: yes
+                           Command line interface enabled: yes
+                         Graphical User Interface enabled: yes
+</pre>
+  <p>If the configure script had found wxWidgets library,
+    both the first and the second options are set to <samp>yes</samp>.
+    The command line and the graphical interfaces requires wxWidgets;
+    without them, only processing engines are compiled.
+    They has no user interfaces and any communication is released only
+    via the standard input and output (which can be useful for daemons,
+    web interfaces, etc.).
+  </p>
+
+
+<h2>Options for the configure</h2>
+
+<p>
+There are some alternative ways to fit uncommon requirements:
+</p>
+<ul>
+  <li>To suppress build of GUI (xmunipack command) suitable for non-iterative
+    analysis (scripts) without support of graphical devices, use:
+<pre>./configure --disable-gui</pre></li>
+  <li>To suppress build of the command-line interface (muninpack command) for direct
+    use of modules:<pre>./configure --disable-cli</pre></li>
+  <li>Virtual Observatory support is disabled by:<pre>./configure --disable-vo</pre></li>
+  <li>Parallel processing (CAF) is disabled by:
+    <pre>./configure --disable-caf</pre></li>
+</ul>
+
+<p>
+Use of all the options (<samp>--disable-[gui|cli|vo]</samp>) together
+eliminates completely dependency on both wxWidgets and PLPlot.
+<samp>--disable-caf</samp> removes dependency on OpenCoarray
+and MPI libraries.
+cFITSIO, Oakleaf and Minpack are always necessary.
+</p>
+
+<p></p>
+
+<h2>Un-Installation</h2>
+<p>Use commands </p>
+<pre>
+# cd $HOME/src/munipack-0.6.X
+# make uninstall
+</pre>
+<p>in the installation directory to uninstall Munipack.  </p>
+<p>This implying that it is not a good idea to remove the source directory
+  immediately after installation (the reason to use <samp>/usr/src</samp>
+  or an equivalent path). </p>
+
+
+<!--
+<h2>Known issues</h2>
+-->
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

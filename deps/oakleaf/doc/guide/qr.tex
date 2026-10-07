@@ -1,0 +1,1396 @@
+\begin{refsection}
+\chapter{QR factorisation}
+
+This chapter describes an implementation of QR factorisation and related
+algorithms by Oak Leaf.
+The implementation is based on ideas, the spirit, and
+a framework developed in the book \fullcite{golub2013matrix}
+(henceforth cited as \cite{golub2013matrix}).
+The fundamental principles of QR decomposition, the algorithm
+by John~G.F.~Francis\footfullcite{wiki:jfrancis},
+can be found in references, see Section~\ref{sec:qrbiblio}.
+
+I have been studying QR factorisation in the hope I will find
+genuinely deep understanding of principles, and properties, of the approach.
+It has helped me to select of effective algorithms for optimisation problems
+solved in Oak Leaf
+rather than to apply of general forms of the algorithms.
+Another benefit is the implementation in modern Fortran
+equipped by vectorisation computing capabilities;
+that permits writing of a clean and computationally efficient code.
+By the way, I had been able to drop dependency of Oak Leaf on external libraries,
+however compilers itselfs utilises routines by Lapack
+(\footfullcite{website:lapack}), the well-known project on base
+of \cite{golub2013matrix}.
+
+I had developed both computation effective and debug variants of the routines.
+A source code for the effective way can be found
+in \texttt{src/qrhouse.f08}, whilst \texttt{src/qrdebug.f08}
+is the basic, naive, implementation intended for verification of algorithms
+at all. Run-time tests contains the files \texttt{test/qr/testqrhouse.f08},
+and \texttt{test/qr/testqrdebug.f08}.
+
+\section{QR factorisation}
+\label{sec:qrfactorisation}
+
+QR algorithm factorise (decompose) of a matrix $A$ on:
+an upper diagonal triangular matrix $R$, and $Q$ matrix
+having orthogonal columns
+\begin{equation}
+  A = Q R.
+\end{equation}
+The decomposition is a wise way how to solve systems of linear equations,
+to derive an inversion, or to find both eigenvalues and eigenvectors
+of a matrix. QR factorisation can be applied on non-square matrices,
+or rank deficient systems of linear equations;
+the problems so much important for real world applications.
+All these astonishing abilities raises from the extraordinary coincidence:
+a linear system with triangular matrix $R$ can be solved trivialy, and
+the inversion of an orthogonal matrix is the matrix transpose $Q^{-1} = Q^T$.
+
+QR factorisation can be applied on the matrix $A^{m \times n}$ having real
+elements $a_{i,j} \in \mathcal{R}$ arranged in $m$ rows and $n$ columns.
+$i$ is an index for rows, $j$ for columns.
+The result matrices has dimensions $m \times n$ for $R$, and
+$m \times m$ for $Q$.
+$A$ can be non-square $m \ne n$, singular, and asymmetric.
+$Q$ is a matrix having orthogonal columns
+\begin{align*}
+  Q_i^T \cdot Q_j = 0, \quad i \ne j,\\
+  Q_i^T \cdot Q_i \ne 0, \quad i = j,
+\end{align*}
+or $Q^T Q = Q Q^T = I$.
+The generalisation on complex elements of $A$ is straightforward,
+but out of scope of our interest.
+
+QR factorisation for elements of $3 \times 3$ matrix can be written as
+\begin{equation}
+    \begin{pmatrix*}[r]
+      a_{11}, & a_{12}, & a_{13},\\
+      a_{21}, & a_{22}, & a_{23},\\
+      a_{31}, & a_{32}, & a_{33}
+    \end{pmatrix*}
+    =
+    \begin{pmatrix*}[r]
+      q_{11}, & q_{12}, & q_{13},\\
+      q_{21}, & q_{22}, & q_{23},\\
+      q_{31}, & q_{32}, & q_{33}
+    \end{pmatrix*}
+    \begin{pmatrix*}[r]
+      r_{11}, & r_{12}, & r_{13},\\
+      0,     & r_{22}, & r_{23},\\
+      0,     & 0,     & r_{33}
+    \end{pmatrix*}.
+\end{equation}
+
+The principle of QR algorithm is to find such equivalence transformation
+of $A$
+which will nullify $r_{ij} = 0$ under-diagonal elements $i < j$ of $R$
+together with keeping $Q$ orthogonal.
+Householder reflection, represented by
+the symmetric $m \times m$ projection matrix
+\begin{equation} \label{eq:housemat}
+  P = I - \beta \, v \otimes v^T, \quad
+  \beta = \frac{2}{v^T \cdot v},
+\end{equation}
+satisfies the requirement.\footnote{
+  The outer and the inner (scalar) product of vectors
+  $u,v \in \mathrm{R}^m$ are defined as
+  \[
+  u \otimes v^T = u_i v_j, \; i,j = 1, \ldots, m,
+  \quad \text{and} \quad
+  u^T \! \cdot v = \sum_{i=1}^m u_i v_i.
+  \]
+}
+The determination of Householder vector $v$, the heart of the factorisation,
+will be described in Section~\ref{sec:house}.
+
+Since this point, Fortran notation for element block selection of matrices
+and vectors will be used:
+the plain $(:)$ means whole row or column,
+$\mdx{j}{m}$ is a part with starting index $j$
+and the last index $m$ (including the interval points).
+
+
+A simple choice for the annihilation of all sub-diagonal elements of
+the column $A_j$ is to get $j$-th column of $A$:
+$x = A_j \in \mathcal{R}^m$, and to set the Householder vector as
+\begin{equation}
+  v(\mdx{j}{m}) = x(\mdx{j}{m}) \pm \lVert x(\mdx{j}{m}) \rVert_2 \ e_j
+\end{equation}
+for the elements of $x$ with indexes $j \ldots n$, zero otherwise.
+The vector is a reflection around the unit vector $e_j$.
+Householder matrix (\ref{eq:housemat}) for $j=2$ is derived
+from $v^{(2)} = (0,v_2,v_3)^T$ in the form
+\begin{equation}
+  P^{(2)} =
+    \begin{pmatrix*}[r]
+      1, & 0, & 0,\\
+      0, & p_{22}, & p_{23},\\
+      0, & p_{32}, & p_{33}
+    \end{pmatrix*}.
+\end{equation}
+
+The annihilation process is designed by this way: the matrix multiplication
+$P^{(1)} A$ eliminates the first sub-column giving
+the first iteration of $R^{(1)}$, the updated matrix is used to
+the eliminate next column $R^{(2)} = P^{(2)} R^{(1)}$, and the machinery
+is repeated until finish in $n$ steps.
+\begin{equation}
+  R^{(j)} = P^{(j)} R^{(j-1)}, \quad j = 1 \dots n.
+\end{equation}
+The sequence has start from the full matrix $R^{(0)} = A$,
+
+The orthogonal matrix $Q$ collects the projection matrices
+during the process.
+\begin{equation}
+  Q^{(j)} = Q^{(j)} P^{(j-1)}, \quad j = 1 \dots n
+\end{equation}
+The sequence has start from a unitary matrix $Q^{(0)} = I$ of dimension $m$.
+
+Algorithm~\ref{alg:qrfactorisation} summarises our development.
+One can be implemented via matrix operations.
+
+
+\begin{algorithm}
+  \caption{QR factorisation}
+  \label{alg:qrfactorisation}
+  \begin{algorithmic}
+    \State \Comment{Let $A, R \in \mathcal{R}^{m \times n},
+    Q,I,P \in \mathcal{R}^{m \times m}, v \in \mathcal{R}^m, \beta \in \mathcal{R}$}
+    \State $R = A$
+    \State $Q = I$
+    \For {$\; j = 1 \ldots n$}
+    \State $v, \beta$ = \Call{housevec}{$R_j$}
+    \State $P = I - \beta \, v \otimes v^T$
+    \State $R = P R$
+    \State $Q = Q P$
+    \EndFor
+    \State \Return factored $A$ into $R,Q$
+  \end{algorithmic}
+\end{algorithm}
+
+The $R$ can be computed using of the sub-matrix
+$R(\mdx{j}{m},\mdx{j}{n}) = P(\mdx{j}{m},\mdx{j}{m}),R(\mdx{j}{m},\mdx{j}{n})$;
+this way of acceleration is not valid for $Q$.
+
+There are more ways how to derive QR factorisation.
+Householder projection is the way having best numerical
+stability and properties. Givens rotations, or modified
+Gram-Schmidt process, are another methods
+useful in particular problems.
+
+
+\section{An effective QR factorisation}
+
+The formulation of QR factorisation in previous section~\ref{sec:qrfactorisation}
+can be improved in terms of both speed up and memory economy.
+
+\subsection{Speed up}
+\label{sec:speedup}
+
+The computations of $P$ in (\ref{eq:housemat}) are expensive due
+the outer product of
+Householder vector $v \in \mathcal{R}^m$, followed by
+the additional matrix multiplication.
+
+A way how to significantly improve speed of the approach comes
+from the observation (\cite{golub2013matrix}, Sect.~5.1.4)
+that the projection matrix $P$ is commonly used as part of
+matrix products. In such case, $P$ can be eliminated
+in behalf of $v$:
+\begin{equation} \label{eq:golub514a}
+  PA = (I - \beta \, v \otimes v^T) \, A = A - (\beta v) \otimes (v^T \! A)
+\end{equation}
+as well as
+\begin{equation} \label{eq:golub514b}
+  A P = A \, (I - \beta \, v \otimes v^T) = A - (A v) \otimes (\beta v)^T.
+\end{equation}
+The re-arrange removes one step in the above algorithm.
+Another step reduction is possible, when $Q$ is not required explicitly.
+
+\subsection{Room sharing}
+\label{subsec:memshare}
+
+The second improvement evolves the previous idea:
+if we need only $v$ for successive operations, we can drop
+to keep matrix $Q$ which can be recovered from vectors $v$,
+if need.
+That approach is very handy;
+otherwise, we should keep both $Q$ and a set of $v$ in order
+to be able do any operations with factored matrices.
+
+Now, we will keep only vectors $v$, and recover $Q$ later.
+The vectors $v$ can be stored in an additional matrix $(v^{(j)})$,
+but there is a better way. All the vectors $v^{(j)}$ has
+the structure
+\[
+(0, \ldots, v_j, v_{j+1}, \ldots, v_m )^T.
+\]
+with $j-1$ null elements.
+The determination of $P$ (\ref{eq:housemat}) is independent
+on norm of $v$, so it becomes useful to introduce the normalisation
+\begin{equation}
+  v = \left( 0, \ldots, 1, \frac{v_{j+1}}{v_j}, \ldots, \frac{v_m}{v_j} \right)^T.
+\end{equation}
+Only the elements $j+1, \ldots, n$ carries desired information, and we
+can use under diagonal elements, the unfilled place, of matrix $R$ to store
+parts of the vectors.
+
+The final structure of matrix $R$, which can share memory with
+$A$ being overwritten sequentially, will be
+\begin{equation}
+    \begin{pmatrix*}[r]
+      r_{11}, & r_{12}, & r_{13}, & r_{14}, \\
+      v_2^{(1)}, & r_{22}, & r_{23}, & r_{24},\\
+      v_3^{(1)}, & v_3^{(2)}, & r_{33}, & r_{34},\\
+      v_4^{(1)}, & v_4^{(2)}, & v_4^{(3)}, & r_{44}
+    \end{pmatrix*}.
+\end{equation}
+
+
+\subsection{Some notes}
+
+It may be disputable, if this way to save some memory is rational
+today, but the related speed up should be important for applications.
+
+The algorithm here is not intended for solution of very large
+problems with sparse matrices. The expected matrix should be dense
+and small. For that matrices, the Householder transformation
+offers numerical stability --- it is the most stable known method.
+
+The execution speed can be improved by a parallel implementation.
+Unfortunately, the Householder matrix should be applied in an exact
+sequence, the parallelization is difficult but possible via
+a recursion (see \fullcite{golub2013matrix}, henceforth cited as \cite{golub2013matrix} Sect.~5.2.4).
+The more parallel friendly way is to replace
+Householder transformations by Givens rotations.
+Unfortunately, they brings worse numerical stability so they
+are recommended for large sparse problems only.
+
+The effective way, described in this section, can speed-up
+computations, but it will work only for compiled computer languages
+like Fortran, Go, or Julia.
+The scripting languages, Matlab or Python,
+will benefits from the matrix formulation; per-element
+operations are too slow due the additional interactive layer between
+the operator and the physical machine.
+
+And finally, there is a question of choice: Do we want to save some memory,
+to be fast, or to be easy to understand?
+
+
+\subsection{The effective QR factorisation}
+
+This section describes algorithms for the effective QR factorisation
+as has been linked above. The algorithms are designed for a heavy load
+processing.
+
+The effective QR factorisation in Algorithm~\ref{alg:qrfac} is
+a transcription of Algorithm 5.2.1 by \cite{golub2013matrix}.
+The function \textsf{housevec} is defined in Algorithm~\ref{alg:housevec}.
+The function \textsf{housemul} is a convenient implementation
+of (\ref{eq:golub514a}).
+Having Householder vectors $v$ stored inside the factored matrix,
+we can easy prepare the orthogonal matrix $Q$ at any moment;
+Algorithm~\ref{alg:qform} (the equation (5.1.5) due \cite{golub2013matrix})
+is such representation.
+
+\begin{algorithm}
+  \caption{The effective QR factorisation}
+  \label{alg:qrfac}
+  \begin{algorithmic}
+    \Function{qrfac}{$A,\beta$}
+    \State \Comment{Let $A \in \mathcal{R}^{m \times n}, \beta \in \mathcal{R}^n$}
+    \State \Comment{$A$ contains a matrix to factorise; the upper
+    triangle of $R$ and Householder vectors $v$ on output.
+    $\beta$ is an output vector storing computed normalisation.}
+    \State \Comment{An auxiliary variable: $v \in \mathcal{R}^m$}
+    \For {$\; j = 1 \ldots n$}
+    \State $v(\mdx{j}{m}), \beta_j$ = \Call{housevec}{$A(\mdx{j}{m},j)$}
+    \State $A(\mdx{j}{m},\mdx{j}{n})$ = \Call{housemul}{$v(\mdx{j}{m}), \beta_j,
+      A(\mdx{j}{m},\mdx{j}{n})$}
+    \If {$\; j < m$}
+    \State $A(\mdx{j+1}{m},j) = v(\mdx{j+1}{m})$
+    \EndIf
+    \EndFor
+    \State Returns factored $A$ and $\beta$, see section.~\ref{subsec:memshare}.
+    \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+
+
+\begin{algorithm}
+  \caption{Householder matrix multiplication}
+  \label{alg:housemul}
+  \begin{algorithmic}
+    \Function{housemul}{$v,\beta,A$}
+    \State \Comment{Let $A \in \mathcal{R}^{m \times n}, v \in \mathcal{R}^n,
+      \beta \in \mathcal{R}$}
+    \State \Comment{Auxiliary variables: $u,w \in \mathcal{R}^m$}
+    \State $u(\mdx{j}{m}) = \beta v(\mdx{j}{m})$
+    \For {$\; j = 1 \ldots n$}
+    \State $w_j = v^T \cdot A_j$
+    \EndFor
+    \For {$\; i = 1 \ldots m, j = 1 \ldots m$}
+    \State $A_{ij} = A_{ij} - u_j w_i$
+    \EndFor
+    \State Returns $RP$ stored on place.
+    \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+
+
+\begin{algorithm}
+  \caption{Evaluate $Q$ from $v$ stored under diagonal of $R$}
+  \label{alg:qform}
+  \begin{algorithmic}
+    \Function{qform}{$A,\beta$}
+    \State \Comment{Let $A \in \mathcal{R}^{m \times n}, \beta \in \mathcal{R},
+      Q \in \mathcal{R}^{m \times m}$}
+    \State \Comment{Auxiliary variables: $v,u,w \in \mathcal{R}^m$}
+    \State $Q = I_{nn}$
+    \For {$\; j = n, n-1, \ldots, 1$}
+    \State $v(\mdx{j}{m}) = (1, A(\mdx{j+1}{m},j))^T$
+    \State $u(\mdx{j}{m}) = \beta_j v(\mdx{j}{m})$
+    \For {$\; l = j \ldots n$}
+    \State $w_l = v(\mdx{j}{m})^T \cdot Q(\mdx{j}{m},l)$
+    \EndFor
+    \For {$\; k = j \ldots m, l = j \ldots n$}
+    \State $Q_{kl} = Q_{kl} - w_l u_k$
+    \EndFor
+    \EndFor
+    \State Returns $Q$
+    \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+
+All the presented algorithms are only slightly changed prototypes of
+the equivalents of \cite{golub2013matrix} intentionally
+keeping notations of the book.
+Only a few important differences are here:
+Householder vector $v$ is starting from $j$-th index, rather than
+from the first index, to be consistent in notation.
+The difference is observable on last line of
+Algorithm~\ref{alg:qrfac} where $A(\mdx{j+1}{m},j) = v(\mdx{j+1}{m})$
+is replaced by $A(\mdx{j+1}{m},j) = v(\mdx{1}{m-j+1}$).
+Another difference is to keep of the vector $\beta$ for later use,
+rather than recovering it during subsequent applications
+to save computation time.
+
+Also, all the
+algorithms are arranged such way, to by easy implemented
+in Fortran (see \texttt{src/qrhouse.f08}). Just for comparison,
+the particular implementation of Algorithm~\ref{alg:housemul}
+in Fortran can be found in listing~\ref{src:housemul}.
+
+\begin{lstlisting}[float,language=Fortran,basicstyle=\ttfamily,
+    caption={Householder matrix multiplication in Fortran},label={src:housemul}]
+
+subroutine housemul(v,beta,A)
+
+  real, dimension(:), intent(in) :: v
+  real, intent(in) :: beta
+  real, dimension(:,:), intent(in out) :: A
+
+  real, dimension(size(v)) :: u, w
+  integer :: i,j,m,n
+
+  m = size(A,1)
+  n = size(A,2)
+  u = beta*v
+  forall(j = 1:m) w(j) = dot_product(v,A(:,j))
+  forall(i = 1:n, j = 1:m) A(i,j) = A(i,j) - u(i)*w(j)
+
+end subroutine housemul
+\end{lstlisting}
+
+
+
+
+\section{Householder reflection}
+\label{sec:house}
+
+To nullify the desired elements of $R$ during $j$-th iteration
+by the numerically stable way,
+Householder vector $v^{(j)}$ is defined via the corresponding
+column of $A$ as $x^{(j)} = A_j$ ($j$-th column of $A$)
+\begin{equation} \label{eq:housevec}
+  v_i^{(j)} =
+  \begin{cases}
+    0, & i < j,\\
+    v_j, & i = j,\\
+    x_j, & i > j,
+  \end{cases}
+\end{equation}
+where
+\begin{equation} \label{eq:housevec0}
+  v_j = x_j \pm \sign(x_j) \lVert x(\mdx{j}{m}) \rVert_2.
+\end{equation}
+The sign in (\ref{eq:housevec0}) as well as the computation of $v_j$
+are source of a disputation. \cite{golub2013matrix}
+proposes negative sign (to maximise norm) which is keeping the numerical
+precision. If $x$ is close to a positive multiple of $e$,
+we can improve the precision by the way
+\[
+v = x - \lVert x \rVert_2 =
+\frac{x_1^2 - \lVert x\rVert_2}{x_1 + \lVert x \rVert_2} =
+-\frac{x_2^2 + \ldots + x_m^2}{x_1 + \lVert x \rVert_2}.
+\]
+Finally, we define
+%The unit vector $e_k = (0 \ldots, 1, 0 \ldots 0)^T$.
+\begin{equation} \label{eq:vj}
+v_j =
+\begin{dcases}
+  -\frac{x_{j+1}^2 + \ldots + x_m^2}{x_j + \lVert x(\mdx{j}{m}) \rVert_2}, & x_j \ge 0,\\
+  x_j - \lVert x(\mdx{j}{m}) \rVert_2, & x_j < 0.
+\end{dcases}
+\end{equation}
+In the important case of a rank deficient matrix,
+Householder vector will $v = 0$,
+and we should add the condition $\beta = 0$.
+
+\begin{algorithm}
+  \caption{Householder vector}
+  \label{alg:housevec}
+  \begin{algorithmic}
+
+    \Function{housevec}{$x$}
+    \State \Comment{$x, v \in \mathcal{R}^m, \beta \in \mathcal{R}$}
+    \State $v(\mdx{2}{m}) = x(\mdx{2}{m})$
+    \State $\sigma^2 = x(\mdx{2}{m})^T \cdot x(\mdx{2}{m})$
+    \If{$\, \sigma^2 > 0$}
+    \State $d = \sqrt{x_1^2 + \sigma^2}$
+    \If{$\, x_1 > 0$}
+    \State $v_1 = -\sigma^2 / (x_1 + d)$
+    \Else
+    \State $v_1 = x_1 - d$
+    \EndIf
+    \If{$\, \lvert v_1 \rvert > 0$}
+    \State $v = v / v_1$
+    \State $\beta = 2 / (v^T \cdot v)$
+    \Else
+    \State $\beta = 0, v = 0$
+    \EndIf
+    \Else
+    \State $v_1 = 1$
+    \If{$\, x_1 \ge 0$}
+    \State $\beta = 0$
+    \Else
+    \State $\beta = 2$
+    \EndIf
+    \EndIf
+    \State \Return $v, \beta$
+    \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+
+
+\begin{example}{Householder vector}
+  \label{ex:housevec}
+  We will compute Householder vector $v$ and matrix $P$
+  for the first column of the matrix
+  (example\footfullcite{wiki:qr} by wiki ,
+  our procedure reflects the distinct definition):
+  \begin{equation}
+    \begin{pmatrix*}[r]
+      12, & -51, & 4,\\
+      6, & 167, & -68,\\
+      -4, & 24, & -41.
+    \end{pmatrix*}
+  \end{equation}
+
+  For $j = 1$, we have
+  $v^{(1)} = (1, -3, 2)^T, \beta = \sfrac{1}{7}$
+  from (\ref{eq:housevec}), (\ref{eq:vj}) and (\ref{eq:housemat})
+  \begin{equation}
+    H^{(1)} =
+    \begin{pmatrix*}[r]
+      1, & 0, & 0,\\
+      0, & 1, & 0,\\
+      0, & 0, & 1.
+    \end{pmatrix*}
+    - \frac{1}{7}
+    \begin{pmatrix*}[r]
+      1, & -3, &  2,\\
+     -3, &  9, & -6,\\
+      2, & -6, &  4.
+    \end{pmatrix*} =
+    \begin{pmatrix*}[r]
+      \sfrac{6}{7},  & \sfrac{3}{7},  &  \sfrac{-2}{7},\\
+      \sfrac{3}{7},  & \sfrac{-2}{7}, &  \sfrac{6}{7},\\
+      \sfrac{-2}{7}, & \sfrac{6}{7},  &  \sfrac{3}{7}.
+    \end{pmatrix*}
+  \end{equation}
+
+    (to be continued).
+\end{example}
+
+
+\section{QR factorisation with pivoting}
+
+QR factorisation including pivoting is important for the numerical
+stability, and significantly extends field of usage of the developed methods.
+It permits to find a solution in such real cases when a system of linear
+equations is badly conditioned or singular. It also suppress
+accumulation of numerical rounding errors emerged from long summations
+and products, the most frequent operations executed on matrices.
+
+The implemented pivoting uses the same principles as the
+column pivoting known for Gauss elimination technique. The pivots
+are represented by a matrix $\Pi$ which collects permutations of rows of $A$.
+$\Pi$ has all elements as zeros except the ones on the appropriate places
+\begin{equation}
+  A \Pi = Q R.
+\end{equation}
+A common used storage of the permutation matrix is a vector
+$p \in \mathcal{N}_0^m$.
+It is implemented in Algorithm~\ref{alg:qrpivo} which is
+a rich variant of Algorithm~\ref{alg:qrfac}.
+The permutation matrix $\Pi$ can be easy recovered from $p$ as
+Algorithm~\ref{alg:perm} demonstrates.
+
+\begin{algorithm}
+  \caption{QR factorisation with column pivoting}
+  \label{alg:qrpivo}
+  \begin{algorithmic}
+    \Function{qrpivot}{$A,\beta, p$}
+    \State \Comment{Let $A \in \mathcal{R}^{m \times n}, \beta \in \mathcal{R}^n,
+    p\in \mathcal{N}_0^m, m \ge n$.}
+    \State \Comment{$A$ contains a matrix to factorise; the upper
+    triangle of $R$ and Householder vectors $v$ and factors $\beta$ on output.
+    $p$ is vector of permutations.
+    }
+    \State \Comment{An auxiliary variables: $c,v \in \mathcal{R}^m,
+      \tau \in \mathcal{R}$}
+    \State $p = (\{1, \ldots, n \} )^T$
+    \For{$\; j =  1 \ldots n$}
+    \State $c(j) = A(\mdx{1}{m},j)^T \cdot A(\mdx{1}{m},j)$
+    \EndFor
+    \For{$\, r = 1, \ldots, n$}
+    \State Find the smallest index $r \le k \le n$ for which $c(k)$
+    is the maximum.
+    \If{$\, \mathrm{not} \, (c(k) > 0)$}
+    \State exit loop over $r$
+    \EndIf
+    \If{$r \ne k$}
+    \State $p(r) \leftrightarrow p(k)$
+    \State $c(r) \leftrightarrow c(k)$
+    \State $A(\mdx{1}{m},r) \leftrightarrow A(\mdx{1}{m},k)$
+    \EndIf
+    \State $v(\mdx{r}{m}), \beta(r)$ = \Call{housevec}{$A(\mdx{r}{m},j)$}
+    \State $A(\mdx{r}{m},\mdx{r}{n})$ = \Call{housemul}{$v(\mdx{r}{m}), \beta(r), A(\mdx{r}{m},\mdx{r}{n})$}
+    \State $A(\mdx{r+1}{m},r) = v(\mdx{r+1}{m})$
+    \For{$\; l =  r+1 \ldots n$}
+    \State $c(l) = c(l) - A(r,l)^2$
+    \EndFor
+    \EndFor
+    \State \Return $A$ factored, $\beta,p$
+    \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+
+
+\begin{algorithm}
+  \caption{Compilation of the permutation matrix}
+  \label{alg:perm}
+  \begin{algorithmic}
+    \State $\Pi = 0$
+    \For{$\; j = 1, \ldots, m$}
+    \State $\Pi(p(j),j) = 1$
+    \EndFor
+  \end{algorithmic}
+\end{algorithm}
+
+
+
+\section{A solution of a system of linear equations}
+\label{sec:lineq}
+
+
+
+A solution $x \in \mathcal{R}^m$ of a system of linear equations
+\begin{equation}
+  Ax = b
+\end{equation}
+with a matrix $A$ factored on $Q,R$, and a right side $x \in \mathcal{R}^m$,
+is straightforward thanks to the identity
+\begin{equation}
+  Q^{-1} = Q^T.
+\end{equation}
+The full system $A$ is transformed on the system having triangle matrix $R$
+\begin{equation}
+  Rx = q,
+\end{equation}
+and the right side $q = Q^T b$. To solve one,
+we can apply the back-substitution under the condition
+$\lvert R_{ii} \rvert \ne 0$ (see Algorithm~\ref{alg:rsol}):
+\begin{equation}
+  x_i = \frac{1}{R_{ii}} \left(
+  q_i - \sum_{j=i+1}^m R_{ij} x_j \right), \qquad i = m, \ldots, 1.
+\end{equation}
+
+\begin{algorithm}
+  \caption{Solution of $Rx=q$ with back-substitution}
+  \label{alg:rsol}
+  \begin{algorithmic}
+    \Function{rsol}{$A,q$}
+    \State \Comment{Let $A \in \mathcal{R}^{m \times n}, q,u \in \mathcal{R}^n$}
+    \For{$\, i = m, \ldots, 1$}
+    \State $u(i) = [q(i) - A(i,\mdx{i+1}{n})^T \cdot x(\mdx{i+1}{n})] / A(i,i)$
+    \EndFor
+    \State \Return $u$
+    \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+
+
+Note that $Q$ can be again restored from vectors $v$ stored in columns of $R$
+by applications of the trick presented in section~\ref{sec:speedup}.
+Algorithm~\ref{alg:houseapp} materialises the idea.
+
+This way is only valid for full square matrices with dimensions
+$m \times m$. This is, in fact, an equivalent to direct Gaussian elimination
+or its variants as $LU$ or $LL^T$ factorisation, notwithstanding
+a numerical class of the matrices is wider (\cite{golub2013matrix}, Sect.~5.3).
+
+The essential advantage of QR factorisation is revealed for
+over-determined systems having more equations than variables ($m > n$),
+and under-determined systems having less equations than variables ($m < n$).
+The particular important case are rank deficient singular matrices.
+
+Next paragraphs briefly describes solutions in the difficult cases,
+which covers Algorithm~\ref{alg:qrsol}.
+
+
+\subsection{A least square solution of a system of linear equations}
+\label{sec:lsqrt}
+
+The least square solution minimises of Pythagorean norm,
+a generalised distance, between a computed $Ax$, and expected $b$,
+solutions
+\begin{equation}
+  \min \lVert A x - b \rVert_2,
+\end{equation}
+where $A \in \mathcal{R}^{m \times n}, m \ge n, b \in \mathcal{R}^m,
+x \in \mathcal{R}^n$.
+The problem can be solved with help of QR factorisation which decompose
+the system on the two parts:
+\begin{equation}
+  Q^T A = R =
+  \begin{pmatrix*}[c]
+    R_1,\\
+    0
+  \end{pmatrix*},
+  \quad Q^T b =
+  \begin{pmatrix*}[c]
+    c,\\
+    d
+  \end{pmatrix*}.
+\end{equation}
+$R_1 \in \mathcal{R}^{n \times n}$ is a square matrix. The lower part
+of factorised $R$ is nullified. $c \in \mathcal{R}^n$ part corresponds
+to the solution, while $d \in \mathcal{R}^{m-n}$ stores residuals.
+\begin{equation}
+  \lVert A x - b \rVert_2^2 = \lVert Q^T A x - Q^T b \rVert_2^2 =
+  \lVert R_1 x - c \rVert_2^2 + \lVert d \rVert_2^2.
+\end{equation}
+The solution in sense of least squares is than
+\begin{equation}
+  R_1 x_0 = c,
+\end{equation}
+and the residual sum is
+\begin{equation}
+\lVert Ax_0 - b \rVert_2 = \lVert d \rVert_2.
+\end{equation}
+
+
+
+\begin{algorithm}
+  \caption{Householder matrix application}
+  \label{alg:houseapp}
+  \begin{algorithmic}
+    \Function{houseapp}{$A,\beta,x$}
+    \State \Comment{Let $A \in \mathcal{R}^{m \times n}, v,\beta \in \mathcal{R}^n$}
+    \For{$\, j = 1, \ldots, m$}
+    \State $v(\mdx{j}{m}) = (1, A(\mdx{j+1}{m},j))^T$
+    \State $x(\mdx{j}{m}) = x(\mdx{j}{m}) - \beta_j
+           [v(\mdx{j}{m})^T \cdot x(\mdx{j}{m})] v(\mdx{j}{m})$
+    \EndFor
+    \State \Return $x$
+    \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+
+
+\begin{algorithm}
+  \caption{Linear equations solver}
+  \label{alg:qrsol}
+  \begin{algorithmic}
+    \Function{qrsol}{$A,b,x$}
+    \State \Comment{Let $A,R \in \mathcal{R}^{m \times n}, x,b \in \mathcal{R}^n$}
+    \State \Comment{Auxiliary variables: $u,q,\beta \in \mathcal{R}^m$}
+
+    \If{$m > n$}
+    \State \Comment{The least-square solution, Section~\ref{sec:lsqrt}}
+    \State $R,\beta = $ \Call{qrfac}{$A$}
+    \State $q =$  \Call{houseapp}{$R,\beta,b$}
+    \State \Return $x =$  \Call{rsol}{$R(\mdx{1}{n},\mdx{1}{n}),q$}
+    \Else
+    \State $R,\beta,\Pi = $ \Call{qrpivot}{$A$}
+    \State $q = Q^T b = $  \Call{houseapp}{$R,\beta,b$}
+
+    \State Set $\delta > 0, \delta = \tau \varepsilon \lvert R(1,1) \rvert,
+    R(1,1) \ne 0$
+    \State Determine rank: $r = \{ i, \lvert R(i,i) \rvert > \Delta \}$
+    \If{$r = m$}
+    \State \Comment{A square matrix Section~\ref{sec:lineq}}
+    \State $z =$ \Call{rsol}{$R,q$}
+    \State \Return $x = \Pi^T z$
+%    \State $u =$  \Call{rsol}{$R,q$}
+%    \State \Return $x = u(p)$
+    \ElsIf{$r < m$}
+    \State \Comment{A rank deficient matrix, Section~\ref{subsec:lsrank}}
+    \State \Comment{Basic solution: $u(\mdx{1}{r}) =$
+      \Call{rsol}{$R(\mdx{1}{r},\mdx{1}{r}),q(\mdx{1}{r})$}, $x_B = \Pi^T u$}
+    \State $S(\mdx{1}{n},\mdx{1}{r}),\beta'(\mdx{1}{r}) = $
+    \Call{qrfac}{$R^T(\mdx{1}{r},\mdx{1}{n})$}
+    \State $U(\mdx{1}{n},\mdx{1}{n})=$ \Call{qform}{$S(\mdx{1}{n},\mdx{1}{r}),\beta'(\mdx{1}{r})$}
+    \State $z(\mdx{1}{r}) = $ \Call{lsol}{$S(\mdx{1}{r},\mdx{1}{m}),q(\mdx{1}{r})$}
+    \State \Return $x = \Pi^T U(:,\mdx{1}{r}) z(\mdx{1}{r}) $
+    \EndIf
+    \EndIf
+
+    \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+
+
+\subsection{A basic solution of linear system with a rank deficient matrix}
+\label{subsec:basic}
+
+We know that rank deficient matrix has no unique solution.
+The class of the possible solutions is usually described
+with help of a slack variable, known as a parameter,
+for analytical solutions.
+
+The parametric solution approach is not suitable for a numerical
+solution. It is reason than one adds an additional information
+to select some particular solution. A basic solution is developed
+in this section, while next section describes a solution
+with the minimal norm.
+
+A solution of rank deficient problems has started by column pivoted
+QR factorisation $A \Pi = QR, Q^{-1} = Q^T$. The pivoting process sorts columns
+by size of diagonal elements
+$\lvert R_{11} \rvert \ge \lvert R_{22} \rvert \ge \ldots \ge \lvert R_{mm} \rvert $.
+Potentially linearly dependent columns has the diagonal elements close
+to the machine epsilon $\varepsilon$. In such case, a condition
+($\tau > 1$), says
+\begin{equation}
+  \lvert R_{ii} \rvert < \tau \varepsilon \lvert R_{11} \rvert
+\end{equation}
+can be used to reveal a numerical rank of the matrix. We will
+denote the rank, an index of a last non-zero diagonal element in numerical
+sense, by $r$,
+
+Let $r \in \mathcal{N}$ is the rank of matrix $A$,
+the last index for which
+$\lvert R_{rr} \rvert > \varepsilon \lvert R_{11} \rvert$.
+The pivoting process will split the matrix $R$, and the system, on two parts
+\begin{equation}
+  A \Pi = Q
+  \begin{pmatrix*}[c]
+    R_{11}, & R_{12}, \\
+    0 & 0
+  \end{pmatrix*}.
+\end{equation}
+with $R_{11} \in \mathcal{R}^{r \times r}, R_{12} \in \mathcal{R}^{r \times m-r}$.
+The least square approach requires
+\begin{equation}
+  \lVert Ax - b\rVert_2^2 = \lVert (Q^T A \Pi) (\Pi x) - (Q^Tb) \rVert_2^2
+  = \lVert R_{11} y (c - R_{12} z) \rVert_2^2 + \lVert  d \rVert_2^2,
+\end{equation}
+where
+\begin{equation}
+  \Pi^T x =
+  \begin{pmatrix*}[c]
+    y,\\
+    z
+  \end{pmatrix*},
+  \qquad
+  Q^T b =
+  \begin{pmatrix*}[c]
+    c,\\
+    d
+  \end{pmatrix*}.
+\end{equation}
+The solution is
+\begin{equation}
+  x_B = \Pi
+  \begin{pmatrix*}[c]
+    R_{11}^{-1} (c - R_{12} z),\\
+    z
+  \end{pmatrix*}.
+\end{equation}
+Ones calls $x_\mathrm{B}$ solution as a basic solution. The basic solution
+is no solution in least square sense, except case $R_{12}=0$.
+
+
+\subsection{A solution in least square sense by a complete orthogonal decomposition}
+\label{subsec:lsrank}
+
+The least square solution of rank deficient matrix
+can be found by application of a dark magic trick.
+If we continue with the revealed information from previous
+paragraph \ref{subsec:basic}, the rectangular matrix
+has dimensions $r \times m$. We can transform the matrix on the least
+square solution studied in Section~\ref{sec:lsqrt} by a matrix transposition
+having dimensions $m \times r, r \le m$.
+
+By the way, we apply again the QR factorisation on already factored
+transposed triangle of $R$: $R^T = US$
+\begin{equation}
+  \begin{pmatrix*}[c]
+    R_{11}^T,\\
+    R_{12}^T
+  \end{pmatrix*}
+  = U
+  \begin{pmatrix*}[c]
+    S_1,\\
+    0
+  \end{pmatrix*}
+\end{equation}
+and so the system $A \Pi  x=b$ can be rewritten on $R \Pi x = Q^T b$,
+and than on
+\begin{equation}
+  S_1 z = Q^T b
+\end{equation}
+and so
+\begin{equation}
+  \Pi x_{\mathrm{LS}} = U z
+\end{equation}
+Finally, the permutation should be inverted $x = u(p).$
+
+This way factorises a matrix on two orthogonal spaces described
+by $U,V$ matrices, or more exactly
+\begin{equation}
+  A = U
+  \begin{pmatrix*}[c]
+    T_{11}, & 0\\
+    0, & 0
+  \end{pmatrix*}
+  V^{-1}
+\end{equation}
+where $V = \Pi Q$, and we are identifying $T_{11} = S_1^T$.
+The process is known as the complete orthogonal decomposition.
+
+This framework gives exactly the same solution as well-known SVD,
+by significantly cheaper way: The number of operations required
+for a single QR run is $~2 n^3/3$ compared to $~12n^3$
+(\cite{golub2013matrix}, p.~293). The drawback of SVD
+is the interactive algorithm and more deep matrix analysis ---
+singular values (eigenvalues) and eigenvectors are hard to find.
+By the way, a natural choice for a quick solution of systems with
+a (potentially) rank-deficient matrix is the described complete
+orthogonal decomposition.
+
+
+\begin{algorithm}
+  \caption{Solution of $Lx=q$ with back-substitution}
+  \label{alg:lsol}
+  \begin{algorithmic}
+    \Function{lsol}{$L,q$}
+    \State \Comment{Let $L \in \mathcal{R}^{m \times n}, q,x \in \mathcal{R}^n$}
+
+    \For{$\, i = 1, \ldots, m$}
+    \State $x(i) = [q(i) - L(\mdx{1}{i-1},i)^T \cdot x(\mdx{1}{i-1})] / L(i,i)$
+    \EndFor
+    \State \Return $x$
+    \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+  \caption{Determine rank of a matrix}
+  \label{alg:rank}
+  \begin{algorithmic}
+    \Function{rank}{$R,\tau$}
+    \State \Comment{Let $R \in \mathcal{R}^{m \times n}, \tau > 0 \in \mathcal{R}$}
+    \State $r = 0$
+    \For{$\, i = 1, \ldots, m$}
+    \If{$\, \lvert R(i,i) \rvert < \tau$}
+    \State \Return $r$
+    \EndIf
+    \State $r = i$
+    \EndFor
+    \State \Return $r$
+    \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+
+\section{About a matrix inversion}
+
+Let $A \in \mathcal{R}^{m \times m}$ is a square matrix. The inverse matrix
+satisfies these conditions
+\begin{equation}
+  \label{eq:invcond}
+  A A^{-1} = I, \quad A^{-1} A = I.
+\end{equation}
+
+Let $A$ is a full rank matrix. A way for computing of inverse matrix
+is a solution of series of linear equations with unit vectors.
+The unitary matrix $I$ has unit vectors $e_j$ in columns (rows).
+By the way, for $j$-th column of $a_j = A_j^{-1}$, we have this linear
+system
+\[
+A a_j = e_j, \qquad j=1, \ldots, n.
+\]
+which can be solved for $n$ times to fill $a_j = A_j^{-1}$.
+This is just a direct generalisation of methods mentioned in
+previous section~\ref{sec:lineq}.
+
+Note that solving systems for coordinate vectors $e_i$ removes the need for
+the matrix multiplication of right side:
+all elements $e_j$ are zeros except the one in $j$-th row:
+\[
+Q^T e_j = Q^T(:,j),
+\]
+so the operation just selects the appropriate column of $Q$
+
+The rank deficient problems, or problems with non-square matrix,
+can be maintained by similar way as we study in the solutions
+of Sect.~\ref{subsec:lsrank}.
+The result will no more satisfy conditions (\ref{eq:invcond});
+they are replaced by the conditions:
+\[
+A A^+ A = A, \ A^+ A A^+ = A^+, \  (A A^+)^T = A A^+, \ (A^+ A)^T = A^+ A.
+\]
+Such matrix is known as pseudo-inverse matrix
+$A^+$ having minimal Frobenius norm
+\[
+\lVert A A^+ - I \rVert_F.
+\]
+The pseudo-inverse is very suitable to estimate of
+a covariance (sub-)matrix.
+The final algorithm~\ref{alg:qrinv} works for both full-rank
+and rank deficient systems.
+
+\begin{algorithm}
+  \caption{(Pseudo-)Inverse of a matrix}
+  \label{alg:qrinv}
+  \begin{algorithmic}
+    \Function{qrinv}{$A,A^{-1},\tau$}
+    \State \Comment{Let $A,A^{-1},A^+ \in \mathcal{R}^{m \times n},
+      x,b \in \mathcal{R}^m, \tau > 1 \in \mathcal{R}$}
+    \State \Comment{Auxiliary variables: $Q,U,W \in \mathcal{R}^{m \times n},
+      \Pi \in \mathcal{N}^{m \times m},
+      z,q,\beta,\beta' \in \mathcal{R}^m$}
+
+    \State $R,\beta,\Pi = $ \Call{qrpivot}{$A$}
+    \State $Q = $ \Call{qform}{$R,\beta$}
+    \State $r = $ \Call{rank}{$A, \tau \varepsilon \lvert R(1,1) \rvert$}
+
+    \If{$\, r =  m$}
+    \For{$\, i = 1, \ldots, m$}
+    \State $z =$ \Call{rsol}{$R,Q(i,:)$}
+    \State $A^{-1}(:,i) = \Pi^T z$
+    \EndFor
+    \State \Return $A^{-1}$
+    \ElsIf{\, $r < m$}
+    \State $S(\mdx{1}{n},\mdx{1}{r}),\beta'(\mdx{1}{r}) = $
+    \Call{qrfac}{$R(\mdx{1}{r},\mdx{1}{n})^T$}
+    \State $U(\mdx{1}{n},\mdx{1}{n})=$
+    \Call{qform}{$S(\mdx{1}{n},\mdx{1}{r}),\beta'(\mdx{1}{r})$}
+    \For{$\, i = 1, \ldots, n$}
+    \State $z(\mdx{1}{r}) = $ \Call{lsol}{$S(\mdx{1}{r},\mdx{1}{r}),Q(i,\mdx{1}{r})$}
+    \State $A^+(:,i) = \Pi^T U(:,\mdx{1}{n}) z$
+    \EndFor
+    \State \Return $A^+$
+    \EndIf
+    \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+
+
+
+\section{Eigenvalues and eigenvectors of a symmetric matrix}
+
+The framework of QR factorisation can be utilised also
+on a problem of determination of eigenvalues and
+eigenvectors of a symmetric square matrix $A \in \mathcal{R}^{n \times n}$.
+Eigenvalues $\lambda$ are roots of a characteristics
+polynomial taken from determinant of a matrix
+\begin{equation}
+  \lvert A  - \lambda I \rvert = 0.
+\end{equation}
+Counts of the roots is exactly the order of the polynomial $n$.
+The roots are real numbers $\lambda_i \in \mathcal{R}$ for
+symmetric real matrices.
+
+An eigenvector $z_i \in \mathcal{R}^n$ is a vector, which is associated
+to every eigenvalue via a solution of the system of equations
+\begin{equation} \label{eg:eigenvec}
+  A z_i = \lambda_i z_i, \quad i = 1, \ldots n.
+\end{equation}
+The eigenvectors are orthogonal each other $z_i \perp z_j, z_i^T \cdot z_j = 0$.
+
+The characteristic polynomial has analytic solution only
+up to order three. All others roots should be, in principle,
+found by an iterative technique. That is the reason, why I am
+limiting only on symmetric problems having efficient methods developed;
+fortunately, only such kind of problems is encountered in field of optimisation.
+
+The basic Algorithm~\ref{alg:power} for determination of eigenvalues is
+on base of the power method (cite?): reiteration of QR factorisation.
+Eigenvalues are then computed by direct solution of (\ref{eg:eigenvec});
+the system is singular by definition, so I use the parametric solution
+for the demonstration.
+
+
+\begin{algorithm}
+  \caption{Outline for determination of eigenvalues and vectors}
+  \label{alg:power}
+  \begin{algorithmic}
+    \State \Comment{Let $A,Q,R,\Lambda,Z \in \mathcal{R}^{m \times n}, b \in \mathcal{R}^n$}
+    \State $\Lambda = A$
+    \For{$\; k = 1, \ldots$}
+    \State $Q,R = $ \Call{qrfac}{$\Lambda$}
+    \State $\Lambda = Q R$
+    \State $d = \max\{\lvert \Lambda_{\div} \rvert\}$,
+    $\Lambda_{\div}$ denotes off-diagonal elements
+    \State Finish when $d$ is under a tolerance
+    \EndFor
+    \For{$\; i = 1, \ldots, n$}
+    \State $Q,R = $ \Call{qrfac}{$A - \lambda_i I$}
+    \State $Z_{ni} = \lVert \{ R_{ii}, i = 1, \ldots, n \} \rVert_2$
+    \For{$\; j = n-1, \ldots, 1$}
+    \State $Z_{ji} = -[R(j,\mdx{j+1}{n})^T \cdot Z(j,\mdx{j+1}{n})] / R_{jj}$
+    \EndFor
+    \State $Z_i = Z_i / \lVert Z_i \rVert_2$, for a non-zero vector
+    \EndFor
+    \State $\lambda_i = \{ \Lambda_{ii}, i = 1, \ldots, n \}$
+    \State \Return $\lambda, Z$
+  \end{algorithmic}
+\end{algorithm}
+
+The drawbacks of the algorithm ~\ref{alg:power} are:
+the slow convergence, and the needs for additional eigenvectors computations.
+There is again an effective way how to compute both eigenvalues and vectors,
+like in case of QR factorisation.
+The algorithm, described in this section,
+computes both values and vectors simultaneously
+within a minimal number of iterations.
+
+
+\section[An effective eigenvalue decomposition]{An effective algorithm for
+  determination of eigenvalues and eigenvectors of a symmetric matrix on base
+  of QR factorisation}
+
+Today convenient algorithms are on base of application of elementary
+rotations which nullifies off-diagonal elements: if the elemental rotation
+are applied repeatedly, they effective transforms an original matrix
+onto diagonal form:
+\begin{equation}
+  D = Z^T A Z.
+\end{equation}
+The matrices $Z$ contains eigenvectors, while eigenvalues are
+on the diagonal. As for QR factorisation, it is possible to
+save a computer memory and store appropriate matrices in which
+are overwrote.
+
+%transformace, ukazka vypoctu definice parametru
+
+
+
+The elementary rotations --- known as Givens transformation ---
+are the matrices:
+\begin{equation}
+  \begin{pmatrix*}[c]
+    1,     & \cdots & 0,     & \cdots & 0,     & \cdots & 0,\\
+    \vdots & \ddots & \vdots & {}     & \vdots & {}     & \vdots\\
+    0,     & \cdots & c,     & \cdots & s,     & \cdots & 0,\\
+    \vdots & {}     & \vdots & \ddots & \vdots & {}     & \vdots\\
+    0,     & \cdots & -s,    & \cdots & c,     & \cdots & 0,\\
+    \vdots & {}     & \vdots & {}     &\vdots  & \ddots & \vdots\\
+    0,     & \cdots & 0,     & \cdots & 0,     & \cdots & 1\\
+  \end{pmatrix*}.
+\end{equation}
+If we know the coordinates $x,y$, the rotation, the angle in $-\pi \ldots \pi$
+can be determined as Algorithm~\ref{alg:givens} summarises.
+
+\begin{algorithm}
+  \caption{Givens rotation}
+  \label{alg:givens}
+  \begin{algorithmic}
+    \Function{givens}{$x,y$}
+    \If{$\; \lvert y \rvert < \varepsilon$}
+    \State $c = 1, s = 0$
+    \Else
+    \If{$\; \lvert y \rvert > \lvert x \rvert$}
+    \State $\tau = -x/y, s = 1 / \sqrt{1 + \tau^2}, c = s \tau$
+    \Else
+    \State $\tau = -y/x, c = 1 / \sqrt{1 + \tau^2}, s = c \tau$
+    \EndIf
+    \EndIf
+    \State \Return $c,s$
+    \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+
+
+
+
+
+\subsection{Householder tri-diagonalisation}
+\label{subsec:housetridig}
+
+Every symmetric matrix can be transformed by application of Householder
+rotations onto tri-diagonal matrix. The transformation applies equivalent
+matrices which does not changes eigenvalues. If we are able to collect
+the transformations, we can determine eigenvectors. The tri-diagonalisation
+significantly simplifies consecutive iteration process via QR factorisation.
+
+
+\begin{algorithm}
+  \caption{Householder tri-diagonalisation}
+  \label{alg:housetridig}
+  \begin{algorithmic}
+    \Function{housetridig}{$A$}
+    \State \Comment{Let $A,T \in \mathcal{R}^{n \times n}, a\in \mathcal{R}^n, b \in \mathcal{R}^{n-1},$}
+    \State \Comment{An auxiliary variables: $p,v,w,u,\beta \in \mathcal{R}^n$}
+    \State $T=A$
+    \For{$\; k =  1, \ldots, n-2$}
+    \State $v(\mdx{k+1}{n}), \beta_k$ = \Call{housevec}{$T(\mdx{k+1}{n},k)$}
+    \State $p(\mdx{k+1}{n}) = \beta_k T(\mdx{k+1}{n},\mdx{k+1}{n}) \cdot v(\mdx{k+1}{n})$
+    \State $r = \beta_k [p(\mdx{k+1}{n})^T \cdot v(\mdx{k+1}{n})] / 2$
+    \State $w(\mdx{k+1}{n}) = p(\mdx{k+1}{n}) - r v(\mdx{k+1}{n})$
+    \State $T_{k+1,k} = T_{k,k+1} = \lVert T(\mdx{k+1}{n},k) \rVert_2$
+    \For{$\; i = k+1, \ldots, n, \, j = k+1, \ldots, n$}
+    \State $T_{i,j} = T_{i,j} - v_i w_j - w_i v_j$
+    \EndFor
+    \If{$\; k > 1$}
+    \State $T(\mdx{k+1}{n},k-1) = u(\mdx{k+1}{n})$
+    \EndIf
+    \State $u(\mdx{k+1}{n}) = v(\mdx{k+1}{n})$
+    \EndFor
+
+    \If{$\; n > 2$}
+    \State $T_{n,n-2} = u_n$
+    \EndIf
+    \State $a = \{ T_{ii}, i = 1, \ldots, n \}$
+    \State $b = \{ T_{i,i+1}, i = 1, \ldots, n-1 \}$
+    \State $T(\mdx{n-1}{n},\mdx{n-1}{n}) = I$
+
+    \For{$\; k = n-2, \ldots, 1$}
+    \State $v(\mdx{k+1}{n}) = (1, T(\mdx{k+2}{n},k))^T$
+    \State $T_{kk} = 1$
+    \State $T(\mdx{k+1}{n}, k) = T(k,\mdx{k+1}{n}) = 0$
+    \State $w(\mdx{k+1}{n}) = \{ [T(\mdx{k+1}{n},i)^T \cdot v(\mdx{k+1}{n})] , i = k+1, \ldots, n \}$
+    \State $u(\mdx{k+1}{n}) = \beta_k v(\mdx{k+1}{n})$
+    \For{$\; i = k+1, \ldots, n, \, j = k+1, \ldots, n$}
+    \State $T_{i,j} = T_{i,j} - w_j u_i$
+    \EndFor
+    \EndFor
+    \State Returns $a,b,T$
+    \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+
+The result is a symmetric tri-diagonal matrix and a matrix storing
+the transformations. The economy use of memory follows ideas developed
+for QR factorisation. The tri-diagonal matrix is can be stored in
+two vectors $a \in \mathcal{R}^n, b \in \mathcal{R}^{n-1}$:
+\begin{equation}
+  \begin{pmatrix*}[c]
+    a_1, & b_1,   & 0,   & 0        & \ldots, & 0\\
+    b_1, & a_2,   & b_2, & 0        & \ldots, & 0\\
+    0,   & b_2,   & a_3, & b_3,     & \ldots, & 0\\
+  \vdots & {}     & \ddots & \ddots & \ddots  & \vdots\\
+    0,   & \dots, & 0,   & b_{n-2}  & a_{n-1}, & b_{n-1}\\
+    0,   & \dots, & 0,   & 0       & b_{n-1}, & a_n\\
+  \end{pmatrix*}.
+\end{equation}
+
+
+
+\subsection{Wilkinson shift}
+
+
+\begin{algorithm}
+  \caption{Implicit symmetric Francis QR step with Wilkinson shift}
+  \label{alg:qrstep}
+  \begin{algorithmic}
+    \Function{qrstep}{$a,b,Q$}
+    \State \Comment{Let $Q \in \mathcal{R}^{n \times n}, a\in \mathcal{R}^n, b \in \mathcal{R}^{n-1},$}
+
+    \State $d = (a_{n-1} - a_n) / 2$
+    \State $\mu = a_n - b_{n-1}^2 / [d + \sign(d) \lVert (d,b_{n-1}) \rVert_2]$
+    \State $x = a_1 - \mu$
+    \State $y = b_1$
+    \For{$\; k = 1, \ldots, n-1$}
+    \State $c,s =$ \Call{givens}{$x,y$}
+    \State $u = a_k, v = a_{k+1}, w = 2 c s b_k$
+    \State $a_k = c^2 u + s^2 v - w$
+    \State $a_{k+1} = c^2 v + s^2 u + w$
+    \State $b_k = (c^2 - s^2) b_k + cs(u-v)$
+    \State $b_{k-1} = cx - sy$, if $k>1$
+    \If{$\; k < n-1$}
+    \State $x = b_k, y = -sb_{k+1},b_{k+1} = c b_{k+1}$
+    \EndIf
+    \State $Q(\mdx{1}{n}, \mdx{k}{k+1}) = Q(\mdx{1}{n}, \mdx{k}{k+1}) \begin{pmatrix*}[r] c, & s,\\ -s, & c \end{pmatrix*}$
+    \EndFor
+    \State Returns modified $a,b,Q$
+    \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+
+Algorithm~\ref{alg:qrstep} is adapted for the tri-diagonal
+matrix discussed in~\ref{subsec:housetridig}. The key operation
+is the Givens rotation applied on the matrix:
+\[
+  \begin{pmatrix*}[c]
+    c, & s \\
+    s, & c \\
+  \end{pmatrix*}
+  \begin{pmatrix*}[c]
+    T_{kk}, & T_{k,k+1} \\
+    T_{k+1,k}, & T_{k+1,k+1} \\
+  \end{pmatrix*}
+  \begin{pmatrix*}[c]
+    c, & s \\
+    -s, & c \\
+  \end{pmatrix*}.
+\]
+The application make a new non-zero element out of the tri-diagonal;
+unfortunately, the immediate step will nullify then. The anomaly
+is moved from up to down and will vanish after the last operation,
+leaving clear tri-diagonal.
+
+If the $a, b$ representation is used, the non-zero element should
+by treated separately. The transformation
+\begin{equation}
+  \begin{pmatrix*}[c]
+    1, & 0, &  0, & 0\\
+    0, & c, & -s, & 0\\
+    0, & s, &  c, & 0\\
+    0, & 0, &  0, & 1
+  \end{pmatrix*}
+  \begin{pmatrix*}[c]
+    a_{k-1}, & b_{k-1}, &  z, & 0\\
+    b_{k-1}, & a_k, &    b_k, & 0\\
+    z, & b_k, &  a_{k+1}, & b_{k+1}\\
+    0, & 0, & b_{k+1}, & a_{k+1}
+  \end{pmatrix*}
+  \begin{pmatrix*}[c]
+    1, & 0, &  0, & 0\\
+    0, & c, &  s, & 0\\
+    0, &-s, &  c, & 0\\
+    0, & 0, &  0, & 1
+  \end{pmatrix*}
+\end{equation}
+leads to the resultant matrix
+\begin{equation}
+  \begin{pmatrix*}[c]
+    a_{k-1}, & cb_{k-1} - sz, & sb_{k-1} + zc, & 0\\
+    cb_{k-1} - sz, & a_k', & b_k', & -sb_{k+1}\\
+    sb_{k-1}+cz, & b_k', & a_{k+1}', & cb_{k+1}\\
+    0, & -sb_{k+1}, & c b_{k+1}, & a_{k+2}
+  \end{pmatrix*},
+\end{equation}
+where the updated elements of the tri-diagonal are
+\begin{align}
+  a_k' =& c^2 a_k + s^2 a_{k+1} - 2csb_k,\\
+  a_{k+1}' =& c^2 a_{k+1} + s^2 a_k + 2csb_k,\\
+  b_k' =& (c^2 - s^2) b_k + cs (a_k - a_{k+1}).
+\end{align}
+We also see that there are conditions
+\begin{equation}
+  b'_{k-1} = c b_{k-1} - s z, \qquad b'_{k+1} = c b_{k+1}.
+\end{equation}
+
+
+
+\subsection{A deflation}
+
+A selecting of suitable sub-matrix during iterative process is know as deflation
+or bounding. The off-diagonal elements of tri-diagonal matrix represented by
+$b$ are nullified from the end or begin. An immediate matrix looks like
+\begin{equation}
+  \begin{pmatrix*}[c]
+    a_1, & <\varepsilon,   & 0,   & 0        & \ldots, & 0\\
+    <\varepsilon, & a_2,   & b_2, & 0        & \ldots, & 0\\
+    0,   & b_2,   & a_3, & b_3,     & \ldots, & 0\\
+    \vdots & {}     & \ddots & \ddots & \ddots  & \vdots\\
+
+    0,   & \dots, & 0,   & <\varepsilon  & a_{n-1}, & <\varepsilon\\
+
+    0,   & \dots, & 0,   & <\varepsilon  & a_{n-1}, & <\varepsilon\\
+    0,   & \dots, & 0,   & 0       & <\varepsilon, & a_n\\
+  \end{pmatrix*}.
+\end{equation}
+With removed the already diagonalised leading and tailing sub-matrices,
+the computation speed can be improved, and numerical errors suppressed.
+
+
+
+\begin{algorithm}
+  \caption{Determines eigenvalues and eigenvectors.}
+  \label{alg:qreig}
+  \begin{algorithmic}
+    \Function{qreig}{$A,\lambda,Z$}
+    \State \Comment{Let $A,Q \in \mathcal{R}^{n \times n},
+      \lambda,a\in \mathcal{R}^n, b \in \mathcal{R}^{n-1},$}
+    \State $a,b,Q =$ \Call{housetridig}{$A$}
+    \State $l = 1$
+    \State $m = n$
+    \For{$\; k = 1, \dots$}
+    \For{$\; i = 2, \ldots, n-1$}
+    \State $\delta(i) = \varepsilon(\lvert a_i \rvert + \lvert a_{i+1} \rvert)$
+    \EndFor
+    \For{$\; i = 2, \ldots, n-1$}
+    \If{$\; \lvert b_i \rvert > \delta_i \; \text{and} \;
+      \lvert b_{i-1} \rvert < \delta_{i-1}$}
+    \State $l = i$
+    \EndIf
+    \If{$\; \lvert b_i \rvert < \delta_i \; \text{and} \;
+      \lvert b_{i-1} \rvert > \delta_{i-1}$}
+    \State $l = i$
+    \EndIf
+    \EndFor
+
+    \If{$\; m > l$}
+    \State \Call{qrstep}{$a(\mdx{l}{m}),b(\mdx{l}{m-1}),Q(\mdx{1}{n},\mdx{l}{m-1})$}
+    \EndIf
+
+    \State Finish, if $m - l = 1$
+    \EndFor
+    \State $\lambda = a$
+    \State Returns modified $\lambda,Q$
+    \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+
+
+
+%\section{John F. Francis}
+
+
+\section{Bibliography notes}
+\label{sec:qrbiblio}
+
+The textbook of {} \textcite{ralston2012first} gives an introduction into
+whole field of numerical mathematics including matrix decomposition itself.
+\cite{golub2013matrix} is a comprehensive summary of general computation
+methods of linear algebra; Lapack computer library\footfullcite{website:lapack}
+is also based on the book.
+
+There are many excellent on-line resources: blogs, documents or forums.
+Mr. Higham\footfullcite{website:nhigham} provides the valuable collection
+of related articles on his website.
+Curses\footfullcite{website:arbenz} by Mr. Arbenz was been very helpful
+for me during the implementation phase.
+
+
+\printbibliography[heading=subbibliography]
+\end{refsection}

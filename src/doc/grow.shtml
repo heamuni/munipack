@@ -1,0 +1,147 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Grow-curve</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Grow Curve</h1>
+
+<p class="abstract">
+  Grow curve is derived as an approximation of the flux
+  of stars in increasing apertures.
+</p>
+
+
+<h1>The Definition</h1>
+
+<p>
+  Lets <i>I(r,φ)</i> is a distribution of the intensity of a star.
+  A flux inside radius <i>R</i> will be <i>F(R)</i>:
+</p>
+<p>
+  <i>F(R) =∫<sub>0</sub><sup>R</sup> I(r,φ) dr dφ </i>
+</p>
+<p>
+  The growth-curve is defined as the radial flux dependency with
+  limit <i>f(∞) = 1</i>. The property <i>F(∞) = F<sub>0</sub>f(∞)</i>
+  defines total flux of the star as <i>F<sub>0</sub></i>.
+  By another words, this is a flux in the infinite aperture
+  without another stars (sources).
+</p>
+
+<p>
+  Lets observed intensity on CCD is <i>I<sub>ij</sub></i>
+  inside <i>R</i> aperture defines the empirical radial flux distribution
+</p>
+<p>
+  <i>
+  F<sub>R</sub> = ∑<sub>ij</sub> (I<sub>ij</sub> - B<sub>ij</sub>),
+  </i>
+</p>
+<p>
+  for <i>√(i<sup>2</sup> + j<sup>2</sup>) ≤ R</i>
+The sum counts photons in radius around a centre of a star.
+The observed intensity contains photons from the star added to photons
+from background <i>B<sub>ij</sub></i> which must be subtracted.
+  When the value of background is poorly estimated, the
+  flux is also affected.
+</p>
+
+
+
+<h1>The Construction</h1>
+
+<p>
+  An empirical growth curve <i>f<sub>i</sub></i> at radii
+  <i>r<sub>i</sub></i> and areas <i>A<sub>i</sub> = π r<sub>i</sub><sup>2</sup></i>
+  is
+</p>
+<p>
+  <i>
+  F<sub>i</sub> = F<sub>0</sub> f<sub>i</sub> + β A<sub>i</sub>
+  </i>
+</p>
+<p>
+  <i>F<sub>i</sub></i> are measurements of fluxes at a set
+  suitably distributed apertures. The effective half-radius
+  (half of FWHM) can be used to estimate the aperture with
+  minimal noise and background contamination: 2 ‒ 3 FWHM.
+  For apertures smaller then the optimal, the growth-curve
+  can be estimated as
+</p>
+<p>
+  <i>
+  f<sub>i</sub> = (F<sub>i</sub> - β A<sub>i</sub>) /
+  (F<sub>i+1</sub> - β A<sub>i+1</sub>) f<sub>i+1</sub>
+  </i>
+</p>
+<p>
+  and for larger radii as
+</p>
+<p>
+  <i>
+    f<sub>i</sub> = (F<sub>i</sub> - β A<sub>i</sub>) / F<sub>0</sub>.
+  </i>
+</p>
+<p>
+  The determination is choice with respect to minimise
+  statistical errors. For proper estimate of the parameters,
+  the use of bright stars is recommended.
+</p>
+
+
+<h1>Properties</h1>
+
+
+<p>
+  Grow curves are preferred against to pure aperture photometry:
+</p>
+<ul>
+  <li>They gives total flux.</li>
+  <li>They are averaged.</li>
+</ul>
+
+<p>
+  The total flux is more invariant quantity than pure flux in
+  aperture because it is independent on actual shape of star image
+  which is changed due to atmospheric conditions, telescope
+  image deformation and specially on airmass. The measurements
+  of extinction and absolute calibration requires the total flux.
+</p>
+
+<p>
+  The total flux is derived from more than one aperture, therefore
+  the values are less affected by unexpected errors. The results
+  has less noise.
+</p>
+
+
+<img style="display: block; margin-left: 2em; margin-top:1em; margin-right: 0;" src="grow_curve_anotated.svg" alt="Grow Curve" title="Grow Curve">
+
+<h1>Aperture Correction</h1>
+
+Aperture correction is a procedure which converts value from a finite
+aperture to total flux. Growth curve can be used to derive the correction.
+
+Generally, the grow curve method superseded the aperture correction
+because use of more apertures together and correct estimate of background.
+
+
+<h2>See Also</h2>
+
+
+<p>
+Manuals:
+<a href="man_aphot.html">Aperture Photometry</a>.
+Data Formats:
+<a href="dataform_proc.html">Format of Processing File</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

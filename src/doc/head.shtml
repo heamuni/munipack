@@ -1,0 +1,29 @@
+<header>
+  <a href="munipack.html"><img src="big_logo.png" alt="Munipack's logo" class="head"></a>
+  <div class="headtitles">
+    <p class="head">
+      <a class="headtitle" href="munipack.html">Munipack</a>
+    </p>
+    <p class="head">
+      <a class="headsubtitle" href="munipack.html">The astronomical image processing software</a>
+    </p>
+  </div>
+  <div class="buttons">
+    <a href="guide.html" class="button">
+      <div class="bicon">
+	📘
+      </div>
+      <div class="hide">
+	Guide
+      </div>
+    </a>
+    <a href="docs.html" class="button">
+      <div class="bicon">
+	📁
+      </div>
+      <div class="hide">
+	Documents
+      </div>
+    </a>
+  </div>
+</header>

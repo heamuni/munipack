@@ -1,0 +1,599 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Colour processing</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1 class="noindent">Colour processing</h1>
+
+<p class="abstract">
+There are described basic principles and algorithms used
+for colour processing.
+</p>
+
+<figure>
+<img class="figure" alt="color-best.png" src="color-best.png">
+</figure>
+
+<p>
+<a href="https://integral.physics.muni.cz/ftp/munipack/munipack-data.tar.gz" class="download">Sample data</a>
+</p>
+
+<h2>What's colour?</h2>
+
+<p>
+As a colour one can consider a perception of a spectral property of reflected
+or illuminated light by the human eye. Our goal is to detect, to process and
+to display pictures by a such way, which correctly reproduces colours
+of the original scene.
+</p>
+
+<p>
+The colour si derived from a spectral property of reflected
+light by an object, while the colour vision is a product of processing
+of the light by both the human eye and brain.
+The right colour can't be determined objectively by an instrument,
+it is fully determined by human perception itself.
+</p>
+
+<p class="indent">
+The meaning of the colour in objective terms can be specified more precisely:
+the colour is determined by proper composition of light bands transmitted
+throughout exactly defined set of filters. The filters
+approximates colour perception of receptors of human eye defined by
+<a href="https://en.wikipedia.org/wiki/CIE_1931_color_space">CIE 1931 XYZ</a>.
+By the description, the colour processing is focused to provide
+the most close approximation of human colour perception.
+</p>
+
+<p class="indent">
+The astronomical terminology is more vague. "Colour" means
+a light flux in any filter, not necessary, in a filter appropriate
+to human receptor sensitivity.
+</p>
+
+
+<h2>Colour reproduction</h2>
+
+<p>
+The common method of reproduction of colours is RGB colour model for
+emitting devices. The RGB colour emitters has distinct
+spectral sensitivity as human eye, original colours
+should be transformed to the colour space.
+</p>
+
+<h2>Colour approximation</h2>
+
+<p>
+Munipack is designed to handle colours as
+correctly as possible. There is effort to display of images
+by colours perfectly reconstructing of the original scene.
+The authenticity can be limited just only by the used hardware.
+</p>
+
+<p class="indent">
+Light fluxes acquired by an instrument like an astronomical CCD camera
+are usually different from ones of display devices. The display devices
+uses sRGB (PC-type hardware) or Adobe RGB (Apple) opposite to Johnson
+UBVRI colour system. Therefore, we need transform the colour data each other.
+Without the transformation, the colours will strongly deformed.
+</p>
+
+<p class="indent">
+The primary colour space of Munipack is CIE XYZ which is practically
+colour space of the human eye.
+</p>
+
+
+<p class="indent">
+Munipack can display only colour FITSes as is <a href="colourfits.html">specified.</a>
+There is no widely accepted colour FITS definition so colour FITSes can be
+created just only by Munipack utilities. Please, be consentient that the
+definition can be changed at any time in future.
+</p>
+
+
+<h1>Colour processing</h1>
+
+<p>
+The colour processing is based on working in colour spaces. Internally,
+Munipack uses
+<a href="https://en.wikipedia.org/wiki/CIE_1931_color_space">CIE 1931 XYZ</a>
+and
+<a href="https://en.wikipedia.org/wiki/CIELUV_color_space">CIE 1976 L*u*v*</a>
+colour spaces. An input data
+in another colour space are transformed to CIE 1931 XYZ. The display is in a
+<a href="https://en.wikipedia.org/wiki/RGB_color_model">RGB</a> space.
+</p>
+
+<p class="indent">
+The colour processing in Munipack starts with loading of colour FITS.
+The software automatically recognize the type of colour space by reading
+of CSPACE keyword in FITS header.
+</p>
+
+<h2>Prescaling</h2>
+<p>
+When the type is different from XYZ, the data need to be transformed to
+XYZ. In this case, the first step is prescaling of values. It is the
+optional step, but usually required for best results. Main goal
+of prescaling is to give the same flux from a white object in
+different filters. Unfortunately, the fluxes are violated by
+a different background and detector sensitivity or exposure time.
+In light polluted industrial localities, the main source of
+pollution are sodium lamps. The background for example in blue
+or red filters is affected differently and we need light of the
+object not, background. Munipack pre-estimate background levels
+as the median subtracted by 1-sigma. The fine tuning needs an user
+experience. The weight of every channel is not pre-estimated by any way.
+The guide can be for example exposure time, but it may be also derived
+from the telescope aperture, atmospheric conditions. etc. The
+prescaling can be omitted (level =0, weight = 1 for all bands).
+</p>
+<p>
+  <i>
+  B'<sub>ij</sub> = w<sub>B</sub> (B<sub>ij</sub> - B<sub>0</sub>),<br>
+  V'<sub>ij</sub> = w<sub>V</sub> (V<sub>ij</sub> - V<sub>0</sub>),<br>
+  R'<sub>ij</sub> = w<sub>R</sub> (R<sub>ij</sub> - R<sub>0</sub>).
+</i>
+</p>
+
+
+<div class="twocolumn">
+  <div class="column">
+    <figure>
+      <img src="colorB1.png" alt="colorB1.png" style="width:382px;" class="figure">
+      <figcaption>B<sub>0</sub> = V<sub>0</sub> = R<sub>0</sub> = 2000</figcaption>
+    </figure>
+    <figure>
+      <img src="color-best.png" alt="color-best.png" style="width:382px;" class="figure">
+      <figcaption>B<sub>0</sub> = 3700, V<sub>0</sub> = 9300,
+	R<sub>0</sub> = 20000</figcaption>
+    </figure>
+  </div>
+  <div class="column">
+    <figure>
+      <img src="colorB2.png" alt="colorB2.png" style="width:382px;" class="figure">
+      <figcaption>B<sub>0</sub> = V<sub>0</sub> = R<sub>0</sub> = 10000</figcaption>
+    </figure>
+  </div>
+</div>
+
+
+<figure>
+<img class="figure" alt="" style="width:1043px" src="Screenshot-channels.png">
+<figcaption>
+The image has strong orange background due to sodium lamps.
+One has been taken
+<a href="http://maps.google.com/maps?f=q&amp;source=s_q&amp;hl=en&amp;geocode=&amp;q=Krav%C3%AD+Hora,+Brno,+Czech+Republic&amp;sll=37.0625,-95.677068&amp;sspn=56.375007,75.498047&amp;ie=UTF8&amp;hq=&amp;hnear=Krav%C3%AD+hora,+Brno,+Czech+Republic&amp;ll=49.204433,16.583582&amp;spn=0.000719,0.001152&amp;t=h&amp;z=20">near of center of Brno town.</a>
+The first image shows all colours as has been detected. The second
+cut-offs blue. The last image has background level arranged according
+to per-frame backgrounds. The structure above lighted sky are
+clearly visible. This is common property of all urban observations.
+</figcaption>
+</figure>
+
+<h2>Colour transformation</h2>
+
+<p>
+The colour transformation follows the prescaling.
+The file <samp>ctable.dat</samp> is looked-up for the header's identifier.
+When the colour space is found, the matrix is loaded and all data
+are transformed. The transformation is usually done by matrix
+multiplication. When the type remains unknown, the behavior is undefined
+so colour assignment will random (false colours).
+Note that the number of input colours
+can be different from XYZ (tree colours).
+</p>
+<p>
+  <i>
+  X = a<sub>11</sub> B + a<sub>12</sub> V + a<sub>13</sub> R,<br>
+  Y = a<sub>21</sub> B + a<sub>22</sub> V + a<sub>23</sub> R,<br>
+  Z = a<sub>31</sub> B + a<sub>32</sub> V + a<sub>33</sub> R.
+  </i>
+</p>
+
+<h3>Before:</h3>
+
+
+<div class="twocolumn">
+  <div class="column">
+    <figure>
+      <img src="colorB.png" alt="colorB.png" style="width:382px;" class="figure">
+      <figcaption>B</figcaption>
+    </figure>
+    <figure>
+      <img src="colorR.png" alt="colorR.png" style="width:382px;" class="figure">
+      <figcaption>R</figcaption>
+    </figure>
+  </div>
+  <div class="column">
+    <figure>
+      <img src="colorV.png" alt="colorV.png" style="width:382px;" class="figure">
+      <figcaption>V</figcaption>
+    </figure>
+    <figure>
+      <img src="color-best.png" alt="color-best.png" style="width:382px;" class="figure">
+      <figcaption>colour</figcaption>
+    </figure>
+  </div>
+</div>
+
+<h3>After:</h3>
+
+<div class="twocolumn">
+  <div class="column">
+    <figure>
+      <img src="colorX.png" alt="colorX.png" style="width:382px;" class="figure">
+      <figcaption>X</figcaption>
+    </figure>
+    <figure>
+      <img src="colorZ.png" alt="colorZ.png" style="width:382px;" class="figure">
+      <figcaption>Z</figcaption>
+    </figure>
+  </div>
+  <div class="column">
+    <figure>
+      <img src="colorY.png" alt="colorY.png" style="width:382px;" class="figure">
+      <figcaption>Y</figcaption>
+    </figure>
+    <figure>
+      <img src="color-best.png" alt="color-best.png" style="width:382px;" class="figure">
+      <figcaption>colour</figcaption>
+    </figure>
+  </div>
+</div>
+
+
+<h1>Night Vision</h1>
+
+<p>
+When light intensity decreases, the effective of use of cones
+is low and the (otherwise saturated) rod cell are activated. The
+spectral sensitivity of rods is shifted to shot wavelengths with
+respect to Y trisimulus. The transition region from daily (photopic
+with cones as receptors) to
+night vision (scotopic by rods) is mesotopic vision and the break
+occurs around 0 magnitudes (10<sup>-2</sup> - 10<sup>-6</sup> cd/m<sup>2</sup>,
+see <a href="https://en.wikipedia.org/wiki/Scotopic_vision">reference</a>)
+for naked eye.
+</p>
+
+<p class="indent">
+Munipack simulates the scotopic and mesotopic vision. The
+scotopic sensitivity is approximated by the formula:
+</p>
+<p>
+<i>I<sub>s</sub> = 0.362 Z + 1.182 Y - 0.805 X.</i>
+</p>
+
+<p>
+Generally, the photopic, mesotopic and scotopic vision probably
+operates simultaneously. The detailed mechanism is perhaps
+unknown so the vision transition are simulated by the
+(empirical estimation!)
+<a href="https://en.wikipedia.org/wiki/Logistic_function">logistic function.</a>
+The logistic function drives many similar effects in real world.
+Especially, phenomenons of saturated detectors are frequently described
+by the way.
+</p>
+<p>
+<i>w = 1/(1 + exp(-x),</i><br>
+<i>x = (I<sub>s</sub> - I<sub>t</sub>)/w<sub>t</sub>.</i>
+</p>
+
+<p>
+Then output colours are computed as:
+</p>
+<p>
+<i>X' = w X + (1-w) I<sub>s</sub>,</i><br>
+<i>Y' = w Y + (1-w) I<sub>s</sub>,</i><br>
+<i>Z' = w Z + (1-w) I<sub>s</sub>.</i>
+</p>
+
+<p>
+The break must be setup manually and the the both vision are mixed.
+The parameters Threshold <i>I<sub>s</sub></i> and Mesotopic
+<i>I<sub>s</sub></i> are used. The thresholds sets
+the level corresponds to the zero-magnitude break. The mesotopic
+sets wide of  transition region. This is absolutely empirical value
+and depends on vision and detector's gain.
+</p>
+
+
+<p>
+The weight determines the types of vision:
+</p>
+<ul>
+<li>photopic: <i>w = 0</i></li>
+<li>mesotopic: <i>0 &lt; w &lt; ∞ </i></li>
+<li>scotopix: <i>w →∞</i></li>
+</ul>
+
+<!--
+* popsat zavedeni logisticke funkce a koeficinetu 2.5
+* napsat, ze reakce na svetlo v tehle oblasti nejsou znamy
+* modelovani spociva v tom, ze potlacujeme vliv jednech a zdruaznujeme
+v liv druhejch receprotu
+* pozor na horsi rozliseni pri pohledu v ruznych (malych) dalekohledech
+</p>
+-->
+
+<figure>
+<img class="figure" alt="color-night.png" src="color-night.png">
+<figcaption>
+Picture in mesotopic regime. The threshold sets background to scotopic
+and foreground to photopic vision. The setting corresponds to use of a
+telescope with one meter diameter.
+</figcaption>
+</figure>
+
+<figure>
+<img class="figure" alt="color-scotopic.png" src="color-scotopic.png">
+<figcaption>
+Picture in scotopic regime. The red hydrogen shock waves are invisible.
+One correspond to vision by a small telescope.
+</figcaption>
+</figure>
+
+<figure>
+<img class="figure" alt="Screenshot-nite.png" style="width:1043px" src="Screenshot-nite.png">
+</figure>
+
+
+<!--
+<h2>Saturated colours</h2>
+<p>
+When any from input pixels are out of range, the colours are saturated.
+In principle, there are two kind of saturation:
+* relative saturation given just only limiting range of display and scaling,
+  photometry information is saved
+* saturated detector when a object id too bright and detectors is saturated
+</p>
+-->
+
+
+<h1>Colour tuning</h1>
+
+<p>
+The XYZ colour space corresponds to eye's precipitation of colour light
+by the cones. The XYZ has no upper limit. The numbers must be zero
+or positive. Unfortunately, the human perceptions of light intensity
+and colours is not linear. Therefore to get tunable parameters
+the parameters are transformed to CIE Luv colour space. The colour space
+is used to tune parameters saturation, hue and to scale luminosity.
+</p>
+
+<h2>Saturation</h2>
+<p>
+The saturation parameter enable decrease or increase colours.
+</p>
+
+<p class="indent">
+The saturation is practically multiplier of radius of colour
+in <i>u,v</i> coordinates.
+</p>
+
+<div class="twocolumn">
+  <div class="column">
+    <figure>
+      <img src="colorS1.png" alt="colorS1.png" style="width:382px;" class="figure">
+      <figcaption>saturation = 1.5</figcaption>
+    </figure>
+    <figure>
+      <img src="colorS2.png" alt="colorS2.png" style="width:382px;" class="figure">
+      <figcaption>saturation = 0.5</figcaption>
+    </figure>
+  </div>
+  <div class="column">
+    <figure>
+      <img src="color-best.png" alt="color-best.png" style="width:382px;" class="figure">
+      <figcaption>saturation = 1.0</figcaption>
+    </figure>
+    <figure>
+      <img src="colorS3.png" alt="colorS3.png" style="width:382px;" class="figure">
+      <figcaption>saturation = 0</figcaption>
+    </figure>
+  </div>
+</div>
+
+
+<h2>Hue</h2>
+<p>
+Hue rotates the pixel in colour space and it is probably useless.
+</p>
+
+<p class="indent">
+The hue is an angle added to angle of current colour in <i>u,v</i> coordinates.
+</p>
+
+
+<h2>White point</h2>
+
+<p>
+The white point parameters enable user to fine tuning of white on image.
+Note that the white is also given by colour temperature. The ideal
+object for white tuning are cumulus clouds. They are easy available
+and white is excellent (tested on white etalon).
+</p>
+
+
+<div class="twocolumn">
+  <div class="column">
+    <figure>
+      <img src="color-best.png" alt="color-best.png" style="width:382px;" class="figure">
+      <figcaption>u = 0.5, v = 0.5</figcaption>
+    </figure>
+    <figure>
+      <img src="colorW3.png" alt="colorW3.png" style="width:382px;" class="figure">
+      <figcaption>u = 0.8, v = 0.6</figcaption>
+    </figure>
+  </div>
+  <div class="column">
+    <figure>
+      <img src="colorW2.png" alt="colorW2.png" style="width:382px;" class="figure">
+      <figcaption>u = 0.1, v = 0.8</figcaption>
+    </figure>
+    <figure>
+      <img src="colorW4.png" alt="colorW4.png" style="width:382px;" class="figure">
+      <figcaption>u = 0.8, v = 0.1</figcaption>
+    </figure>
+  </div>
+</div>
+
+<figure>
+<img class="figure" alt="Screenshot-colors.png" style="width:1043px" src="Screenshot-colors.png">
+</figure>
+
+
+<h2>Output Colour space</h2>
+
+<p>
+Finally, the Luv is converted back to XYZ and consequently
+XYZ to a RGB space. There are two possibilities. The
+<a href="https://en.wikipedia.org/wiki/SRGB">sRGB</a> colour space is
+widely used on PC-like hardware. If you are running Linux or Windows
+your monitor, LCD or beamer works in sRGB.
+The <a href="https://en.wikipedia.org/wiki/Adobe_RGB_color_space">AdobeRGB</a> is very similar
+(a slightly different parameters are used) and is used on Apple hardware.
+Note that the AdobeRGB has wider gamut (displays more colours). Your
+RGB colour space must correspond to your HW, otherwise the output
+colours will certainly deformed.
+</p>
+
+<p class="indent">
+The tuning of colour space is available in Preferences. The colour temperature
+must exactly corresponds to values set on your display.
+</p>
+
+<div class="twocolumn">
+  <div class="column">
+    <figure>
+      <img src="color-best.png" alt="color-best.png" style="width:382px;" class="figure">
+      <figcaption>sRGB</figcaption>
+    </figure>
+  </div>
+  <div class="column">
+    <figure>
+      <img src="colorAdobe.png" alt="colorAdobe.png" style="width:382px;" class="figure">
+      <figcaption>AdobeRGB</figcaption>
+    </figure>
+  </div>
+</div>
+
+<p>
+No other colour spaces are available, but ones might be easy implemented
+when needs.
+</p>
+
+
+<h1>Why so complicated?</h1>
+
+<p>
+The standard image formats stores data in very limited
+precision of 256 levels on every colour. It is 256*256*256
+approximately 17 millions colours. But low-cost CCD chip
+has dynamic rage more wider and human eye at least over
+ten orders. The main problem of displaying of astronomical
+images is correct displaying of the wide range of data on display
+with 256 levels. The problem is widely known in recent as the high
+range photography HDR.
+Moreover, the data has more usage over displaying.
+For example, the photometric data requires high precision.
+</p>
+
+<p class="indent">
+Therefore, the best way how to store of data is store raw data with
+exact definition of photometric instrument (filters, etc.) and
+use this data by various ways. One from the ways, it can be the colour
+imaging. The side effect of the way are wide possibilities of image
+tuning.
+</p>
+
+
+<h1>The algorithm</h1>
+
+<p>
+There is described algorithm used to rendering of colour FITS images.
+</p>
+
+<ol>
+<li>Detect input colour space as CSPACE keyword in FITS header.</li>
+<li>Processing:<br>
+<ol>
+<li>For general colour space, scale values and convert to CIE 1931 XYZ</li>
+<li>Convert CIE 1931 XYZ to CIE Lab</li>
+<li>Scale luminosity, tune saturation and hue.</li>
+<li>Convert back from CIE Lab to CIE 1931 XYZ</li>
+<li>Optionally add night vision.</li>
+<li>Convert to a display RGB colour space</li>
+</ol>
+</li>
+<li>Display image</li>
+</ol>
+
+
+<p>
+The rendering code is implemented in C (<samp>fitspng.c</samp>),
+Fortran (<samp>colouring/colour.f08</samp>) and
+C++ (<samp>xmunipack/fitsimage.cpp</samp>).
+</p>
+
+
+<h1>Colouring tool</h1>
+
+<p>
+  The colouring tool is invoked from the menu of View:
+  <samp class="sans">File → Create → Colour image</samp>
+</p>
+
+<figure>
+  <img class="figure" style="width:1043px" alt="Screenshot-Coloring.png"
+       src="Screenshot-Coloring.png">
+</figure>
+
+<h1>Command line usage</h1>
+
+<p>
+Complete colour management can be driven from a command line. There are
+two Munipack internal utility colouring providing its.
+The export from
+colour FITS to any conventional picture format PNG is provided by
+<a href="https://integral.physics.muni.cz/fitspng">fitspng</a> utility.
+</p>
+
+<h2>Colour composition</h2>
+
+<p>
+Composing of images to a colour image is provided by colouring internal
+utility. It is invoked via <samp>munipack</samp> command. Use the syntax:
+</p>
+<pre>
+$ munipack colouring -o colour.fits blue.fits green.fits red.fits
+</pre>
+<p>
+Prepare pictures in a colour space and pass ones in wavelength increase order
+to create a colour FITS. The test data package contains pictures of Dumbbell
+nebula in Johnson BVR. The colour image can be created as:
+<pre>
+$ munipack colouring -o m27.fits m27_B.fits m27_V.fits m27_R.fits
+</pre>
+
+
+<h3>Acknowledgment</h3>
+
+<p>
+Images of M27 has been taken by J.Połedniková, O. Urban and M. Kocka
+on MonteBoo observatory via 0.62 m reflector.
+</p>
+
+</section>
+
+<!-- #include virtual="/foot.shtml" -->
+
+</body>
+</html>

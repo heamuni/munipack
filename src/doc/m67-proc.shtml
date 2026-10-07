@@ -1,0 +1,55 @@
+<li>Prepare images for photometric corrections as describes
+<a href="phcorrtut.html">Photometric Corrections Tutorial</a>.
+<pre>
+$ munipack dark -o d7.fits d7_*.fits
+$ munipack dark -o d30.fits d30_*.fits
+
+$ munipack flat -o fB.fits -dark d7.fits flat_*B.fits
+$ munipack flat -o fV.fits -dark d7.fits flat_*V.fits
+$ munipack flat -o fR.fits -dark d7.fits flat_*R.fits
+
+$ munipack phcorr -dark d30.fits -flat fB.fits m67_*B.fits
+$ munipack phcorr -dark d30.fits -flat fV.fits m67_*V.fits
+$ munipack phcorr -dark d30.fits -flat fR.fits m67_*R.fits
+</pre>
+
+</li>
+<li>Stars detection and photometry
+<pre>
+$ munipack find -th 10 -f 6 m67_*.fits
+$ munipack aphot m67_*.fits
+</pre>
+Warnings like:
+<pre>
+Object at coordinates:   739.055908       94.7188416
+  Are you sure your bad pixel thresholds are all right?
+  If so, then you need a larger outer sky radius.
+           8          20        1762   84700.0000       3.39999995E+38
+</pre>
+are reported for stars near of border (when aperture lie outside
+of image) and can be safety ignored.
+</li>
+<li>Search an astrometric catalogue (required for astrometric calibration)
+<pre>
+$ munipack cone -r 0.2 --magmax 14 -- 132.8 11.8
+</pre>
+</li>
+<li>Astrometry calibration of all images
+<pre>
+$ munipack astrometry -c cone.fits m67_*.fits
+</pre>
+</li>
+<li>
+Sum of all images
+<pre>
+$ munipack kombine --rcen 132.8304 --dcen 11.7771 -o m67_B.fits m67_*B.fits
+$ munipack kombine --rcen 132.8304 --dcen 11.7771 -o m67_V.fits m67_*V.fits
+$ munipack kombine --rcen 132.8304 --dcen 11.7771 -o m67_R.fits m67_*R.fits
+</pre>
+</li>
+<li>Aperture photometry of final frames
+<pre>
+$ munipack find -th 10 -f 6 m67_?.fits
+$ munipack aphot m67_?.fits
+</pre>
+</li>

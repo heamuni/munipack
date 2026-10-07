@@ -1,0 +1,29 @@
+
+Binary distribution
+-------------------
+
+Goals:
+
+  * offer simple installation for peoples without computer skills
+  * be multiplatform
+  * be independent on local libraries (version and configuration diversity)
+
+
+Because:
+
+  * users are not computer specialist but astronomers
+  * there is many of unix flavours (espetially linux distributions)
+  * there is great diversity in presence and configuration of required
+    libraries in many linux distributions
+  * It is very difficult to maintain distribution packages for
+    Debian (stable, testing, unstable,..), Ubuntu (8.x,9.x,10.x..),
+    Fedora..., Mandriva, ...., *BSD, ...
+
+
+
+How to create a binary package
+------------------------------
+
+See:
+
+   https://munipack.physics.muni.cz/appimage.html

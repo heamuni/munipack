@@ -1,0 +1,210 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Flat-field</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Flat-field</h1>
+
+<p class="abstract">
+  Overview of a general flat-fielding problem and description
+  of its solution by Munipack.
+</p>
+<p class="indent">
+  Munipack implements its own flat-field algorithm on base of
+  the standard photometry calibration rather than commonly used
+  methods (they uses of median of scaled flat-fields).
+  The presented approach enables to reach the maximal possible
+  accuracy which is limited by only statistical noise of the light.
+  The approach has been not found in any available literature.
+</p>
+
+<h1>Standing on the shoulders of flat-fields</h1>
+
+<p>
+  Although a correct flat-field is the crucial tool for reaching
+  of suitable photometry accuracy, the care of acquiring
+  and processing of flat-fields is not commonly appropriate. This is
+  especially true for any flat-field post-processing.
+</p>
+
+<p class="indent">
+  A capacity of common semi-conductor detectors is limited
+  on values, say, 200k counts per pixels.
+  A good flat-field has its
+  mean level about half of full range, eg.
+  100k counts which gives its relative accuracy on value
+  √100k / 100k ≈ 0.003 per pixel, if <a href="https://en.wikipedia.org/wiki/Poisson_distribution">Poisson distribution</a> can by considered.
+  So for a star which occupy about
+  ten pixels (3×3), one will have a relative deviation over 0.01 magnitude
+  due to the flat-field. A small error in flat-field determination
+  can lead to measurable deviations of results.
+</p>
+
+<p class="indent">
+  To improve the precision, increase of a capacity of detectors
+  can help, but it have technical limitations. Also, it will not suppress
+  different light sensitivity of pixels including all the optical path.
+  In this case, the feasible way is averaging of frames as provides
+  Munipack <samp>flat</samp> utility.
+</p>
+
+
+<h1>The flat-fielding mystery revealing</h1>
+<p>
+  Mean levels of flat-fields, captured using of an unstable light source
+  (during twilight), are unequal.
+  As a consequence, a direct average of that flat-fields
+  is impossible.
+</p>
+<p class="indent">
+  A common solution of the trouble is an initial normalisation of flat-fields
+  on an equal intensity level.
+  The approach key difficulty is the determination of a mean level of
+  every frame.
+  Single frame values has no
+  <a href="https://en.wikipedia.org/wiki/Normal_distribution">Normal</a>
+  distribution
+  which is leading to a staticticaly poor definition of the average level.
+</p>
+
+<!--
+<p>
+  There are summarised key ideas of flat-field algorithm
+  implemented in Munipack.
+</p>
+-->
+
+<figure>
+  <div class="twocolumn">
+    <div class="column">
+      <img class="figure" src="flatzero.png" alt="inital flat" title="inital flat">
+    </div>
+    <div class="column">
+      <img class="figure" src="flatdebug_zero.svg" alt="Histogram" title="Histogram">
+    </div>
+  </div>
+  <figcaption>
+    A distribution of values of flat-field shows an asymmetric
+    non-Gaussian histogram
+  </figcaption>
+
+</figure>
+
+<p class="indent">
+  The difficulty comes due to the folded surface of flat-fields.
+  While it is possible to compute a mean level, the estimate
+  will not be optimal or accurate due to blending of statistical
+  distributions: the light noise and the surface of flat-field
+  itself.
+</p>
+
+<p class="indent">
+  The crucial point of Munipack approach is decomposition
+  of flat-field frames on single, independent pixels.
+  These pixels, having the same position and collected
+  over all frames, can be considered as sources of the light
+  like stars; a star calibration procedure can be subsequenty used.
+  Reference sources are initially unknown,
+  fortunately, they can be estimated by iterations.
+</p>
+
+<figure>
+  <img class="figure" src="wrinkledflat.svg" alt="wrinkled flat"
+       title="wrinkled flat" style="max-width:90%;">
+<figcaption>
+  A blended distribution of values as result of a folded surface
+  of a flat-field
+</figcaption>
+</figure>
+
+
+<p class="indent">
+  Munipack implements two-phase algorithm which determine a rough
+  flat-field during the first phase (equivalent to common
+  practice). In the second phase, it determines
+  the mean level of individual frames by scaling on to
+  the rough initial flat approximation.
+  The second phase of the approach works with Normally
+  distributed data giving accurate, reliable and statistically correct
+  results.
+</p>
+
+
+<figure>
+  <div class="twocolumn">
+    <div class="column">
+      <img class="figure" src="flatfine.png" alt="final flat" title="final flat">
+    </div>
+    <div class="column">
+      <img src="flatdebug_3.svg" alt="Histogram" title="Histogram">
+    </div>
+  </div>
+  <figcaption>
+    The final flat-field accepting folded (wrinkled) property. Resultant
+    histogram of residuals of an single frame is near of Normal distribution
+    (some per frame deviations are visible).
+  </figcaption>
+</figure>
+
+<p class="indent">
+  The developed algorithm solves a non-linear implicit equation
+  for all pixels of the final flat-field.
+  The approach is a variant of photon calibration,
+  the reference photon sources are iteratively established
+  during the computation.
+</p>
+
+
+<h1>Flat-fielding rules</h1>
+
+<p>
+  There is a list of rules,
+  summarising of my long time experiences with flat-fielding,
+  which I recommends for flat-fielding:
+</p>
+<ul>
+  <li>The flat-field frame is very important, because
+   a quality of the flat-field determines photometry accuracy
+    of results.</li>
+  <li>Only twilight flat-frames are acceptable (any light gadgets
+    gives poor results – , if not agree, please send me some
+    counter-example).</li>
+  <li>The twilight flats can be acquired with this rules in mind:
+    <ul>
+      <li>catch its only on the clear sky, on the sky without any clouds,</li>
+      <li>any light pollution by an artificial light or Moon is
+	unacceptable,</li>
+      <li>use opposite directions on Sun,</li>
+      <li>choose fields in Earth's shadow,</li>
+      <li>acquire on field not too close to horizon,</li>
+      <li>keep <a href="https://en.wikipedia.org/wiki/Rayleigh_sky_model">polarisation</a>
+	due to Sun on minimum,
+      </li>
+      <li>select a field with sparse and faint stars,</li>
+      <li>switch-off sidereal motion of telescope mount's,</li>
+      <li>use shorter minimal exposure to prevent changes of illumination
+        during the twilight (but not such short to capture
+	shutter speed),</li>
+      <li>prefer levels of flat-fields around half of its full range (capacity).
+    </ul>
+  </li>
+</ul>
+
+
+<h2>See Also</h2>
+
+<p>
+<a href="man_flat.html">Flat-field manual</a>,
+<a href="man_phcorr.html">Photometry corrections</a>.
+<a href="https://en.wikipedia.org/wiki/Standing_on_the_shoulders_of_giants">Standing on the shoulders of giants</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

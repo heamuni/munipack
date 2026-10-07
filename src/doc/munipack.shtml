@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<div class="content">
+
+<div class="twocolumn">
+  <div class="column">
+    <p>
+      <a href="https://ascl.net/1402.006">Munipack</a> is a free open source tool
+      for an advanced scientific processing of astronomical images.
+    </p>
+
+    <p class="indent">
+      The goal of Munipack project is to develop, to implement, and to prove
+      of general methods, recognised among all the fundamental principles
+      of nature, for reliable, reproducible, and efficient astronomical image data
+      processing.
+    </p>
+
+    <h2>Munipack 0.6.2 “The robust mean”</h2>
+
+    <p>This release adopts the recent implementation of the robust mean
+      by <span style="color: #83991a;">☘</span>&nbsp;<a href="https://integral.physics.muni.cz/oakleaf/">Oakleaf</a> library.
+    </p>
+
+    <div class="release">
+<!--    <div class="symbol">☙</div>-->
+
+    <ul class="titlepage">
+      <li><a href="install.html">Install</a></li>
+      <li><a href="download.html">Downloads</a></li>
+      <li><a href="changes.html">Changelog</a></li>
+      <li><a title="munipack-users"
+	     href="https://groups.google.com/g/munipack-users">Mailing list</a></li>
+      <li><a href="https://integral.physics.muni.cz/pelican/tag/munipack.html"
+	     title="Munipack on Works">Blog ☙</a>
+    </ul>
+    </div>
+
+  </div><!-- col-left -->
+
+  <div class="column">
+
+    <figure>
+      <a href="sombrero_comparison.png">
+	<img class="figure"
+	     style="box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19); max-height: 20em;"
+	     src="sombrero_comparison.png" alt="sombrero_comparison.png"
+	     title="The comparison of robust mean algorithms">
+	</a>
+
+      <figcaption>
+	The comparison of the new and the original algorithm for the robust mean
+	in the colour <a href="colourimage.html">composition</a>.
+      </figcaption>
+
+    </figure>
+
+      <h2>Attenzione</h2>
+
+    <div class="symbol">⚠</div>
+
+    <p>
+      Munipack is under <b>development.</b>
+      Munipack is distributed without <b>any warranty.</b>  See the
+      <a href="https://www.gnu.org/licenses/gpl.html">GNU General Public License</a>,
+      version 3 or later, for more details.
+    </p>
+
+  </div><!-- col-right -->
+</div><!-- twocolumn -->
+
+</div>
+
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>
+<!-- http://www.w3.org/MarkUp/Guide/Overview.html -->

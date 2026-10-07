@@ -1,0 +1,167 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Photometric Systems Definition</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1 class="noindent">Photometric Systems Definition</h1>
+<p class="abstract">
+Definition of a FITS table providing parameters of photometric systems.
+</p>
+
+<p>
+One uses selected photometric systems from
+<a href="http://ulisse.pd.astro.it/Astro/ADPS/Systems/index.html">The Asiago
+Database on Photometric Systems</a> as the reference.
+</p>
+
+<p>
+This table specification has been developed for internal use in Munipack
+and backward compatibility is not guarantied.
+</p>
+
+<h2>File Structure</h2>
+
+<p>
+The photometric system definition file is a FITS binary table.
+Every particular photometric system occupies a single FITS extension.
+The extension name is a short identification of the corresponding
+system. Bands (filters) of the system are stored as rows of the table and
+contains full photometric description of the filter.
+</p>
+
+<div class="table">
+<table>
+<caption>Photometric system FITS file structure</caption>
+<tr><th>HDU</th><th>EXTNAME</th><th>Description</th></tr>
+<tr><td>0</td><td></td><td>Dummy<sup><a href="#dummy">[†]</a></sup></td></tr>
+<tr><td>1</td><td>identifier</td><td>Short identification of system</td></tr>
+<tr><td>...</td><td>...</td><td>...</td></tr>
+</table>
+</div>
+
+<div class="notes">
+<p id="dummy">
+<sup><a href="#dummy">[†]</a></sup>
+The dummy section contains keyword AUTHOR identifying who
+compiled the table (by default set to 'Munipack'), HDUNAME describing
+the file which is set mandatory to 'PHOTSYS' and the link to
+this page as a comment. Please, if your are modifying
+the photometric table, change AUTHOR field and leave untouched HDUNAME,
+because one is the main identifier of this table format.
+</p>
+</div>
+
+
+<h2>Photometric System HDU</h2>
+
+<p>
+Every photometric system occupies a single extension.
+The system is identified by EXTNAME keyword. The reference to a definition
+of the system is in REFID keyword. Other keywords defines
+the table structure. Comments can contain additional specifications.
+</p>
+
+<p>
+All quantities must be expressed strictly in SI.
+</p>
+
+<div class="table">
+<table>
+<caption>Photometric System HDU Table</caption>
+<tr><th>Column</th><th>Type</th><th>Description</th><th>units</th></tr>
+<tr><td>FILTER</td><td>12A</td><td>Filter designation<sup><a href="#filter">[1]</a></sup></td><td></td></tr>
+<tr><td>LAM_EFF</td><td>E</td><td><i>λ</i><sub>eff</sub> effective wavelength<sup><a href="#leff">[2]</a></sup></td><td>m</td></tr>
+<tr><td>LAM_FWHM</td><td>E</td><td><i>Δλ</i> passband FWHM<sup><a href="#lfwhm">[3]</a></sup></td><td>m</td></tr>
+<tr><td>NU_EFF</td><td>E</td><td><i>ν</i><sub>eff</sub> effective frequency<sup><a href="#neff">[4]</a></sup></td><td>Hz</td></tr>
+<tr><td>NU_FWHM</td><td>E</td><td><i>Δν</i> passband FWHM<sup><a href="#nfwhm">[5]</a></sup></td><td>Hz</td></tr>
+<tr><td>FNU_REF</td><td>E</td><td><i>f<sub>ν</sub></i> spectral density flux per frequency unit for zero magnitude star<sup><a href="#flx">[6]</a></sup></td><td>W/m2/Hz</td></tr>
+<tr><td>FLAM_REF</td><td>E</td><td><i>f<sub>λ</sub></i> spectral density flux per wavelength unit for zero magnitude star<sup><a href="#flx">[6]</a></sup></td><td>W/m2/nm</td></tr>
+</table>
+</div>
+
+<div class="notes">
+<p id="filter">
+<sup><a href="#filter">[1]</a></sup>
+A unique filter identifier in the given system. The string will be
+matched against to FILTER keyword in headers of calibrated frames.
+</p>
+
+<p id="leff">
+<sup><a href="#leff">[2]</a></sup>
+Effective wavelength is computed as a mean wavelength of the given
+filter transmissivity.
+</p>
+
+<p id="lfwhm">
+<sup><a href="#lfwhm">[3]</a></sup>
+Passband full width at half of maximum (FWHM) given in wavelengths.
+</p>
+
+<p id="neff">
+<sup><a href="#neff">[4]</a></sup>
+Effective frequency is computed as a mean frequency. Usually, the system
+definitions in optical
+bands are established by effective wavelengths and the quantity is computed
+as <i>ν</i>=c/<i>λ</i>.
+</p>
+
+<p id="nfwhm">
+<sup><a href="#nfwhm">[5]</a></sup>
+Passband FWHM in frequency units. When not defined,
+the formula <i>Δν</i>=(c/<i>λ</i><sup>2</sup>)<i>Δλ</i> is used to derive it.
+</p>
+
+<p id="flx">
+<sup><a href="#flx">[6]</a></sup>
+Spectral fluxes densities are rarely given with a required precision.
+The formula of reciprocity between fluxes per wavelength and frequency
+in Hertz is <i>f<sub>ν</sub></i> = (<i>λ</i><sup>2</sup>/c) <i>f<sub>λ</sub></i>
+(by a convention, use 10<sup>-9</sup>m=1nm multiplicand to specify it in nanometers).
+</p>
+</div>
+
+
+<h2>Modification of Photometric System Table</h2>
+
+<p>
+The system table is created from a text file which can be found at source
+tree as <samp>muniphot/photosystems.lst</samp>.
+The text file can be modified as needed,saved to my_photosystems.lst,
+and new FITS table will be created as
+</p>
+<pre>
+$ munipack fits --restore my_photosystems.lst,my_photosystems.fits
+</pre>
+
+<p>
+The modified file can be used as
+</p>
+<pre>
+$ munipack phfotran --phsystab SOMEWHERE/my_photosystems.fits ...
+$ munipack phcal --phsystab SOMEWHERE/my_photosystems.fits ...
+</pre>
+
+<p>
+Of course, many alternative ways can be used to create the table.
+It is only important respect the structure of the file, the main
+identifiers and data types.
+</p>
+
+<h2>See Also</h2>
+<p>
+<a href="man_phcal.html">Photometric Calibration</a>,
+<a href="man_phfotran.html">Photometric System Transformation</a>,
+<a href="http://ulisse.pd.astro.it/Astro/ADPS/Systems/index.html">The Asiago Database on Photometric Systems</a>,
+<a href="http://www.astro.umd.edu/~ssm/ASTR620/mags.html">Astronomical Magnitude Systems</a>
+</p>
+
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

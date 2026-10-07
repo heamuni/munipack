@@ -1,0 +1,341 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Mosaics</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Mosaics</h1>
+
+<p class="abstract">
+How to montage multiple exposure to a single frame covering
+large area of heavens.
+</p>
+
+<h2>Whirlpool Galaxy</h2>
+<p>
+<a href="https://en.wikipedia.org/wiki/Whirlpool_Galaxy">Whirlpool galaxy (M51)</a>
+is a pretty photogenic object showing nice example of interacting (merging) of galaxies.
+The primary, grand design galaxy, has a spiral arm deformed by interaction
+with the small second one with a bar and without any arms.
+Whirlpool galaxy is so large that fills full field of view of many
+telescopes. Therefore we must apply mosaics technique to acquire
+peripheral parts of Whirlpool.
+</p>
+
+<p class="indent">
+A scene of the galaxy interaction covers unusually large part
+of the sky. Night photographers are in doubt on which point
+theirs equipment must be centred.
+A large telescope can capture fainter objects (details)
+but a small field of view permits portraying just only part of an
+object. A small telescope has larger field of view, but detect
+only brighter parts. Mosaics offers amazing possibility
+to use of large telescope and also cover of larger part of sky.
+On the contrary, the way is more time consuming and requires
+advanced processing methods.
+</p>
+
+<p class="indent">
+There, images of large part of neighbourhood of Whirlpool
+galaxy taken on Vyškov's Observatory (17°01'20.6" E, 49°17'01.4" N)
+by 0.4 m Newtonian telescope and Moravian Instrument's G2 camera via
+a filter of RGB by Jaroslava Kocková and Filip Hroch
+are served as an example. The data has poor quality, the observation
+was having interrupted by rapidly changing clouds and some technical
+problems with both CCD camera and telescope was solved. Please,
+consider the images as an example for mosaic construction
+(not a perfect imaging).
+</p>
+
+<p>
+<a href="https://integral.physics.muni.cz/ftp/munipack/munipack-data-m51.tar.gz">Download</a> data for mosaics of Whirlpool galaxy and unpack it:
+</p>
+<pre>
+  $ wget ftp://integral.physics.muni.cz/pub/munipack/munipack-data-m51.tar.gz
+  $ tar zxf munipack-data-m51.tar.gz
+  $ cd munipack-data-m51/
+</pre>
+
+
+<p>
+To construct a mosaics, please follow commands in this tutorial.
+</p>
+
+<h2>Photometric Precorrections</h2>
+
+<p>
+The first step is photometric precorrections of images.
+</p>
+
+<p>Construct of mean dark frame for Whirlpool (for darks
+with 120s exposure time):
+</p>
+<pre>
+$ munipack dark -o dark120.fits dark_005?.fits dark_008?.fits
+</pre>
+
+<p class="indent">
+Tip. Inspect FITS header of dark120.fits. One will have zero temperatures
+because input images has its chip temperatures pointed by CCD-TEMP keyword.
+Munipack expects the keyword as TEMPERATURE. To get correct values,
+set an appropriate  <a href="man_env.html">environment variable</a>:
+</p>
+<pre>
+$ export FITS_KEY_TEMPERATURE="CCD-TEMP"
+</pre>
+
+<figure>
+  <img class="figure" src="m51_dark.png" alt="m51_dark.png"
+       title="Averadge of dark frames">
+  <figcaption>
+    Average of dark frames for object
+  </figcaption>
+</figure>
+
+<p>
+Analogically, the mean dark frame for flat-field frames will be
+constructed as
+</p>
+<pre>
+$ munipack dark -o dark10.fits dark_003?.fits dark_004?.fits
+</pre>
+
+<p>
+Flat-field frames can be corrected for the dark as
+</p>
+<pre>
+$ munipack phcorr -dark dark10.fits flat_Green_*.fits
+</pre>
+<p>
+And the mean flat-field can be prepared as
+</p>
+<pre>
+$ munipack flat -o flat_Green.fits flat_Green_*.fits
+</pre>
+
+<figure>
+  <img class="figure" src="m51_flat.png" alt="m51_flat.png"
+       title="Averadge of flat-field frames">
+<figcaption>
+Average of flat-field frames for object
+</figcaption>
+</figure>
+
+<p>
+All frames of Whirlpool can be corrected for both dark and flat-field frames
+by the single command:
+</p>
+<pre>
+$ munipack phcorr -dark dark120.fits -flat flat_Green.fits m51_Green_*.fits
+</pre>
+
+<figure>
+  <img class="figure" src="m51_Green_0053.png" alt="m51_Green_0053.png"
+       title="A corrected image">
+<figcaption>
+An image with all photometric precorrections applied.
+</figcaption>
+</figure>
+
+
+<p>
+  The corrected images has the same name as the original
+with <samp>_proc.fits</samp> suffix. It is highly recommended
+visually compare images before and after precorrections.
+</p>
+
+<h2>Astrometry and Photometry Calibration</h2>
+
+<p>
+The first delicate point of our analysis is detection of stars
+on images. The detection is mostly on base of presumption that
+all stars are Gaussian-like peaks with an identical profile. The profile
+has the same width at half of maximum (FWHM) which an image
+of a point source imagined via our (optical) telescope (apparatus).
+The FWHM is in pixels and is in range 2-10 for optical non-space
+telescopes. The value can be easy estimated and checked with
+Photometry tool in xmunipack:
+</p>
+
+<figure>
+  <img class="figure" src="m51_photometry_tool.png" alt="m51_photometry_tool.png"
+       title="Photometry Tool">
+<figcaption>
+Photometry Tool in action
+</figcaption>
+</figure>
+
+<p class="indent">
+With help of the tool, we can found that right parameters for
+out images are: FWHM=6 and threshold is 10 sigma above background level.
+With the information, all stars on all frames will be found and
+aperture photometry will be easy:
+</p>
+<pre>
+$ munipack find -f 6 -th 10  m51_Green_*_proc.fits
+$ munipack aphot m51_Green_*_proc.fits
+</pre>
+
+<p>
+An arbitrary image can show detected stars (see pic)
+</p>
+
+<figure>
+<img class="figure" src="m51_aphot.png" alt="m51_aphot.png" title="Detected Objects">
+<figcaption>
+Detected objects
+</figcaption>
+</figure>
+
+
+<p class="indent">
+The perfect arrange of images is prepared with help of precise astrometry.
+To prepare astrometry, we should list a part an astrometry catalogue. The
+UCAC5 is an ideal for our purposes. We are selected cone
+about centre of Whirlpool galaxy in radius 0.2° because our
+fields are spread over the area.
+</p>
+<pre>
+$ munipack cone -r 0.2 202.47 +47.2
+</pre>
+<p>
+and run the astrometry calibration
+</p>
+<pre>
+$ munipack astrometry m51_Green_00*_proc.fits
+</pre>
+<p>
+Note use of <samp>-r 0.2</samp> option. In this case, when we need large
+part of sky, we also need more than default count of stars.
+</p>
+
+<p>
+The astrometry will take a while. The warnings like
+</p>
+<pre>
+ Mutual match for files `m51_Green_0062_proc.fits' and `cone.fits' failed.
+</pre>
+<p>
+can be safety ignored. The visual inspection give our understand why
+the match failed.
+</p>
+
+
+
+<h2>Final Mosaic</h2>
+
+<p>
+The last step is composition of images to a mosaic. Try
+</p>
+<pre>
+  $ munipack kombine --rcen 202.47 --dcen +47.2 --width 1000 --height 1000 \
+                     m51_Green_00??_proc.fits
+</pre>
+<p>
+You can play with the values of centre of projection (--rcen, --dcen)
+and also with size of output image.
+</p>
+
+<figure>
+  <img class="figure" src="m51_mosaic.png" alt="m51_mosaic.png"
+       title="Mosaic of Whirlpool galaxy">
+<figcaption>
+Mosaic of Whirlpool galaxy (non-calibrated frames). The logistic function
+and some fine tuning of parameters has been applied.
+</figcaption>
+</figure>
+
+
+<p class="indent">
+The image is not perfect, specially due to clouds. On other side, we can
+observe how the image was merged from single exposures (omitting --expomask).
+</p>
+
+<p class="indent">
+Some CCD device problem are appeared: the residuals for hot column at
+left part on coordinates (93,221-3) copied from flat-fields and the
+dark rows at centre of the image. There is no way hot to correct it
+by a standard way (the image must be patched).
+</p>
+
+<h2>Perfecting Mosaics by Photometric Calibration</h2>
+
+<p>
+The final image is affected by clouds which visible obscured our
+object and reduces amount of collected light.
+We should perfect of final image by using
+of photometrically calibrated images.
+</p>
+
+<p class="indent">
+The photometry calibration can be used to derive
+different attenuation of light on different frames due to observing
+conditions (clouds).
+The calibration is not absolute and we not need know photometry
+system and filter (moreover our identification of the filter as 'Green'
+is probably incorrect).
+</p>
+
+
+<pre>
+$ for A in m51_Green_00??.fits_proc; do
+    munipack fits --update --key FILTER --val "'V'" $A
+    munipack phcal --photsys-ref Johnson --area 0.3 -c cone.fits \
+           --col-ra RAJ2000 --col-dec DEJ2000 -f V --col-mag Vmag $A ;
+  done
+$ munipack kombine --rcen 202.47 --dcen +47.2 --width 1000 --height 1000 \
+                   m51_Green_00??_proc_cal.fits
+</pre>
+
+<figure>
+  <img class="figure" src="m51_cal_mosaic.png" alt="m51_cal_mosaic.png"
+       title="Mosaic of Whirlpool galaxy">
+<figcaption>
+Mosaic of Whirlpool galaxy (calibrated frames)
+</figcaption>
+</figure>
+
+
+<h2>Tips</h2>
+
+<p>
+  Some recommendations for creating of photogenic frames:
+</p>
+<ul>
+<li>Take images under excellent atmospheric conditions: suppress fluency
+    of clouds, urban lights and similar polluting factors.
+    Avoid observations near horizon and where changes of background
+    can by expected.</li>
+<li>Use stable equipment (temperature regulated camera) and the best
+    flat-fields.</li>
+<li>Cover all the area by similar exposures.</li>
+<li>Try large overlaps (ideally per half of field of view)</li>
+<li>Select the best exposures only.</li>
+</ul>
+
+
+
+<h2>See Also</h2>
+
+<p>
+Manuals:
+<a href="man_kombine.html">Kombine</a>,
+<a href="man_astrometry.html">Astrometry</a>,
+<a href="man_aphot.html">Aperture Photometry</a>,
+<a href="man_phcorr.html">Photometric corrections</a>.<br>
+A bash script summarising of this tutorial: <a href="mosaic.sh">mosaic.sh</a>.
+</p>
+
+<p>
+<a href="http://montage.ipac.caltech.edu/">Montage</a>
+is much more advanced tool.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

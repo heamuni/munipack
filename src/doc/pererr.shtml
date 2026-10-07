@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Periodic Error</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Periodic Error Determination</h1>
+
+<p class="abstract">
+A short tutorial for determination
+of the periodic error of a telescope mount.
+</p>
+
+<h2>Periodic Error</h2>
+
+<p>
+Periodic error of a telescope mount has its origin in gears of
+the sidereal driver.
+Common arrangement of gears of mount is the main
+cogwheel of the mount which is driven by a smaller ones (worm).
+The control force is carried from the main to the secondary
+wheel via a single tooth or more worse via a small contacting area
+on the tooth. As a consequence of the assembly, the driver
+periodically accelerates and decelerates of the sidereal movement of
+the telescope. The effect can be seen directly in small telescopes
+(without any corrections) as slow periodic drifting of objects throughout
+the field of view. Characteristic time periods are in order of minutes
+and their angular amplitude about a few arcseconds.
+</p>
+
+<p>
+The periodic
+error can be suppressed by large gears, precise mechanics work on gears
+or an electronic correction (PEC). Perhaps (!), the best way to eliminate ones is
+use more than one driven worm or use of conical worms.
+</p>
+
+<h2>How To Determine The Periodic Error</h2>
+
+<ol>
+<li>Switch-off any electronic corrector.</li>
+<li>Select a suitable star: a bright star near of the celestial equator
+   and meridian,
+   which will have peak intensities approximately half of full dynamic
+   range at a very short exposure (under second). The star
+   must be arranged near of the center of field of view to suppress
+   deviations due to non-complanar mount (rotated field) of CCD.
+   An alone star is preferred.
+</li>
+<li>
+Grab a long time serie of frames. Use shortest exposures as possible
+   and also frequently as possible. Cover multiple expected periods.
+</li>
+<li>
+Than process the acquired images:
+<pre>
+$ munipack find -th 10 -f 2 per_*.fits
+$ munipack timeserie --extname FIND -c X,Y --coo-type RECT --stdout
+>                    --tol=66 666,666 per_*.fits > per
+</pre>
+The find tool detects bright stars (10 times over background
+   noise and with FWHM about 2 pixels). The second command lists rectangular
+   coordinates (--coo-type RECT) from FIND table (--extname FIND)
+   of a selected object near of center (at pixel
+   in 666,666) at circular surrounding of radius 66 pixels (--tol=66)
+   (this is why we had used an alone bright star) to a standard output (--stdout).
+   Results are stored in 'per' file (and timeserie.fits) with the structure:
+<pre>
+ Julian Date at mid       X         Y
+   2455945.24947       421.682   234.723
+</pre>
+</li>
+</ol>
+
+<p>
+That's all. The output file can be used in a data analyzing tool
+to visualize and analyze your mount.
+</p>
+
+<figure>
+<img class="figure" src="pererr.png" alt="pererr.png" title="Periodic error">
+<figcaption>Periodic error of 0.6 m MonteBoo telescope (imperfect mount example)</figcaption>
+</figure>
+
+<p>
+The above figure shows horizontal coordinate of star Menkar for ten
+periods of mount on MonteBoo observatory. The periodic pattern is
+result of the periodic error. The slow decreasing of the graph
+shows difference between angular velocity of the telescope and Earth rotation.
+</p>
+
+
+<h2>Similar Tasks</h2>
+
+<p>
+The above example of determination of the periodical error describes
+how to get a list of coordinates of
+a star on frame. One can be generalized on any task
+where coordinates of moving objects are required:
+</p>
+
+<ul>
+<li>Telescope alignment </li>
+<li>Tracking of fast moving objects: satellites, asteroids or comets</li>
+</ul>
+
+
+<h2>See Also</h2>
+
+<p>
+Manuals:
+<a href="man_timeseries.html">Timeseries</a>,
+<a href="man_aphot.html">Aperture Photometry</a>.
+
+Tutorial:
+<a href="lctut.html">Light Curve</a>
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

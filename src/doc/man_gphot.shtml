@@ -1,0 +1,80 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Growth-Curve Photometry</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Growth-Curve Photometry</h1>
+
+<p class="abstract">
+  Growth-curve photometry is primary intended
+  for the absolute photometry calibration.
+  This routine constructs a mean radial growth-curve by using of
+  machine selected bright stars. Total absolute fluxes of all stars
+  are determined from the growth-curve.
+  As a side effect, the method produces less scattered
+  data for well radially defined images of stars. <em>Unfinished!</em>
+</p>
+
+<h2>Synopsis</h2>
+
+<code>
+munipack gphot [.. parameters ..] file(s)[,result(s)]
+</code>
+
+<h2>Description</h2>
+
+<p>
+  Growth-curve photometry determines absolute fluxes
+  of all star-like objects of frames.
+
+  sum of counts from a star in predefined apertures.
+</p>
+
+<h2>Apperture correction determination</h2>
+
+<p>
+</p>
+
+
+<h2>Parameters</h2>
+<dl>
+  <dt><samp>-th, --threshold</samp></dt><dd>
+    The
+    </dd>
+<dt><samp>--verbose</samp></dt><dd>With this (common) parameter,
+    additional extensions GROWFUNC and GROWDATA are added to processed
+    files and create a report file (replaces .fits with .png)
+    with plotted details about growth curve photometry.
+    See <a href="dataform_growrep.html">detailed</a> description.
+    The graphs requires <b>gnuplot</b> to be installed.
+    Any error is silently ignored.
+</dd>
+</dl>
+
+<h2>Examples</h2>
+
+<p>
+Common usage
+</p>
+<code>
+$ munipack gphot --verbose pleiades.fits
+</code>
+
+
+<h2>See Also</h2>
+<p>
+<a href="grow.html">Growth Curve Overview</a>,
+<a href="man_aphot.html">Aperture Photometry</a>,
+<a href="man_com.html">Common options</a>,
+<a href="dataform_photometry.html">Photometry Format</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

@@ -1,0 +1,404 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Photometry Calibrated File</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1 class="noindent">Photometry Calibrated File</h1>
+<p class="abstract">
+The description of a FITS file with fully calibrated data.
+</p>
+
+<p>
+The file is result of run of <samp>munipack phcal</samp> action.
+</p>
+
+<p>
+The specification has been created for internal use in Munipack.
+Any backward compatibility is not guarantied.
+</p>
+
+<h2>Introduction</h2>
+
+<p>
+Raw frames contains an array of counts, the array of digitised
+amount of electrical charges due to dropped photons. The detected signal
+is proportional of quality of detector, area of telescope and fluency
+of many additional things appears.
+</p>
+
+<p>
+To by able to compare, the raw data, we needs combine observed
+quantities with calibrated ones. The dirty job is provided by
+<samp>phcal</samp> action. And results of calibration are stored
+in this kind of FITS file.
+</p>
+
+<p>
+Crucial properties:
+</p>
+<ul>
+<li>The array of observed data is converted from counts to photons (or another
+    physical quantity).</li>
+<li>The quantities as additional tables are converted too.</li>
+</ul>
+
+<p>
+Note that the calibration requires knowledge of both filter and photometric system.
+</p>
+
+
+<h2>Primary Array</h2>
+
+<p>
+The primary array has modified header with items:
+</p>
+
+<div class="table">
+<table>
+<caption><a href="http://www.stsci.edu/hst/HST_overview/documents/datahandbook/">Keywords compatible to HST</a> added by Photometry Calibration in primary image</caption>
+<tr><th>Keyword</th><th>Description</th><th>Units</th></tr>
+<tr><td>PHOTSYS</td><td>Photometric system</td><td></td></tr>
+<tr><td>BUNITS</td><td>Physical units of array values, always 'photons'</td><td></td></tr>
+<tr><td>PHOTFLAM</td><td>flux for 1 photon/s/cm2</td><td>erg/s/cm<sup>2</sup>/Å</td></tr>
+<tr><td>PHOTZPT</td><td>magnitude zero-point for fluxes</td><td>erg/s/cm<sup>2</sup>/Å</td></tr>
+<tr><td>PHOTPLAM</td><td>effective wavelength</td><td>Å</td></tr>
+<tr><td>PHOTBW</td><td>passband FWHM</td><td>Å</td></tr>
+</table>
+</div>
+
+<p>
+All pixels of result image are converted to a required quantity.
+</p>
+<p>
+The key conversion is from observed counts <i>c</i> to photons <i>n</i> (see BUNITS)
+for every pixel in the image. For one-filter approximation, the relation
+is used:
+</p>
+<p><i>n = r c</i></p>
+<p>
+where <i>r = 1/η</i> is photon to counts ratio.
+<i>η</i> is coded in FITS header by CTPH keyword.
+</p>
+
+<p>
+The conversion is more complicated in case of multi-filter observation.
+Every pixel in a standard photometric system is computed as the linear
+combination of pixels in an instrumental photometric on the same position.
+This is main reason for creation of this kind of photometric calibration file.
+</p>
+
+<p>
+The conversion from counts to photons will probably not visible on the first
+sight due to algorithms used for scaling of high-range images, ones suppress
+simple linear scaling in intensity.
+</p>
+
+
+<h2>Photometry Table</h2>
+
+<p>
+This PHOTOMETRY extension contains a photometry which would be used for
+further processing.
+</p>
+
+<h3>Header Keywords</h3>
+
+<div class="table">
+<table>
+<caption>Keywords</caption>
+<tr><th>Keyword</th><th>Description</th><th>Units</th></tr>
+<tr><td>EXTNAME</td><td>PHOTOMETRY as the identifier of this table</td><td></td></tr>
+<tr><td>ORIGHDU</td><td>APERPHOT</td><td></td></tr>
+<tr><td>APER</td><td>aperture radius<td>deg</td></tr>
+<tr><td>ANNULUS1</td><td>inner sky annulus radius<td>deg</td></tr>
+<tr><td>ANNULUS2</td><td>outer sky annulus radius<td>deg</td></tr>
+<tr><td>CTPH</td><td>counts per photons<td></td></tr>
+<tr><td>CTPHERR</td><td>Statistical Error of CTPH<td></td></tr>
+<!--<tr><td>FWHM</td><td>standard FWHM of objects<td>pix</td></tr>-->
+</table>
+</div>
+
+<p>
+The parameters ANULLUSes an APER are directly copied from instrumental
+table and with known astrometry calibration converted to degrees.
+</p>
+
+<p>
+The photometry calibration is summarised in the comments
+of this table.
+</p>
+<pre>
+COMMENT === Photometric Calibration by Munipack ===
+COMMENT Reference photometric sequence: UCAC5 Catalogue (Zacharias+, 2017)
+COMMENT Number of objects used = 10
+COMMENT Counts rate per photon rate =   1.1420     +-  7.9E-03
+COMMENT Catalogue RA,DEC [deg]   Photons [ph/s/m2] Rate [cts/s/m2]   rel.err.
+COMMENT   58.45428950   0.04279090    145.975E+03     59.052E+03       -0.00040
+COMMENT   58.26729090   0.04719370     54.135E+03     21.358E+03        0.01220
+COMMENT   58.36659530   0.10020920     25.089E+03     10.164E+03       -0.01539
+COMMENT   58.32388300   0.07288640     20.058E+03      7.913E+03       -0.00444
+COMMENT   58.32013680  -0.04973250      9.143E+03      3.632E+03       -0.03498
+COMMENT   58.29327650  -0.11260250     13.611E+03      5.616E+03       -0.03224
+COMMENT   58.38659270   0.07895420      5.104E+03      1.940E+03        0.01366
+COMMENT   58.36115270  -0.04099480      4.532E+03      1.791E+03        0.00234
+COMMENT   58.38704450   0.09433840      2.199E+03    810.295E+00        0.02770
+COMMENT   58.28163680   0.01965840      3.141E+03      1.217E+03        0.01977
+COMMENT Description: http://munipack.physics.muni.cz/dataform_photometry.html
+COMMENT === End of Photometric Calibration by Munipack ===
+</pre>
+
+<p>
+The table is designed likely of the <a href="dataform_astrometry.html">astrometry</a>
+residual page. First and second
+columns identifies calibration star, the third is photon flux in given filter
+computed from catalogue magnitude of star, the fourth is counts rate
+and last the ratio of [(3) - CTPH *(4)]/(3) as an analogy of residuals.
+</p>
+
+<h3>Table</h3>
+
+<div class="table">
+<table>
+<caption>Photometry table of calibrated frame</caption>
+<tr><th>Column</th><th>Description</th><th>unit</th></tr>
+<tr><td>X</td><td>Horizontal coordinate</td><td>pix</td></tr>
+<tr><td>Y</td><td>Vertical coordinate</td><td>pix</td></tr>
+<tr><td>SKY</td><td>Mean sky level</td><td>photons per square arcsec</td></tr>
+<tr><td>SKYERR</td><td>Statistical error of SKY</td><td>photons per square arcsec</td></tr>
+<tr><td>PHOTON</td><td>Star photon count</td><td>photons</td></tr>
+<tr><td>PHOTONERR</td><td>Statistical error of PHOTON</td><td>photons</td></tr>
+</table>
+</table>
+
+<p>
+The structure is perfectly same as structure of PHOTOMETRY
+table in Processing file except that COUNTs are replaced by PHOTONs.
+</p>
+
+
+
+<h1 id="phquantities" >Available Photometric Quantities</h1>
+
+
+<table>
+<caption>Table of available photometry quantities for non-calibrated data</caption>
+<tr><th>Quantity</th><th>Description</th><th>Units</th></tr>
+<tr><td>COUNT<sup><a href="#count">[α]</a></sup></td><td>Counts <i>c</i></td><td>count</td></tr>
+<tr><td>RATE<sup><a href="#rate">[β]</a></sup></td><td>Count rate</td><td>count/s/m<sup>2</sup></td></tr>
+<tr><td>MAG<sup><a href="#imag">[γ]</a></sup></td><td>Instrumental magnitude <i>m</i></td><td></td></tr>
+</table>
+
+<div class="notes">
+<p id="count">
+<sup><a href="#count">[α]</a></sup>
+Counts means number of detected electrons by captured photons. Ones are derived
+from raw data <i>d</i><sub>n</sub> (data number (DN)) in relative units (ADU)
+with help of gain <i>g</i> (photo-electrons per ADU): <i>c = g*d</i><sub>n</sub>.
+</p>
+
+<p id="rate">
+<sup><a href="#rate">[β]</a></sup>
+Counts rates are counts per area <i>A</i> of a detector per a time period <i>T</i>.
+<i>A</i> is derived from AREA, <i>T</i> from EXPTIME header keyword
+as <i>c/(A T)</i>.
+</p>
+
+<p id="imag">
+<sup><a href="#imag">[γ]</a></sup>
+Instrumental magnitudes are derived from rates. Theirs shift
+against to right magnitudes is given by optical system attenuation.
+Magnitudes are derived as <i>m</i> = 25 - 2.5 log<sub>10</sub> <i>c/(A T)</i>.
+Note, that an instrumental shift has been chooses as 1 cts/s/m<sup>2</sup>
+for magnitude 25 (see -2.5 log<sub>10</sub> 10<sup>-10</sup>).
+</p>
+</div>
+
+<div class="table">
+<table>
+<caption>Table of available photometry quantities for fully calibrated data</caption>
+<tr><th>Quantity</th><th>Description</th><th>Units</th></tr>
+<tr><td>PHOTON<sup><a href="#photon">[a]</a></sup></td><td>Photon counts <i>n</i></td><td>photon</td></tr>
+<tr><td></td><td>Photon flux <i>Φ</i></td><td>ph/s/m<sup>2</sup></td></tr>
+<tr><td>PHOTNU<sup><a href="#photnu">[b]</a></sup></td><td>Photon rate per frequency n<sub>ν</sub></td><td>ph/m<sup>2</sup>/Hz</td></tr>
+<tr><td>PHOTLAM<sup><a href="#photlam">[c]</a></sup></td><td>Photon rate per wavelength n<sub>λ</sub></td><td>ph/m<sup>2</sup>/nm</td></tr>
+<tr><td>FLUX<sup><a href="#flux">[d]</a></sup></td><td>Energy flux in a band <i>f</i></td><td>W/m<sup>2</sup></td></tr>
+<tr><td>FNU<sup><a href="#fnu">[e]</a></sup></td><td>Energy density flux per frequency <i>f</i><sub>ν</sub></td><td>W/m<sup>2</sup>/Hz</td></tr>
+<tr><td>FLAM<sup><a href="#flam">[f]</a></sup></td><td>Energy density flux per wavelength <i>f</i><sub>λ</sub></td><td>W/m<sup>2</sup>/nm</td></tr>
+<tr><td>MAG<sup><a href="#mag">[g]</a></sup></td><td>Magnitude <i>m</i></td><td></td></tr>
+<tr><td>ABMAG<sup><a href="#abmag">[h]</a></sup></td><td>Magnitude per 1 Hz of frequency <i>m</i><sub>AB</sub></td><td></td></tr>
+<tr><td>STMAG<sup><a href="#stmag">[ch]</a></sup></td><td>Magnitude per 1 nm of wavelength <i>m</i><sub>ST</sub></td><td></td></tr>
+</table>
+</div>
+
+<div class="notes">
+<p id="photon">
+<sup><a href="#photon">[a]</a></sup>
+Photon count <i>n</i> and photon flux <i>Φ</i> are the core of calibration.
+The fitting routines estimates ratio of detected <i>c</i> and expected
+<i>n</i> photons and derive quantity (efficiency by mean) <i>η = c / n</i>
+(0 ≤ <i>η</i> ≤ 1). The typical values are between
+0.1 — 0.5. The <i>η</i>  is included in header keywords as CTPH and its
+dispersion as CTPHERR. Photon count is derived from original data as
+<i>n = c / η</i>.
+The reference photon count in a band <i>B</i> is derived from a known (catalogue)
+star magnitude <i>m<sub>B</sub></i><br>
+<i>Φ = (f<sub>νB</sub> Δν<sub>B</sub> / h ν<sub>B</sub>) 10<sup>-0.4 m</sup>  =
+(f<sub>λB</sub> Δλ<sub>B</sub>) (h c / λ<sub>B</sub>) 10<sup>-0.4 m</sup></i>,<br>
+where <i>f<sub>νB</sub></i> and
+<i>Δν<sub>B</sub></i> are spectral density flux and passband FWHM (in this order)
+defined by <a href="dataform_photosys.html">photometry system</a>.
+Count of photons is <i>n = Φ A T</i>.
+Note that product <i>f<sub>νB</sub> Δν<sub>B</sub></i> has meaning of
+energy flux and <i>h ν<sub>B</sub></i> is the mean
+energy of photon in the given band.<br>
+The photon flux is also frequently is used quantity defined as <i>ϕ = n / A T</i>.
+
+<p id="photnu">
+<sup><a href="#photnu">[b]</a></sup>
+Photon rate per unit frequency defined as
+<i>n<sub>ν</sub> = n / Δν</i>.
+</p>
+
+<p id="photlam">
+<sup><a href="#photlam">[c]</a></sup>
+Photon rate per 1nm of  wavelenght defined as
+<i>n<sub>λ</sub> = n Δλ c / λ</i><sub>eff</sub><sup>2</sup>.
+</p>
+
+<p id="flux">
+<sup><a href="#flux">[d]</a></sup>
+Energy flux in given band (filter) defined as
+<i>F = ϕ h ν</i><sub>eff</sub><i> = ϕ h Δλ c / λ</i><sub>eff</sub><sup>2</sup>.
+</p>
+
+<p id="fnu">
+<sup><a href="#fnu">[e]</a></sup>
+Spectral energy flux density per unit frequency defined as
+<i>f<sub>ν</sub> = ϕ<sub>ν</sub> h ν</i><sub>eff</sub><i>
+                 = ϕ h ν</i><sub>eff</sub><i> / Δν</i>.
+</p>
+
+<p id="flam">
+<sup><a href="#flam">[f]</a></sup>
+Spectral energy flux density per 1nm of wavelength defined as
+<i>f<sub>λ</sub> = ϕ<sub>λ</sub> Δλ c / λ</i><sup>2</sup><sub>eff</sub><i>
+                 = ϕ h c / λ</i><sup>2</sup><sub>eff</sub><i> /</i> 10<sup>-9</sup>.
+</p>
+
+<p id="mag">
+<sup><a href="#mag">[g]</a></sup>
+Magnitudes in the given filter are computed as
+<i>m</i> = -2.5 log<sub>10</sub> <i>F / (f<sub>0ν</sub> Δν)</i> =
+           -2.5 log<sub>10</sub> <i>F / (f<sub>0λ</sub> Δλ)</i>.
+Undefined values are marked 99.999.
+</p>
+
+<p id="abmag">
+<sup><a href="#abmag">[h]</a></sup>
+Magnitudes in the given filter are computed as
+<i>m</i> = -2.5 log<sub>10</sub> <i>f<sub>ν</sub> / f<sub>AB</sub></i>,
+where <i>f</i><sub>AB</sub> = 3.631 .10<sup>-23</sup> [W/m2/Hz] is
+spectral flux density for star of magnitude zero in V (545nm) band for AB system.
+Undefined values are marked 99.999.
+</p>
+
+<p id="stmag">
+<sup><a href="#stmag">[ch]</a></sup>
+Magnitudes in the given filter are computed as
+<i>m</i> = -2.5 log<sub>10</sub> <i>f<sub>λ</sub> / f<sub>ST</sub></i>,
+where <i>f</i><sub>ST</sub> = 3.6335 .10<sup>-10</sup> [W/m2/nm] is
+spectral flux density for star of magnitude zero in V (545nm) band for ST system.
+Undefined values are marked 99.999.
+</p>
+</div>
+
+<div class="table">
+<table>
+<caption>Photometry table for fully calibrated data</caption>
+<tr><th>Column</th><th>Description</th><th>units</th></tr>
+<tr><td>RA</td><td>Right Ascension</td><td>deg</td></tr>
+<tr><td>DEC</td><td>Declination</td><td>deg</td></tr>
+<tr><td>SKY</td><td>Sky intensity</td><td><sup><a href="#usky">[-]</a></sup></td></tr>
+<tr><td>SKYERR</td><td>Sky intensity error</td><td><sup><a href="#usky">[-]</a></sup></td></tr>
+<tr><td>Q</td><td>A selected quantity<sup><a href="#uq">[+]</a></sup></td><td></td></tr>
+<tr><td>QERR</td><td>The quantity standard error<sup><a href="#uq">[+]</a></sup></td><td></td></tr>
+</table>
+</div>
+
+<p>
+Note that for fully calibrated data, keywords TUNITn are presented in the
+header.
+</p>
+
+<div class="notes">
+<p id="usky">
+<sup><a href="#usky">[-]</a></sup>
+Units of sky intensity are the same as quantity Q, but, in addition,
+they are related to the cone 1 arcsec<sup>2</sup>.
+</p>
+
+<p id="uq">
+<sup><a href="#uq">[+]</a></sup>
+There is many of possible related quantities, which can be directly
+derived from calibrated photons.
+</p>
+</div>
+
+
+
+<h2>Magnitudes Are Considered As Obsolete</h2>
+<p>
+Please, have in mind.
+The photometry calibration is designed for a photon counting detector, eg.
+a device that can detect an incoming single photon. CCD, CMOS and
+many modern detectors are that photon counting devices. Ones are extremely sensitive
+with linear response. The calibration naturally take the advantage.
+</p>
+
+<p>
+The magnitude scale is considered as obsolete in this framework and
+provided just for backward compatibility.
+This approach for the photometry has many advantages for modern
+astronomy  for following reasons:
+</p>
+<ul>
+<li>Simple, physical and powerful mind framework which is compatible
+with astronomical photometry in non-optical bands.</li>
+<li>There is new point of view onto many of classical astronomy problems, as light
+attenuation in a media like Earth's atmosphere or the interstellar extinction.</li>
+<li>
+Magnitudes are used just only by optical astronomers and the data
+are difficult to compare and understand for non-optical astronomers.</li>
+<li>
+Moreover, all modern detectors (photo-multiplier tube, CCD, ...) are strictly
+linear, not logarithmic as human eye is supposed (note that modern
+measurements of eye response shows dependency of response on flux
+as ∝flux<sup>1/3</sup> in limited light ranges of modern digital devices
+(<a href="https://en.wikipedia.org/wiki/CIELUV">CIE 1976 (L*, u*, v*) colour space</a>).
+</li>
+<li>A relative photometry (differential magnitudes) can be easy replaced
+    by ratio of fluxes (intensities).</li>
+<li>An easy manipulation with wide range data can be replaced by (decadic)
+    logarithm over creepy  2.5*log<sub>10</sub>.</li>
+<li>The normalised photon flux can be mutually converted to
+spectral (density) fluxes (or intensities).</li>
+</ul>
+
+
+
+
+<h2>See Also</h2>
+<p>
+<a href="man_aphot.html">Aperture Photometry</a>,
+<a href="man_phcal.html">Photometry Calibration</a>
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

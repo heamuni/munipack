@@ -1,0 +1,70 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Growth Report</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1 class="noindent">Growth Curve Report</h1>
+<p class="abstract">
+  The optional parameter <samp>--verbose</samp> to <samp>gphot</samp>
+  invokes addiding of GROWFUNC and GROWDATA extension to all files
+  together with plotting results to a graphical PNG file.
+</p>
+
+<div class="table">
+<table>
+  <caption>GROWFUNC extension</caption>
+  <tr><th>Column</th><th>Description</th><th></th></tr>
+  <tr><td>R</td><td>radius</td><td>pix</td></tr>
+  <tr><td>GROWCURVE</td><td>growth curve value at R</td><td></td></tr>
+  <tr><td>RADIALPROFILE</td><td>Radial profile at R</td><td></td></tr>
+</table>
+</div>
+
+<p>
+  GROWFUNC tabulates growth-curve at more sampled radiuses than
+  extension GROWCURVE contains. The curve is interpolated by
+  <a href="https://en.wikipedia.org/wiki/Smoothing_spline">smoothing
+    cubic spline</a> from the derived curve.
+</p>
+
+<div class="table">
+<table>
+  <caption>GROWDATA extension</caption>
+  <tr><th>Column</th><th>Description</th></tr>
+  <tr><td>GROWCURVE<i>i</i></td><td>Empirical growth-curve for <i>i</i>-th aperture.</td></tr>
+  <tr><td>GROWCURVEERR<i>i</i></td><td>Statistical error of GROWCURVE</td></tr>
+  <tr><td>RESGROW<i>i</i></td><td>Residuals.</td></tr>
+</table>
+</div>
+
+<p>
+  GROWDATA extension stores empirical growth-curves of stars
+  on image. Growth curves of all stars are plotted in light blue,
+  ones used for growth-curve construction in dark blue.
+  Residuals between final curve and the data are plotted by RESGROW
+  column. Order number in GROWDATA refers to GROWPHOT extension.
+</p>
+
+<figure>
+  <img class="figure" src="0716_111R.png" alt="Grow Curve Report"
+       title="Grow Curve Report">
+<figcaption>
+  An example of growth-curve report image.
+</figcaption>
+</figure>
+
+
+<h2>See Also</h2>
+<p>
+<a href="grow.html">Growth Curve Overview</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

@@ -1,0 +1,248 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ FITS Astrometry Calibration</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1 class="noindent">FITS Astrometry Calibration</h1>
+<p class="abstract">
+A detailed description of a form used by Munipack to store
+astrometry calibration in FITS header.
+</p>
+
+<ul>
+<li>Keywords and values strictly conforms FITS standard recommendations</li>
+<li>The calibration is fully compatible with other astronomical software.</li>
+<li>The detailed list of astrometry reference stars and primary fitting parameters
+    is provided.</li>
+<li>The image data itself are untouched by the calibration.</li>
+<li>The <a href="https://en.wikipedia.org/wiki/Affine_transformation">affine transformation</a>
+is used for description of all translation, rotation, scale, mirroring, etc.</li>
+</ul>
+
+
+
+<h2>Astrometry Keywords</h2>
+
+<p>All parameters describing the precious astrometry calibration
+are presented in a table that follows. For parameters description,
+see <a href="man_astrometry.html">Astrometry Overview</a>.
+</p>
+
+<p>
+The background description of representation of spherical coordinates in FITS
+is defined in the article
+<a href="http://adsabs.harvard.edu/cgi-bin/nph-bib_query?bibcode=2002A%26A...395.1061G&amp;db_key=AST&amp;high=3db47576cf14130">Greisen and Calabretta: A &amp; A, <b>395</b>, 1061-1075 (2002).</a> See also links in
+<a href="http://fits.gsfc.nasa.gov/fits_wcs.html">FITS Support Office.</a>
+</p>
+
+<p>
+Note, that the set of parameters used by Munipack is different to set of ones
+in standard FITS header.
+For direct manipulation with standard WCS keywords,
+<a href="man_fits.html">FITS utilities</a> can be used.
+</p>
+
+<div class="table">
+<table>
+<caption>Parameters of astrometry calibration</caption>
+<tr><th>FITS key</th><th>Parameter</th><th>Description</th><th>Units</th></tr>
+<tr><td>CTYPE1</td><td></td><td>projection type along horizontal axis<sup><a href="#ctype">[a]</a></sup></td><td></td></tr>
+<tr><td>CTYPE2</td><td></td><td>projection type along vertical axis<sup><a href="#ctype">[a]</a></sup></td><td></td></tr>
+<tr><td>CRPIX1</td><td><i>x</i><sub>c</sub></td><td>horizontal coordinate of reference pixel<sup><a href="#crpix">[b]</a></sup></td><td>pix</td></tr>
+<tr><td>CRPIX2</td><td><i>y</i><sub>c</sub></td><td>vertical coordinate of reference pixel<sup><a href="#crpix">[b]</a></sup></td><td>pix</td></tr>
+<tr><td>CRVAL1</td><td><i>α</i><sub>c</sub></td><td>longitude-like spherical coordinate related to CRPIX1</td><td>deg</td></tr>
+<tr><td>CRVAL2</td><td><i>δ</i><sub>c</sub></td><td>latitude-like spherical coordinate related to CRPIX2</td><td>deg</td></tr>
+<tr><td>CD1_1</td><td>- <i>c</i> ⋅ cos <i>φ</i></td><td> element of matrix of rotation<sup><a href="#cd">[c]</a></sup></td><td>deg/pix</td></tr>
+<tr><td>CD1_2</td><td>- <i>c</i> ⋅ sin <i>φ</i></td><td> element of matrix of rotation<sup><a href="#cd">[c]</a></sup></td><td>deg/pix</td></tr>
+<tr><td>CD2_1</td><td>- <i>c</i> ⋅ sin <i>φ</i></td><td> element of matrix of rotation<sup><a href="#cd">[c]</a></sup></td><td>deg/pix</td></tr>
+<tr><td>CD2_2</td><td>&nbsp; <i>c</i> ⋅ cos <i>φ</i></td><td> element of matrix of rotation<sup><a href="#cd">[c]</a></sup></td><td>deg/pix</td></tr>
+<tr><td>CRDER1</td><td></td><td>typical uncertainty in horizontal direction<sup><a href="#crder">[d]</a></sup></td><td>deg</td></tr>
+<tr><td>CRDER2</td><td></td><td>typical uncertainty in vertical direction<sup><a href="#crder">[d]</a></sup></td><td>deg</td></tr>
+<tr><td>CRUNIT1</td><td></td><td>units of spherical coordinates<sup><a href="#units">[e]</a></sup></td><td></td></tr>
+<tr><td>CRUNIT2</td><td></td><td>units of spherical coordinates<sup><a href="#units">[e]</a></sup></td><td></td></tr>
+</table>
+</div>
+
+<div class="notes">
+<p id="ctype">
+<sup><a href="#ctype">[a]</a></sup>
+The projection type is the same for both axis.
+</p>
+
+<p id="crpix">
+<sup><a href="#crpix">[b]</a></sup>
+Reference pixel is located at centre of an image (the origin around which the image
+is rotated). The centre is by default determined from image sizes:
+CRPIX1 = NAXIS1 / 2 (widht / 2), CRPIX2 = NAXIS2 /2 (height / 2).
+</p>
+
+<p id="cd">
+<sup><a href="#cd">[c]</a></sup>
+<i>φ</i> is an angle of rotation about the reference point (centre).
+One is an analogy to the
+<a href="https://en.wikipedia.org/wiki/Position_angle">position angle</a> (PA),
+but the PA has origin on twelve and also the opposite direction.
+<i>c</i> is the image scale in degrees per pixel.
+</p>
+
+<p id="crder">
+<sup><a href="#crder">[d]</a></sup>
+RMS (root mean square) is used for both directions.
+</p>
+
+<p id="units">
+<sup><a href="#units">[e]</a></sup>
+Degrees are always used.
+</p>
+
+</div>
+
+<h2>Details Of Astrometry</h2>
+
+<p>
+Munipack adds related comments to the header which includes some
+additional information describing astrometry calibration in detail.
+</p>
+
+<p>
+Astrometry comments are included within the "bracket" lines:
+</p>
+<pre>
+=== Astrometry Solution by Munipack ===
+..
+..
+=== End of Astrometry Solution by Munipack ===
+</pre>
+<p>
+The form is designed for simple machine recognition and removing.
+</p>
+
+<p>
+The items are parts of the comments:
+</p>
+<dl>
+<dt>Type</dt>
+   <dd>Absolute (against to an astrometry catalogue) or relative (against
+       to an another image). The second case also induces use of pixels
+       in all coordinates.</dd>
+<dt>Reference catalogue</dt>
+   <dd>Identification of photometry catalogue. Given by EXTNAME of catalogue
+       or &lt;DESCRIPTION&gt; field in &lt;RESOURCE&gt; part of VOtable.</dd>
+<dt>Projection</dt><dd>Human readable type of projection</dd>
+<dt>Number of objects used</dt><dd>How many object has been used to estimate
+              the calibration.</dd>
+<dt>RMS</dt><dd>Root mean square of residuals between catalogue and
+                estimated coordinates.</dd>
+<dt>Residual Table</dt><dd>
+First, second columns are equatorial coordinates of reference stars,
+third, fourth are coordinates on image and last two columns are differences
+for catalogue and computed coordinates.</dd>
+</dl>
+
+
+<h2>Example</h2>
+
+<!--
+<p>
+The astrometry calibration is generally provided by
+<a href="man_astrometry.html">astrometry</a> action:
+</p>
+<pre>
+$ munipack astrometry ... [file(s)]
+</pre>
+-->
+
+<p>
+An example of calibration included in FITS header follows (with removed
+irrelevant lines).
+</p>
+
+<pre>
+NAXIS   =                    2 / number of axes
+NAXIS1  =                  768 / length of data axis
+NAXIS2  =                  512 / length of data axis
+CTYPE1  = 'RA---TAN'           / the coordinate type for the first axis
+CTYPE2  = 'DEC--TAN'           / the coordinate type for the second axis
+CRVAL1  = 3.3069918316990805E+02 / [deg] first axis value at reference pixel
+CRVAL2  = 4.2273184170171220E+01 / [deg] second axis value at reference pixel
+CRDER1  =             3.96E-05 / [deg] random error in first axis
+CRDER2  =             3.97E-05 / [deg] random error in second axis
+CUNIT1  = 'deg     '           / units of first axis
+CUNIT2  = 'deg     '           / units of second axis
+CRPIX1  = 3.8400000000000000E+02 / x-coordinate of reference pixel
+CRPIX2  = 2.5600000000000000E+02 / y-coordinate of reference pixel
+CD1_1   = -1.8251021731683297E-04 / partial of first axis coordinate w.r.t. x
+CD1_2   = 2.1990049474366615E-06 / partial of first axis coordinate w.r.t. y
+CD2_1   = 2.1990049474366615E-06 / partial of second axis coordinate w.r.t. x
+CD2_2   = 1.8251021731683297E-04 / partial of second axis coordinate w.r.t. y
+COMMENT === Astrometry Solution by Munipack ===
+COMMENT Type: absolute
+COMMENT Reference catalogue: UCAC5 Catalogue (Zacharias+, 2017)
+COMMENT Projection: TAN
+COMMENT Objects used = 44
+COMMENT RMS =      142.3699873     [mas]
+COMMENT Scale =      657.0844718     +-   2.0E-02 [mas/pix]
+COMMENT cos(pa) =    0.9999274227 +-   2.1E-06
+COMMENT sin(pa) =    0.0120477932 +-   1.7E-04
+COMMENT Position Angle (pa)  =    0.6903044013 +-   9.9E-03 [deg]
+COMMENT Reflexion =     F
+COMMENT Alpha center projection (CRVAL1) =  330.6991831699 +-   2.5E-06 [deg]
+COMMENT Delta center projection (CRVAL2) =   42.2731841702 +-   3.9E-06 [deg]
+COMMENT Horizontal center (CRPIX1) =   384.000 [pix]
+COMMENT Vertical   center (CRPIX2) =   256.000 [pix]
+COMMENT Catalogue RA,DEC [deg]        Data X,Y [pix]     Residuals [mas]
+COMMENT  330.68963830  42.26674250  422.700  220.245  -282.0E+00   878.9E-03
+COMMENT  330.68923240  42.27652500  424.821  273.784  -174.0E+00    22.5E+00
+COMMENT  330.67244740  42.31684500  494.557  493.933   412.9E+00   -20.5E+00
+...
+COMMENT  330.61571920  42.30084060  724.180  403.675  -108.1E+00   -47.7E+00
+COMMENT  330.61550500  42.24693730  721.816  108.630  -131.7E+00  -224.3E+00
+COMMENT  330.78309090  42.26153810   42.777  196.604   169.4E+00   -91.0E+00
+COMMENT  330.68781030  42.24563480  428.254  104.291    32.5E+00   151.8E+00
+COMMENT  330.78027980  42.29270640   56.484  366.877   110.6E+00   124.0E+00
+COMMENT  330.63015890  42.26125810  663.472  187.155  -264.1E+00   165.2E+00
+COMMENT  330.68914300  42.23852450  422.511   65.362   -50.4E+00   178.9E+00
+COMMENT Munipack 0.5.4, (C) 1997-2013 F.Hroch (hroch@physics.muni.cz),
+COMMENT http://munipack.physics.muni.cz, Masaryk University, Brno, CZ.
+COMMENT === End of Astrometry Solution by Munipack ===
+</pre>
+
+<p>
+In this example, the calibration can be easy interpreted as:
+</p>
+<ul>
+<li>The image has 768 × 512 pixels according to NAXIS1, NAXIS2 keywords.</li>
+<li>CRPIX1 = 768/2, CRPIX2 = 512/2 (at centre of the image size)</li>
+<li>The Gnomonic projection is used (Both CTYPEs contains TAN).</li>
+<li>Centre of projection (CRVAL1, CRVAL2): α = 330.6991832° ± 2.5E-06°,
+    δ = 42.2731842° ± 3.9E-06°</li>
+<li>Scale: 1/√(CD1_1² + CD1_2²) ≅ 5478.7 pix/°,
+    <i>c</i>=√(CD1_1² + CD1_2²) = 1.825e-04 deg/pix
+    (note sin²<i>φ</i> + cos²<i>φ</i> = 1),
+    3600*c ≅ 0.657 arcsec/pixel.</li>
+<li>Rotation around central pixel: atan(CD1_2/CD1_1) ≅ 0.7°,
+    1 radian = 180°/π ≅ 57.3°</li>
+<li>CD1_1 &lt; 0 means that Right Ascension increase to left (breaking
+  Cartesian habit)</li>
+<li>There is no reflection.</li>
+<li>Positions of stars has uncertainty about CRDER1,2 ≅ 0.14 arcsec on 1-σ level
+    (68% of stars will fall to the circular neighbourhood with this radius).</li>
+</ul>
+
+
+
+<h2>See Also</h2>
+<p>
+<a href="man_astrometry.html">Astrometry Manual</a>,
+<a href="astoverview.html">Astrometry Overview</a>
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

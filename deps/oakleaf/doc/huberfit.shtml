@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+  <!-- #include "meta.shtml" -->
+<body>
+  <!-- #include "head.shtml" -->
+
+<h1>Huber's robust regression</h1>
+
+  <h2>Synopsis</h2>
+
+  <pre class="fortran">
+
+use oakleaf
+
+  type, abstract, public :: robfun_function
+   contains
+     procedure(fvalue), deferred :: val
+     procedure(fgradient), deferred :: grad
+     procedure :: fungrad => fungradient
+     procedure :: hess => fhessian
+     procedure :: maxalf => maxalpha
+  end type bfgs_function
+
+  abstract interface
+
+     real(REAL64) function fvalue(this,x)
+       import :: REAL64, bfgs_function
+       class(bfgs_function), intent(in) :: this
+       real(REAL64), dimension(:), intent(in) :: x
+     end function fvalue
+
+     subroutine fgradient(this,x,fgrad)
+       import :: REAL64, bfgs_function
+       class(bfgs_function), intent(in) :: this
+       real(REAL64), dimension(:), intent(in) :: x
+       real(REAL64), dimension(:), intent(out) :: fgrad
+     end subroutine fgradient
+
+  end interface
+
+subroutine <span class="subroutine">huberfit</span>(fcn,x,H,gtol,maxiter,verbose,report_file,iflag)
+
+    class(bfgs_function), intent(in) :: fcn
+    real(REAL64), dimension(:), intent(in out) :: x
+    real(REAL64), dimension(:,:), intent(out) :: H
+    real(REAL64), intent(in) :: gtol
+    integer, intent(in) :: maxiter
+    logical, intent(in) :: verbose
+    character(len=*), intent(in) :: report_file
+    integer, intent(out) :: iflag
+
+end subroutine huberfit
+  </pre>
+
+
+    <h2>Description</h2>
+
+  <p>
+    The subroutine <samp>huberfit</samp> estimates parameters of a model
+    by the method of the maximum likelihood with the
+    robust Huber's function.
+    It is implemented based on the <a href="bfgs.html">BFGS method</a>.
+  <p/>
+
+  <p>
+    The function does to approximate the
+    data <i>y<sub>i</sub> ≈ f(x<sub>i</sub>; <b>p</b>)</i>
+    for <i>i = 1, …, N</i> points
+    by the function <i>f(.)</i> with  an optimal choice of a vector
+    of parameters <i><b>p</b></i>.
+    The user must supply the value  <i>f(.)</i>,
+    its gradient <i>𝛻 f(x)</i> and a data set.
+    The scale <i>s</i>, a slack variable, is added
+    and the robust likelihood estimate is made
+    by search of a minimum of the function
+  </p>
+  <p>
+    log <i> L({x<sub>i</sub>,y<sub>i</sub>};<b>p</b>)
+    = 1/N ∑ ϱ{[y<sub>i</sub> - f(x<sub>i</sub>;<b>p</b>)] / s}</i> + </i> log <i>s</i>.
+</i>
+</p>
+
+<p>
+  Robust methods suppose <i>s &gt 0</i>, as the consequence,
+  they does not converge for data without statistical errors
+  (rounding errors are not enough). If the state is recognised,
+  the solution continues with the constrain <i>s = 1</i> set.
+</p>
+
+<p>
+  Statistical errors of parameters are estimated based on the inverse
+  Hessian in the minimum. Its estimate by BFSG method is rough,
+  the accuracy is about ~10%.
+</p>
+
+<p>
+  The regression is suitable for fully determined problems
+  without constrains. As BFGS method can fail for non-decreasing
+  functions, like functions of Tukey or Hampel,
+  the only the Huber function is implemented.
+  No leverage points are sanitised and data should be
+  winsorised prior to use,
+  i.e. data must not contain IEEE Nans and Infs and far
+  data should be replaced by an order  value,
+  else such data can significantly affect
+  the solution. If the assumptions are met,
+  the results are both stable and reliable.
+</p>
+
+<p>For details, see Oakleaf's User guide.</p>
+
+  <h2>Parameters</h2>
+
+  <dl>
+    <dt>fcn</dt><dd>[in] is an abstract function carrying
+      the value of the function and the gradient. See below for details.
+    </dd>
+    <dt>x,y</dt><dd>[in] Arrays of data.</dd>
+    <dt>par</dt><dd>[in out] The initial estimates on the input,
+      and results on the output.
+    </dd>
+    <dt>parerr</dt><dd>[out] The estimates of statistical errors of the parameters.
+    </dd>
+    <dt>scale</dt><dd>[in out] The robust scale. The estimate
+      should be given on the input.
+    </dd>
+    <dt>stdsig</dt><dd>[out] The standard deviation
+    </dd>
+    <dt>H</dt><dd>[out] an approximation the quasi-Hessian in minimum</dd>
+    <dt>gtol</dt><dd>[in] the tolerance for the convergence finish
+      as the Euclidean norm of the gradient. The square root
+      of machine epsilon (10<sup>-8</sup>) is safe choice, if elements
+      of the gradient are small, value about 10<sup>-13</sup> is enough.
+    </dd>
+    <dt>maxiter</dt><dd>[in] The maximal amount of iterations. Recommended
+      value is about two hundredth per variable. Usually a few thousands
+      is enough.
+    </dd>
+    <dt>verbose</dt><dd>[in] Be, or not to be, verbose.</dd>
+    <dt>report_file</dt><dd>[in] A file to store intermediate steps,
+      if a non-empty string is passed. Consult the program listing
+      for details.</dd>
+    <dt>iflag</dt><dd>[out] A result flag; the values 0,1 indicates
+      success, value 6 is a fail. For details,
+      see <a href="bfgs.html">BFGS method</a>.
+      If it fails, the output values must be considered undefined.
+  </dl>
+
+  <p>The implementation is in <samp>src/huberfit.f08</samp>.
+
+  <h2>The function</h2>
+
+<p>
+  The minimised function is defined as a derived type object.
+    The user must specify its functional value <i>f(x)</i>
+  and the gradient <i>𝛻 f(x)</i>.
+  Note, user specifies
+    <i>f(x)</i>, not the likelihood function log <i>L(x;<b>p</b>)</i>.
+    If data are required, they are stored in the derived type,
+    see the example below.
+  </p>
+
+  <dl>
+    <dt>fcn % val() </dt><dd>Returns the functional value <i>f(x<sub>i</sub>)</i>
+      at the point <i>x<sub>i</sub></i>.</dd>
+    <dt>fcn % grad() </dt><dd>The gradient <i>𝛻 f(x<sub>i</sub>)</i>
+      at the point <i>x<sub>i</sub></i>.</dd>
+  </dl>
+
+    <h2>Example</h2>
+
+  <p>
+    We wish to estimate of parameters <i>a,b</i> of a line
+    by the robust regression. The function implementation should have
+    been in the module, to generate the external interface.
+    Save the program to the file <samp>rline.f08</samp>:
+  </p>
+  <pre>
+module the_function
+
+  use oakleaf
+  use iso_fortran_env
+  implicit none
+
+  type, extends(huberfit_function) :: line_function
+   contains
+     procedure :: val => lvalue
+     procedure :: grad => lgradient
+  end type line_function
+
+contains
+
+  function lvalue(this,x,p) result(fval)
+    class(line_function) :: this
+    real(REAL64), intent(in) :: x
+    real(REAL64), dimension(:), intent(in) :: p
+    real(REAL64) :: fval
+    real(REAL64) :: a, b
+
+    a = p(1)
+    b = p(2)
+    fval = a*x + b
+
+  end function lvalue
+
+  subroutine lgradient(this,x,p,fgrad)
+    class(line_function) :: this
+    real(REAL64), intent(in) :: x
+    real(REAL64), dimension(:), intent(in) :: p
+    real(REAL64), dimension(:), intent(out) :: fgrad
+
+    fgrad(1) = x
+    fgrad(2) = 1
+
+  end subroutine lgradient
+
+end module the_function
+
+program what_about_rline
+
+  use oakleaf
+  use the_function
+  use iso_fortran_env
+  implicit none
+
+  real(REAL64), dimension(5), target :: x = [ 1, 2, 3, 4, 5 ]
+  real(REAL64), dimension(5),target :: y = [ 1.1, 2.2, 3.3, 4.2, 5.5 ]
+  type(line_function), target :: fcn
+  real(REAL64), dimension(2) :: p, perr
+  real(REAL64), dimension(2,2) :: H
+  real(REAL64) :: s, stdsig, gtol
+  integer :: iflag,i
+
+  ! initial scale estimate, s > 0
+  s = 1
+
+  ! initial parameters estimate, p = [ a, b ]
+  p = 0
+
+
+  gtol = sqrt(epsilon(gtol))
+
+  call huberfit(fcn,x,y,p,perr,stdsig,s,H,gtol,2*200, &
+       .true.,'',iflag)
+  write(error_unit,*) 'huberfit iflag=',iflag
+  write(error_unit,*) 'scale=',s,' stdsig=',stdsig
+
+  do i = 1,2
+     write(error_unit,*) i,': p=',p(i),'+-',perr(i)
+  end do
+
+   write(*,*) 'residuals: ', y - (p(1)*x + p(2))
+
+end program what_about_rline
+  </pre>
+
+<p>
+  An output:
+</p>
+  <pre>
+$ gfortran -I/usr/local/include rline.f08 -L/usr/local/lib -loakleaf
+$ ./a.out
+iter: pars ... > fval, |grad| | alpha, fval-fv,  info
+    0:     1.000     0.000     0.000  >  3.486E+00 5.354E+00
+    1:     3.059     2.463     0.801  >  2.426E+00 1.353E+00 |  0.618  1.060E+00  11 T
+    2:     3.221     1.910     0.631  >  1.699E+00 1.064E+00 |  1.000  7.278E-01  11 T
+    3:     3.226     0.429     0.205  >  1.363E+00 6.848E-01 |  0.618  3.360E-01  11 T
+    4:     3.167     0.990     0.361  >  1.154E+00 3.150E-01 |  1.000  2.083E-01  11 T
+    5:     2.998     1.045     0.369  >  1.102E+00 3.402E-01 |  1.000  5.268E-02  11 T
+    6:     1.330     1.455     0.412  >  1.005E+00 2.785E+00 |  0.052  9.641E-02  11 T
+    7:     2.254     1.092     0.344  >  8.261E-01 4.880E-01 |  1.000  1.791E-01  11 T
+    8:     1.649     1.068     0.303  >  5.128E-01 6.540E-01 |  1.000  3.133E-01  11 T
+    9:     0.821     1.041     0.246  > -1.817E-01 1.249E+00 |  1.000  6.945E-01  11 F
+   10:     0.082     1.028     0.194  > -1.709E+00 5.956E+00 |  0.447  1.527E+00  11 F
+   11:     0.118     1.033     0.129  > -1.760E+00 1.078E+01 |  0.146  5.083E-02  11 T
+   12:     0.121     1.082     0.040  > -1.896E+00 7.514E+00 |  0.034  1.361E-01  11 T
+   13:     0.079     1.110    -0.067  > -2.015E+00 3.834E+00 |  0.026  1.198E-01  11 T
+   14:     0.069     1.081     0.009  > -2.111E+00 1.228E+01 |  1.000  9.524E-02  11 T
+   15:     0.067     1.083     0.034  > -2.147E+00 4.706E+00 |  1.000  3.619E-02  11 T
+   16:     0.052     1.090     0.016  > -2.175E+00 5.078E+00 |  0.618  2.782E-02  11 T
+   17:     0.054     1.091     0.004  > -2.179E+00 9.361E-01 |  0.618  4.773E-03  11 T
+   18:     0.055     1.088     0.013  > -2.180E+00 9.658E-01 |  1.000  9.665E-04  11 T
+   19:     0.054     1.090     0.010  > -2.181E+00 3.717E-01 |  1.000  4.619E-04  11 T
+   20:     0.054     1.090     0.010  > -2.181E+00 1.698E-01 |  1.000  1.746E-05  11 T
+   21:     0.054     1.090     0.010  > -2.181E+00 6.825E-03 |  1.000  1.568E-05  11 T
+   22:     0.054     1.090     0.010  > -2.181E+00 1.158E-03 |  1.000  2.735E-08  11 T
+   23:     0.054     1.090     0.010  > -2.181E+00 2.147E-05 |  1.000  2.642E-10  11 T
+   24:     0.054     1.090     0.010  > -2.181E+00 1.432E-07 |  1.000  1.368E-13  11 T
+   25:     0.054     1.090     0.010  > -2.181E+00 1.718E-08 |  1.000  0.000E+00  11 T
+   26:     0.054     1.090     0.010  > -2.181E+00 4.377E-10 |  1.000  0.000E+00  11 T
+ scale:    5.3800049474804143E-002     pars:    1.0896626945613177        1.0337329280631986E-002   iflag:            0
+ huberfit iflag=           0
+ scale=   5.3800049474804143E-002  stdsig=   4.8348271276672149E-002
+           1 : p=   1.0896626945613177      +-   2.4260411250087193E-002
+           2 : p=   1.0337329280631986E-002 +-   7.3595511073463446E-002
+ residuals:   -9.1704421834037930E-014   1.0337329280448504E-002   2.0674539351698940E-002 -0.16898829826076600        4.1349197912779800E-002
+  </pre>
+
+      <h2>References</h2>
+
+<p>
+  Other examples can by found in <samp>test/bfgs/</samp>:
+  <samp>rline.f08, rline.sh</samp> is a robust regresion example.
+</p>
+
+<!-- #include "foot.shtml" -->
+  </body>
+</html>

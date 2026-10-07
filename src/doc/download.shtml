@@ -1,0 +1,78 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Downloads</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1 class="noindent">Downloads</h1>
+
+<p class="abstract">
+  Files which provides test data, and links to related external tools.
+</p>
+
+<h2>Distribution site</h2>
+
+<p>
+  All Munipack related files, including source files itself,
+  can be downloaded from the:
+</p>
+<p class="download">
+<a href="https://integral.physics.muni.cz/ftp/munipack">FTP directory</a>
+</p>
+
+<h2>Test data</h2>
+
+<div class="symbol">🌌</div>
+<p>
+There are archives of sample data: <a href="https://integral.physics.muni.cz/ftp/munipack/munipack-data.tar.gz">testing set, colour compositions</a>,
+<a href="https://integral.physics.muni.cz/ftp/munipack/munipack-data-blazar.tar.gz">time serie of blazar 0716+71 (short)</a>,
+<a href="https://integral.physics.muni.cz/ftp/munipack/munipack-data-0716.tar.gz">time serie of blazar 0716+71 (long)</a>,
+<a href="https://integral.physics.muni.cz/ftp/munipack/munipack-data-bubble.tar.gz">exposures of Bubble nebula (NGC 7635) for composition</a> and
+the <a href="https://integral.physics.muni.cz/ftp/munipack/munipack-data-m67.tar.gz">standard field in M67</a>.
+</p>
+
+<!--
+<p>
+The source distribution is the most flexible way for installation.
+Unfortunately, it is also the most complicated way.
+The installation and compilation is described in detail in
+<a href="SourceInstallation.html">Source Installation section</a>.
+</p>
+
+<p>
+Sources of the latest version can be downloaded as:
+<a href="ftp://munipack.physics.muni.cz/pub/munipack/munipack-0.5.7.tar.gz">munipack-0.5.7.tar.gz</a>
+</p>
+-->
+
+<h2><a>External tools</a></h2>
+
+<div class="symbol">📷</div>
+<p>
+Additional <a href="external.html">external</a> utilities
+<a href="https://integral.physics.muni.cz/rawtran">rawtran</a>,
+<a href="https://integral.physics.muni.cz/fitspng">fitspng</a>,
+<a href="https://integral.physics.muni.cz/konve">konve</a> and
+<a href="https://integral.physics.muni.cz/picko">picko</a>
+can be used for import and export of images.
+Using of raw pictures requires availability of
+<a href="https://www.dechifro.org/dcraw/">dcraw</a>.
+</p>
+
+
+
+<h2>See also</h2>
+<p>
+<a href="install.html">Install</a>,
+<a href="changes.html">Recent changes</a>,
+   <a href="version.html">Versioning</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

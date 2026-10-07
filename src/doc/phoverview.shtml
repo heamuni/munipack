@@ -1,0 +1,365 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Photometry Calibration Overview</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Photometry Calibration Overview</h1>
+
+<p class="abstract">
+A photometry calibration, implemented by Munipack, is on base of
+relation between detected counts and expected photons
+as the natural consequence of use of photon counting detectors.
+<!--
+Ratio of observed and expected photons represents an efficiency
+of the detection and establishes the calibration itself.
+-->
+</p>
+
+
+<h2>Basic Ideas</h2>
+
+<p>
+  The traditional way for calibrating of optical observations is to derive,
+  so called, instrumental magnitudes from some observed quantity. A magnitude offset,
+  between both instrumental and catalogue magnitudes, represents the calibration.
+</p>
+
+<p class="indent">
+  Munipack offers an alternative approach. Magnitudes of calibration stars are
+  converted to photons and the calibration establishes a relation
+  between expected amount of photons and observed counts.
+</p>
+
+<p class="indent">
+The photon approach has been chosen for two reasons. For the principal reason,
+the physical quantity which is detected by modern detectors are photons.
+For the second reason: statistical properties are much more suitable for
+robust statistics.
+</p>
+
+<p class="indent">
+  Why photons? Common modern devices detects photons.
+  Its energy and wavelength doesn't matter (at least for an ideal detector).
+  The amount of detected photons is quantity designed as the counts
+  of events that appeared in detector. An ideal detector has amount of counts
+  equal to amount of detected photons.
+</p>
+
+<h2>Photons</h2>
+
+<p>
+Light is composed from electromagnetic waves which carries an energy
+emited by sources. The connection between the energy <i>E</i>
+of <i>n</i> photons for a single wave with frequency <i>ν</i> is established
+by <a href="https://en.wikipedia.org/wiki/Planck%E2%80%93Einstein_relation">
+Planck's relation</a>:
+</p>
+<p>
+    <i>E = n h ν</i>
+</p>
+<p>
+The energy <i>E</i> can be measured by a calorimeter (bolometer)
+while photons <i>n</i> are collected by digital cameras or photomultipliers.
+</p>
+
+<p class="indent">
+In astronomical photometry, we are collecting the energy or photons
+for a time interval <i>T</i> falling on an area <i>A</i>.
+To get values independent on the factors we are normalising
+the (specific) quantities.
+The energy per unit of time and area is replaced by energy flux
+</p>
+<p>
+<i>E / T A → F</i>
+</p>
+<p class="indent">
+and photons by photon flux
+</p>
+<p>
+<i>n / T A → Φ</i>.
+</p>
+<p class="indent">
+By using the substitutions, Planck's relation gets the form
+</p>
+<p>
+    <i>F = Φ h ν</i>
+</p>
+
+<p class="indent">
+A relation between between energy flux <i>F</i>
+and the apparent magnitude <i>m</i> in a filter can be determined
+(inverse of
+<a href="https://en.wikipedia.org/wiki/Apparent_magnitude">Pogsons's equation</a>) as
+</p>
+<p>
+<i>
+F = f<sub>ν0</sub> Δν ‧ 10<sup>-m/2.5</sup>
+</i>
+</p>
+<p>
+where <i>f<sub>ν0</sub></i> is a reference flux density (per frequency)
+and <i>Δν</i> is the frequency width of the filter (the filter is modelled
+as a rectangle). The product <i>f<sub>ν0</sub> Δν</i> is flux throughout
+given filter. The <i>h ν</i> is energy of single photon.
+For photon flux, the mean number of photons is flux per
+photon energy, we have
+</p>
+<p>
+<i>
+Φ = (f<sub>ν0</sub> Δν) / (h ν) ‧ 10<sup>-m/2.5</sup>
+</i>
+</p>
+
+<p class="indent">
+Of course, photon flux can be also expresed in terms of wavelengts.
+Use standard relation between frequency and wavelength
+</p>
+<p>
+<i>ν = c / λ</i>,
+</p>
+<p>
+form the flux as
+</p>
+<p>
+<i>
+Φ = (f<sub>λ0</sub> Δλ) / (h c / λ) ‧ 10<sup>-m/2.5</sup>.
+</i>
+</p>
+
+
+<p class="indent">
+Just for illustration, number of photons
+falling on square meter per second in Johnson's V filter
+(like eye's sensitivity) is summarised in following table
+(constants approved <i>f<sub>ν0</sub></i> = 4 ‧ 10<sup>-11</sup> W/m<sup>2</sup>/nm,
+<i>Δλ</i> = 70 nm, <i>λ</i> = 550 nm).
+</p>
+
+<div class="table">
+<table>
+<caption>Energy and photon fluxes in visual band</caption>
+<tr><th>magnitude</th><th>energy flux [W/m<sup>2</sup>]</th><th>photon flux [ph/s/m<sup>2</sup>]</th><th>example</th></tr>
+<tr><td>0</td><td>10<sup>-9</sup></td><td>10<sup>10</sup></td><td>Vega</td></tr>
+<tr><td>5</td><td>10<sup>-11</sup></td><td>10<sup>8</sup></td><td>naked eye limit</td></tr>
+<tr><td>10</td><td>10<sup>-13</sup></td><td>10<sup>6</sup></td><td>bright quasars</td></tr>
+<tr><td>15</td><td>10<sup>-15</sup></td><td>10<sup>4</sup></td><td>Kuiper belt objects</td></tr>
+<tr><td>20</td><td>10<sup>-17</sup></td><td>10<sup>2</sup></td><td>optical afterglows</td></tr>
+<tr><td>25</td><td>10<sup>-19</sup></td><td>1</td><td>Earth telescope limit</td></tr>
+</table>
+</div>
+
+<h2>Calibration</h2>
+
+<p class="indent">
+A knowledge of magnitudes of standard stars can be used to compute expected
+photon flux and also count of photons for our observations.
+</p>
+<p>
+<i>n = A T Φ</i>
+</p>
+<p>
+and we can compare it with actually observed photons <i>c = g d</i>
+(where <i>g</i> is gain and <i>d</i> number of events given by our instrument):
+</p>
+<p><i>
+   η = c / n
+</i></p>
+<p>
+which determines a sensitivity of both our and a standard instrument.
+The ratio has meaning of light effectivity of full
+device (detector, optical apparatus, atmosphere together).
+</p>
+
+<p class="indent">
+Both catalogue <i>n</i> and measured quantities <i>c</i> are determined with
+a certain uncertainity. Main source of the uncertainity comes from properties
+of detection mechanism of photons which is known as
+<a href="https://en.wikipedia.org/wiki/Poisson_distribution">Poisson distribution</a>.
+The statistical error is related to count of detected photons as <i>σ² = c</i>
+as can be see on <a href="https://integral.physics.muni.cz/pelican/articles/photon-rain-statistics.html">simple numerical experiment</a>. As one can see, the uncertainity
+depends on calibration star brightness which is absolutely strange
+for common experiences with regular meassurements (time, lenght).
+</p>
+
+<p class="indent">
+Direct computation of mean of ratio <i>c/n</i> is slightly uncorrect
+because measurements has principially huge diffrences in precision.
+Therefore, we are using the transformation to a new variable
+</p>
+<p><i>
+(n - c/η) / σ
+</i></p>
+<p>
+which has mean value 0 and dispersion 1. This is mathematically
+little bit complicated way because detremination of <i>η</i> requires
+solution of implicit non-linear equation.
+</p>
+
+
+<p class="indent">
+The very hearth of calibration is determining of the ratio and the constant
+<i>η</i> from a set of stars.
+The prerequisites leads to minimisation the function
+</p>
+<p>
+<i>
+Σ<sub>i</sub> ρ[(n<sub>i</sub> - r c<sub>i</sub>) / σ<sub>i</sub>]
+</i>
+</p>
+<p>
+where <i>σ² = r c + σ²<sub>x</sub> + …</i> (Poisson and
+others sources of noise), the unknown parameter <i>r = 1 / η</i>
+and function <i>ρ</i>
+is a <a href="https://en.wikipedia.org/wiki/Robust_statistics">robust function</a>
+(classic <i>χ<sup>2</sup></i> or least squares has non-robust version
+of <i>ρ[x]</i> as <i>x<sup>2</sup></i>).
+</p>
+
+<p>
+If the parameter <i>r = 1 / η</i> is known, all objects can be transformed
+to standard photon counts:
+</p>
+<p>
+<i>
+n<sub>i</sub> = r c<sub>i</sub>
+</i>
+</p>
+<p>
+and also to fluxes or magnitudes.
+</p>
+
+<p class="indent">
+  The photon calibration approach is common to high-energy astrophysics,
+  the flux-based for radio-astronomy and magnitude based to (near-)optical
+  astronomy. Important advantages are:
+</p>
+<ul>
+<li> Properties of Poisson distributions can be used
+    for determination and check of statistical errors.
+</li>
+<li>
+   The robust statistical methods can be used.
+</li>
+<li>
+   The determination of colour transformations is more exact
+    and clearer.
+</li>
+<li>
+   The quantities can be easy used in multi-wavelength
+    research.
+</li>
+<li>
+   Photons are easy to use and understand because detected
+   counts are same kind.
+</li>
+<li>
+   The framework is not confusing.
+</li>
+</ul>
+
+<p class="indent">
+  Why magnitudes are confusing? Because bright objects has negative
+  magnitude. Sum means products. Magnitude increases with distance.
+  Magnitudes are both relative and absolute quantity. Magnitudes has no units.
+  There are none magnitude detectors.
+</p>
+
+<figure>
+<img src="res_fill.svg" alt="Residuals" title="Residuals of calibration">
+<figcaption>Residuals on Landolt 101 field in V filter. Crosses
+are relative difference between catalogue and measured counts
+<i>(n - r*c)/n</i> and the filling is expected <i>1-σ</i> interval
+of errors. The filling has rougly limit as <i>1/√n</i>.
+</figcaption>
+</figure>
+
+
+
+<h2 id="calibration">Photometry Calibration</h2>
+
+<p>
+   The basic photometry tool is <a href="man_phcal.html">phcal</a>
+   which computes calibration ratio <i>r=1/η</i> coded by CTPH keyword
+   and creates a new frame with values in photons (not counts). The
+   frame has both photometry table and image values calibrated in
+   photons.
+<!-- and is a central point of the whole calibration.-->
+</p>
+
+
+<!--
+<h2>Photometry In Magnitudes</h2>
+
+<p>
+   Whereas, Munipack internally uses photons as a basic calibration
+   quantity, another quantities are also available:
+</p>
+<ul>
+<li>
+     Magnitudes: instrumental, calibrated in a filter, STmag and ABmag
+</li>
+<li>
+     Fluxes: energy fluxes in a filter and as a flux density per frequency
+              or wavelength unit
+</li>
+</ul>
+-->
+
+
+
+<!--
+
+<h2>Photometry system transformations</h2>
+
+
+
+
+<h2>Aperture Photometry</h2>
+
+<p>
+aphot prepares aperture photometry. One is stored as a table HDU
+in FITS file with APERPHOT extname. The structure of the table
+is quilt extensive and intended for additional processing.
+</p>
+
+
+<h2>Frame conversion</h2>
+
+<p>
+To provide exactly defined photometry quantity. Utility for frame
+conversion is included.
+</p>
+
+
+<h2>Calibration Modes</h2>
+
+<h2>Calibration field</h2>
+
+<h2>Calibration Transformation</h2>
+
+<h2>Multi-filter calibration</h2>
+
+-->
+
+<h2>See Also</h2>
+
+
+<p>
+Manuals:
+<a href="man_aphot.html">Aperture Photometry</a>,
+<a href="man_phcal.html">Photometry Calibration</a>,
+<a href="man_phcorr.html">Photometric corrections</a>.
+Data Formats:
+<a href="dataform_tmseries.html">Time Series Tables</a>.
+</p>
+
+</section>
+
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

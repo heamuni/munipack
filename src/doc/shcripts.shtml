@@ -1,0 +1,28 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Scripting in Bash</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+
+<h1>Scripting in Bash</h1>
+
+<p class="abstract">
+
+</p>
+
+<a href="lctut.sh">Light curve</a>
+
+ucac_jmuc.py
+artificial.sh
+kombitut.sh
+mosaic.sh
+henden_m67.sh
+
+
+<!-- #include virtual="/foot.shtml" -->
+
+</body>
+</html>

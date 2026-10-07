@@ -1,0 +1,95 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Setup</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+  <h1>Setup</h1>
+
+<p class="abstract">
+  Munipack reads many important data needed for processing from FITS headers.
+  The data are coded in the form KEYWORD=VALUE like a dictionary. Both the
+  keywords and values are standardized, but there is many local conventions
+  and differences and specificatiions in naming KEYWORD conventions.
+  Therefore, there are a list of keywords recognized by Munipack together
+  with default values.
+</p>
+
+<p>
+  How to set the values for command <samp>munipack</samp> is described in
+  <a href="man_env.html">Environment variables</a> document.
+</p>
+
+<p>
+A file mostly comply with
+<a href="http://heasarc.gsfc.nasa.gov/docs/fcg/standard_dict.html">FITS Standard</a>
+will not need redefine none of the keywords (except some local conventions).
+</p>
+
+<p>
+  Just for instance. Many software keeps the exposure time in FITS header
+  in the keyword EXPOSURE. Munipack expects the same quantity in the keyword
+  EXPTIME (see table below). Using of the command
+</p>
+<pre>
+  export FITS_KEY_EXPTIME="EXPOSURE"
+</pre>
+<p>
+  replaces the default value. Similar way can be used in all other cases.
+</p>
+
+<h2 id="preprocenv">Keywords Affecting Preprocessing</h2>
+
+<div class="table">
+<table>
+<caption>Preprocessing variables</caption>
+<tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+<tr><td><samp>MUNIPACK_TEMPERATURE_TOLERANCE</samp></td><td>1°C</td><td>maximal temperature difference between frames in Celsius degrees</td></tr>
+<tr><td><samp>MUNIPACK_EXPTIME_TOLERANCE</samp></td><td>1 μs</td><td>maximal difference between exposure times of frames in seconds</td></tr>
+</table>
+</div>
+
+<p>
+  The variables are used by bias, dark and phcorr.
+</p>
+
+
+<h2>Keywords Affecting Photometry Calibration</h2>
+
+<h2>General Usage Keywords</h2>
+
+
+<h2>General Usage Keywords</h2>
+
+<h2>FITS environment variables</h2>
+
+<div class="table">
+<table>
+<caption>FITS environment keywords</caption>
+<tr><th>Variable</th><th>Default</th><th>Identifies of</th></tr>
+<tr><td><samp>FITS_KEY_FILTER</samp></td><td><samp>FILTER</samp></td><td>the photometric filter</td></tr>
+<tr><td><samp>FITS_KEY_EXPTIME</samp></td><td><samp>EXPTIME</samp></td><td>the exposure time</td></tr>
+<tr><td><samp>FITS_KEY_TEMPERATURE</samp></td><td><samp>TEMPERAT</samp></td><td>the temperature of camera</td></tr>
+<tr><td><samp>FITS_KEY_AIRMASS</samp></td><td><samp>AIRMASS</samp></td><td>airmass</td></tr>
+<tr><td><samp>FITS_KEY_DATEOBS</samp></td><td><samp>DATE-OBS</samp></td><td>the start of exposure</td></tr>
+<tr><td><samp>FITS_KEY_TIMEOBS</samp></td><td><samp>TIME-OBS</samp></td><td>the start of exposure (legacy)</td></tr>
+<tr><td><samp>FITS_KEY_OBJECT</samp></td><td><samp>OBJECT</samp></td><td>the object identifier</td></tr>
+<tr><td><samp>FITS_KEY_IMAGETYP</samp></td><td><samp>IMAGETYP</samp></td><td>imagetyp: light, flat, dark</td></tr>
+<tr><td><samp>FITS_KEY_SATURATE</samp></td><td><samp>SATURATE</samp></td><td>detector saturation (full well capacity) on ADU</td></tr>
+<tr><td><samp>FITS_KEY_READNOISE</samp></td><td><samp>READNS</samp></td><td>read noise in ADU</td></tr>
+<tr><td><samp>FITS_KEY_GAIN</samp></td><td><samp>GAIN</samp></td><td>amplifier gain in electrons per ADU</td></tr>
+<tr><td><samp>FITS_KEY_AREA</samp></td><td><samp>AREA</samp></td><td>area of detector in square meters</td></tr>
+<tr><td><samp>FITS_KEY_EPOCH</samp></td><td><samp>EPOCH</samp></td><td>reference time epoch</td></tr>
+<tr><td><samp>FITS_KEY_LATITUDE</samp></td><td><samp>LATITUDE</samp></td><td>geographical latitude of station in degrees, north positive (+north)</td></tr>
+<tr><td><samp>FITS_KEY_LONGITUDE</samp></td><td><samp>LONGITUD</samp></td><td>geographical longitude of station in degrees, east positive (-west)</td></tr>
+</table>
+</div>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

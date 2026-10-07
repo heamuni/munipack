@@ -1,0 +1,671 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Artificial Frames</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Artificial Frames</h1>
+
+<p class="abstract">
+  This tool is designed to create the artificial, nevertheless photometric
+  realistic, frames. They are intended for modelling of various observation
+  effects as well as for testing purposes.
+</p>
+
+
+<h2>Synopsis</h2>
+
+<code>
+munipack artificial [.. parameters ..]
+</code>
+
+<h2>Description</h2>
+
+<p>
+  Artificial frames are created by artificial photons having origin
+  in physical principles and mathematical formulas rather than in nature.
+  This approach can be very useful for understanding
+  of true nature of many effects which can be else gathered
+  by a plenty of observational experiences.
+</p>
+
+<p>
+  There is list of currently implemented features:
+ <!-- The models  describes impact of these effects:-->
+</p>
+<ul>
+  <li>Quantum efficiency of detector, telescope parameters.</li>
+  <li>Atmospheric extinction (monochromatic)</li>
+  <li><a href="https://en.wikipedia.org/wiki/Astronomical_seeing">Astronomical Seeing</a>
+    </li>
+  <li>Point spread functions (PSF): Gaussian, Moffat and seeing.</li>
+  <li>Background noise</li>
+  <li>Light curves: plain wave, Algol-like, δ Cep and user defined</li>
+  <li>Field stars: by a catalogue or generated randomly.
+  <!--
+  <li>Appearance of clouds</li>
+  -->
+</ul>
+<p>
+  The frames are generated:
+</p>
+<ul>
+  <li>on base of catalogue stars which simulates nearly real field or</li>
+  <li>on base of randomly generated positions and magnitudes of stars.</li>
+</ul>
+
+
+<h3>Modelling of Telescope Properties</h3>
+
+<p>
+  The properties of star images can be easy simulated for
+  various quantum efficiency <i>η</i> of a detection apparatus (including
+  detector itself), an exposure duration and a telescope diameter.
+</p>
+
+<p>
+  Both angular resolution and collecting area of a telescoped
+  are proportional to diameter.
+  The parameter <samp>--airy</samp> can set it directly, but
+  better way is set diameter (via <samp>--diameter</samp> in meters)
+  which sets both diffraction limit and input area.
+</p>
+
+
+<h3>Modelling of Extinction</h3>
+
+<p>
+  An observed light intensity <i>I(X)</i> passing the clear (no clouds) Earth's
+  atmosphere is attenuated proportionally of air-mass <i>X</i> according
+  to the formula
+</p>
+<p>
+  <i>I(X) = I<sub>0</sub> e<sup>-k(X-1)</sup></i>
+</p>
+<p>
+  where <i>I<sub>0</sub></i> is an extra-atmospheric intensity.
+  The extinction coefficient <i>k</i> depends on a spectral band.
+</p>
+
+<p>
+  The sky brightness (see below) is modelled by the same way
+  (<i>b<sub>Z</sub></i> is its zenit value)
+</p>
+<p>
+  <i>b(X) = b<sub>Z</sub> e<sup>-k(X-1)</sup></i>
+</p>
+
+<h3>Modelling of seeing</h3>
+
+<p>
+  Turbulent motion in atmosphere creates large cells
+  which slightly reflect light rays. The nature of turbulent
+  motion is totally chaotic. There is a formula describing
+  effect of chaotic moving of picture of a star due atmosphere
+  during long exposures. It modelled star profile as function
+  of air mass.
+</p>
+
+<p>
+  By <a href="https://en.wikipedia.org/wiki/Fried_parameter">Mr.Fries theory</a>
+  (very nice description has <a href="http://link.springer.com/book/10.1007/978-3-540-76583-7/page/1">Electronic Imaging in Astronomy</a> by Ian S. McLean),
+  the seeing radius is
+  <a href="http://www.astro.auth.gr/~seeing-gr/seeing_gr_files/theory/node17.html">modelled</a> as
+</p>
+<p>
+  <i>r'<sub>0</sub> = r<sub>0</sub> X<sup>0.6</sup></i>.
+</p>
+<p>
+  <i>r'<sub>0</sub></i> is an actual radius of stars at air-mass <i>X</i>,
+    while <i>r<sub>0</sub></i> is the one at zenith.
+</p>
+
+
+<h3>Modelling of Star Profiles</h3>
+
+<p>
+These profiles known as point spread functions (PSF) are available:
+</p>
+<ul>
+  <li>Seeing spread function which convoluted diffraction pattern of
+    telescope aperture and Gaussian spread by seeing. It is the best
+    method for simulation of any star natural profile.
+    <!--The spread
+    (convolution) can be computed by direct method (repeatelly
+    shift and add  difraction pattern to the profile) which is very
+    slow, but gives non-symatetric profiles) and by Fourier convolution
+    method which is fast and results are perefctly smooth.
+      -->
+  </li>
+  <li>
+    <a href="http://adsabs.harvard.edu/abs/1969A%26A.....3..455M">Moffat profile</a>
+    which is commonly used for rough description of observed profiles.
+  </li>
+  <li>
+    Gaussian profiles exp<i>(-r<sup>2</sup>/r<sup>2</sup><sub>0</sub>)</i>
+    which is the basic estimator. It is ideal for
+    theoretical work; any practical use is limited on extra-atmospheric
+    applications, such as spacecraft or Moon base observatories, without
+    image perturbations by the seeing.
+  </li>
+</ul>
+
+<div class="threecolumn">
+  <div class="column3">
+    <figure>
+      <img class="figure" src="GAUSS_PSF.jpeg" alt="GAUSS_PSF.jpeg"
+	   title="Gauss PSF">
+      <figcaption>Gauss</figcaption>
+    </figure>
+  </div>
+  <div class="column3">
+    <figure>
+      <img class="figure" src="MOFFAT_PSF.jpeg" alt="MOFFAT_PSF.jpeg"
+	   title="Moffat PSF">
+      <figcaption>Moffat</figcaption>
+    </figure>
+  </div>
+  <div class="column3">
+    <figure>
+      <img class="figure" src="SEEING_PSF.jpeg" alt="SEEING_PSF.jpeg"
+	   title="seeing PSF">
+      <figcaption>seeing</figcaption>
+    </figure>
+  </div>
+</div>
+
+<p>
+  The plain diffraction pattern, representing response of an input aperture
+  of a telescope without atmosphere seeing,  can be generated as seeing spread
+  with zero seeing parameter. It is difficult to expose it, even in laboratory,
+  due to limited dynamical range of detectors.
+</p>
+
+
+<p>
+  The distribution of seeing is supposed as Gaussian and convoluted
+  with actual diffraction profile. There are two methods convolution
+  implemented:
+</p>
+<ul>
+  <li>Direct convolution -- diffraction profile is randomly shifted
+    in both directions and the result is accumulated. This slow method
+    gives slightly asymmetrical frames and is intended for
+    simulating of short exposures.</li>
+  <li>Fourier convolution -- this method generates both diffraction profile
+    and Gaussian with the Fried's width. The profiles are convoluted
+    with help of <a href="https://en.wikipedia.org/wiki/Convolution">convolution theorem</a> and
+    <a href="https://en.wikipedia.org/wiki/Fast_Fourier_transform">FFT</a>. This  method is fast and results are perfectly smooth.
+</ul>
+<p>All stars, on the image, are modelled with the same profile.</p>
+
+<h3>Elliptic star profiles</h3>
+
+<p>
+  Non-circular star profiles are modelled by
+  <a href="https://en.wikipedia.org/wiki/Ellipse">ellipse</a>.
+  Any ellipse is characterised by
+  semi-major axis <i>a</i> (having radius meaning <i>r<sub>0</sub></i>)
+  and semi-minor axis <i>b</i>. <i>b</i> can not be specified directly:
+  eccentricity <i>0 &le; e &lt; 1</i> is used instead;
+  the parameter squeezes circle (<i>e=0, a = b</i>)
+  to a line (<i>e → 1</i>).
+</p>
+
+<p>
+  Ellipsis is oriented to have its major semi-axis parallel to horizontal
+  Cartesian axis by default. It can be optionally rotated by angle
+  <i>-90° &lt; i &le; 90°</i>.
+</p>
+
+<p>
+  Non-circularity can be used to model
+  imperfections in telescope tracking.
+</p>
+
+<figure>
+  <svg style="display: block; margin-left: auto; margin-right:auto;"
+       width="500" height="330">
+  <g style="stroke:black; stroke-width:1" transform="translate(220,160)">
+    <line x1="0" y1="-200" x2="0" y2="200" />
+    <line x1="-200" y1="0" x2="250" y2="0" />
+  </g>
+  <g style="stroke:#8AB8E6; fill:none; stroke-width:2;"
+     transform="translate(220,160)">
+    <line x1="0" y1="0" x2="200" y2="0"
+	  transform="rotate(-30 0 0)"/>
+    <line x1="0" y1="0" x2="0" y2="-120"
+	  transform="rotate(-30 0 0)"/>
+   <path d="M 60 0 Q 60 -15,  51.2 -30 " />
+    <text x="40" y="-5" font-style="italic">i</text>
+    <text x="80" y="-60" font-style="italic">a</text>
+    <text x="-55" y="-40" font-style="italic">b</text>
+    <ellipse cx="0" cy="0" rx="200" ry="120"
+	     transform="rotate(-30 0 0)"/>
+  </g>
+</svg>
+<figcaption>Ellipsis</figcaption>
+</figure>
+
+
+<h3>Modelling of Background</h3>
+
+<p>
+  Background <i>B(x,y)</i> is modelled as a plane
+</p>
+<p>
+  <i>b(x,y) = B<sub>0</sub> + ΔB<sub>x</sub> (x - x<sub>0</sub>) +
+    ΔB<sub>y</sub> (y - y<sub>0</sub>)</i>
+</p>
+<p>
+  <i>
+    B(x,y) =  N( b(x,y), Δb)
+  </i>
+</p>
+<p>
+  where <i>B<sub>0</sub></i> is a mean level (derived
+  from <samp>--skymag</samp>)
+  at centre of the picture <i>x<sub>0</sub>, y<sub>0</sub></i>,
+  <i>N(b, Δb)</i> is a function which makes a noise with
+  <a href="https://en.wikipedia.org/wiki/Normal_distribution">Normal
+    distribution</a>.
+  The parameters are mean level <i>b</i> and standard deviation <i>Δb</i>,
+  which is computed as <i>Δb = √ B<sub>0</sub></i>.
+  <i>B(x,y)</i> is allways set to be non-zero.
+</p>
+
+<p>
+  The optional gradient in background in counts per pixels is given
+  by terms <i>ΔB<sub>x</sub>, ΔB<sub>y</sub></i>
+  (<samp>--sky-grad-x, --sky-grad-y</samp>). It can do modelling of
+  a light pollution (by Moon). The common values for gradients are
+  of order 0.0001 … 0.001 (negative values means negative slope of
+  the plane in given direction).
+</p>
+
+<div class="table">
+<table>
+<caption>Common sky brightness in zenit</caption>
+<tr><th>value [mag/arcsec<sup>2</sup>]</th><th>light conditions</th></tr>
+<tr><td>above 22</td><td>natural sky, high-altitude observatory</td></tr>
+<tr><td>22</td><td>dark place, excellent night</td></tr>
+<tr><td>21</td><td>countryside sky, average night</td></tr>
+<tr><td>20</td><td>suburban sky, poor night</td></tr>
+<tr><td>18</td><td>urban sky, full Moon</td></tr>
+<tr><td>under 17</td><td>city sky, twilight</td></tr>
+</table>
+</div>
+
+<p>
+  Values in the table are rought and determined by my observing
+  experiences
+  (<a href="https://en.wikipedia.org/wiki/Bortle_scale">wiki page</a>).
+</p>
+
+
+<h3>Star fields</h3>
+
+<p>
+  Field stars are generated by a random number generator,
+  if no <samp>-c</samp> option (a catalogue) is presented.
+  Catalogue star coordinates and magnitudes are used otherwise.
+</p>
+
+<p>
+  Rectangular (without projection) coordinates of the stars has
+  <a href="https://en.wikipedia.org/wiki/Uniform_distribution_(continuous)">
+    uniform distribution</a> in ranges given by a frame size.
+  The standard Fortran random number generator, with no initial seed, is used.
+</p>
+
+<p>
+  Magnitude distribution, meaning a probability to found number
+  of stars in given magnitude interval per square degree, is
+  modelled as an exponential function with a cut-off to prevent
+  <a href="https://en.wikipedia.org/wiki/Olbers%27_paradox">Olbersʼ
+    paradox</a>.
+  I derived a rough approximation
+  of the observed (surface) distribution of stars by brightens
+  from <a href="https://www.cosmos.esa.int/web/gaia/dr1">DR1</a>
+  by <a href="https://www.cosmos.esa.int/web/gaia">Gaia mission</a>:
+</p>
+<p>
+  <i>
+    Σ(m) = 10<sup>-4</sup> · e<sup>1.1m</sup> [□°], &nbsp;
+         m &lt; m<sub>0</sub>,
+  </i>
+</p>
+<p>
+  (the symbol <i>□°</i> designates square degree).
+  The cut-off <i>m<sub>0</sub></i> is given by <samp>--maglim</samp>
+  parameter.
+Large values of <i>m<sub>0</sub></i> and large field of view
+can effectively exhaust the computer memory.</p>
+
+<p>
+  The distribution approximation must be considered as an effective description.
+  Stars are distributed over our sky very non homogeneously. Standard galaxy
+  textbooks (like Binney's &amp; Merrifield's
+  <a href="http://adsabs.harvard.edu/abs/1998gaas.book.....B">Galactic Astronomy</a>)
+  gives more extensive description with references.
+</p>
+
+<h3>Models of light curves</h3>
+
+<p>
+  The artificial tool has three models of light curves included. The model
+  of the pulsating star δ Cep (data computed by <a href="http://cds.aanda.org/component/article?access=bibcode&bibcode=2015A%252526A...584A..80M">Mérand et al.</a>)
+  and the eclipsing binary star Algol (observed by <a href="http://adsabs.harvard.edu/abs/1989ApJ...342.1061K">Kim, Ho-Il</a>). Both the curves has been approximated by
+  Fourier series. The last model is a simple cosine wave.
+</p>
+
+<figure>
+<img class="figure" src="lcapprox.svg" alt="lcapprox.svg" title="LC">
+<figcaption>The approximation of light curves of δ Cep and Algol.</figcaption>
+</figure>
+
+<p>
+  There is also possibility to define own
+  <a href="https://en.wikipedia.org/wiki/Fourier_series">Fourier series</a>
+  approximation of light curves which is suitable for wave-like patterns.
+  Do create a FITS table with format similar to <a href="fourier.lst">fourier.lst</a>.
+  The table contains real Fourier coefficients <i>a<sub>n</sub>, b<sub>n</sub></i>.
+  If the coefficients are estimated from measured data with noise,
+  any appearance of high-order terms indicates inappropriateness of Fourier approximation.
+  I can't recommend  use on curves with sharp edges as Algol-like objects has.
+Note. The Fourier approximation gives very good approximation
+of Cepheids but is not very suitable for Algoids. The spline approximation
+can be recommended in that case.
+</p>
+
+<p>
+  Universal flux-time pattern is implemented as a time series table.
+  It can represent a periodic object like Algol star or exoplanet transition,
+  but it can also model an non periodic behaviour like a supernova explosion
+  or an optical afterglow. The usage is described in
+  <a href="artific.html#lc">Light Curves</a> section of Overview.
+</p>
+
+<h3>Galaxy models</h3>
+
+<p>
+  This artificial tool implements models of
+  <a href="https://en.wikipedia.org/wiki/Elliptical_galaxy">elliptical galaxies</a>.
+  A radial profile have
+  <a href="https://en.wikipedia.org/wiki/Sersic_profile">Sérsic profile</a>
+  (generalised
+  <a href="https://en.wikipedia.org/wiki/De_Vaucouleurs%27s_law">de Vaucouleurs profile</a>).
+  A shape (nearly circular or nearly lenticular) is given by the Hubble
+  classification;
+  an orientation and shape of ellipticity is the same as for PSF of stars.
+  All parameters are specified in the particular
+  <a href="dataform_artgalaxy.html">galaxy catalogue</a> file.
+  See <a href="artific.html#egal">Artificial sky</a> for examples.
+</p>
+
+
+<h3>Watermark</h3>
+<p>
+  Every generated frame is marked by a symbol which indicates
+  its artificial origin to prevent potential confusion.
+  The mark can not be hide.
+</p>
+
+
+<h2>Parameters</h2>
+
+<dl>
+  <dt><samp>--psf [SEEING|MOFFAT|GAUSS]</samp></dt><dd>
+    Selects PSF function: SEEING (the best, slow, default), MOFFAT (commonly used),
+    GAUSS (basic model, fast)
+    </dd>
+  <dt><samp>--psf-file filename</samp></dt><dd>
+    PSF by the external FITS file
+    (<a href="dataform_artpsf.html">specification</a>).
+    </dd>
+  <dt><samp>--spread [AUTO|FFT|RANDOM]</samp></dt><dd>
+    The method used to spread diffraction pattern (useful with --psf SEEING only):
+    FFT (fast, smooth), RANDOM (slow, natural look) or AUTO (the RANDOM
+    is selected for exposures shorter than 3 seconds)
+  </dd>
+  <dt><samp>--hwhm hwhm</samp></dt><dd>
+    Half with of half of maximum of spread Gaussian in pixels. It represents
+    half of seeing parameter. The parameter is common for all PSF.
+  </dd>
+  <dt><samp>--airy airy</samp></dt><dd>
+    Radius of Airy spot in pixels. It is useful for seeing PSF.
+    This parameter can be also set by <samp>--diameter</samp>.
+  </dd>
+  <dt><samp>--beta β</samp></dt><dd>
+    Value of β exponent of Moffat profile (<i>β &gt; 0, β ≠ 1</i>).
+  </dd>
+  <dt><samp>--eccentricity <i>e</i></samp></dt><dd>
+    Eccentricity of PSF by a contour
+    <a href="https://en.wikipedia.org/wiki/Ellipse">ellipse</a>:
+    <i>0 &le; e  &lt; 1</i>. The default value <i>e=0</i> specifies
+    a circular PSF.
+  </dd>
+  <dt><samp>--inclination <i>i</i></samp></dt><dd>
+    Inclination of major semi-axis of the
+    <a href="https://en.wikipedia.org/wiki/Ellipse">ellipse</a>
+    in degrees. Positive values of the angle are in mathematics sense
+    (counter-clockwise).
+  </dd>
+  <dt><samp>--maglim m<sub>0</sub></samp></dt><dd>
+    Sets the most faint stars on frame for random generated field stars.
+    This option is active only when star catalogue (by <samp>-c,--cat</samp>)
+    is not used.
+  </dd>
+  <dt><samp>--lc-model [Cepheid|Algol|wave]</samp></dt><dd>
+    The light curve model: `Cepheid' means light curve of δ Cep, `Algol' means β Per,
+    `wave' means cosine function.
+    This parameter is mutually exclusive with <samp>--lc-table, --lc-fourier</samp>.
+  </dd>
+  <dt><samp>--lc-table file</samp></dt><dd>
+    The light curve model is determined by the
+    <a href="https://en.wikipedia.org/wiki/Smoothing_spline">smoothing spline</a>
+    interpolation in De Boor's approach of the table values.
+    The table format is <a href="#lctab">described</a>  below.
+    This parameter is mutually exclusive with <samp>--lc-model, --lc-fourier</samp>.
+  </dd>
+  <dt><samp>--lc-fourier file</samp></dt><dd>
+    The light curve model is given by the coefficients
+    of Fourier series listed in a FITS table (see <a href="#lctab">below</a>).
+    This parameter is mutually exclusive with <samp>--lc-model, --lc-table</samp>.
+  </dd>
+  <dt><samp>--lc-mag <i>m<sub>0</sub></i>, --lc-amp <i>A</i></samp></dt><dd>
+    The magnitude zero point and the amplitude for a light curve.
+    Magnitudes are derived from computed fluxes <i>F</i>
+    as <i>m = m<sub>0</sub> + 2.5 </i>log <i>AF</i>.
+  </dd>
+  <dt><samp>--lc-jd0 jd0, --lc-per period </samp></dt><dd>
+    Time elements of the light curve: jd0 is a reference time in
+    Julian date (exact meaning depends on the kind of the curve), period in
+    days. Don't use modified JD.
+  </dd>
+  <dt><samp>--lc-ra α, --lc-dec δ</samp></dt><dd>
+    A Right Ascension and Declination of the variable source. If the coordinates
+    are undefined, the centre of projection (as <samp>--rcen, --dcen</samp>)
+    is used.
+  </dd>
+  <dt><samp>--sky-mag skymag</samp></dt><dd>
+    Set sky brightness in magnitudes per square arcsecond.
+    Default value is 21 meaning good observing conditions.
+    Set <samp>--sky-mag 99</samp> to effectivelly switch it off.
+  </dd>
+  <dt><samp>--sky-grad-x xmag, --sky-grad-y ymag</samp></dt><dd>
+    Background change in magnitues per square arcsecond and pixel
+    in given direction.
+    The order of common values is in the interval 0.0001 … 0.001.
+    It simulates a light pollution (by Moon).
+  </dd>
+  <dt><samp>--gnoise dispersion</samp></dt><dd>
+    Set the dispersion of gaussian noise per pixel. The parameter is intended
+    to simulate various sources of noise like dark current, readout noise,
+    noise of background,  etc. The value of gnoise is merged with skymag.
+  </dd>
+  <dt><samp>--area area</samp></dt><dd>
+    The detection area of a simulated telescope in square meters.
+    It is 1m² by default (see <samp>--diameter</samp> option).
+    This is equivalent area for 56 cm (22 inch) diameter telescope.
+  </dd>
+  <dt><samp>--diameter diameter</samp></dt><dd>
+    Sets diameter (twice of radius) of a telescope in meters. If set,
+    the area (<samp>--area</samp>) and Airy radius (<samp>--airy</samp>)
+    is (re-)defined.
+  </dd>
+  <dt><samp>--exptime time</samp></dt><dd>
+    The exposure time of generated frames in seconds.
+  </dd>
+  <dt><samp>--qeff η</samp></dt><dd>
+    The quantum efficiency of a whole apparatus (<i>0 ≤ η ≤ 1</i>).
+  </dd>
+  <dt><samp>--disable-noise</samp></dt><dd>
+    Switch-off including of these sources of noise: photon, and background
+    noise. This switch is intended for some algorithm testing.
+  </dd>
+  <dt><samp>--atmosphere</samp></dt><dd>
+    Switch-on modelling of the atmosphere. The model includes
+    both extinction and seeing.
+  </dd>
+  <dt><samp>--extk k</samp></dt><dd>
+    Monochromatic extinction coefficient. Setting on zero effectively
+    suppress of the extinction determination.
+  </dd>
+  <dt><samp>--long λ, --lat φ</samp></dt><dd>
+    Geographic coordinates of a station in degrees (+east, +north).
+    Coordinates of <a href="https://en.wikipedia.org/wiki/List_of_observatory_codes">Brno observatory</a> are specified as
+    <samp>--long +16.6, --lat +49.2</samp>.
+  </dd>
+  <dt><samp>--date YYYY-MM-DD, --time HH:MM:SS</samp></dt><dd>
+    Date as YYYY-MM-DD and time as HH:MM:SS of (initial) frame.
+  </dd>
+  <dt><samp>--count #</samp></dt><dd>
+    Total count of generated frames.
+  </dd>
+  <dt><samp>--timestep time</samp></dt><dd>
+    Time delay between simulated exposures in seconds.
+  </dd>
+  <dt><samp>-f, --filter filter</samp></dt><dd>
+    Simulated filter.
+  </dd>
+  <dt><samp>--gain gain</samp></dt><dd>
+    The value of gain meaning (photo-)electrons per ADU.
+  </dd>
+  <dt><samp>--saturate saturate</samp></dt><dd>
+    The saturation, or the maximal value in the frame,
+    the equivalent of the full-well capacity.
+  </dd>
+  <dt><samp>--cosmics-freq freq</samp></dt><dd>
+    Cosmic-rays frequency per one second.
+  </dd>
+  <dt><samp>--cosmics-fmax fmax</samp></dt><dd>
+    The cosmic-rays maximal intensity in counts.
+  </dd>
+  <dt><samp>--cosmics-len length</samp></dt><dd>
+    The maximal lengths of cosmics rays.
+  </dd>
+  <dt><samp>-c, --cat file</samp></dt><dd>
+    Input catalogue with star positions and magnitudes.
+  </dd>
+  <dt><samp>--galcat file</samp></dt><dd>
+    Input catalogue with galaxy models (<a href="dataform_artgalaxy.html">format</a>)
+  </dd>
+  <dt><samp>--fov fov</samp></dt><dd>
+    Field of view in degrees. If specified, the scale (<samp>--scale</samp>)
+    is superseded.
+  </dd>
+  <dt><samp>-p, --projection code</samp></dt><dd>
+    The code of celestial projections. TAN is for the gnomonical projection
+    (the default one). The codes should be recognised by <a href="https://www.atnf.csiro.au/computing/software/wcs/">WCSLIB</a>.
+  </dd>
+  <dt><samp>--rcen α, --dcen δ</samp></dt><dd>
+    Centre of the field of view in Right Ascension and Declination
+    in degrees.
+  </dd>
+  <dt><samp>--scale s</samp></dt><dd>
+    Scale of the frame in degrees per pixel.
+  </dd>
+  <dt><samp>--angle φ</samp></dt><dd>
+    Angle of rotation of the frame around the centre in degrees.
+    Clockwise direction is positive.
+  </dd>
+  <dt><samp>--width width, --height height</samp></dt><dd>
+    Dimensions of output frame in pixels.
+  </dd>
+  <dt><samp>--fits-keys-file file</samp></dt><dd>
+    The file contains additional FITS keys.
+    The a plain text file is in the same form
+    as a <a href="man_fits.html">template</a>.
+  </dd>
+  <dt><samp>--flat-model-file fitsfile</samp></dt><dd>
+    A FITS file as a model a flat-field, i.e. the per pixel
+    sensitivity due both camera and telescope.
+    The frame dimensions must correspond to the artificial image.
+  </dd>
+</dl>
+
+<h2>Examples</h2>
+
+<pre>
+  $ munipack artificial
+  $ xmunipack artificial.fits
+</pre>
+
+<p>
+  <a href="artific.html">Overview</a> comes with more useful examples.
+</p>
+
+<h2 id="lctab">Light curve table</h2>
+
+<p>The table contains the light curve
+  representing dependence of relative fluxes (i.e. not in magnitudes) on the phase.
+  The tree column format
+  of the <a href="dataform_tmseries.html">Time Series Table</a>
+  is assumed. Columns are: the phase, the flux, and the flux statistical error.
+  The first column with is the phase.
+  The second column is the light curve represented in relative fluxes.
+  The third column is a uncertainty of the flux
+  (standard deviations) as positive numbers.
+  Records in the table must be sorted in time-increasing
+  order. The interpolated value is combined with
+  <samp>--lc-mag, --lc-amp, --lc-jd0, --lc-per</samp>.
+  <a href="artific.html">Overview</a> describes its application.
+  </p>
+
+<h2 id="lcfour">Table of Fourier coefficients</h2>
+
+<p>
+  The table contains the Fourier approximation of a light curve
+  in the fluxes (i.e. not in magnitudes) for a single period.
+  There are two columns representing the real (first) and the imaginary
+  (second) parts of coefficients in the
+  <a href="https://en.wikipedia.org/wiki/Fourier_series">Fourier series</a>.
+  The <i>n</i> row of the table corresponds to
+  <i>a<sub>n-1</sub>,b<sub>n-1</sub></i> coefficients.
+  The determined value is combined with
+  <samp>--lc-mag, --lc-amp, --lc-jd0, --lc-per</samp>.
+  The text file <a href="fourier.lst">fourier.lst</a> demonstrates
+  an instance of data; a FITS file,
+  required by <samp>--lc-fourier</samp>, is created as
+</p>
+<pre>
+  $ munipack fits --restore fourier.lst
+</pre>
+
+<h2>See Also</h2>
+<p>
+  <a href="artific.html">Overview of Artificial sky</a>,
+  <a href="http://physics.muni.cz/~hroch/artific.pdf">Artificial Sky …</a> (seminary talk),
+  <a href="man_com.html">Common options</a>.
+</p>
+
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

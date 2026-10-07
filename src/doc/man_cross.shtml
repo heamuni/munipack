@@ -1,0 +1,157 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Cross-Match</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Cross-Match</h1>
+
+<p class="abstract">
+The cross-match is procedure which is looking for the equivalent objects
+in two tables. The equivalence is assigned on base of a metric
+(spherical distance). An index of equivalent rows of the tables is generated.
+</p>
+
+<h2>Command</h2>
+
+<code>
+munipack cross [..] file1 file2
+</code>
+
+<h2>Description</h2>
+<p>
+The cross-match is the procedure which searches tables
+for the equivalent objects on base of minimal spherical
+distance and optionally, on similar fluxes. Purpose of the
+match is looking for the objects in different catalogues,
+detected object on frame or two frames.
+</p>
+
+<p>
+This utility cross-match implementation is follows the criteria
+for successful match:
+</p>
+<ul>
+<li>Spherical distance needs to be minimal and under a tolerance.</li>
+<li>Optionally, relative calibrated fluxes needs to be similar.
+    (partially implemented)</li>
+<li>Optionally, the mutual correspondence is one to one. (not implemented yet)</li>
+</ul>
+
+<p>
+  For the first criterion, one computes the distance along
+  <a href="https://en.wikipedia.org/wiki/Great-circle_distance">great circle</a>
+of spherical coordinates.
+which must be equal under given tolerance.
+The tolerance is a parameter and must be provided. The method looks plain,
+but is very powerful and in sparse star fields works very well.
+</p>
+
+<p>
+Visual double stars (stars are angular near) has rare occurrence
+but can confuse the distance criterion, especially when theirs
+coordinates are load down by statistical errors. In this case,
+the comparison of fluxes can be helpful.
+</p>
+
+<!--
+<p>
+Passing of the previsous criretii, the twices (or groups) of
+near and the same brightness stars can be. In this case one
+row of one table can corresponds to more rows of other table.
+We can check the situation and we can look for the most probable
+candidates on base of ...
+</p>
+-->
+
+<p>
+The algorithm compares coordinates computed at the same epoch
+(the same time) which can be differ from catalogue positions
+by proper motion of the objects. The algorithm is used:
+</p>
+<ul>
+<li>For known epoch (time), the coordinates are computed.</li>
+<li>The epoch is determined from EPOCH parameter of the catalogue
+    (FITS keyword), when is not provided, one is set to 2000.00 year.</li>
+<li>When proper motions are not set, the coordinates are used directly.</li>
+</ul>
+<p>
+The proper motion of stars is usually small and one is often omitted.
+But sometimes, one can be important for heavy crowded
+star fields or fast stars.
+</p>
+
+<p>
+This utility is just public interface to internal procedures for
+cross-match. The same code is used internally for all catalogue to frame
+matching.
+</p>
+
+<h2>Parameters</h2>
+
+<dl>
+<dt><samp>--tol</samp></dt><dd>tolerance of uncertainty of coordinates of objects
+                               in degrees</dd>
+<dt><samp>--ftol</samp></dt><dd>relative errors for flux ratios, default = 1</dd>
+<dt><samp>--col-ra</samp></dt><dd>Right Ascension column in catalogue</dd>
+<dt><samp>--col-dec</samp></dt><dd>Declination column in catalogue</dd>
+<dt><samp>--col-pm-ra</samp></dt><dd>Proper motion in Right Ascension column in catalogue</dd>
+<dt><samp>--col-pm-dec</samp></dt><dd>Proper motion in Declination column in catalogue</dd>
+<dt><samp>--col-mag</samp></dt><dd>Magnitude-like column in catalogue</dd>
+</dl>
+
+<p>
+The parameter <samp>--tol</samp> is by default set to machine precision
+(which will be not too useful). Therefore the parameter is practically mandatory.
+</p>
+
+<p>
+The parameters <samp>--col-ra,--col-dec</samp> are mandatory. When any from
+<samp>--col-pm-ra,--col-pm-dec,--col-pm-mag</samp> missing, the corresponding
+criterion is not used.
+</p>
+
+<p>
+See <a href="man_com.html">Common options</a> for
+input/output file names.
+</p>
+
+
+<h2>Data Format</h2>
+
+<p>
+Results of cross-matching are stored in a FITS table with two
+columns only. Every column represents the index of object in
+corresponding file. In the first column, indexes of second
+files are stored. In second column, the indexes of first objects
+are stored. Zero value means no correspondence has been found.
+Number of rows is maximum of both tables.
+</p>
+
+<p>
+Keywords FILE1,FILE2 in FITS header points to filenames of input tables.
+</p>
+
+
+<h2>Examples</h2>
+
+<p>
+Lets have already calibrated frame <samp>T_Phe_000003.fits</samp>
+and we are doing cross-match with a catalogue:
+</p>
+<pre>
+$ munipack cross --tol 5e-4 --col-ra RA,RAJ2000 --col-dec DEC,DEJ2000 \
+       T_Phe_000003.fits cone.fits
+</pre>
+
+<h2>See Also</h2>
+<p><a href="man_com.html">Common options</a></p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

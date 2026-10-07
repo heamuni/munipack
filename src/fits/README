@@ -1,0 +1,36 @@
+
+FITSUTILS
+
+Purpose of all that utilities is general manipulation with FITSes.
+
+
+
+
+munitits 
+
+ * inspired by sng (convertor PNG to plain text and vice versa)
+   Extremly useful for any unpredictable manipulations by standard tool
+   with fits. For headers, images and tables.
+
+
+munihead
+
+ * general work with fits header's keywords (in fashion of exiftool)
+   Usefull for list, read, modify, write header's records.
+
+
+
+muniarit
+
+ * a simple FITS arithmetics (+-*/ functions?)
+
+
+munistat
+
+ * a general statistic function's (mean, median, ..)
+
+
+
+
+
+

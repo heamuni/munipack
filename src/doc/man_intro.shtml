@@ -1,0 +1,169 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Introduction</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Introduction</h1>
+
+<p class="abstract">
+An introduction to philosophy of Munipack framework
+and a short summary of provided features.
+</p>
+
+<h2>Overview</h2>
+
+<p>
+Munipack is a general framework intended on processing
+of astronomical images. The framework implements
+methods for extracting photometry and astrometry information
+from the image data. All the implemented methods regards on robust
+algorithms, fast and effective processing.
+</p>
+
+<p class="indent">
+Munipack is intended for processing of very large data by professionals,
+with flexibility of use, a wide compatibility with other
+astronomical tools (Virtual Observatory) and data formats (data can be accessed
+and modified with help of external utilities) in mind.
+</p>
+
+<h2>Command line interface</h2>
+
+<p>
+Munipack can be used via the user interfaces: a graphical
+and a command-line. This manual is focused on the command-line usage
+which provides all implemented features. Opposite with this, the graphical interface
+is designed to be easy to use. Therefore a true mean of many actions should be obscured,
+missed by design or unimplemented yet.
+</p>
+
+<p class="indent">
+The command-line interface respects Unix conventions.
+Munipack can be directly used in shell scripts, core routines can be
+wrapped for various (scripting) languages and integrated to a large
+processing systems.
+</p>
+
+<h2>Actions</h2>
+<p>
+The command-line interface is provided by only the simple command:
+</p>
+<code>
+$ munipack
+</code>
+
+<p>
+The command wrappers individual actions and provides an user input data
+pre-processing under Unix environment.
+The <a href="modules.html">direct access</a> for programmers is also possible.
+</p>
+
+<p>
+The most typical invocation is in the form:
+</p>
+<pre>
+$ munipack action [options] files
+</pre>
+<p>
+User specifies the <em>action</em>, seldom <em>options</em>
+and <em>files</em> to work on its. The <em>action</em> is natural shortcut
+of a logical action (for instance, the dark correction). The <em>options</em> modifies
+a default parameters and provide a way for fine tune of a processing.
+The last argument <em>files</em> specify files to be processed.
+Usually, names with wildcards (* or ?) are provided.
+To read filenames from its standard input, a dash (-) should be passed too.
+</p>
+
+<p class="indent">
+The interface is designed in fashion of widely used control version systems
+like <a href="http://mercurial.selenic.com">Mercurial</a>
+or latest <a href="http://git-scm.com/">Git</a>. The design has been
+adopted because regular users (including author) remembers
+one (maybe two) command-names to call, but not a huge list of various
+names of commands.
+</p>
+
+<p>
+Actions are naturally grouped on categories:
+</p>
+<h3>Preprocessing</h3>
+<p>
+There are actions for averaging of <a href="man_bias.html">biases</a>,
+<a href="man_bias.html">dark-frames</a> and <a href="man_flat.html">flat-field</a>
+frames and <a href="man_phcorr.html">phcorr</a> tool for batch correction of
+all frames.
+</p>
+
+<h3>Processing</h3>
+<p>
+The images can be processed by many ways. The most common is
+fully automatic <a href="man_find.html">detection of stars</a>
+and providing of <a href="man_aphot.html">aperture photometry</a> on images.
+</p>
+
+<p>
+Frames with known stars can be <a href="man_astrometry.html">astrometricaly</a>
+and <a href="man_phcal.html">photometrically</a> calibrated. To get more
+precise calibration by multi-filter observation, the instrumental photometry system
+must be <a href="man_phfotran.html">transformed</a> to a standard equivalent
+and converted to various photometry quantities like magnitudes (in a filter,
+STmag and ABmag) or fluxes (in a filter, per wavelength or frequency unit).
+</p>
+
+<h3>Products</h3>
+
+<p>
+From calibrated images, one can construct <a href="man_timeseries.html">a time series</a>
+(with light curve as a special case) or <a href="man_kombine.html">construct</a>
+a mosaic or sum images with more deeper exposure.
+</p>
+
+<h3>Colour Images</h3>
+
+<p>
+  A set of images can be <a href="man_colouring.html">collected</a> to
+  a <a href="colourfits.html">Colour FITS</a> image to provide natural colours.
+</p>
+
+<h3>Virtual Observatory</h3>
+
+<p>
+Just only <a href="man_cone.html">cone search</a> is implemented
+from the wide offer of services by Virtual Observatory. The
+<a href="man_votable.html">conversion</a> from VOTable format
+to many another computer formats can be also useful.
+</p>
+
+<h3>FITS</h3>
+<p>
+Munipack <a href="man_fits.html">wraps</a> some routines provided
+by cFITSIO library for conventional use in shell scripts.
+</p>
+
+<h2>Verbose logging</h2>
+<p>
+Sometimes, one can be difficult to understand error messages.
+The option <samp>--verbose</samp> which prints a lot of garbage
+can help.
+</p>
+
+<h2>Golden Rule</h2>
+<p>
+Before start to play with Munipack, please remember the golden rule:
+<b>Never touch any data without a backup!</b>
+</p>
+
+<h2>See Also</h2>
+<p>
+<a href="guide.html">☺ User Guide</a>
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

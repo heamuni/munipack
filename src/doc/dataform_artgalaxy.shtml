@@ -1,0 +1,71 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Artificial galaxy simulation format</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1 class="noindent">Artificial galaxy simulation format</h1>
+<p class="abstract">
+  This document describes the format of an input catalogue for a galaxy
+  simulation in <a href="artific.html">Artificial sky tool</a>
+  (<a href="man_artificial.html">manual</a>).
+</p>
+
+<h2>Structure of the galaxy catalogue</h2>
+
+<p>
+  The galaxy catalogue is FITS file with one or more table extensions.
+  Every extension represents a galaxy class (type) like elliptical or
+  spiral galaxy. Every row in the table describes parameters of
+  a model for the class. Currently, only elliptical
+  galaxies are implemented.
+</p>
+
+<h2>The first extension</h2>
+
+<p>
+  The first extension is dummy. It is recommend to have set HDUNAME = 'ARTGALAXY',
+  even it is not currently used.
+</p>
+
+<h2>ELLIPTICAL</h2>
+
+<p>
+  This extension, identified by EXTNAME = 'ELLIPTICAL', contains parameters for
+  specification of elliptical galaxies. Their profiles are based on
+  <a href="https://en.wikipedia.org/wiki/Sersic_profile">Sérsic model</a>.
+
+</p>
+
+<div class="table">
+<table>
+  <caption>ELLIPTICAL extension</caption>
+  <tr><th>Column</th><th>Description</th><th>Units</th></tr>
+  <tr><td>RAJ2000</td><td>Right Ascension of the centre</td><td>deg</td></tr>
+  <tr><td>DEJ2000</td><td>Declination of the centre</td><td>deg</td></tr>
+  <tr><td>MUEFF</td><td>Surface magnitude in Reff</td><td>mag/arcsec<sup>2</sup></td></tr>
+  <tr><td>REFF</td><td>Effective radius Reff</td><td>deg</td></tr>
+  <tr><td>PA</td><td>Position angle (top is zero)</td><td>deg</td></tr>
+  <tr><td>E</td><td>Eccentricity <i>b/a</i></td><td></td></tr>
+  <tr><td>SERSIC</td><td>Sérsic exponent</td><td></td></tr>
+</table>
+</div>
+
+<h2>See Also</h2>
+<p>
+  <a href="artific.html#egal">Artificial sky tool</a>,
+  <a href="man_artificial.html">manual</a>.
+</p>
+<p>
+  <a href="artgalaxy.lst">artgalaxy.lst</a> is a template of a galaxy catalogue;
+  run <samp>munipack fits --restore artgalaxy.lst</samp> to make FITS itself.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

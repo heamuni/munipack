@@ -1,0 +1,278 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Kombine</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Kombine</h1>
+
+<p class="abstract">
+  Kombine collects multiple frames to create a new enhanced image.
+</p>
+
+<h2>Command</h2>
+
+<code>
+munipack kombine [..] files
+</code>
+
+<h2>Description</h2>
+
+<p>
+  Purpose of this routine is
+</p>
+<ul>
+  <li>to collect observed frames together,</li>
+  <li> to reveal very faint objects (potentially invisible on a particular frame),</li>
+  <li>to increase of the dynamic range of frames,</li>
+  <li>to average frames, or</li>
+  <li>to create of a mosaics covering larger sky area than any single frame.</li>
+</ul>
+
+<p class="indent">
+  The image can be scaled to arbitrary size, rotated, shifted and reflected.
+  The routine provides sub-pixel resolution. The blurring of image due to
+  convolution can be reduced by a local interpolation method.
+</p>
+
+<p class="indent">
+  The output frames can be used for a regular photometry.
+  To keep proper both surface photometry and sky (background),
+  the switch <b><samp>--disable-back</samp></b> should be presented.
+  By default, the background is removed during the composition process.
+</p>
+
+<p class="indent">
+  The intensity-like values in the output images represents the sum of ones,
+  notwithstanding the values are computed by averadging.
+</p>
+
+<h2>The algorithm</h2>
+
+<ol>
+  <li>Kombine had started the processing by developing of a grid,
+  in spherical coordinates, which covers desired area.</li>
+  <li>Every input frame is re-projected on the sky grid:</li>
+  <ol>
+  <li>The coordinates of the pixels are interpolated, and</li>
+  <li>their values are averaged.</li>
+  </ol>
+  <li>The output frame is a projection of the sky grid nodes onto plane
+  of the new synthetic image.</li>
+</ol>
+
+
+<h2>Input and output</h2>
+
+<p>
+  On input, list of frames with astrometry calibration is necessary.
+  A regular photometry calibration is recommended for averaging.
+</p>
+
+<p>
+  On output, the mean of the input files is created.
+  The file has STDERR extension with standard errors.
+  The MAXDEV extension contains maximal deviations of
+  the robust mean (not included if <samp>--arith</samp>);
+  it helps to detect anomalies.
+</p>
+
+
+<h2>Memory space requirements</h2>
+
+<p>
+  Kombine requires approximately NAXIS(1)*NAXIS(2)*4 bytes per frame
+  (frames are stored as single precision real numbers).
+  For an illustration, one hundredth  of 1000 × 1000 frames (1MB)
+  takes 400 MB in memory.
+</p>
+
+<h2>Parameters</h2>
+
+<h3>Parameters for composition:</h3>
+<dl>
+  <dt><samp>-i, --interpol [near,bilinear,bicubic,bi3conv]</samp></dt>
+  <dd>An interpolation method selection:
+    <a href="https://en.wikipedia.org/wiki/Nearest-neighbor_interpolation">nearest
+      neighbourhood</a>,
+    <a href="https://en.wikipedia.org/wiki/Bilinear_interpolation">bilinear</a>,
+    <a href="https://en.wikipedia.org/wiki/Bicubic_interpolation">bicubic</a>, and
+    <a href="https://en.wikipedia.org/wiki/Bicubic_interpolation">bi3conv
+      by convolution</a>.
+
+    <p>
+      The bi-cubic interpolation gives smooth, little bit sharpen, images.
+      The convolution variant of bi-cubic interpolation gives better results
+      for critically under-sampled frames. <em>Warning: All bi-algorithms
+	can create an artificial fingering patterns on the background.</em>
+    </p>
+    <p>
+      By default, the nearest neighbourhood method is used. It is also
+      the fastest method. For under-sampled data, one brings a little
+      bit pixelised images.
+    </p>
+  </dd>
+  <dt><samp>--disable-back</samp></dt><dd>
+    switch-off the subtracting of a estimated background.
+    The frames has the actual background unchanged,
+    preserving the sky brightness. It is intended for the astronomical photometry.
+    Final frames, especially a mosaics, can contains unfolded regions
+    with brighter and fainter backgrounds.
+  </dd>
+  <dt><samp>--arith</samp></dt><dd>
+    Kombine computes the average by arithmetic mean per every single pixel.
+    By default, the average is computed by robust mean, giving the brilliant
+    look of results, yet both significantly slower and memory consuming.
+  </dd>
+</dl>
+
+<h3>Projection parameters:</h3>
+<dl>
+  <dt><samp>-p, --projection [TAN|...]</samp></dt>
+  <dd> projections: Gnomonic by code TAN (default),
+    <a href="https://www.atnf.csiro.au/computing/software/wcs/wcslib/prj_8h.html"></a>list of possible projections codes.</dd>
+  <dt><samp>--rcen ddd.ddd, --dcen ddd.ddd</samp></dt>
+  <dd> centre of projection in Right Ascension and Declination [deg]</dd>
+  <dt><samp>--pm-ra d.ddd, --pm-dec d.ddd</samp></dt><dd> proper motion
+    of centre of projection in [deg/day]</dd>
+  <dt><samp>--pm-jdref JD</samp></dt><dd> reference Julian date for
+    the proper motion</dd>
+  <dt><samp>--width xxx, --height yyy</samp></dt><dd>dimensions of the output
+    frame in pixels</dd>
+  <dt><samp>--xcen xxx.x, --ycen yyy.y</samp></dt>
+  <dd> centre of projection on result [pix] (default: width/2, height/2)</dd>
+  <dt><samp>--scale sss.sss</samp></dt><dd>scale [deg/pix]</dd>
+  <dt><samp>--angle ddd.ddd</samp></dt><dd>rotation angle [deg]</dd>
+  <dt><samp>--reflex [yes|no]</samp></dt><dd>setup reflection</dd>
+</dl>
+
+<p>
+  Any unspecified parameters are inherited from the first
+  frame on input. The strategy is chosen to be the minimal surprise way.
+</p>
+
+<p>
+  The life will be easy by setting of the output frame with
+  the zero rotation angle (<samp>--angle 0</samp>), as well as without
+  any reflection (<samp>--reflex no</samp>).
+</p>
+
+<p>See <a href="man_com.html">Common options</a> for input/output filenames.</p>
+
+<h2>Examples</h2>
+
+<p>
+  The very basic, and common way, of use is
+</p>
+<code>
+$ munipack kombine images*.fits
+</code>
+<p>
+  All parameters of output frame (saved to <samp>kombine.fits</samp>)
+  are inherited from the first frame.
+</p>
+
+<p>
+  Other common usage specifies the output filename, and adjust
+  orientation by spherical grid:
+</p>
+<code>
+$ munipack kombine -o kombi.fits --angle 0 --reflex no  images*.fits
+</code>
+
+<p>
+  The frames can be composed into a large canvas (1000×1000 pixels)
+  and scaled by factor two. As the first step, one determines the frame
+  scale by FITS keywords
+</p>
+<pre>
+$ munipack fits -K CD1_1,CD1_2 image1.fits
+CD1_1   = -2.6589961865059603E-04
+CD1_2   = -6.0182917772180531E-06
+</pre>
+<p>
+  The frame scale is <i>√({CD1_1}<sup>2</sup> + {CD1_2}<sup>2</sup>)</i>
+  = 2.66e-4 deg/pix. The parameters are
+</p>
+<code>
+$ munipack kombine --width 1000 --height 1000 --scale 5.32e-4  images*.fits
+</code>
+
+<p>
+  A little bit uncommon example describes the tracking
+  of comets or faint asteroids:
+</p>
+<code>
+$ munipack kombine --pm-ra 0.4 --pm-dec -0.01 images*.fits
+</code>
+<p>
+  The utility sets initial frame position and time by the first
+  image and shifts all next images by the specified proper motion.
+  Best way how to get values of the proper motion is to use of its
+  ephemeris. An alternative, for visible objects, is the difference
+  of object coordinates between the first and last images.
+</p>
+
+<p>
+  A demonstration of interpolation methods. The frames has been
+  created by:
+</p>
+<pre>
+$ munipack kombine            -o m86.fits     m86_V_*_proc.fits
+$ munipack kombine -i bicubic -o m86_bic.fits m86_V_*_proc.fits
+$ fitspng -s 3 -r 0.3,30 m86.fits
+$ fitspng -s 3 -r 0.3,30 m86_bic.fits
+</pre>
+
+<div class="twocolumn">
+  <div class="column">
+    <figure>
+      <img class="figure" src="m86.png" alt="m68.png" title="M86">
+      <figcaption>The picture of neighbourhood of M 86 as a demonstration of
+      <a href="https://en.wikipedia.org/wiki/Nearest-neighbor_interpolation">nearest
+	neighbourhood</a> interpolation method. The image series is an composition
+      of 52 observed images. The observation has included the meridian flip.
+      The after-flip images are with an offset. The offset can be distinguished
+      on a large rectangular region having slightly different background at
+      the top-right part of the composition.
+      </figcaption>
+    </figure>
+  </div>
+  <div class="column">
+    <figure>
+      <img class="figure" src="m86_bic.png" alt="m86_bic.png" title="M86">
+      <figcaption>The same composition with
+	<a href="https://en.wikipedia.org/wiki/Bicubic_interpolation">bi-cubic</a>
+	interpolation applied. The fringing patterns are clearly visible
+	in the after-flip region having offset.
+      </figcaption>
+    </figure>
+  </div>
+</div>
+
+
+<h2>See Also</h2>
+<p>
+  <a href="kombitut.html">Frame composition</a>
+  is the detailed tutorial how to made of a deep exposure;
+  <a href="mosaics.html">Mosaics</a> describes assembly of a mosaic.
+  <a href="colorimage.html">Frame colouring</a>
+  uses <samp>kombine</samp> to get deeper frames (nice example
+  of the application of <samp>--rcen, --dcen</samp> parameters).
+
+</p>
+<p>
+  See also:
+  <a href="https://en.wikipedia.org/wiki/Slip_(clothing)"
+     title="Kombiné is Czech term for slip ☺">Slip</a>,
+  <a href="man_com.html">Common options</a>
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

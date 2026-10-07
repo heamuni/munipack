@@ -1,0 +1,132 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ VOTable</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>VOTable Utility</h1>
+
+<p class="abstract">
+VOTable utility converts data in VOTable format
+to other file-formats: FITS (processing),
+CSV (spreadsheet), plain text (processing), SVG (charts), XML (XUL).
+</p>
+
+<h2>Command</h2>
+
+<code>
+munipack votable [..] file
+</code>
+
+<h2>Description</h2>
+
+<p>
+<a href="http://www.ivoa.net/Documents/VOTable/">VOTable</a> file format is
+a kind of <a href="https://en.wikipedia.org/wiki/XML">XML format</a>. One is used
+as the primary data exchange format within
+<a href="https://en.wikipedia.org/wiki/Virtual_observatory">Virtual Observatory</a>.
+VOTable file is a text file with defined marks. The marks provides a tool
+for describe of a structure of data (tables, for example). VOTable
+format is designed for inter-process communication (in client — server model).
+</p>
+
+<p>
+This routine is a converter between VOTable format provided by Virtual Observatory (XML
+with any defined structure) and another formats:
+</p>
+<ul>
+<li>The primary goal is conversion of VO catalogues to FITS tables</li>
+<li>Conversion to the plain text format can be very useful for any additional
+    processing by using conventional tools (text editors, utilities like awk, etc.).</li>
+<li>Conversion to <a href="https://en.wikipedia.org/wiki/Comma-separated_values">CSV</a>
+    format can be useful for users familiar with a spreadsheet-like utilities.</li>
+<li>VOTable as a XML can be easy converted to
+    <a href="https://en.wikipedia.org/wiki/Scalable_Vector_Graphics">SVG</a>
+    (another XML based file format)
+    for drawing. Specially, it is for drawing of star charts.</li>
+</ul>
+
+
+<h2>Input And Output</h2>
+
+<p>
+On input, a single file is expected.
+</p>
+
+<p>
+On output, a single file of various type is created.
+</p>
+
+<h2>Parameters</h2>
+
+<dl>
+<dt><samp>-pt</samp></dt><dd>select projection: gnomonic</dd>
+<dt><samp>-pa</samp></dt><dd>Right Ascension of projection centre [deg]</dd>
+<dt><samp>-pd</samp></dt><dd>Declination of projection centre [deg]</dd>
+<dt><samp>-pw</samp></dt><dd>Canvas width [pix]</dd>
+<dt><samp>-ph</samp></dt><dd>Canvas height [pix]</dd>
+<dt><samp>-ps</samp></dt><dd>scale of projection [pix/deg]</dd>
+<dt><samp>-ml</samp></dt><dd>magnitude limit</dd>
+<dt><samp>--col-mag</samp></dt><dd>magnitude field key</dd>
+<dt><samp>--col-ra</samp></dt><dd>Right Ascension field key</dd>
+<dt><samp>--col-dec</samp></dt><dd>Declination field key</dd>
+<dt><samp>--type</samp></dt><dd>type of output file: fits,csv,txt,svg,xml</dd>
+</dl>
+
+<p>
+See <a href="man_com.html">Common options</a> for
+input/output filenames.
+</p>
+
+<h2>Examples</h2>
+
+<p>
+As a preparation step, download VOTable from Virtual Observatory
+(use <a href="man_cone.html">cone search</a>):
+</p>
+<code>
+$ munipack cone -c Hipparcos -o pleiades.xml -r 3 57 24
+</code>
+
+<p>
+A text table:
+</p>
+<code>
+$ munipack votable -o subaru.txt pleiades.xml
+</code>
+
+<p>
+FITS table:
+</p>
+<pre>
+$ munipack votable -o subaru.fits  pleiades.xml
+$ xmunipack subaru.fits
+</pre>
+
+<p>
+CSV table:
+</p>
+<pre>
+$ munipack votable -o pleiades.csv pleiades.xml
+$ gnumeric pleiades.csv
+</pre>
+
+<figure>
+<img class="figure" src="Screenshot-gnumeric.png" alt="Screenshot-gnumeric.png" title="csv">
+<figcaption>In GNUmeric</figcaption>
+</figure>
+
+
+<h2>See Also</h2>
+<p><a href="vobs.html">Virtual Observatory</a>,
+<a href="chart.html">Star Charts</a>,
+<a href="man_com.html">Common options</a></p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

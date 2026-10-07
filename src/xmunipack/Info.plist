@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist SYSTEM "file://localhost/System/Library/DTDs/PropertyList.dtd">
+<plist version="0.9">
+<dict>
+        <key>CFBundleName</key>
+        <string>Xmunipack</string>
+        <key>CFBundleIdentifier</key>
+        <string>cz.muni.physics.Xmunipack</string>
+        <key>CFBundleVersion</key>
+        <string>0.0</string>
+        <key>CFBundlePackageType</key>
+        <string>APPL</string>
+        <key>CFBundleSignature</key>
+        <string>????</string>
+        <key>CFBundleExecutable</key>
+        <string>xmunipack</string>
+</dict>
+</plist>

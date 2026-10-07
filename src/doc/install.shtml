@@ -1,0 +1,154 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+
+<title>Munipack ‒ Installation</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1 class="noindent">Installation</h1>
+
+<p class="abstract">
+  This page describes offer to install of Munipack.
+</p>
+
+<h2>AppImage</h2>
+
+<div class="symbol">📦</div>
+<p>
+  <a href="https://appimage.org/">AppImage</a> is a modern all-in-one bundle
+  package executable under any Linux Distribution without need to installed.
+</p>
+<p class="download">
+  <a href="https://integral.physics.muni.cz/ftp/munipack/Munipack-x86_64.AppImage">
+    Munipack-x86_64.AppImage</a>
+</p>
+<p>
+  Just download it, set the executable flag,
+  adjust the link providing the command line interface, and run it:
+</p>
+<pre>
+  $ chmod +x Munipack-x86_64.AppImage
+  $ ln -s Munipack-x86_64.AppImage munipack
+  $ ./Munipack-x86_64.AppImage
+</pre>
+<p>
+  The AppImage should to work on any recent Linux distribution;
+  one is build under Debian
+  <a href="https://www.debian.org/releases/">oldstable</a>,
+  eg. aged two years or more.
+</p>
+
+
+<h2>Munipack in Debian and Ubuntu (and its derivatives)</h2>
+
+<p>
+<img class="symbol" src="big_logo.png" width="64" height="64" alt="Munipack logo">
+</p>
+
+<p>
+  Munipack is available as an official package repository in Debian and
+  Ubuntu since '17.
+  Regular issues of (these) distributions are usually delayed behind
+  Munipack releases itself.
+</p>
+
+<p>
+  The installation is straightforward by standard software tools.
+  Packages can be found in appropriate repositories:
+  <a href="https://packages.debian.org/munipack">Debian</a>,
+  <a href="http://packages.ubuntu.com/munipack">Ubuntu</a>.
+  To install Munipack, just type the command in a terminal:
+</p>
+<pre>
+  $ sudo apt install munipack
+</pre>
+
+<h2>Source code</h2>
+
+<div class="symbol">⚙</div>
+<p>
+  Munipack is designed as multiplatform software; it
+  can be compiled under many computer systems. The
+  building from the <a href="SourceInstallation.html">source code</a>
+  is the most portable way. There is available the archive:
+</p>
+
+<p class="download">
+  <a href="https://integral.physics.muni.cz/ftp/munipack/munipack-0.6.2.tar.gz">
+    munipack-0.6.2.tar.gz</a>
+</p>
+
+
+<h2><a id="development">Development repository for Debian stable</a></h2>
+
+<p>
+<img class="symbol" src="debian_icon.png" width="64" height="64" alt="debian icon">
+</p>
+
+
+<p>There is a bleeding edge branch of Munipack, which is primary intended
+  for various testing purposes.
+  The latest development packages are usually available only for the stable
+  64-bit Debian.
+</p>
+
+<!-- https://blog.jak-linux.org/2021/06/20/migrating-away-apt-key/ -->
+<p>
+  The repository can be activated by downloading of
+  <a href="https://munipack.physics.muni.cz/devel/munipack.sources">munipack.sources</a>, and
+  <a href="https://nm.debian.org/person/hroch/">my</a>
+  (also available on Hockeypuck OpenPGP keyserver by my e-mail address)
+  <a href="https://munipack.physics.muni.cz/devel/munipack-devel.gpg">public</a>
+  GPG key.
+  Put it in <samp>/etc/apt/sources.list.d/</samp>:
+</p>
+<pre>
+  $ wget -qO- https://munipack.physics.muni.cz/devel/munipack.sources | \
+    sudo tee -a /etc/apt/sources.list.d/munipack.sources
+
+  $ wget -qO- https://munipack.physics.muni.cz/devel/munipack-devel.gpg | \
+    sudo tee -a /usr/share/keyrings/munipack-devel.gpg
+</pre>
+<p>
+  The location of the GPG public key file must match
+  <samp>Signed-By</samp> line in <samp>munipack.sources</samp>;
+  the path <samp>/usr/share/keyrings</samp> is recommended by
+  <a href="https://wiki.debian.org/DebianRepository/UseThirdParty">Debian wiki</a>.
+</p>
+
+<p>
+  The GPG key must be refreshed regularly on a year base,
+  the validity is limited to 13 months.
+  If <samp>apt update</samp> reports, the key is expired,
+  just refrest it by the last command.
+</p>
+
+<p>The installation itself is straightforward:
+</p>
+<pre>
+# apt update
+# apt install munipack
+</pre>
+
+<p>
+  Be warned, the development release can contain various problems and errors,
+  outdated documentation, etc. If needed, anything can be corrected in the
+  source package. To rebuild the package, follow instructions described by
+  <a href="https://debian-handbook.info/browse/stable/debian-packaging.html">Debian Administrator's Handbook</a>.
+</p>
+
+
+<h2>See Also</h2>
+<p>
+<a href="download.html">Download</a>,
+   <a href="version.html">Versions</a> and <a href="guide.html">Guide</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Averaged bias frame</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Averaged bias frame</h1>
+
+<p class="abstract">
+An average bias frame of a set of bias frames.
+</p>
+
+<h2>Synopsis</h2>
+
+<code>
+munipack bias [..] file(s)
+</code>
+
+<h2>Description</h2>
+
+<p>
+A bias frame is a zero-time exposure with no light. The exposure with the shortest
+possible exposure time provided by a device. One maps a pre-amplifier bias (offset)
+of readout electronics. This routine creates an average bias frame,
+sometimes named as a masterbias.
+</p>
+
+<p class="indent">
+Because bias exposure times are really short (1/100s or less), it is
+recommended to acquire and average a lot of exposures (>10).
+</p>
+
+<p>
+An output bias <i>B<sub>ij</sub></i> is computed as the average of every pixel of
+input images <i>(I<sub>k</sub>)<sub>ij</sub></i>:
+</p>
+
+<p>
+<i>B<sub>ij</sub></i> = 〈 <i>I<sub>k</sub></i> 〉<i><sub>ij</sub></i>,
+</p>
+<p>
+where <i>i,j</i> is an index of a pixel and <i>k</i> is an index of an image.
+</p>
+
+<p class="indent">
+Both chip temperatures or exposure times are checked to be nearly the same
+during processing when FITS_KEY_TEMPERATURE and FITS_KEY_EXPTIME
+<a href="man_env.html">environment variables</a> are set to values of
+corresponding quantities.
+</p>
+
+<h2>Input and output</h2>
+
+<p>
+On input, a list of bias frames is expected.
+</p>
+
+<p>
+  On output, a single file representing of the mean bias frame is created.
+  The file has STDERR extension with standard errors.
+  Masked values (if parameter <samp>-bitmask</samp> is presented) are
+  set to the frame mean.
+</p>
+
+<h2>Parameters</h2>
+
+<dl>
+  <!-- #include virtual="/man_phcorr_common.shtml" -->
+
+  <dt><samp>-B bitpix</samp></dt><dd>set numerical type of output images,
+    see <a href="man_com.html">Common options</a> (default -32)</dd>
+  <dt><samp>-o filename</samp></dt><dd>save to the output file,
+    see <a href="man_com.html">Common options</a></dd>
+</dl>
+
+<p>Also see <a href="man_com.html">Common options</a>
+  A temperature and exposure time parameteres are set via
+<a href="man_setup.html#preprocenv">Environment variables</a>.
+</p>
+
+<h2>Examples</h2>
+
+<pre>
+$ munipack bias -o bias.fits bias_*.fits
+</pre>
+
+<figure>
+<img class="figure" src="robust_mean.png" alt="robust_mean.png" title="Robust mean">
+<figcaption>
+Mean bias frame
+</figcaption>
+</figure>
+
+
+<h2>See also</h2>
+<p>
+<a href="lctut.html">Light Curve Tutorial</a>,
+<a href="phcorrtut.html">Photometric corrections tutorial</a>,
+<a href="man_dark.html">Averaged dark frame</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

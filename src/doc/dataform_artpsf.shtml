@@ -1,0 +1,75 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Artificial PSF format</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1 class="noindent">Artificial PSF format</h1>
+<p class="abstract">
+  This document describes the format of a point spread function (PSF)
+  FITS file intended for simulation in
+  <a href="artific.html">Artificial sky tool</a>
+  (<a href="man_artificial.html">manual</a>).
+</p>
+
+<h2>Structure</h2>
+
+<p>
+  PSF is specified by a FITS file having one single primary image extension.
+  The image data represent intensities in projected coordinates.
+</p>
+
+<h2>PSF</h2>
+
+<p>
+  PSF is a two-dimensional array of real values.
+  PSF is recommended to be normalised; the total intensity
+  under the surface can be equal to one, which
+  helps to keep the photometry information.
+</p>
+
+<p>
+  The extension should have included parameter ZOOM which maps
+  PSF on a simulated image.
+</p>
+
+<p>
+  Processing follows the way:
+</p>
+<ol>
+  <li>PSF centre is shifted to the centre of a star,</li>
+  <li>PSF is pixelised. Final dimensions are in width: NAXIS1/ZOOM,
+    and in height: NAXIS2/ZOOM,</li>
+  <li>than PSF is directly copied on the right place of the simulated frame.
+</ol>
+
+
+<h3>Limitations</h3>
+
+<p>
+  There are those limitations:
+</p>
+<ul>
+  <li>Data array should cover a square, eg. NAXIS=2, NAXIS1=NAXIS2.</li>
+  <li>ZOOM should by an integer number.</li>
+</ul>
+
+<h2>See Also</h2>
+<p>
+  <a href="artific.html#egal">Artificial sky tool</a>,
+  <a href="man_artificial.html">manual</a>.
+</p>
+<p>
+  <a href="artpsf.f08">artpsf.f08</a> does generate the template
+  <a href="artpsf.lst">artpsf.lst</a> of PSF file;
+  run <samp>munipack fits --restore artpsf.lst</samp> to make FITS itself.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

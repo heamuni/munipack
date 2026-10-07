@@ -1,0 +1,155 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ AppImage</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+  <h1>AppImage</h1>
+
+  <p class="abstract">This page describes building of AppImage binary package.
+  </p>
+
+  <p>
+    The building process is easy: download the required software
+    and run <samp>appimage.sh</samp> script.
+  </p>
+
+  <h2>The script</h2>
+
+  <p>The shell script</p>
+  <ul>
+    <li><samp>dist/appimage.sh</samp></li>
+  </ul>
+  <p>
+  in Munipack source tree is AppImage packager.
+  </p>
+
+  <h2>Prerequisites</h2>
+
+<p>The software listed below is mandatory for building: </p>
+<ul>
+<li>Fortran 95 and C++ compilers </li>
+<li>GTK3 development libraries</li>
+<li>Both make and cmake</li>
+<li><a href="https://en.wikipedia.org/wiki/Filesystem_in_Userspace">fuse</a>
+   (<a href="https://github.com/AppImage/AppImageKit/wiki/FUSE">why?</a>)</li>
+</ul>
+
+<p>
+  All the requirements are available in any good Linux distribution.
+</p>
+
+
+<h2>AppImage tools</h2>
+
+  <p>
+    The main utility
+    <a href="https://github.com/AppImage/AppImageKit">appimagetool</a>
+    is left unused. The packaging itself is provided by
+  </p>
+  <ul>
+    <li>
+    <a href="https://github.com/linuxdeploy/linuxdeploy">linuxdeploy</a>
+    (<a href="https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage">download</a>)
+    having
+    </li>
+    <li>
+      <a href="https://github.com/linuxdeploy/awesome-linuxdeploy">module for GTK</a>
+      (<a href="https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh">download</a>).
+      </li>
+  </ul>
+
+  <p>
+    In the terminology of AppImage, Munipack is build by
+    <a href="https://docs.appimage.org/packaging-guide/manual.html">Manual way</a>
+  into the standard directory tree by
+  <a href="https://docs.appimage.org/reference/appdir.html">AppDir specification</a>.
+  </p>
+
+<h2>Source packages</h2>
+
+  <p>
+    These packages are required to build AppImage for Munipack:
+  </p>
+  <ul>
+    <li><a href="https://integral.physics.muni.cz/ftp/munipack/">Munipack</a></li>
+    <li><a href="https://integral.physics.muni.cz/oakleaf">Oakleaf</a></li>
+    <li><a href="http://heasarc.gsfc.nasa.gov/fitsio/">cFITSIO<a/></li>
+    <li><a href="https://plplot.sourceforge.net/">PLPLot</a></li>
+    <li><a href="https://en.wikipedia.org/wiki/MINPACK">Minpack</a>,
+      available in
+      <a href="https://packages.debian.org/source/bullseye/minpack">Debian's
+	source package<a/> as .tar.gz</li>
+    <li><a href="https://www.wxwidgets.org/downloads/">wxWidgets</a></li>
+  </ul>
+
+<h2>Directory structure</h2>
+
+  <p>
+    The building script <samp>dist/appimage.sh</samp> requires the set
+    of source packages collected into a directory.
+    The tree structure as it will be referenced below:
+  </p>
+  <pre>
+    appimage/
+       bin/
+       src/
+  </pre>
+  <p>
+    <samp>appimage/src/</samp> is the place where
+    <samp>linuxdeploy-x86_64.AppImage</samp> and
+    <samp>linuxdeploy-plugin-gtk.sh</samp> are available.
+  </p>
+  <p>
+    <samp>appimage/src/</samp> is the place where
+    the source packages are collected.
+  </p>
+
+<h2>Building</h2>
+
+<p>
+  The previous steps guaranties to be all requisites are ready. Now, it's
+  the moment of truth:
+</p>
+<pre>
+  $ APPDIR=/path/to/appimage/
+  $ MUNIPACK=/path/to/munipack-X.Y.Z/
+  $ PATH=$PATH:$APPDIR/bin sh $MUNIPACK/dist/appimage.sh $APPDIR/src/
+</pre>
+
+<p>
+  If the building process is successful, a new package does appear
+  in the current working directory. Be patient, it take a while.
+</p>
+
+<h2>Usage</h2>
+
+  <p>
+    A simple launch (by hand in terminal or by click of an icon in a file manager)
+    invokes <samp>xmunipack</samp> by default.
+  </p>
+
+  <p>
+    Munipack's command line interface <samp>munipack</samp>
+    is activated by making the link:
+  </p>
+  <pre>
+    $ ln -s Munipack-x86_64.AppImage munipack
+  </pre>
+  <p>It is base on the trick representing <samp>argv[0]</samp>
+     as the current executable file name.</p>
+
+<h2>See Also</h2>
+
+<p>
+<a href="install.html">Installation</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

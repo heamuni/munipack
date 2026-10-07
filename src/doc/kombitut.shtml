@@ -1,0 +1,145 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Frame Composition Tutorial</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Frame Composition</h1>
+
+<p>
+How to compose frames to get more deeper and precise image.
+</p>
+
+<h1>Deep Field of Bubble Nebula</h1>
+
+<p>
+Bubble nebula NGC 7635 is a HII ionized region in Cassiopeia.
+</p>
+
+<h2>Sample Data</h2>
+
+<p>
+A sample data are available as
+<a href="https://integral.physics.muni.cz/ftp/munipack/munipack-data-bubble.tar.gz">munipack-data-bubble.tar.gz</a>.
+Use commands
+</p>
+<pre>
+$ cd /tmp
+$ tar zxf munipack-data-bubble.tar.gz
+$ cd munipack-data-bubble/
+</pre>
+<p>
+to unpack it to a desired directory.
+We will assume that the sample data are unpacked to <samp>/tmp</samp> directory
+as <samp>/tmp/munipack-data-bubble</samp>.
+</p>
+
+
+<h2>Photometric Corrections</h2>
+
+<p>
+Prepare corrected data as is described in
+<a href="phcorrtut.html">Photometric Corrections Tutorial</a>.
+Flat-fields are not available.
+</p>
+
+<pre>
+$ munipack dark d120_*.fits
+$ munipack phcorr -gain 2.3 -dark dark.fits ngc7635_0*.fits
+</pre>
+
+<p>
+  Results will saved in files with suffix <samp>_proc.fits</samp>.
+</p>
+
+
+<h2>Photometry and Astrometry</h2>
+
+<p>
+Both precise astrometry and photometry of all frames is necessary
+to compose ones together.
+The astrometry gives a mutual transformation of pixels on
+images against to a world reference frame (usually
+represented by spherical coordinates).
+The relative (frame to frame) transformation can be also used.
+</p>
+
+<pre>
+$ munipack find ngc7635_0*_proc.fits
+$ munipack aphot ngc7635_0*_proc.fits
+$ munipack cone -r 0.1 350.20 61.20
+$ munipack astrometry ngc7635_0*_proc.fits
+</pre>
+
+
+<h2>Image Composition</h2>
+
+<p>
+The calibrated images can be easy used to create of a frame:
+</p>
+
+<pre>
+$ munipack kombine -o bubble.fits ngc7635_0*_proc.fits
+</pre>
+
+<p>
+The example contains 19 frames each 120 sec. The composed
+frame is an equivalent of total exposure time 2280 seconds.
+</p>
+
+
+<figure>
+  <img class="figure" src="bubble-single.png" alt="bubble-single.png"
+       title="Single exposure">
+<figcaption>Single exposure, 120 sec</figcaption>
+</figure>
+
+<figure>
+  <img class="figure" src="bubble-deep.png" alt="bubble-deep.png"
+       title="Deep exposure">
+<figcaption>Deeper exposure, 2280 sec.</figcaption>
+</figure>
+
+<p>
+These images nicely reveals the Poisson's noise nature. Because
+dispersion of the noise is square of detected photons and its relative
+error the reciprocal square, frames shows more details and less noise.
+</p>
+
+
+<h2>Advanced Usage</h2>
+
+<p>
+Kombine action can be also used for:
+</p>
+
+<ul>
+<li>Geometric transformation of images: scaling, rotation: try <samp>--scale, --angle</samp> parameters.</li>
+<li>Creating of mosaics: define a large canvas using <samp>--width, --height</samp> parameters.</li>
+</ul>
+
+
+<h2>See Also</h2>
+
+<p>
+Manuals:
+<a href="man_kombine.html">Kombine</a>,
+<a href="man_astrometry.html">Astrometry</a>,
+<a href="man_aphot.html">Aperture Photometry</a>,
+<a href="man_phcorr.html">Photometric corrections</a>.
+<a href="kombitut.sh">kombitut.sh</a> is a bash script summarizing
+of this tutorial.</p>
+
+<p>
+Tutorial:
+<a href="mosaics.html">Mosaic</a>
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

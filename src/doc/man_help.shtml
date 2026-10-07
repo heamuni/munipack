@@ -1,0 +1,105 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Help</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Help</h1>
+
+<p class="abstract">
+Munipack is distributed with an extensive help in HTML format.
+An on-line help and manual pages are additional sources of documentation
+primary intended for experienced users.
+</p>
+
+<h2>Reference Documentation</h2>
+
+<p>
+The main documentation of Munipack is included in distribution
+and can be found in a local installation directory.
+One can be considered as the reference documentation.
+</p>
+
+<p>
+The documentation is available also world-wide:
+</p>
+<p class="download">
+<a href="https://munipack.physics.muni.cz">Munipack homepage</a>
+</p>
+
+<p>
+The binary distribution contains reference document tree under directory
+<samp>/opt/munipack</samp>:
+</p>
+<p class="download">
+<a href="file:////opt/munipack/share/doc/munipack-doc/munipack.html">/opt/munipack/share/doc/munipack/html</a>
+</p>
+
+<p>
+The source distribution usually install reference document tree under directory
+<samp>/usr</samp> (<samp>/usr/local</samp>):
+</p>
+<p class="download">
+<a href="file:////usr/share/doc/munipack-doc/munipack.html">/usr/share/doc/munipack/html</a>
+</p>
+
+
+<h2>On-Line Help</h2>
+
+<p>
+On-line help system has two major modes ‒ global ‒ and ‒ action ‒ oriented
+to get summary of all actions or to get detailed help about a selected action.
+</p>
+
+
+<h3>Global Help</h3>
+
+<p>
+The global help is invoked by using of switch <samp>--help</samp> or shortly
+as <samp>-h</samp> or run munipack with no action:
+</p>
+<code>
+$ munipack --help
+</code>
+
+<h3>Help for Actions</h3>
+
+<p>
+A help print for an action is invoked as help together with the action:
+</p>
+<code>
+$ munipack astrometry --help
+</code>
+
+<p>
+To get list of actions, use global help (as in example above) and
+select appropriate item.
+</p>
+
+
+<h3>Version and License</h3>
+
+<p>
+Both version and license are available with <samp>--version</samp> switch:
+</p>
+<code>
+$ munipack --version
+</code>
+
+<h2>Manual Pages</h2>
+<p>
+Munipack installation provides manual pages for both graphical
+and command-line interfaces. Pages contains just short description of usage.
+</p>
+<code>
+$ man munipack
+</code>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

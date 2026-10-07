@@ -1,0 +1,53 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack - Classics Edition</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1 class="noindent">Classics Edition</h1>
+
+<p class="abstract">
+The classic edition is <b>obsoleted</b> since version 0.5.3.
+</p>
+
+<p>
+The classics edition of Munipack was a set of command-line utilities
+without a graphical user interface and an unified command line interface.
+One was developed at end of last century (1997 - 2000) and maintained up to 2008.
+</p>
+
+
+<p class="indent">
+Munipack has been originally developed on base of P.B.Stetson's
+<a href="http://adsabs.harvard.edu/abs/1987PASP...99..191S">DAOPHOT II</a>
+packaged in ESO
+<a href="http://www.eso.org/sci/data-processing/software/esomidas/">Midas</a>
+distribution. The classic version shares
+many great ideas of the original Daophot II and adds
+a lot of enhancements. The additional code contains photometry reduction,
+astrometry, image matching and combining utilities.
+</p>
+
+<p class="indent">
+Current editions of Munipack had reimplemented all its functionality
+(and offers much more over) of the classic edition.
+</p>
+
+
+<h2>Download</h2>
+
+<p>
+The classics edition is unmaintained and available only as the source
+</p>
+<p class="download">
+<a href="https://integral.physics.muni.cz/ftp/munipack/obsolete/munipack-0.4.2.tar.gz">munipack-0.4.2.tar.gz.</a>
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

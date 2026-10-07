@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+  <!-- #include "meta.shtml" -->
+<body>
+  <!-- #include "head.shtml" -->
+
+  <h1>Oakleaf in Fortran</h1>
+
+  <p>
+    The Oakleaf interface for Fortran programmers.
+  </p>
+
+
+  <p>
+    Since Oakleaf is developed in Fortran,
+    the choice is natural as the interface design follows common conventions.
+  </p>
+
+  <ul>
+    <li><a href="rmean.html">M-estimates</a></li>
+    <li><a href="order.html">The order statistics</a></li>
+  </ul>
+
+
+  <h2>A basic usage</h2>
+
+  <p>
+    Oakleaf is used in the same fashion as other libraries:
+  </p>
+
+  <dl>
+    <dt>Use</dt><dd>Include <samp>use oakleaf</samp> in the preambule
+      of the program. It provide declarations of routines.
+    </dd>
+    <dt>Call</dt><dd>Call a desired subroutine.</dd>
+    <dt>Link</dt><dd>Link the program with the Oakleaf library. The
+      library depends on common system libraries and Minpack.</dd>
+  </dl>
+
+  <p>An illustration can be the program saved into <samp>hello.f08</samp>:</p>
+
+<pre class="fortran">
+program hello
+
+   use oakleaf
+   real :: mean
+
+   call rmean([1.0,2.0,3.0],mean)
+   write(*,*) "Hello world, the mean is:",mean
+
+end program hello
+</pre>
+
+  <p>The program can be compiled, linked and run as:</p>
+<pre>
+$ gfortran -I/usr/include hello.f08 -L/usr/lib -loakleaf -lminpack
+$ ./a.out
+ Hello world, the mean is:   2.00038409
+</pre>
+
+  <p>The setup for paths, both the includes and libraries,
+    as <samp>-I/path/to/fortran/modules</samp>
+    or <samp>-L/path/to/libraries</samp>,
+    depends on the current instalation.
+    The sub-tree is <samp>/usr/local</samp>
+    if installed <a href="build.html">by hand</a>,
+    whilst the packages for GNU/Debian or Ubuntu place it into
+    <samp>/usr</samp>, like the example.
+  </p>
+
+<!--
+  <p>
+    is a library. It can be used by standard way, like
+    other libraries:
+  </p>
+  <ul>
+    <li>You must include the library module in every program unit:
+      <pre>
+program name
+   use oakleaf
+
+   ...
+end program name
+      </pre>
+    </li>
+
+    <li>
+      The program should be compiled, and the library linked to:
+      <pre>
+$ gfortran -I/usr/include prumer.f08 -L/usr/lib -loakleaf -lminpack
+      </pre>
+    </li>
+  </ul>
+-->
+
+
+
+<!--
+
+  <h2 id="fmean">Flux mean</h2>
+
+  <p>
+    Robust estimation of the factor lambda of Poisson distribution,
+     it is an average number of events per a time period.
+  </p>
+
+  <pre>
+
+  subroutine <span class="subroutine">fmean(photons,photons_err,counts,counts_err, &
+       mean,stderr,stdsig,scale,reliable,poisson,flag,verbose)</span>
+
+    real(kind), dimension(:), target, intent(in) :: &
+         photons,photons_err,counts,counts_err
+    real(kind), intent(out) :: mean
+    real(kind), intent(out), optional :: stderr,stdsig,scale
+    logical, intent(out), optional :: reliable, poisson
+    integer, intent(out), optional :: flag
+    logical, intent(in), optional :: verbose
+
+   This module implements a robust estimator of a ratio of events
+
+       t =  photon / counts
+
+   (including estimation of its scatter) appearing as the factor
+   lambda parameter of Poisson distribution
+
+       Po(lambda) = lambda**k/k! * exp(-lambda),   lambda = t * C
+
+    which provides zero mean for difference of N1 - N2 events
+    in Skellam's distribution
+       https://en.wikipedia.org/wiki/Skellam_distribution
+
+    The estimation is valid only for large values of lambda >> 1
+    in Gaussian regime when transformation
+
+        (photon - t*counts) / sqrt(photon_err**2 + t**2*count_err**2)
+
+    is valid. The approach usually requires proper estimates errors.
+
+    Both photons, counts should be non-integers > 1 as a product of
+    previous computations.
+
+
+   fmean should be called as:
+
+    call fmean(photons,photons_err,counts,counts_err,mean,stderr,stdsig,
+               scale,reliable,poisson,verbose)
+
+   On input:
+     photons - array of reference photon rates
+     photons_err - array of statistical errors of photons
+     counts - array of measured rates
+     counts_err - array of statistical errors of counts
+     verbose - print additional info
+
+   On output are estimated:
+     mean - mean
+     stderr (optional) - its standard error
+     stdsig (optional) - estimate of standard deviation
+     scale (optional) - estimate of scale
+     reliable - indicates reliability of results (optional)
+     poisson - indicates Poisson (.true.) or Normal (.false.)
+               distribution used for determine of results (optional)
+
+   The given results  means that a true value T of the sample
+   photons / counts can be, with 70% probability, found in interval
+
+           t - dt  <  T  <  t + dt
+
+   The estimate is performed as maximum of entropy of Poisson density
+   for values of photons smaller than 'plimit' (666) or by robust estimate
+   of parameters of Normal distribution. Both the estimates are robust.
+   Poisson mean is estimated as the minimum of free energy:
+   https://en.wikipedia.org/wiki/Helmholtz_free_energy
+
+  </pre>
+
+
+  <h1>Supporting routines</h1>
+
+  <p>
+    The routines, described above, works with help of supporting
+    routines described below. They are should be usefull in general.
+  </p>
+
+  <h2>Scale by information</h2>
+
+  <p>
+    This routine provides estimation of scale by maximising of information,
+    or minimising of variance (dispersion):
+    <a href="https://en.wikipedia.org/wiki/Fisher_information">
+      Fisher information</a>.
+  </p>
+
+  <p>
+    The scale of dispersion of data is crutial quantity
+    for robust estimates on base of the maximum-likelihood
+    principle.
+  </p>
+
+  <pre class="fortran">
+
+   Iscale should be called as:
+
+    call <span class="subroutine">iscale(r,s,reliable,flag,verbose)</span>
+
+   <b>On input:</b>
+     r - array of residuals: (data-mean), (data-mean)/errors, ...
+     verbose (optional) - verbose prints
+
+   <b>On output</b> are estimated:
+     s - scale
+     reliable (optional) - indicates reliability of result
+                           if .true., scale has been correctly
+                           localised. if .false., s is undefined
+     flag (optional) - result code:
+            0 == success, results are both reliable and precise
+            1 == consider rough estimate due convergence fail, try verbose
+            2 == basic estimates, few datapoints available
+            3 == data looks nearly identical
+            5 == failed to allocate memory, initial estimates are returned
+
+   Note.
+   Scale parameter shouldn't confused with standard deviation.
+   Their values are identical only in case of Normal distribution.
+  </pre>
+
+-->
+
+<!-- #include "foot.shtml" -->
+</body>
+</html>

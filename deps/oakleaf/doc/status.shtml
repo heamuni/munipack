@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <!-- #include "meta.shtml" -->
+<body>
+  <!-- #include "head.shtml" -->
+
+    <h1>Status codes</h1>
+
+    <table style="margin-top:2em; margin-bottom:1em;">
+      <tr><th>The code</th><th>Description</th></tr>
+      <tr><td class="c">0</td>
+	<td>Success, results are both reliable and accurate</td></tr>
+      <tr><td class="c">1</td>
+	<td>Success, results are reliable, can be inaccurate due rounding</td></tr>
+      <tr><td class="c">2</td>
+	<td>Success, a basic estimate for a single point or a pair</td></tr>
+      <tr><td class="c">3</td>
+	<td>Success, majority of data looks identical.</td></tr>
+      <tr><td class="c">5</td>
+	<td>Fail, improper input parameters
+	  (<samp>reltol, scale &lt; 0</samp>, etc.)</td></tr>
+      <tr><td class="c">6</td>
+	<td>Fail, no convergence or a unexpected error</td></tr>
+      <tr><td class="c">8</td>
+	<td>Fail, failed to allocate a memory.</td></tr>
+      <tr><td class="c">9</td>
+	<td>An interrupt on request.</td></tr>
+    </table>
+
+  <p>
+    The status codes &lt; 5 indicates the success,
+    whilst &ge; 5 stands for a fail.
+    Some subroutines use codes above ten for an inter-routine communication.
+  </p>
+
+  <p>
+    <samp>verbose = .true.</samp> becomes helpful in doubts.
+  </p>
+
+<!-- #include "foot.shtml" -->
+</body>
+</html>

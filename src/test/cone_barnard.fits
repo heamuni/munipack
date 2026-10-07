@@ -1,0 +1,171 @@
+SIMPLE  =                    T / file does conform to FITS standard             BITPIX  =                    8 / number of bits per data pixel                  NAXIS   =                    0 / number of data axes                            EXTEND  =                    T / FITS dataset may contain extensions            COMMENT   FITS (Flexible Image Transport System) format is defined in 'AstronomyCOMMENT   and Astrophysics', volume 376, page 359; bibcode: 2001A&A...376..359H COMMENT VO server description:                                                  COMMENT    VizieR Astronomical Server vizier.u-strasbg.fr                       COMMENT     Date: 2019-01-09T18:59:05 [V1.99+ (14-Oct-2013)]                    COMMENT    Explanations and Statistics of UCDs:   See LINK below                COMMENT    In case of problem, please report to: cds-question@unistra.fr        COMMENT    In this version, NULL integer columns are written as an empty string COMMENT    <TD></TD>, explicitely possible from VOTable-1.3                     COMMENT                                                                         COMMENT VO query:                                                               COMMENT -oc.form=DM                                                             COMMENT -source=I/322                                                           COMMENT -c                                                                      COMMENT -c.ra=269.44                                                            COMMENT -c.dec=4.69                                                             COMMENT -c.rd=0.1                                                               COMMENT -out=_r _RAJ() _DEJ() **                                                COMMENT Vmag=<15                                                                END                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             XTENSION= 'BINTABLE'           / binary table extension                         BITPIX  =                    8 / 8-bit bytes                                    NAXIS   =                    2 / 2-dimensional binary table                     NAXIS1  =                  237 / width of table in bytes                        NAXIS2  =                   31 / number of rows in table                        PCOUNT  =                    0 / size of special data area                      GCOUNT  =                    1 / one data group (required keyword)              TFIELDS =                   64 / number of fields in each row                   TTYPE1  = '_r      '           / label for field   1                            TFORM1  = '1D      '           / data format of field: 8-byte DOUBLE            TUNIT1  = 'deg     '           / physical unit of field                         TTYPE2  = '_RAJ2000'           / label for field   2                            TFORM2  = '1D      '           / data format of field: 8-byte DOUBLE            TUNIT2  = 'deg     '           / physical unit of field                         TTYPE3  = '_DEJ2000'           / label for field   3                            TFORM3  = '1D      '           / data format of field: 8-byte DOUBLE            TUNIT3  = 'deg     '           / physical unit of field                         TTYPE4  = 'UCAC4   '           / label for field   4                            TFORM4  = '10A     '           / data format of field: ASCII Character          TTYPE5  = 'RAJ2000 '           / label for field   5                            TFORM5  = '1D      '           / data format of field: 8-byte DOUBLE            TUNIT5  = 'deg     '           / physical unit of field                         TTYPE6  = 'e_RAJ2000'          / label for field   6                            TFORM6  = '1I      '           / data format of field: 2-byte INTEGER           TUNIT6  = 'mas     '           / physical unit of field                         TTYPE7  = 'DEJ2000 '           / label for field   7                            TFORM7  = '1D      '           / data format of field: 8-byte DOUBLE            TUNIT7  = 'deg     '           / physical unit of field                         TTYPE8  = 'e_DEJ2000'          / label for field   8                            TFORM8  = '1I      '           / data format of field: 2-byte INTEGER           TUNIT8  = 'mas     '           / physical unit of field                         TTYPE9  = 'ePos    '           / label for field   9                            TFORM9  = '1I      '           / data format of field: 2-byte INTEGER           TUNIT9  = 'mas     '           / physical unit of field                         TTYPE10 = 'EpRA    '           / label for field  10                            TFORM10 = '1D      '           / data format of field: 8-byte DOUBLE            TUNIT10 = 'yr      '           / physical unit of field                         TTYPE11 = 'EpDE    '           / label for field  11                            TFORM11 = '1D      '           / data format of field: 8-byte DOUBLE            TUNIT11 = 'yr      '           / physical unit of field                         TTYPE12 = 'f.mag   '           / label for field  12                            TFORM12 = '1E      '           / data format of field: 4-byte REAL              TUNIT12 = 'mag     '           / physical unit of field                         TTYPE13 = 'a.mag   '           / label for field  13                            TFORM13 = '1E      '           / data format of field: 4-byte REAL              TUNIT13 = 'mag     '           / physical unit of field                         TTYPE14 = 'e_a.mag '           / label for field  14                            TFORM14 = '1E      '           / data format of field: 4-byte REAL              TUNIT14 = 'mag     '           / physical unit of field                         TTYPE15 = 'of      '           / label for field  15                            TFORM15 = '1B      '           / data format of field: BYTE                     TTYPE16 = 'db      '           / label for field  16                            TFORM16 = '1I      '           / data format of field: 2-byte INTEGER           TTYPE17 = 'Na      '           / label for field  17                            TFORM17 = '1I      '           / data format of field: 2-byte INTEGER           TTYPE18 = 'Nu      '           / label for field  18                            TFORM18 = '1I      '           / data format of field: 2-byte INTEGER           TTYPE19 = 'Nc      '           / label for field  19                            TFORM19 = '1I      '           / data format of field: 2-byte INTEGER           TTYPE20 = 'pmRA    '           / label for field  20                            TFORM20 = '1D      '           / data format of field: 8-byte DOUBLE            TUNIT20 = 'mas/yr  '           / physical unit of field                         TTYPE21 = 'e_pmRA  '           / label for field  21                            TFORM21 = '1E      '           / data format of field: 4-byte REAL              TUNIT21 = 'mas/yr  '           / physical unit of field                         TTYPE22 = 'pmDE    '           / label for field  22                            TFORM22 = '1D      '           / data format of field: 8-byte DOUBLE            TUNIT22 = 'mas/yr  '           / physical unit of field                         TTYPE23 = 'e_pmDE  '           / label for field  23                            TFORM23 = '1E      '           / data format of field: 4-byte REAL              TUNIT23 = 'mas/yr  '           / physical unit of field                         TTYPE24 = 'MPOS1   '           / label for field  24                            TFORM24 = '1J      '           / data format of field: 4-byte INTEGER           TTYPE25 = 'UCAC2   '           / label for field  25                            TFORM25 = '10A     '           / data format of field: ASCII Character          TTYPE26 = 'Tycho-2 '           / label for field  26                            TFORM26 = '12A     '           / data format of field: ASCII Character          TTYPE27 = '2Mkey   '           / label for field  27                            TFORM27 = '1J      '           / data format of field: 4-byte INTEGER           TTYPE28 = 'Jmag    '           / label for field  28                            TFORM28 = '1E      '           / data format of field: 4-byte REAL              TUNIT28 = 'mag     '           / physical unit of field                         TTYPE29 = 'e_Jmag  '           / label for field  29                            TFORM29 = '1E      '           / data format of field: 4-byte REAL              TUNIT29 = 'mag     '           / physical unit of field                         TTYPE30 = 'q_Jmag  '           / label for field  30                            TFORM30 = '2A      '           / data format of field: ASCII Character          TTYPE31 = 'Hmag    '           / label for field  31                            TFORM31 = '1E      '           / data format of field: 4-byte REAL              TUNIT31 = 'mag     '           / physical unit of field                         TTYPE32 = 'e_Hmag  '           / label for field  32                            TFORM32 = '1E      '           / data format of field: 4-byte REAL              TUNIT32 = 'mag     '           / physical unit of field                         TTYPE33 = 'q_Hmag  '           / label for field  33                            TFORM33 = '2A      '           / data format of field: ASCII Character          TTYPE34 = 'Kmag    '           / label for field  34                            TFORM34 = '1E      '           / data format of field: 4-byte REAL              TUNIT34 = 'mag     '           / physical unit of field                         TTYPE35 = 'e_Kmag  '           / label for field  35                            TFORM35 = '1E      '           / data format of field: 4-byte REAL              TUNIT35 = 'mag     '           / physical unit of field                         TTYPE36 = 'q_Kmag  '           / label for field  36                            TFORM36 = '2A      '           / data format of field: ASCII Character          TTYPE37 = 'Bmag    '           / label for field  37                            TFORM37 = '1E      '           / data format of field: 4-byte REAL              TUNIT37 = 'mag     '           / physical unit of field                         TTYPE38 = 'e_Bmag  '           / label for field  38                            TFORM38 = '1E      '           / data format of field: 4-byte REAL              TUNIT38 = 'cmag    '           / physical unit of field                         TTYPE39 = 'f_Bmag  '           / label for field  39                            TFORM39 = '1A      '           / data format of field: ASCII Character          TTYPE40 = 'Vmag    '           / label for field  40                            TFORM40 = '1E      '           / data format of field: 4-byte REAL              TUNIT40 = 'mag     '           / physical unit of field                         TTYPE41 = 'e_Vmag  '           / label for field  41                            TFORM41 = '1E      '           / data format of field: 4-byte REAL              TUNIT41 = 'cmag    '           / physical unit of field                         TTYPE42 = 'f_Vmag  '           / label for field  42                            TFORM42 = '1A      '           / data format of field: ASCII Character          TTYPE43 = 'gmag    '           / label for field  43                            TFORM43 = '1E      '           / data format of field: 4-byte REAL              TUNIT43 = 'mag     '           / physical unit of field                         TTYPE44 = 'e_gmag  '           / label for field  44                            TFORM44 = '1E      '           / data format of field: 4-byte REAL              TUNIT44 = 'cmag    '           / physical unit of field                         TTYPE45 = 'f_gmag  '           / label for field  45                            TFORM45 = '1A      '           / data format of field: ASCII Character          TTYPE46 = 'rmag    '           / label for field  46                            TFORM46 = '1E      '           / data format of field: 4-byte REAL              TUNIT46 = 'mag     '           / physical unit of field                         TTYPE47 = 'e_rmag  '           / label for field  47                            TFORM47 = '1E      '           / data format of field: 4-byte REAL              TUNIT47 = 'cmag    '           / physical unit of field                         TTYPE48 = 'f_rmag  '           / label for field  48                            TFORM48 = '1A      '           / data format of field: ASCII Character          TTYPE49 = 'imag    '           / label for field  49                            TFORM49 = '1E      '           / data format of field: 4-byte REAL              TUNIT49 = 'mag     '           / physical unit of field                         TTYPE50 = 'e_imag  '           / label for field  50                            TFORM50 = '1E      '           / data format of field: 4-byte REAL              TUNIT50 = 'cmag    '           / physical unit of field                         TTYPE51 = 'f_imag  '           / label for field  51                            TFORM51 = '1A      '           / data format of field: ASCII Character          TTYPE52 = 'g       '           / label for field  52                            TFORM52 = '1B      '           / data format of field: BYTE                     TTYPE53 = 'c       '           / label for field  53                            TFORM53 = '1B      '           / data format of field: BYTE                     TTYPE54 = 'H       '           / label for field  54                            TFORM54 = '1B      '           / data format of field: BYTE                     TTYPE55 = 'A       '           / label for field  55                            TFORM55 = '1B      '           / data format of field: BYTE                     TTYPE56 = 'b       '           / label for field  56                            TFORM56 = '1B      '           / data format of field: BYTE                     TTYPE57 = 'h       '           / label for field  57                            TFORM57 = '1B      '           / data format of field: BYTE                     TTYPE58 = 'Z       '           / label for field  58                            TFORM58 = '1B      '           / data format of field: BYTE                     TTYPE59 = 'B       '           / label for field  59                            TFORM59 = '1B      '           / data format of field: BYTE                     TTYPE60 = 'L       '           / label for field  60                            TFORM60 = '1B      '           / data format of field: BYTE                     TTYPE61 = 'N       '           / label for field  61                            TFORM61 = '1B      '           / data format of field: BYTE                     TTYPE62 = 'S       '           / label for field  62                            TFORM62 = '1B      '           / data format of field: BYTE                     TTYPE63 = 'LEDA    '           / label for field  63                            TFORM63 = '1I      '           / data format of field: 2-byte INTEGER           TUNIT63 = '[6arcsec]'          / physical unit of field                         TTYPE64 = '2MX     '           / label for field  64                            TFORM64 = '1I      '           / data format of field: 2-byte INTEGER           TUNIT64 = 'arcsec  '           / physical unit of field                         EXTNAME = 'UCAC4 Catalogue (Zacharias+, 2012)' / name of this binary table extenCOMMENT Fourth U.S. Naval Observatory CCD Astrograph Catalog                    EPOCH   =                2000. / reference time (epoch)                         END                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             ?Ÿag#$È6@p×vœß£@ÒŒ‡b_q474-068233@p×vœß£ @ÒŒ‡b_q  @Ÿ!     @Ÿ&Â\(öA8È´A8bN=LÌÍ      ?Ó333333?€  À333333?€  jİ190-0973550425-00262-1C]=A+Æ¨<£×
+05A*n˜<õÂ05A)33<õÂ05A<õÃ<#×
+.A85?<#×
+.A9X<#×
+.A7hs<#×
+.A7\)<#×
+.          ?¶\ö{ @p×s½vd@m³÷é±474-068231@p×s½vd @m³÷é±  @Ÿ4Që…¸@Ÿ1Që…¸A=Æ¨A=&é=uÂ      À'ffffff?À  ÀK™™™™š@   hiu190-097354            C]SA'33<£×
+05A!hs<õÂ05A ff<£×
+05AK¡Ë<#×
+.A?ß;<#×
+.ADÌÍ    .A< Å    .A89X<#×
+.            ?¸S*I¥Ó@pÖF+$q@²¨^X{474-068162@pÖF+$q ,@²¨^X{  0@Ÿ5
+=p£×@Ÿ;33333AA‰7A@í‘=uÂ      @ffffff@œÌÍ¿æffffff@ÌÍkA190-097251            C]pA"^5<£×
+05AáH<õÂ05A¼j<£×
+05AY‰7<õÂ.AEë…    .ANÔş<#×
+.A?7L<#×
+.A8¸R    .             ?£]íñà‚Œ@p× Ñœ?f@¸îİ˜Ìë474-068239@p× Ñœ?f @¸îİ˜Ìë  @Ÿ;ÌÌÌÌÍ@Ÿ:õÂ\)AM¶FAM=¸Qì      À      @™š@      @33i±Ó190-097365            C]?A0ƒ<£×
+05A'®<õÂ05A%ß;<£×
+05Ab\<õÂ.AQÊÁ<#×
+.AYKÇ<#×
+.AKÊÁ<#×
+.AE®<#×
+.             ?¸
+ñË‰Ö®@pÕp–k@²İË!Ñâ474-068122@pÕp–k @²İË!Ñâ  @Ÿ:áG®{@Ÿ<(õÂ\ANƒAN=q=áG®      À      @33@      @&ffi—‹190-097193            C]‚A5?}<õÂ05A-Â<õÂ05A,¬<£×
+05A`1<#×
+.AQ <õÂ.AWÛ#<#×
+.AL‡+<£×
+.AGë…    .             ?±½ÙßÚÇ@pÕï[½•ø@ºfpwa`474-068145@pÕï[½•ø @ºfpwa`  @Ÿ8Që…¸@Ÿ=Që…¸ANÌÍANbN=£×
+      ¿Ó333333@ff@333333@333i¸f190-097222            C]§A*zá<£×
+05A%<õÂ05An˜<£×
+05Ak¡Ë<£×
+.AT‹D    .A_    .AL$İ<#×
+.AD1'<#×
+.             ?².	ş†ƒ<@pØ+©Ñö@Ëî¶+ ˜474-068265@pØ+©Ñö @Ëî¶+ ˜  "@Ÿ;\(õÂ@Ÿ9Â\(öAO²AO;d=£×
+      À0æfffff@y™šÀ%333333@ÌÍj?190-097398            C]>ÃA8^5<£×
+05A2¬<õÂ05A1?}<£×
+05A_P<£×
+.ARQì    .AWãT    .AMß;<#×
+.AI•<#×
+.             ?§\Nµo¹@pÖ¹¼ïß÷@í0\¿¸474-068190@pÖ¹¼ïß÷ @í0\¿¸  @Ÿ=áG®{@Ÿ;¸Që…AR  AR-=¸Qì      ÀÌÌÌÌÌÍ@333?ù™™™™™š@   j‘µ190-097293            C]ºA2(ö<£×
+05A)Oß<õÂ05A&¸R<£×
+05Aj    .AVÌÍ<#×
+.A_²<õÂ.AP5?<£×
+.AI;d<#×
+.             ?·Ù˜*@pÖ7õÀ@IdÍßò474-068159@pÖ7õÀ @IdÍßò  @Ÿ<záG®@Ÿ;33333AS7LARƒ=ÌÌÍ      À2€     @   À4æfffff@,ÌÍk.z                      C]YA<‹D<£×
+05A7P<õÂ05A6j<£×
+05Ah(ö<#×
+-AWOß<#×
+-AZ\<#×
+-ARE¢<#×
+-À  À                ?¸¸køÉ@p×İB­@%nÀ§û\474-068212@p×İB­ @%nÀ§û\  @Ÿ8fffff@Ÿ=™™™™šA[7LAZ~ú=áG®      @       @™šÀÌÌÌÌÌÍ@LÌÍk€M190-097320            C]­A;ß;<£×
+05A2›¦<õÂ05A0~ú<£×
+05As¡Ë<#×
+.A_hs<£×
+.AhŸ¾<#×
+.AX´9<#×
+.ARJ=#×
+.             ?´·õ¥3*Ğ@pÕÑ
+d@¦ª´cI474-068137@pÕÑ
+d @¦ª´cI  @Ÿ7®záH@Ÿ*=p£×
+A\\A\-=áG®      ?ó333333@ÌÍ?ñ™™™™™š?À  ib­190-097215            C]MA<‡+<£×
+05A2ÌÍ<õÂ05A0ÌÍ<£×
+05At‡+<£×
+.A`Ù<õÂ.AiÊÁ<£×
+.AYÛ#    .AS…<#×
+.             ?´ò¾ÎİHE@pÕèey×\@˜Åû!t474-068144@pÕèey×\ @˜Åû!t  @Ÿ:ë…¸R@ŸfffffA]²A]¾w=£×
+      ?şffffff@9™šÀ*333333?™™ši#ã190-097220            C]ACÎÙ<£×
+05A<A‰<õÂ05A:<£×
+05Aoë…<õÂ.Aa33<£×
+.Agçm    .A\MÓ<£×
+.AW…<#×
+.             ?³[_¢'Õ@pÖ±ËT&É@xUÌ»/474-068189@pÖ±ËT&É @xUÌ»/  #@Ÿ6…¸Qì@Ÿ7õÂ\)A`§ğA`È´=ÌÌÍ      ¿ã333333@@          @&ffhšÚ190-097289            C]ŒAHZ<£×
+05ABE¢<õÂ05A@n˜<õÂ05Arıô<£×
+.Ae<£×
+.AjáH<#×
+.A`      .A[dZ<£×
+.             ?³=Jä)à¤@pØ%“ˆ¡@á3O¸¤ø474-068264@pØ%“ˆ¡ @á3O¸¤ø  @Ÿ<
+=p£×@Ÿ*záG®Aa
+=A_ãT>#×
+      Àffffff@9™šÀffffff?ÌÌÍj^…190-097397            C]>iA>\<£×
+05A3`B<õÂ05A1ÊÁ<£×
+05Az¼j=\).Ae•<£×
+.AoG®<#×
+.A]ÊÁ<#×
+.AV£×<#×
+.             ?µËhH¾µ³@pÕ¿l¬Ñ…@Şóñíï474-068133@pÕ¿l¬Ñ… @Şóñíï $ -@Ÿ\(õÃ@Ÿ*×
+=p¤AaxÕAa‘h=ÌÌÍ      @ffffff?™™šÀ333333@@  jT‰190-097208            C]xA>V<£×
+05A2¼j<õÂ05A0£×<£×
+05A{Æ¨<õÂ.AfvÉ=#×
+.AoÒò<#×
+.A_Oß<#×
+.AW%=LÌÌ.             ?¢ÿÑÜ×@pÖŒ7«h@×æ­H£474-068182@pÖŒ7«h @×æ­H£   @Ÿ<G®zá@Ÿ)õÂ\)Aa²-A`Àƒ>¸      À333333@fff?ó333333?Ù™šj5Â190-097280            C]TAE¸<õÂ05A=
+=<õÂ05A<“<õÂ05Ar“<£×
+.AdJ<#×
+.AjIº<#×
+.A^›¦<#×
+.AYKÇ<#×
+.             ?²¼ÿŸ‡ğ@p×ü+_)[@–
+¨y0474-068259@p×ü+_)[ @–
+¨y0  "@Ÿ8Që…¸@Ÿ;fffffAc©üAadZ>\)      ¿æffffff@   Àffffff@LÌÍiX190-097390            C]?¶AN£×<õÂ25AIÎÙ<õÂ05AI+<õÂ05Al\<£×
+.Ac <#×
+.Aféy<#×
+.A_ÊÁ    .A\j<£×
+.             ?·{®Í…/@pÕÀ[Tºl@ğ™+µ474-068134@pÕÀ[Tºl @ğ™+µ   @Ÿ<ë…¸R@Ÿ0£×
+=qAd ÅAc>#×
+      À™™™™™š@@  @333333@ffj3190-097209            C]ÈAN“u<õÂ05AIl‹<õÂ05AI<õÂ05AnÌÍ<#×
+.Ad(ö<#×
+.Ahff<£×
+.A`Ù    .A]×
+=#×
+.             ?´´Zåÿ£º@p×Àß©Hc@}]¶”|#474-068248@p×Àß©Hc @}]¶”|#  @ŸA\(õÃ@ŸA\(õÃAd9XAcdZ>.{      ÀÌÌÌÌÌÍ@¹™š?à      @À  h°Á190-097376            C]@AE²-<£×
+05A=?}<õÂ05A;<õÂ05Ay <£×
+.Ag¶F<#×
+.Ap(ö<£×
+.AaÛ#    .A[P<£×
+.              ?³jPÖ²(İ@p×à¯¸@úëìLÄÕ474-068255@p×à¯¸ @úëìLÄÕ  $@Ÿ0G®zá@Ÿ3G®záAeoAcß;>¸      @!      @   ?¹™™™™™š@33jËş190-097384            C]>AOp¤<£×
+05AIçm<õÂ05AHùÛ<õÂ05ApZ<£×
+.Af<£×
+.Aj9X<#×
+.AbŸ¾<#×
+.A_|î<#×
+.             ?šÏtFù¹•@pÖİD Á@ª+Òì¡~474-068201@pÖİD Á @ª+Òì¡~  $@ŸA¸Që…@ŸAQë…¸AgSøAehs>¸      À™™™™™š@¹™šÀ#ffffff@À  ir190-097304            C][AL$İ<£×
+05ACÛ#<õÂ05ABr°<õÂ05Azéy    .AjõÃ<#×
+.ArE¢    .Ae‡<#×
+.A_®<õÂ.              ?®œˆabñg@pÖÂÉ©+Ş@‡û¥ş+ê474-068194@pÖÂÉ©+Ş @‡û¥ş+ê  '@ŸAG®zá@Ÿ@…¸QìAgl‹Af£×>\)      ¿ø      @¶ff¿şffffff@¼ÌÍhß©190-097296            C]ÍABMÓ<£×
+05A6¬<õÂ05A3;d<£×
+05A‚å`<õÂ.An{<#×
+.AyC–<õÂ.AeÎÙ    .A]=uÂ.              ?¹RÚ˜gj@pÖx>4îõ@eIùHUÚ473-069593@pÖx>4îõ @eIùHUÚ  +@Ÿ@záG®@Ÿ@£×
+=qAhJAhÙ=\)      À2æfffff@¹™šÀ      @Ã33hG[190-097274            C]5AU×
+<õÂ05AQ&é<õÂ05AOp¤<õÂ05Au¶F<õÂ.Al¼j<£×
+.ApvÉ    .AiÛ#<£×
+.Af~ú=uÂ.              ?¨æ>ò„@pÖïI™§@óè(råÑ474-068206@pÖïI™§ @óè(råÑ  $@ŸA33333@ŸA(õÂ\Ah¬Ai¡Ë=ÌÌÍ      ?ôÌÌÌÌÌÍ@¹™š?Ó333333@¼ÌÍj®190-097308            C]ÔAJéy<õÂ05AAº^<õÂ05A?ãT<£×
+05AÊÁ<£×
+.Am²-=uÂ.AuÊÁ<#×
+.AgÆ¨<£×
+.A`Ğå<£×
+.              ?°DŒ÷Ê§Y@pÖÄ¡… f@FäÀßY474-068195@pÖÄ¡… f @FäÀßY  =@ŸB¸Që…@ŸB¸Që…AhjAfí‘=uÂ     ø      À  ø      À  jæÅ                      C]AIG®<õÂ25A@°!=#×
+25A>j<õÂ05Ap  <£×
+.A`¼j<£×
+.Aghs    .A[º^    .AVff<#×
+.               ?µcV­Í-@pÖå™¼Û@m"õÎN474-068204@pÖå™¼Û @m"õÎN 6 =@Ÿ@£×
+=q@Ÿ<záG®AlAl“u=õÂ      @      @¼ÌÍÀÌÌÌÌÌÍ@Ã33hkb190-097305            C]YA\{<õÂ05AX(ö=#×
+05AWÛ#=#×
+05AvÀƒ<õÂ.Anıô<#×
+.Aqº^<#×
+.AlV<£×
+.Ak
+=<õÂ.              ?§ê$Ìh#@pÖkRôš@«,N<£õ474-068174@pÖkRôš !@«,N<£õ ! B@ŸB¸Që…@ŸB¸Që…Al§ğAiÒò>¸     ø      À  ø      À  ivX190-097270            C]]AU…<õÂ25APJ<õÂ05AO\)=#×
+05AsÛ#=uÂ.Ahzá<#×
+.Am <#×
+.Ad5?    .Aa¸<#×
+.               ?†“t¼j@pÖşŸ’×Ş@·ğ•ÿ±&474-068210@pÖşŸ’×Ş %@·ğ•ÿ±& $ 3@Ÿ?™™™™š@Ÿ?õÂ\)Am•Al—=£×
+      @ÌÌÌÌÌÍ@¼ÌÍ@333333@Ã33i­190-097316            C]˜AX¬<õÂ05ATÌÍ<õÂ05AS®=#×
+05Aw²-<õÂ.AnJ<õÂ.Aqë…<#×
+.AkSø=£×
+.Aip¤<õÂ.              ?°B0üøÃ@p×1:Ç@‡²ˆä474-068215@p×1:Ç .@‡²ˆä / A@Ÿ=×
+=p¤@Ÿ=áG®{Ar{Ap¸R=\)      @&ffffff@¹™šÀ9ffffff@À  hÃ”                      C]²A[©ü<õÂ25AUOß=#×
+05AT°!=#×
+05A{Æ¨<£×
+.Ao²-<#×
+.At´9=#×
+.Aj¬<#×
+.Aeçm=ÌÌÌ.              ?¦#lÒĞ@pÖnÑ9C@­°ĞíÄ474-068175@pÖnÑ9C ›@­°ĞíÄ ¤ ı@ŸÌÌÌÌÍ@Ÿ\(õÂA²AV>Š=q      @GÙ™™™™š@ìÌÍÀC@     @ìÌÍi~r                      C]fAkhs=LÌÍ25Adéy=\)25Adn˜=¸Qì05AsÛ#=uÂ.Ahzá<#×
+.Am <#×
+.Ad5?    .Aa¸<#×
+.              ?‰›,@Ğª¨@p×;³OME@ÆC›`C474-068224@p×;³OME @ÆC›`C  @Ÿ     @Ÿ     À  À  À         ÀˆôÌÌÌÌÍ@   @Ä,ÌÌÌÍ@    Z                      C]û@§ÎÙ<£×
+05@š°!<õÂ05@Äœ<£×
+05A×
+    .A£×    .A)&é=\).A›¦<£×
+.@ø1'=#×
+.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           

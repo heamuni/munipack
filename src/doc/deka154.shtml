@@ -1,0 +1,57 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Scripting of DK 154 pipeline</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+
+<h1>Scripting of DK 154 pipeline</h1>
+
+<p class="abstract">
+There is a description of development of a pipeline for
+processing of images from DK154. The scripts can be modified
+and used for general data processing.
+</p>
+
+<h2>Introduction</h2>
+
+<p>
+DK154 is the famous <a href="https://www.eso.org/public/teles-instr/lasilla/danish154/">Danish 1.54-meter</a> telescope at La Silla (Chilie).
+</p>
+
+
+<h2>Prerequisities</h2>
+
+<p>
+The frames are taken under common conditions:
+</p>
+<ul>
+<li>Every frame includes IMAGETYP keyword in header with possible values:
+    LIGHT, BIAS, FLAT</li>
+<li>The CCD is cooled below -100°C, so taking of darks has been abandoned by operators.</li>
+<li>Biases are cheeply available. There is easy to get 15 - 20 biases per run. It is
+    supposed biases are get every night.</li>
+<li>Flat-fileds are relative expensive to acquire. Ones are taken only one 
+    per seasson (per month), certainly, at least not every night. Flat-fields 
+    can be visually checked.</li>
+<li>The rought sky position (± few arcmin) is known. The position
+is pre-set in frame headers by telescopes's controlers.</li>
+</ul>
+
+<h2>Overview</h2>
+
+
+
+
+<h2>See Also</h2>
+<p>
+<a href="dataform_tmseries.html">Data format</a>,
+<a href="lctut.html">Light Curve</a>,
+<a href="man_list.html">Listing</a>,
+<a href="man_com.html">Common options</a>.</p>
+
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

@@ -1,0 +1,234 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Cone Search</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Cone Search</h1>
+
+<p class="abstract">
+Cone search of catalogues provided by Virtual Observatory.
+</p>
+
+<h2>Command</h2>
+
+<pre>
+munipack cone [.. options ..] [--] RA DEC
+munipack cone [--list-catalogues | --list-servers]
+</pre>
+
+<h2>Description</h2>
+
+<p>
+Search a selected catalogue provided by Virtual observatory
+interface (VO-capable cone search) with following features:
+</p>
+<ul>
+<li>List of available catalogues is prepared.</li>
+<li>List of available servers is prepared.</li>
+<li>All parameters are in degrees.</li>
+<li>Output is stored to VOTable format (XML),
+FITS table or a plain text or any format supported by
+<a href="man_votable.html">votable</a>.</li>
+</ul>
+<p>
+</p>
+
+<h2>Southern declinations</h2>
+
+<p>
+Southern object coordinates starts with minus sign which can be recognised,
+by the parsing routine, as an option or a switch. To prevent the confusion,
+we must separate options and parameters by double-dash [--]. Than recognition
+of the coordinates will work as expected.
+</p>
+
+<p>
+A typical message when the problem is occurred:
+<pre>
+$ munipack cone 245.9 -26.5
+Unknown option '26'
+Usage: munipack cone ...
+</pre>
+<p>
+And can be easy solved as
+</p>
+<pre>
+$ munipack cone -- 245.9 -26.5
+</pre>
+
+<h2>Catalogue Servers</h2>
+
+<p>
+Central Virtual Observatory catalogue site (VizieR) is maintained by
+<a href="http://cdsweb.u-strasbg.fr/">Centre de Données astronomiques de Strasbourg</a>
+and provided as a <a href="http://vizier.u-strasbg.fr/viz-bin/VizieR">VizieR</a> service.
+The service is mirrored by other sites. The option <samp>--service</samp>
+offers possibility to select an appropriate mirror.
+</p>
+
+<h2>Network Timeout</h2>
+
+<p>
+Sometimes connection can not be established on first attempt or a network
+connection is down, in this case, the connection will be repeated for a while.
+</p>
+
+
+<h2>Input And Output</h2>
+
+<p>
+On input, no files are expected. Virtual Observatory is connected via network.
+</p>
+
+<p>
+On output, results of the cone search are saved to a file.
+</p>
+
+<h2>Magnitudes in Johnson BVRI system</h2>
+
+<p>
+  One can found usefull a conversion of UCAC4 magnitudes to Johnson
+  BVRI photometry system. <samp>cone</samp> utility with
+  <samp>--Johnson-patch</samp>  has included the transformation derived by
+  <a href="http://classic.sdss.org/dr4/algorithms/sdssUBVRITransform.html#Lupton2005">Lupton (2005)</a>.
+</p>
+
+
+<h2>Selection Constrains</h2>
+
+<p>
+Some servers supports additional parameters for search, output form and etc.
+For instance, there is a way how to limit magnitudes in V filter for stars
+brighter than eleven:
+</p>
+<pre>
+munipack cone --par 'Vmag=&lt;11' -- 245.9 -26.5
+</pre>
+<p>
+  The magnitude interval, as well as another quantity, is set by double dots:
+</p>
+<pre>
+munipack cone --par 'Vmag=11..12' -- 245.9 -26.5
+</pre>
+
+<p>
+  Additional info can be found in VizieR utilitiy
+  <a href="http://vizier.u-strasbg.fr/vizier/doc/vizquery.htx">vizquery</a> and
+  <a href="http://vizier.u-strasbg.fr/vizier/vizHelp/syntax.htx">constrain
+    syntax</a> documentation.
+</p>
+
+
+<h2>Parameters</h2>
+
+<dl>
+<dt><samp>-c,--cat</samp></dt><dd>catalogue alias (see --list-catalogues)</dd>
+<dt><samp>-r</samp></dt><dd>search radius in degrees (default: 0.1)</dd>
+<dt><samp>--magmin</samp></dt><dd>bright object magnitude limit for the search</dd>
+<dt><samp>--magmax</samp></dt><dd>faint object magnitude limit for the search</dd>
+<dt><samp>--Johnson-patch</samp></dt>
+<dd>convert Gunn's ri magnitudes to Johnson RI (UCAC4 only)</dd>
+<dt><samp>-s, --sort</samp></dt><dd>sort by the column</dd>
+<dt><samp>--url</samp></dt><dd>use the URL. Following options are ignored:
+                               -c, --cat, --par, -r, --server</dd>
+<dt><samp>--id</samp></dt><dd>Full catalogue identifier like I/666</dd>
+<dt><samp>--par</samp></dt><dd>additional optional parameters
+    (by default maximum verbosity is used)</dd>
+<dt><samp>--type</samp></dt><dd>A file type of the output file: fits,votable
+    (default by suffix of <samp>-o</samp> option).
+    <a href="man_votable.thml">votable</a> provides conversion to other types.
+</dd>
+<dt><samp>--vocat</samp></dt><dd>an alternative configuration file (normally,
+    located in <samp>[/opt]/usr/share/munipack/VOcat_conf.xml</samp>)</dd>
+<dt><samp>--server</samp></dt><dd>use the mirror of VizieR</dd>
+<dt><samp>--list-catalogues</samp></dt><dd>list of predefined catalogues</dd>
+<dt><samp>--list-servers</samp></dt><dd>list of available VizieR servers</dd>
+<dt><samp>--</samp></dt><dd>Double-dash separates options and switches from
+    coordinates, it is necessary for negative coordinates (parser can
+    be confused by minus sign normally introducting of a switch).</dd>
+</dl>
+
+<p>
+See <a href="man_com.html">Common options</a> for input/output filenames.
+</p>
+
+<p>
+  Limits by <samp>--magmin, --magmax</samp> uses
+  magnitudes in the sort column.
+</p>
+
+<h2>Using Another Catalogue</h2>
+<p>
+The list of predefined catalogues is short. Any other catalogue can
+be added by this way:
+</p>
+<ul>
+<li>Go to <a href="http://vizier.u-strasbg.fr/viz-bin/VizieR">VizieR</a>
+service and discover your catalogue. We will need ID of the catalogue like
+"J/A+A/544/A31" (Ptolemaios catalogue).</li>
+<li>
+Invoke the cone as
+<pre>
+$ munipack cone --id 'J/A+A/544/A31' -r 1 -- 104 -16
+</pre>
+</li>
+<li>
+To use the data, apropriate parameters <samp>--col-ra, --col-dec,
+--col-pm-ra, --col-pm-dec</samp> for <samp>astrometry, phcal,</samp> etc
+must be specified.
+</li>
+</ul>
+
+
+<h2>Examples</h2>
+
+<p>
+  Does cone search of a default catalogue (UCAC4) pointed on Trifid nebula
+  (α = 270.675°, δ = -22.972°):
+</p>
+<pre>
+$ munipack cone -- 270.675  -22.972
+</pre>
+
+<p>
+  Do cone search of a default catalogue (UCAC4) pointed on globular cluster
+  M13 with star magnitude limitation for a small telescope
+</p>
+<pre>
+$ munipack cone --magmin 10 --magmax 15 -- 250.423 36.461
+</pre>
+
+<p>
+Search GSC catalogue within Pleiades (α = 92.4°, δ = 24.1°) with cone radius
+of 0.2°:
+</p>
+<pre>
+$ munipack cone -c GSC -r 0.2 92.4 24.1
+</pre>
+
+<p>
+Cone search for south hemisphere coordinates needs separate parameters and
+options with double-dash:
+</p>
+<pre>
+$ munipack cone -- 245.9 -26.5
+</pre>
+
+
+<h2>See Also</h2>
+<p>
+  <a href="vobs.html">Virtual Observatory</a>,
+  <a href="man_sesame.html">Sesame name resolver</a>,
+  <a href="man_com.html">Common options</a>,
+  <a href="http://cdsweb.u-strasbg.fr/vizier/doc/vizquery.htx">vizquery documentation</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

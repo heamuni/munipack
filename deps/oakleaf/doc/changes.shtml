@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <!-- #include "meta.shtml" -->
+  <body>
+  <!-- #include "head.shtml" -->
+
+    <h1>List of changes</h1>
+
+    <h2>Oakleaf 0.0.0</h2>
+    <p>Initial release as a fork of robust methods maintained for Munipack
+      (18. Jun. 2018)</p>
+
+    <h2>Oakleaf 0.0.1</h2>
+    <p>The first public release (22. Jan. 2019)</p>
+
+    <ul>
+      <li>Added documentation.</li>
+      <li>Added automachinery.</li>
+    </ul>
+
+    <h2>Oakleaf 1.0.0</h2>
+    <p>The implemenatation of the robust mean (31. Jan. 2025)</p>
+
+    <ul>
+      <li>The robust mean routine has been completely reimplemented.
+	It is based on the developed method for optimisation
+	applied on the likelihood in two-dimensional space.
+      </li>
+    </ul>
+
+    <h2>Oakleaf 1.0.1</h2>
+    <p>The flexible implementation of the robust mean (13. Jan. 2025)</p>
+
+    <ul>
+      <li>The release can be compiled under 32-bit platforms with
+	no support of the quadruple precision.
+      </li>
+    </ul>
+
+    <h2>Oakleaf 1.1.0</h2>
+  <p>Improvements for the robust mean in both speed and accuracy
+    (13. Feb. 2026)</p>
+
+  <ul>
+    <li>Improved interface of robust functions modules.</li>
+    </ul>
+
+<!-- #include "foot.shtml" -->
+  </body>
+</html>

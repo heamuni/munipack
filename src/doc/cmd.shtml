@@ -1,0 +1,165 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Colour — Magnitude Diagram Tutorial</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>Colour — Magnitude Diagram</h1>
+
+<p class="abstract">
+How to create of a colour-magnitude (CMD) diagram which is a photometric
+equivalent of the Hertzsprung-Russel diagram.
+</p>
+
+<h1>Open cluster M 67</h1>
+
+<p>
+Open cluster M 67 is an old galactic cluster with a differently
+evolved stars which covers wide range of colour indexes.
+All stars are approximately same old, but due to its different
+initial masses and the fact that heavy stars gets older quickly,
+we are observing the cluster members in different stages of evolution.
+</p>
+
+<!-- #include virtual="/m67-common.shtml" -->
+
+<h2>Data Processing</h2>
+
+<p>
+To get CMD, follow these points:
+</p>
+
+<ol>
+  <!-- #include virtual="/m67-proc.shtml" -->
+  <li>
+    <p class="li">
+      At this point, data are uncalibrated in magnitudes, but
+      can be used directly, if no calibration source is available.
+      The shape of final diagram will be shifted alongside both axis.
+    </p>
+    <p class="li">
+      The files M67_*_MAG.fits contains the table, which
+      can be matched and visualised by
+      <a href="http://www.star.bris.ac.uk/~mbt/topcat/">topcat</a>
+      (Virtual Observatory software).
+</p>
+<div class="table">
+<table>
+<tr><th>α [J2000]</th><th>δ [J2000]</th><th>instrumental magnitude</th><th>std. deviation</th></tr>
+<tr><td>132.8228301</td><td>11.7562805</td><td>7.62841</td><td>.00036</td></tr>
+<tr><td>…</td><td>…</td><td>…</td><td></td></tr>
+</table>
+</div>
+</li>
+
+  <li>
+    <p class="li">
+      A photometry calibration offers determination of
+      astrophysical characteristics of clusters. The calibration
+      depends on availability of already known calibration stars.
+      We will take stars by UCAC4 catalogue, notwithstanding the
+      photometry accuracy is only about ten percents.
+    </p>
+
+    <pre>
+      $ munipack cone -r 0.2 --magmax 14 --Johnson-patch -o phcal_cone.fits -- 132.8 11.8
+      $ munipack phcal --photsys-ref Johnson -f B --area 0.3 --col-mag Bmag \
+         --col-magerr e_Bmag -c phcal_cone.fits m67_B.fits
+      $ munipack phcal --photsys-ref Johnson -f V --area 0.3 --col-mag Vmag \
+         --col-magerr e_Vmag -c phcal_cone.fits m67_V.fits
+      $ munipack phcal --photsys-ref Johnson -f R --area 0.3 --col-mag Rmag \
+         --col-magerr e_Rmag -c phcal_cone.fits m67_R.fits
+    </pre>
+
+    <p class="li">
+      The calibration utilises conversion of Gun's r,i magnitudes on
+      data in Johnson R filter, and determines the conversion.
+      Another source of calibrated magnitudes can be used, if the magnitudes
+      are stored in a FITS file.
+    </p>
+  </li>
+
+</ol>
+
+<h2>Determination of Properties of M67</h2>
+<p>
+Final results can be compared with models tabulated in the article
+
+<a href="http://adsabs.harvard.edu/abs/1994A%26AS..106..275B">
+Theoretical isochrones from models with new radiative opacities,
+   Bertelli G., Bressan A., Chiosi C., Fagotto F., Nasi E,
+   Astron. Astrophys. Suppl. Ser. 106, 275 (1994).
+</a>
+
+Tables can be downloaded here:
+<a href="ftp://cdsarc.u-strasbg.fr/pub/cats/J/A+AS/106/275">
+  ftp://cdsarc.u-strasbg.fr/pub/cats/J/A+AS/106/275</a>.
+Alternatively, isochrone models are also available via
+<a href="http://www.star.bris.ac.uk/~mbt/topcat/">topcat</a>
+(look for BaSTI).
+</p>
+
+<figure>
+<img class="figure" src="M67cmd.png" alt="M67cmd.png" title="M 67">
+<figcaption>Colour - magnitude diagram for M 67.
+The star track for 10 Gyr, Z=0.0080, Y=0.25 and 1 kpc.</figcaption>
+</figure>
+
+<p>
+The models can be easy plotted and one can determine
+basic astrophysical characteristics of M 67 open cluster:
+</p>
+<ul>
+<li>chemical composition</li>
+<li>age</li>
+<li>distance</li>
+</ul>
+
+<h2>Notes</h2>
+
+<p>
+This is the outline of the real method used to determine the parameters
+of clusters in astrophysics. The fitting of the main sequence
+and the turning point gives an age estimation, at least as wishful thinking.
+</p>
+
+
+<p>
+The presented method is focused on use of Munipack. Therefore
+we are ignoring some astrophysical difficulties:
+</p>
+<ul>
+<li>Some stars on the images may be not members of the cluster. Independent
+    tests on base of proper motions or distance measurements should be used
+    to select only the right members.</li>
+<li>The colours are affected by the interstellar extinction which
+    deforms observational data. The extinction has different fluency
+    onto short- and long-wavelength fluxes. One can be mapped
+    by using of tree filters together.</li>
+<li>We are believing in theoretical models (which may be, generally,
+    false idea).</li>
+<li>The colour indexes <i>B-V,V-R</i> can be used to construction
+of extinction diagram.</li>
+<li>
+Instrumental magnitudes are used. To get more precise results, use
+<a href="man_phcal.html">photometric calibration</a> along with
+<a href="man_phfotran.html">Photometric System Transformation</a>.
+</li>
+</ul>
+
+<h2>See Also</h2>
+<p>
+<a href="man_phcal.html">Photometry calibration</a>,
+<a href="man_phfotran.html">Photometric System Transformation</a>,
+<a href="dataform_photometry.html">Photometry Format</a>,
+<a href="m67.sh">m67.sh</a>
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

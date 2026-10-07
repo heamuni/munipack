@@ -1,0 +1,10 @@
+User-Agent: *
+Disallow: /hg/
+Disallow: /devel/
+Disallow: /ubuntu/
+
+User-agent: ltx71 - (http://ltx71.com/)
+Disallow: /hg/
+
+User-agent: VelenPublicWebCrawler
+Disallow: /hg/

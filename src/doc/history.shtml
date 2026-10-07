@@ -1,0 +1,133 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ The History</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+  <h1>About History Of Munipack</h1>
+
+<p><i>DRAFT</i></p>
+
+<p class="abstract">
+Munipack is a general astronomical image processing software focused on processing
+of any kind of observed image data. The processing is like a art of data processing
+and Munipack is a tool in hands of experineced astronomer.
+</p>
+
+<h2>Early Era</h2>
+
+<p>
+A processing of astronomical images is one from the most exciting parts of the
+observational astronomy. But the relevant processing of the tusand of images is
+also the most difficult task for scientists. Since 1998, I'm working on developing
+of a system for automarise the processing and on fully automated
+algorithms for that purpose. I started from the famous DAOPHOT II
+package by P. B. Stetson. The name Munipack is inspired
+by DAOPHOT, P.B. Stetson wroted DAOPHOT at Dominion
+Astrophysical Observatory therefore I use Munipack
+originated from my alma mater, Masaryk University in Brno. Note,
+that T.G. Masaryk was a first Czech(oslovak) democratic
+president. I thinks, that names like Hrophot are not suitable for the case.
+</p>
+
+<p>
+The CCD photomtery is a art of data processing. Any
+algorithm (Munipack's component or another) can
+diminantly help of this processing but it must be used
+with naximum warranty. Are you a astronomical photometry
+guru?
+
+</p>
+
+<p>
+Munipack project has been started by me in Masaryk University at 1996. A primary idea
+has been to prepare a batch processing software for huge amount of our CCD data.
+As the photometry core, the source codes of DAOPHOT II implemented by Midas, has
+been selected. Just star detection and the aperture photometry routines
+has been used, for reason, that ones did not required any user interaction,
+the key feature for non-iterative analysis.
+</p>
+
+<p>
+The original code has been arranged to work as a separate tool (without Midas
+environment). Parameters and data files has been not altered (ones are identical
+to obsolete 0.4.2 version).
+</p>
+
+<p>
+The core of the Munipack package - muniphot - is based on the
+world-wide known code DAOPHOT by the P. B. Stetson. Nevertheless,
+the munipack was rewritten from Fortran 77 language to Fortran 90
+and its robust mean estimator was coded from the scratch.
+The methods for the mean were described in book:
+</p>
+
+<p>
+Muniphot is less general the DAOPHOT.
+DAOPHOT uses aperture and PSF photometry, but muniphot only aperture
+photometry. The differences between both utilities will be on a crowded
+field greather then on a sparse. The photmetry with munipack of the stars
+in a globular cluster or supernovae on the background of a galaxy
+is probbably bad idea. This is work for DAOPHOT. The processing
+of a few hundred images of your favourite variable star in
+Ursa Major is typical use of the munipack.
+</p>
+
+<h2>Developing of additional utilities</h2>
+<p>
+Some utilities has been implemented to provide additional facility for extraction
+of light curves of variable stars from the images. The matching of
+star lists has provided a way to find an affine transformation between images
+and vice versa. The routines had enabled construction of light curves. Also
+basic image reduction (dark and flat corrections) has been added. The work has
+been published under both Unix (Linux and Solaris) and MS-DOS operating systems
+during 1997.
+</p>
+
+<h2>Under DOS</h2>
+<p>
+My friend Rudolf Novak wrote DOS/WIN port of the prehistorical
+version of Munipack named MUNIDOS. This package contains
+main components for photometry and additional routines
+for user friendly interface. Many people reports MUNIDOS as
+new DOS clone (like MSDOS, DRDOS or FreeDOS). On base it,
+we (I) omiting this name. Therefore, MUNIDOS still lives.
+It is maintainted by the Lukas Kral.
+</p>
+
+<h2>Robust Algorithms and Fortran 90</h2>
+<p>
+1998 and 2000 improvements included the creation of a robust flat-field routine
+from series of flat-fields (using mean and sigma normalization).
+Some important improvements in algorithms has been realized: The main part
+of code has been arranged for Fortran 90 compilers. The implementation
+has been changed to use of dynamical arrays, routines has been rewrote
+to use memory instead of disk-buffers and massive speed up has been preformed.
+Robust algorithms with non-Gaussian distributions replaced the original
+DAOPHOT's filtering and cutting methods (while the methods has shown
+the right way to determine results).
+</p>
+
+<h2>Long Bug-fixing</h2>
+<p>
+The 2000-late improvements included image collecting utilities which
+provides composition of images and deep-field imaging and precise photometry
+of combined images. The period has been characterized by a slow progress,
+bug-fixing and perfecting of the application.
+</p>
+
+<h2>Graphical interfaces</h2>
+<p>
+The new era of Munipack started on begin of 2009 when the plan for GUI,
+modernization and improvements has been started. As the part of the work,
+you can read this sentences.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

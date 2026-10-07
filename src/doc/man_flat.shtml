@@ -1,0 +1,241 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Flat-field frame</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<!-- TODO:
+    * describe of verbose info (for all commands!)
+-->
+
+<h1>Flat-field frame</h1>
+
+
+<p class="abstract">
+  This utility builds a flat field by scaling and averadging
+  of a set of individual flat-field frames.
+</p>
+
+<h2>Synopsis</h2>
+
+<code>
+munipack flat [.. parameters ..] file(s)
+</code>
+
+<h2>Description</h2>
+
+<p>
+A flat-field frame is a map of a photometric response of an instrument
+(all together detector, filter, and optical configuration). Flat-fields
+are intended to remove a light path non-uniformity as:
+the variable sensitivity of pixels, dust grains shadows,
+filter homogenity, or vignetting.
+Ones can be acquired on sky during twilight, as night sky images,
+the dome flats or by another technique.
+</p>
+
+<p class="indent">
+  Flat-fiels are build on base of
+  principial properties of the statistic of photons:
+  the bound relation between the mean
+  <i><span style="text-decoration: overline">c</span></i>
+  and the standard deviation <i>σ²</i>, it is described in detail by
+  <a href="https://en.wikipedia.org/wiki/Poisson_distribution">
+    Poisson's distribution
+  </a>.
+  The properties are utilised to scale and to averadge of
+  single flats.
+  The averaging improves accuracy of the final flat-field, moreover,
+  all defects, presented on any single frame (like random
+  cosmics), are softly cleared.
+</p>
+
+<p class="indent">
+  The values of the final flat-field <i>F<sub>ij</sub></i> are
+  computed as the a solution of a non-linear implicit equation,
+  pixel by pixel for every input frame.
+  A lot of both computer power and memory is need.
+  The required memory is width × height × 4 × 2 bytes per frame,
+  one hundred of 1000×1000 frames takes 800MB.
+</p>
+
+<p class="indent">
+  Relative accuracy of a final flat-field increase as
+  square root of amount of input frames <i>√N</i>
+  (sixteen input frames increases accuracy by factor 4×).
+  Implemented robust methods works well when amount of
+  input frames is over thirteen frames <i>N &gt; 13</i>.
+</p>
+
+<p class="indent">
+  The input flat-fields should be initialy corrected for all of these
+  gain, bias and dark correctors:
+</p>
+<p>
+<i>F<sub>ij</sub> → g(F<sub>ij</sub> - x D<sub>ij</sub> - B<sub>ij</sub>)</i>.
+</p>
+<p>
+The meaning of <i>x</i> and the algorithm itself are the same as in
+<a href="man_phcorr.html">photometric corrections</a>.
+</p>
+
+<p class="indent">
+It is strongly recommended to set of correct value of FITS_KEY_FILTER
+(<a href="man_env.html">environment variables</a>), because
+the filter identification in the FITS header of the flat-field
+should be available for some later processing.
+</p>
+
+
+<h2>Gain estimate</h2>
+
+<p>
+Flat-fielding can be used to estimate of gain <i>g</i> of a camera.
+The estimation determines
+<a href="https://en.wikipedia.org/wiki/Variance">variance</a>
+<i>σ<sup>2</sup></i> and the mean value
+<i><span style="text-decoration: overline">c</span></i>
+of individual flat-field frames. Ratio satisfies the condition
+<i><span style="text-decoration: overline">c</span>/σ<sup>2</sup> ≈ 1</i>
+only for <a href="https://en.wikipedia.org/wiki/Poisson_distribution">Poisson distributed</a> data, when other sources of noise are negligible.
+Values significantly violating the conditions
+indicates that <i>g</i> is differ to one.
+The recommended mean values for all <i>c</i> are about half of full well
+capacity of a detector.
+</p>
+
+<p class="indent">
+The gain <i>g</i> is determined by the relation
+</p>
+<p>
+<i>g = <span style="text-decoration: overline">c</span> / σ²</i>
+</p>
+
+<p class="indent">
+  The gain estimate, values of variance <i>σ<sup>2</sup></i> and gain <i>g</i>
+  are determined when <samp>--verbose</samp> printings are
+  activated:
+</p>
+<pre>
+  ...
+  Filename, mean level <i><span style="text-decoration: overline">c</span></i>, std.err., std.dev. σ, gain g, reliable:
+  ...
+  flat-V_000006.fits:   99142.  0.151 313.73  1.007  T
+  flat-V_000007.fits:   81895.  0.137 285.10  1.008  T
+  flat-V_000008.fits:   67706.  0.125 259.86  1.003  T
+  ...
+</pre>
+<p class="indent">
+  A recommended way to determine of gain is initialy set to
+  some value
+  (<i>g=1</i> if no other approximation is already known) and invoke
+  the estimate.
+  Than use the newly determined value
+  to set the gain again and repeat the procedure
+  while estimated gain will remain on value near to one
+  with desired accuracy.
+</p>
+
+<p class="indent">
+When gain keyword is available in the header, the values are
+initially scaled by the gain so results will be determined relative
+against to the value.
+</p>
+
+<p class="indent">
+The estimation of value of gain is just indicative and to check by some
+alternative method (factory provided, …) is highly recommended.
+</p>
+
+<h2>Input and output</h2>
+
+<p>
+  On input, list of observed flat-fields is expected.
+  Optionally, all gain, bias and dark corrections can
+  by applied on every frame.
+</p>
+
+<p>
+  On output, just the flat-field frame is created.
+    The file has STDERR extension with standard errors.
+</p>
+
+<h2>Parameters</h2>
+
+<dl>
+  <dt><samp>-gain g</samp></dt><dd>provides value of gain (rather than
+    one by FITS keyword), in [e-/ADU]</dd>
+<dt><samp>-bias file</samp></dt><dd>bias frame</dd>
+<dt><samp>-dark file</samp></dt><dd>dark frame</dd>
+  <dt><samp>-xdark x</samp></dt><dd>dark frame multiplicative factor</dd>
+
+  <!-- #include virtual="/man_phcorr_common.shtml" -->
+
+  <dt><samp>--approximation [basic|standard]</samp></dt><dd>
+    Basic level of approximation computes only robust mean of all flat-fields;
+    it is considered as very rough estimate.
+    The standard approximation level provides the most accurate
+    solution as possible, limited by the photon noise only.
+  </dd>
+  <dt><samp>-B bitpix</samp></dt><dd>Set numerical type of output images.
+    Only the default -32 should be used.
+    The mean value of outputs will be changed to be order of
+    <i>100, 10<sup>4</sup>, 10<sup>9</sup></i> for BITPIX 8,16 and 32.
+  </dd>
+  <dt><samp>-o filename</samp></dt><dd>save to the output file</dd>
+</dl>
+
+<p>Also see <a href="man_com.html">Common options</a></p>
+
+<h2>Environment variables</h2>
+
+<p>
+FITS_KEY_FILTER, FITS_KEY_DATEOBS, FITS_KEY_EXPTIME, FITS_KEY_IMAGETYP,
+FITS_KEY_GAIN, FITS_KEY_SATURATE
+(see <a href="man_env.html">Environment variables</a>).
+</p>
+
+<p class="indent">
+  No one is mandatory, yet keep in mind: a flat-field with no some filter
+  identification is like the heavy water without neutrons.
+</p>
+
+
+<h2>Examples</h2>
+
+<pre>
+$ munipack flat -o f_R.fits -gain 2.3 -dark d30.fits -st 6e4 f30_*R.fits
+</pre>
+
+<figure>
+<img class="figure" src="f10_1.png" alt="f10_1.png" title="A flat-field image">
+<figcaption>
+A single flat-field frame.
+</figcaption>
+</figure>
+
+<figure>
+<img class="figure" src="autoflat.png" alt="autoflat.png" title="A scaled robust mean of flats">
+<figcaption>
+An averadge of flat-field frames.
+</figcaption>
+</figure>
+
+
+<h2>See also</h2>
+<p>
+  <a href="flatfielding.html">Flat-fielding</a>,
+  <a href="lctut.html">Light curve tutorial</a>,
+  <a href="phcorrtut.html">Photometry corrections tutorial</a>,
+  <a href="man_bias.html">Averaged bias frame</a>,
+  <a href="man_dark.html">Averaged dark frame</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

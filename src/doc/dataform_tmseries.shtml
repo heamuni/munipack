@@ -1,0 +1,181 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ Time Series Table Format</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1 class="noindent">Time Series Table Format</h1>
+<p class="abstract">
+Description of FITS tables intended for store of time series
+(light curves) or another time series data.
+</p>
+
+<p>
+The table is created as output of <samp>munipack timeseries</samp> command.
+</p>
+
+<p>
+  The specification slightly follows <a href="http://dotastro.org/simpletimeseries/">SimpleTimeseries</a> format (IMPORTANT: This link is intentionally dead due authors themselves.
+  There is  no widely accepted definition
+  of a format for light curves and related affairs yet.) Generally, Munipack's format is a bit more simplified and
+restrictive.
+</p>
+
+<h1>File Structure</h1>
+
+<div class="table">
+<table>
+<caption>FITS file structure</caption>
+<tr><th>HDU</th><th>EXTNAME</th><th>Description</th></tr>
+<tr><td>0</td><td></td><td>Dummy<sup><a href="#dummy">[†]</a></sup></td></tr>
+<tr><td>1</td><td>TIMESERIES</td><td>Time Series Table</td></tr>
+<tr><td>2</td><td>CATALOGUE</td><td>Objects identification (coordinates)</td></tr>
+</table>
+</div>
+
+<div class="notes">
+<p id="dummy">
+<sup><a href="#dummy">[†]</a></sup>
+The first dummy extension contains keywords of identification HDUNAME,
+which is set mandatory to 'TIMESERIES', CREATURE is set to
+'Munipack X.Y.Z' version and a link to this page as a comment.
+</p>
+</div>
+
+
+<h1 id="tmtable">Time Series Table</h1>
+
+<p>
+The main table which stores the time series.
+</p>
+
+<div class="table">
+<table>
+<caption>Time Series Keywords</caption>
+<tr><th>Keyword</th><th>Value</th><th>Default</th><th>Description</th></tr>
+<tr><td>EXTNAME</td><td>TIMESERIES</td><td>TIMESERIES</td><td>extension identifier</td></tr>
+<tr><td>TIMETYPE</td><td>JD</td><td>JD</td><td>Type of TIME: JD (Julian Day),
+MJD (modified JD), HJD (heliocentric JD), phase <i>φ</i><sup><a href="#ttype">[1]</a></sup></td></tr>
+<tr><td>TIMESYS</td><td>UTC</td><td>UTC</td><td>Time system</td></tr>
+<tr><td>TIMEREF</td><td>GEOCENTRIC</td><td></td><td>Reference time point</td></tr>
+<tr><td>TIMESTMP</td><td>MIDPOINT</td><td>MIDPOINT</td><td>time stamp = MIDPOINT,BEGIN,END<sup><a href="#tstamp">[2]</a></sup></td></tr>
+<!--
+<tr><td>TIMEERR</td><td></td><td></td><td>Uncertainty in the time measurement<sup><a href="#terr">[3]</a></sup></td></tr>
+<tr><td>TIMERES</td><td></td><td></td><td>Resolution in the time measurement<sup><a href="#terr">[3]</a></sup></td></tr>
+<tr><td>FILTER</td><td></td><td></td><td>Filter, spectral band-pass<sup><a href="#fsys">[4]</a></sup></td></tr>
+<tr><td>PHOTSYS</td><td></td><td></td><td>Photometry system<sup><a href="#fsys">[4]</a></sup></td></tr>
+-->
+</table>
+</div>
+
+<div class="notes">
+<p id="ttype">
+<sup><a href="#ttype">[1]</a></sup>
+Definition of Julian (also other derived) days provides <a href="https://en.wikipedia.org/wiki/Julian_day">Julian day</a> wiki page. The phase <i>φ = {(t - t<sub>0</sub>)/P}</i> is
+defined as <a href="https://en.wikipedia.org/wiki/Floor_and_ceiling_functions">fractional
+part</a> (<i>{x} = x - ⌊x⌋</i>) of time difference HJD since the epoch <i>t<sub>0</sub></i>
+per period <i>P</i>.
+</p>
+
+<p id="tstamp">
+<sup><a href="#tstamp">[2]</a></sup>
+The time is labeled by timestamps (the elapsed time is <i>T</i>):
+at the begin <i>t<sub>0</sub></i> (BEGIN) up to finish <i>t<sub>1</sub> =
+t<sub>0</sub> + T</i> (END) time. The midpoint
+is computed as <i>t<sub>0</sub> + T/2</i>.
+</p>
+
+<!--
+<p id="terr">
+<sup><a href="#terr">[3]</a></sup>
+The keyword is optional. It is presented, if the value has been provided
+by user.
+</p>
+
+<p id="fsys">
+<sup><a href="#fsys">[4]</a></sup>
+Values are common spectral pass-band for all frames derived from FILTER
+and PHOTSYS keywords (for calibrated data).
+</p>
+-->
+</div>
+
+
+<div class="table">
+<table>
+<caption>Time Series Table</caption>
+<tr><th>Column</th><th>Type</th><th>Description</th></tr>
+<tr><td>TIME</td><td>1D</td><td>Time-like quantity<sup><a href="#tt">[a]</a></sup></td></tr>
+<tr><td>EXPTIME</td><td>1D</td><td>Integration time like quantity<sup><a href="#te">[b]</a></sup></td></tr>
+<tr><td>Q<sub><i>i</i></sub></td><td>1D</td><td>Quantity for <i>i</i>-th object<sup><a href="#qt">[c]</a></sup></td></tr>
+<tr><td>QE<sub><i>i</i></sub></td><td>1D</td><td>Standard deviation of Q-<i>i</i><sup><a href="#qt">[c]</a></sup></td></tr>
+</table>
+</div>
+
+<div class="notes">
+<p id="tt">
+<sup><a href="#tt">[a]</a></sup>
+Units of the time-like quantity in days (for H,M,JD). The phase has no units.
+</p>
+
+<p id="te">
+<sup><a href="#te">[b]</a></sup>
+The exposure time is directly copied from frames and units are (perhaps)
+seconds.
+</p>
+
+<p id="qt">
+<sup><a href="#qt">[c]</a></sup>
+Table can contain many physical quantities. For their meaning, see
+<a href="dataform_photometry.html">Photometry data table</a>. The table
+can contains multiple columns of the quantities for all required objects.
+</p>
+</div>
+
+<h1>Object Catalogue Table</h1>
+
+<p>
+This extension contains equatorial coordinates of objects of TIMESERIES extension.
+</p>
+
+<div class="table">
+<table>
+<caption>Object Catalogue Keywords</caption>
+<tr><th>Keyword</th><th>Value</th><th>Default</th><th>Description</th></tr>
+<tr><td>EXTNAME</td><td>CATALOGUE</td><td>CATALOGUE</td><td>extension identifier</td></tr>
+<tr><td>REFRAME</td><td></td><td>ICRS</td><td>Reference celestial coordinate system</td></tr>
+<tr><td>EPOCH</td><td></td><td>2000</td><td>Reference epoch for proper motion</td></tr>
+</table>
+</div>
+
+<div class="table">
+<table>
+<caption>Object catalogue Table</caption>
+<tr><th>Column</th><th>Type</th><th>Description</th><th>Units</th></tr>
+<tr><td>RAJ2000</td><td>1D</td><td>Right Ascension<sup><a href="#ep">[§]</a></sup></td><td>degrees</td></tr>
+<tr><td>DEJ2000</td><td>1D</td><td>Declination<sup><a href="#ep">[§]</a></sup></td><td>degrees</td></tr>
+</table>
+</div>
+
+<div class="notes">
+<p id="ep">
+<sup><a href="#ep">[§]</a></sup>
+Coordinates are referenced for epoch of the observation.
+Fast-moving objects can evince visible coordinate differences.
+</p>
+</div>
+
+<h2>See Also</h2>
+<p>
+<a href="man_timeseries.html">Time Series</a>
+</p>
+
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

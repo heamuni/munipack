@@ -1,0 +1,32 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ 404</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+
+<div class="notfound">[ 404 ] &nbsp; PAGE NOT FOUND</div>
+
+<p class="notfound">
+The requested page not found. Please, stay for a while.
+</p>
+
+<figure>
+  <a href="https://en.wikipedia.org/wiki/Ještěd_Tower">
+    <img class="figure" src="big_logo.png"
+	 title="Pictures of Ještěd" alt="Pictures of Ještěd">
+  </a>
+</figure>
+
+<p class="notfound">
+  I designed Munipack's logo in honour to architect
+  <a href="https://en.wikipedia.org/wiki/Karel_Hubáček">Karel Hubáček</a>
+  (1924 – 2011) who projected the hotel with TV tower on top of Ještěd
+  mountain, which magically fascinates me since the first sight.
+</p>
+
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

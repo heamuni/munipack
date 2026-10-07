@@ -1,0 +1,31 @@
+  <dt><samp>-bitmask file</samp></dt><dd>mask frame (see
+  <a href="man_phcorr.html#masking">phcorr</a> for description).
+  Only pixels, marked by this mask are processed.
+  </dd>
+  <dt><samp>-st, --saturate s</samp></dt><dd>Set saturate limit in
+    units of input frames.
+    Any pixel out of the range <i>th &lt; pixel &lt; s</i>
+    (see also --threshold)  is rejected the processing.
+    This switch is useful mainly for over-exposed parts of frames
+    and elimination of non-linear parts of gradation curve.
+    If unset, the value is determined from FITS header
+    (by FITS_KEY_SATURATE, <a href="man_setup.html">see</a>).
+    If the keyword is not found and the frame contains
+    an integer number type, the maximum value 2**BITPIX-1 is
+  provided, otherwise the maximum value of given data-type
+    is used (which practically switch-off the saturation bound check).
+    The value is set in ADU (values reported by camera).
+  </dd>
+  <dt><samp>-th, --threshold th</samp></dt><dd>Set threshold limit
+    in units of input frames.
+    Any pixel below the value is rejected from the processing.
+  If unset, the value is number one.
+  Threshold is minor significance parameter.
+    It should help for faulty values or filtering
+  of bad pixels.
+  <!--
+  Its recommended value is inside interval
+ from zero to one quarter of full range.
+-->
+    The value is set in ADU (values reported by camera).
+  </dd>

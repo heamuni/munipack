@@ -1,0 +1,62 @@
+# BEGIN HDU 0
+SIMPLE  =                    T / file does conform to FITS standard
+BITPIX  =                    8 / number of bits per data pixel
+NAXIS   =                    0 / number of data axes
+EXTEND  =                    T / FITS dataset may contain extensions
+COMMENT   FITS (Flexible Image Transport System) format is defined in 'Astronomy
+COMMENT   and Astrophysics', volume 376, page 359; bibcode: 2001A&A...376..359H
+END
+# END HDU 0
+# BEGIN HDU 1
+XTENSION= 'BINTABLE'           / binary table extension
+BITPIX  =                    8 / 8-bit bytes
+NAXIS   =                    2 / 2-dimensional binary table
+NAXIS1  =                   48 / (mag + err)*4 + 2*8, width of table in bytes
+NAXIS2  =                    8 / number of rows in table
+PCOUNT  =                    0 / size of special data area
+GCOUNT  =                    1 / one data group (required keyword)
+TFIELDS =                   10 / number of fields in each row
+EXTNAME = '0716+74 '           / Reference
+TTYPE1  = 'RAJ2000 '           / Right Ascension in degrees
+TFORM1  = '1D      '           / data format of field: double (8 bytes)
+TUNIT1  = 'deg     '           / physical unit of field
+TTYPE2  = 'DEJ2000 '           / Declination in degrees
+TFORM2  = '1D      '           / data format of field: double (8 bytes)
+TUNIT2  = 'deg     '           / physical unit of field
+TTYPE3  = 'Bmag    '           / magnitude in B filter
+TFORM3  = '1E      '           / data format of field: single (4 bytes)
+TUNIT3  = 'mag     '           / unit
+TTYPE4  = 'e_Bmag  '           / magnitude error in B filter
+TFORM4  = '1E      '           / data format of field: single (4 bytes)
+TUNIT4  = 'mag     '           / units
+TTYPE5  = 'Vmag    '           / magnitude in V filter
+TFORM5  = '1E      '           / data format of field: single (4 bytes)
+TUNIT5  = 'mag     '           / unit
+TTYPE6  = 'e_Vmag  '           / magnitude error in V filter
+TFORM6  = '1E      '           / data format of field: single (4 bytes)
+TUNIT6  = 'mag     '           / units
+TTYPE7  = 'Rmag    '           / magnitude in R filter
+TFORM7  = '1E      '           / data format of field: single (4 bytes)
+TUNIT7  = 'mag     '           / unit
+TTYPE8  = 'e_Rmag  '           / magnitude error in R filter
+TFORM8  = '1E      '           / data format of field: single (4 bytes)
+TUNIT8  = 'mag     '           / units
+TTYPE9  = 'Imag    '           / magnitude in I filter
+TFORM9  = '1E      '           / data format of field: single (4 bytes)
+TUNIT9  = 'mag     '           / unit
+TTYPE10 = 'e_Imag  '           / magnitude error in I filter
+TFORM10 = '1E      '           / data format of field: single (4 bytes)
+TUNIT10 = 'mag     '           / units
+COMMENT Calibration field for blazar 0716+71:
+COMMENT http://www.lsw.uni-heidelberg.de/projects/extragalactic/charts/0716+714.html
+COMMENT Coordinates by UCAC4
+END
+110.65176 71.38016 11.54 0.01	10.99 0.02	10.63 0.01	99.999 9.999
+110.38904 71.32252 12.02 0.01	11.46 0.01	11.12 0.01	10.92 0.020
+110.46803 71.30492 13.04 0.01	12.43 0.02	12.06 0.01	11.79 0.022
+110.57517 71.39292 13.66 0.01	13.19 0.02	12.89 0.01	99.999 9.999
+110.47648 71.32247 14.15 0.01	13.55 0.02	13.18 0.01	12.85 0.026
+110.55259 71.35411 14.24 0.01	13.63 0.02	13.26 0.01	12.97 0.027
+110.30834 71.28599 14.55 0.01	13.74 0.02	13.32 0.01	99.999 9.999
+110.61750 71.29376 14.70 0.01	14.10 0.02	13.79 0.02	99.999 9.999
+# END HDU 1

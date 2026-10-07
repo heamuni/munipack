@@ -1,0 +1,22 @@
+
+<h2>Sample Data</h2>
+
+<p>
+A sample data are available as
+<a href="https://integral.physics.muni.cz/ftp/munipack/munipack-data-m67.tar.gz">munipack-data-m67.tar.gz</a>. Use commands
+</p>
+<pre>
+$ cd /tmp
+$ tar zxf munipack-data-m67.tar.gz
+</pre>
+<p>
+to unpack it to a desired directory.
+We will assume that the sample data are unpacked to <samp>/tmp</samp> directory
+as <samp>/tmp/munipack-data-m67</samp>.
+</p>
+
+<p>
+The sample data has been acquired at MonteBoo Observatory by group
+of author's students "Hrošátka". The flat-fields by ChM. Quality
+of the observation is poor due to a light pollution by our urban neighbourhood.
+</p>

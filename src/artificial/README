@@ -1,0 +1,39 @@
+
+
+
+Note to a watermark
+-------------------
+
+* The watermark has been painted by me in Gimp. The artwork is kept as artpicture.xcf.
+
+* One is converted (by Gimp) to artpicture.xpm.
+
+* Program artpicture.c++ converts the XPM to Fortran source:
+
+  $ g++ artpicture.c++
+
+  (warnings about conversions from/to char * can be safety ignored)
+
+* Fortran source itself is created as
+
+  $ ./a.out > artpicture.f95
+
+
+* marker.f95 reads directly the source file.
+
+
+
+Light Curves
+------------
+
+Light curves are approximated by Fourier polynomials.
+
+* delta-Cep, data included (reference in lcapprox.f08)
+
+* Algol (data included)
+
+* Fourier coefficients are eastimated and saved to lcparams:
+
+  $ gfortran -I../lib -Wall -g -p -fcheck=all -fimplicit-none -fbacktrace lcapprox.f08 \
+           -L../lib -lminpacks -lminpack
+  $./a.out > lcparams.f95

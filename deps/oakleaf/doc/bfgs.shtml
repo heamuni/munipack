@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+  <!-- #include "meta.shtml" -->
+<body>
+  <!-- #include "head.shtml" -->
+
+<h1>BFGS method</h1>
+
+  <h2>Synopsis</h2>
+
+  <pre class="fortran">
+
+  use oakleaf
+
+  type, abstract, public :: bfgs_function
+   contains
+     procedure(fvalue), deferred :: val
+     procedure(fgradient), deferred :: grad
+     procedure :: fungrad => fungradient
+     procedure :: hess => fhessian
+     procedure :: maxalf => maxalpha
+     procedure :: break => breaker
+  end type bfgs_function
+
+  abstract interface
+
+     real(REAL64) function fvalue(this,x)
+       import :: REAL64, bfgs_function
+       class(bfgs_function), intent(in) :: this
+       real(REAL64), dimension(:), intent(in) :: x
+     end function fvalue
+
+     subroutine fgradient(this,x,fgrad)
+       import :: REAL64, bfgs_function
+       class(bfgs_function), intent(in) :: this
+       real(REAL64), dimension(:), intent(in) :: x
+       real(REAL64), dimension(:), intent(out) :: fgrad
+     end subroutine fgradient
+
+  end interface
+
+  subroutine <span class="subroutine">bfgsmin</span>(fcn,x,H,gtol,maxiter,verbose,report_file,iflag)
+
+    class(bfgs_function), intent(in) :: fcn
+    real(REAL64), dimension(:), intent(in out) :: x
+    real(REAL64), dimension(:,:), intent(out) :: H
+    real(REAL64), intent(in) :: gtol
+    integer, intent(in) :: maxiter
+    logical, intent(in) :: verbose
+    character(len=*), intent(in) :: report_file
+    integer, intent(out) :: iflag
+
+  end subroutine bfgsmin
+  </pre>
+
+
+    <h2>Description</h2>
+
+  <p>
+    The <samp>bfgsmin</samp> is a general optimisation routine
+    based on the <a href="https://en.wikipedia.org/wiki/Broyden%E2%80%93Fletcher%E2%80%93Goldfarb%E2%80%93Shanno_algorithm">BFGS method</a>.
+    The procedure search for a minimum of a non-linear function
+    <i>f(x), x ∈ R<sup>n</sup></i> by the Newton-Raphson method
+    with help of the gradient <i>𝛻 f(x)</i> and
+    the quasi-Newton estimation of the Hessian.
+    The function should be strictly convex without any constrains
+    and fully determined (i.e. all variables are independent).
+    It is considered as a counterpart of
+    the <a href="https://en.wikipedia.org/wiki/Levenberg%E2%80%93Marquardt_algorithm">Marquard-Levenberg method</a>,
+    especially the routines <samp>lmder(),lmdif()</samp>
+    of <a href="https://en.wikipedia.org/wiki/MINPACK">Minpack</a>;
+    the minimised function is be general rather than a sum of squares.
+  <p/>
+
+  <p>
+    The line search, based on the backward-search, is used.
+    It can handle constraints if the minimum is
+    inside of the feasible region (nor on the border).
+    As the linear search parameter can be controlled,
+    the principal drawback of the parameter search
+    in Marquard-Levenberg method is removed.
+    It is useful for
+    the scale estimation of <a href="huberfit.html">Huber's regression</a>
+    and similar cases.
+  </p>
+
+<p>
+  The success of the finding of the global minima
+  depends on initial estimates for non-linear functions having
+  multiple local ones. A suitable initial
+  estimate leads to fast convergence.
+</p>
+
+  <p>
+    The algorithm is simple, stable and reliable, but the convergence
+    is slow and the function approximation can be poor compared to
+    trust-region methods.
+  </p>
+
+  <h2>Parameters</h2>
+
+  <dl>
+    <dt>fcn</dt><dd>[in] is an abstract function carrying the minimisation
+      function itself and the gradient, see below. </dd>
+    <dt>x</dt><dd>[in out] The array of initial estimates on the input,
+      and the reached solution on the output.
+    </dd>
+    <dt>H</dt><dd>[out] an approximation the inverse quasi-Hessian
+      in the minimum. The covariance matrix, as well as statistical
+      errors of parameters, are <a href="huberfit.html">computed</a> based on.
+    </dd>
+    <dt>gtol</dt><dd>[in] the tolerance for the convergence finish
+      as the Euclidean norm of the gradient. The square root
+      of machine epsilon (10<sup>-8</sup>) is safe choice, if elements
+      of the gradient are small, value about 10<sup>-13</sup> is enough.
+    </dd>
+    <dt>maxiter</dt><dd>[in] The maximal amount of iterations. Recommended
+      value is about two hundredth per variable. Usually a few thousands
+      is enought.
+    </dd>
+    <dt>verbose</dt><dd>[in] Be, or not to be, verbose.</dd>
+    <dt>report_file</dt><dd>[in] A file to store intermediate steps,
+      if a non-empty string is passed. Consult the program listing
+      for details.</dd>
+    <dt>iflag</dt><dd>[out] A result flag; the values 0,1 indicates
+      success, value 6 is a fail.
+      If <i>|𝛻 f(x)| &lt; </i><samp>gtol</samp>, <samp>iflag</samp> is 0,
+      if moreover <i>|f<sub>i+1</sub>(x) - f<sub>i</sub>(x)| &lt; ϵ</i>
+      (machine epsilon), <samp>iflag</samp> is 1. If interrupted by user,
+      <samp>iflag</samp> = 9.
+    </dd>
+  </dl>
+
+  <p>The implementation is in <samp>src/bfgs.f08</samp>.
+
+  <h2>The function</h2>
+
+  <p>
+    The minimised function is defined as a derived type object.
+    The user must specify its functional value <i>f(x)</i>
+    and the gradient <i>𝛻 f(x)</i>.
+    If data are required, they are stored in the derived type,
+    see the example below.
+  </p>
+
+  <dl>
+    <dt>fcn % val()</dt><dd>(mandatory)
+      The function calculate the functional value <i>f(x)</i>.</dd>
+    <dt>fcn % grad()</dt><dd>(mandatory)
+      The subroutine evaluate of the gradient <i>𝛻 f(x)</i>.</dd>
+    <dt>fcn % fungrad()</dt><dd>The subroutine compute both the value
+      and the gradient together; it can improve the speed.</dd>
+    <dt>fcn % hess()</dt><dd>The analytic Hessian,
+      in fact, it is not used in any calculations. By default
+      it is computed numerically.</dd>
+    <dt>fcn % maxalpha()</dt><dd>The scalar search parameter, purpose of this routine
+      is to keep the solution inside the feasible region. </dd>
+    <dt>fcn % break()</dt><dd>The purpose of this function is to offer a possibility
+      to interrupt
+      the optimisation process by user. It is called once per iteration.
+    </dd>
+  </dl>
+
+    <h2>Example</h2>
+
+  <p>
+    We wish to estimate of parameters <i>a,b</i> of the line
+    <i>y ≈ ax + b</i> by method of least squares. The function
+    implementation should have
+    been in the module, to generate the external interface.
+    Save the program to the file <samp>line.f08</samp>:
+  </p>
+  <pre>
+module lajna
+
+  use bfgs_method
+  use iso_fortran_env
+  implicit none
+
+  type, extends(bfgs_function) :: line_function
+     real(REAL64), dimension(:), pointer :: x,y
+   contains
+     procedure :: val => lvalue
+     procedure :: grad => lgradient
+  end type line_function
+
+contains
+
+  real(REAL64) function lvalue(this,x)
+    class(line_function) :: this
+    real(REAL64), dimension(:), intent(in) :: x
+    real(REAL64) :: a,b
+
+    a = x(1)
+    b = x(2)
+    associate( x => this%x, y => this%y )
+      lvalue = sum((y - a*x - b)**2)
+    end associate
+
+  end function lvalue
+
+  subroutine lgradient(this,x,fgrad)
+    class(line_function) :: this
+    real(REAL64), dimension(:), intent(in) :: x
+    real(REAL64), dimension(:), intent(out) :: fgrad
+    real(REAL64) :: a,b
+
+    a = x(1)
+    b = x(2)
+    associate( x => this%x, y => this%y )
+      fgrad(1) = -sum( (y - a*x - b)*x )
+      fgrad(2) = -sum( (y - a*x - b) )
+    end associate
+
+  end subroutine lgradient
+
+end module lajna
+
+program line
+
+   use lajna
+   use oakleaf
+
+   real, dimension(5), target :: x = [ 1, 2, 3, 4, 5 ]
+   real, dimension(5), target :: y = [ 1.1, 2.2, 3.3, 4.2, 5.5 ]
+   type(lajna), allocatable :: fcn
+   real(REAL64), dimension(2) :: p
+   real(REAL64), dimension(2,2) :: H
+   real(REAL64) :: gtol
+   integer :: iflag
+
+   ! create the function
+   fcn = line_function(x,y)
+   ! only pointers on data are stored in the function
+
+   ! initial estimate, p = [ a, b ]
+   p = 0
+
+   ! the tolerance for the norm of the gradient
+   gtol = sqrt(epsilon(gtol))
+
+   call bfgsmin(fcn,p,H,gtol,2*200,.true.,'',iflag)
+   write(*,*) 'p=',p,'    iflag=',iflag
+   write(*,*) 'H=',H
+   write(*,*) 'residuals: ', y - (p(1)*x + p(2))
+
+end program line
+</pre>
+
+  <p>
+  An output:
+</p>
+
+  <pre>
+$ gfortran -I/usr/local/include line.f08 -L/usr/local/lib -loakleaf
+$ ./a.out
+iter: pars ... > fval, |grad| | alpha, fval-fv,  info
+    0:     0.000     0.000  >  6.483E+01 6.189E+01
+    1:     1.271     0.347  >  4.436E+00 1.604E+01 |  0.021  6.039E+01  11 T
+    2:     1.010     0.272  >  8.575E-02 2.209E-01 |  1.000  4.350E+00  11 T
+    3:     1.011     0.268  >  8.411E-02 2.178E-01 |  1.000  1.639E-03  11 T
+    4:     1.080     0.020  >  2.800E-02 2.792E-03 |  1.000  5.611E-02  11 T
+    5:     1.080     0.020  >  2.800E-02 3.660E-05 |  1.000  1.335E-07  11 T
+    6:     1.080     0.020  >  2.800E-02 1.248E-10 |  1.000  2.264E-11  11 T
+ p=   1.0799999714164839        2.0000052350113512E-002     iflag=           0
+ H=   9.9986758326191624E-002 -0.29994945189889249      -0.29994945189889249        1.0998070402158870
+ residuals:    7.5260464527104887E-011   2.0000052500634524E-002   3.9999985716719255E-002 -0.14000012875091183        8.0000090567467375E-002
+  </pre>
+
+
+  <h2>References</h2>
+
+<p>
+  Other examples can by found in <samp>test/bfgs/</samp>:
+  <samp>line.f08, line.sh</samp> is a linear regresion example, and
+  <samp>rosenbrock.f08, rosenbrock.sh</samp> is
+  <a href="https://en.wikipedia.org/wiki/Rosenbrock_function">Rosenbrock function</a>.
+</p>
+
+
+<!-- #include "foot.shtml" -->
+  </body>
+</html>

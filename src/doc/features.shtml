@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack's Features</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+
+<section>
+
+<h1>Features</h1>
+<ul>
+<li>Munipack is a free open source tool which aim is to be
+a software eye of an astronomer.</li>
+<li>Munipack's goal is to implement easy-to-use tools for all
+astronomical astrometry and photometry, access to
+Virtual observatory as well as FITS files operations
+and even more.</li>
+<li>Munipack provides a <a href="basic.html">simple user interface</a>
+along with a powerful processing engine.</li>
+</ul>
+
+
+<h2>General</h2>
+<ul>
+<li>All results are estimated by
+<a href="https://en.wikipedia.org/wiki/Robust_statistics">robust statistical</a>
+methods. Mixed statistical distributions or random outliers does not matter
+in this robust approach.</li>
+<li>As the heart of optimisation methods, <a href="https://en.wikipedia.org/wiki/MINPACK">Minpack</a> has been selected (<a href="http://www.netlib.org/minpack/">source code by Netlib</a>).
+</li>
+</ul>
+
+
+<h2>Astrometry</h2>
+<p>
+Munipack has implemented the very complex
+<a href="man_astrometry.html">astrometry</a> module:
+</p>
+<ul>
+<li>Robust statistical estimators and algorithms are implemented.</li>
+<li>Mutual correspondence of an astrometric catalogue and processed images
+is determined by a developed matching algorithm on base of back-tracking.</li>
+<li>As the star position source, a catalogue or an already calibrated image can be
+provided.</li>
+<li>Astrometry calibration can be stored in <a href="dataform_astrometry.html">FITS
+header</a>.</li>
+</ul>
+
+<h2>Photometry</h2>
+<p>
+  Munipack provides the classical method detection of stars
+  and the aperture photometry on base of DAOPHOT II.
+</p>
+<ul>
+<li>Automatic <a href="man_find.html">detection</a> of stars</li>
+<li><a href="man_aphot.html">Aperture photometry</a> of stars</li>
+<li><a href="grow.html">Growth curve photometry</a> of stars</li>
+<li><a href="phoverview.html">A novel approach</a> on photometric calibration
+has been developed.</li>
+<li>The calibration on <a href="man_phcal.html">absolute fluxes</a> is possible.</li>
+<li><a href="man_phfotran.html">Photometric System Transformation</a>
+can be determined.</li>
+</ul>
+
+<h2>Photometric Pre-corrections</h2>
+
+<p>A standard way to correct for all the <a href="man_bias.html">bias</a>,
+<a href="man_dark.html">dark</a> and <a href="man_flat.html">flat-field</a>
+frames is implemented.
+</p>
+<ul>
+<li>Averaging is implemented by robust statistical methods (eg. suppress
+defects like cosmic-ray events)</li>
+<li>Flat-fielding can be applied on series of twilight frames,
+  including different levels of illumination.</li>
+<li> A very <a href="flatfielding.html">advanced algorithm</a>
+  for flat-fielding has been developed.</li>
+</ul>
+
+<h2>Data Products</h2>
+<ul>
+<li><a href="man_timeseries.html">Time-series (light curves)</a></li>
+<li><a href="man_kombine.html">Deep fields and mosaics</a></li>
+<li><a href="colourspace.html">Universe in natural colours</a></li>
+</ul>
+
+<h2>Colour Imaging</h2>
+<ul>
+<li><a href="colourfits.html">Developed</a> colour FITS convention</li>
+<li>Create of colour images in natural (not false!) colours from
+    observations in astronomical <a href="colourspace.html">Johnson BVR bands</a>.</li>
+</ul>
+
+<h2>Graphical Interface</h2>
+
+<p>Properties of Viewer:</p>
+<ul>
+<li>Analysis of FITS format structure</li>
+<li>Munipack is set as system default FITS images viewer.</li>
+<li>Basic (astronomical) operations with frames</li>
+<li><a href="itone.html">Advanced image processor</a> supporting an infinite dynamic range</li>
+<li><a href="colourspace.html">Advanced colour management</a></li>
+<li>The image composition in false and natural colours</li>
+<li><a href="astoverview.html">Astrometric calibration of images</a></li>
+</ul>
+
+<p>Properties of browser:</p>
+<ul>
+<li>A fast thumb-nailing tool</li>
+<li>Batch operations on large lists of files</li>
+<li>Recognition of structure of usual FITS files including tables and multi-HDU extensions</li>
+<li>Import of digital camera RAW photos (CR2, RAW, …) to colour FITS</li>
+<li>Common photometric reductions (dark, bias corrections, flat-fielding)</li>
+<li>Search of FITS headers</li>
+</ul>
+
+<h2>Software Properties</h2>
+<ul>
+<li>Munipack is designed as a multi-platform application.
+Developed and currently maintained only under GNU/Linux.
+<!--
+Developed under GNU/Linux, possibly
+    working under Mac OS X, MS Windows and others.
+Munipack is designed pretty much portable and multiplatform but every platform needs <em>a fine tunning of details which wasn't done yet.</em>
+-->
+</li>
+<li>Munipack is developed on top of <a href="http://www.wxWidgets.org/">wxWidgets</a>, a C++ toolkit.
+</li>
+<li>Both graphical and command-line interfaces are available.</li>
+<li>All functionality can be scripted. Therefore, one is prepared for a batch
+    processing of large amount of the astronomical data
+  (for preparation of data pipelines).</li>
+<li>Munipack's functional core is split onto working modules. They are designed
+    as independent routines written (mostly) in Fortran 95. They are
+    available directly and can be controlled via standard input and output
+    (possibly providing a network access, a scripting language wrapper, etc).</li>
+</ul>
+
+
+<h2>See Also</h2>
+
+<ul>
+<li><a href="basic.html">Getting started</a></li>
+<li><a href="man_intro.html">Introduction for command-line utilities</a></li>
+<li><a href="guide.html">☺ User Guide</a></li>
+<li><a href="docs.html">◈ Documentation</a></li>
+</ul>
+
+</section>
+
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>
