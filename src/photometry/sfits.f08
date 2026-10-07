@@ -83,7 +83,8 @@ contains
     real(dbl), dimension(:,:), allocatable :: ras,decs,ct,dct,sky,dsky,ph,dph, &
          phsky,dphsky,mag,dmag,phr,dphr
     real, dimension(:,:,:), allocatable :: cube,tcube
-    real(dbl), dimension(size(ctph)) :: xctph,sqarcsec,airmass,aring,nsky
+    real(dbl), dimension(size(ctph)) :: xctph,sqarcsec,airmass,aring,nsky, &
+         leff,lfwhm
     real(dbl), dimension(1,size(ctph)) :: skymag,dskymag,skyrate,dskyrate
     integer, allocatable, dimension(:) :: order
     integer :: i,j,k,n,status,nrows_max, width, height, nq, ncat, nfiles, nrows, npht
@@ -110,6 +111,14 @@ contains
        if( fitses(n)%nrows > nrows_max ) nrows_max = fitses(n)%nrows
        if( init_area ) fitses(n)%area = area
        airmass(n) = fitses(n)%airmass
+       ! passband parameters of the frame
+       leff(n) = -1
+       do i = 1, phsyscal%nbands
+          if( phsyscal%filter(i) == fitses(n)%filter ) then
+             leff(n) = phsyscal%lam_eff(i)
+             lfwhm(n) = phsyscal%lam_fwhm(i)
+          end if
+       end do
     end do
 
     ! convert frames from counts to photons
@@ -229,8 +238,9 @@ contains
          dphr(ncat,nfiles))
 
     if( nfiles > 1 ) then
-       ! estimate effective extinction
-       call scaterr(phsyscal%lam_eff,ctph,airmass,k0,r,lref)
+       ! estimate effective extinction, passbands correspond to frames
+       if( any(leff < 0) ) stop 'Filter of a frame not found in photometry system.'
+       call scaterr(leff,ctph,airmass,k0,r,lref)
     else
        r = -1
     end if
@@ -285,7 +295,7 @@ contains
           dsky(i,:) = ctph * dsky(i,:) / xctph
           call fotra(tra,pairs,ct(i,:),dct(i,:),phr(i,:),dphr(i,:))
           call fotra(tra,pairs,sky(i,:),dsky(i,:),phsky(i,:),dphsky(i,:))
-          call correx(phsyscal%lam_eff,phsyscal%lam_fwhm/2,airmass,k0,r,lref,phr(i,:))
+          call correx(leff,lfwhm/2,airmass,k0,r,lref,phr(i,:))
           where( phr(i,:) > 0 )
              ph(i,:) = phr(i,:) * xctph
              dph(i,:) = dphr(i,:) * xctph !! correct !!!

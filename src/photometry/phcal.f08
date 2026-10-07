@@ -411,9 +411,12 @@ contains
        call phsysmagph(phsyscal,filters,pairs,mag(1:ncat,:),dmag(1:ncat,:), &
             refph,drefph)
 
+       ! photon rates [ph/s/m2] to expected photons on n-th frame;
+       ! columns of refph corresponds to frames (both ordered by filters)
        do n = 1,nfiles
           q = exptime(n)*areas(n)
-          refph = q*refph
+          refph(:,n) = q*refph(:,n)
+          drefph(:,n) = q*drefph(:,n)
        end do
 
     else
