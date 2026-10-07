@@ -117,10 +117,10 @@ contains
     b(2,:) = [-s, c ]
     t%cd = scale * matmul(a,b)
 
-    ! .. and the inverse
+    ! .. and the inverse: (A*B)^-1 = B^T * A^-1 = B^T * A
     b(1,:) = [ c,-s]
     b(2,:) = [ s, c]
-    t%icd = matmul(a,b) / scale
+    t%icd = matmul(b,a) / scale
 
   end subroutine initgeom
 
@@ -360,13 +360,15 @@ contains
       c = cos(f)
       s = sin(f)
 
-      ! the affine projection matrix
-      ! it's taken negative, flipping of x-axis, due the left-hand convention in RA
-      a(1,:) =-[       refl, 0.0_REAL64 ]
+      ! the affine projection matrix, the inverse of AstrometryGeometry%cd,
+      ! pc = diag(-1,1) * B^T * diag(refl,1) / scale;
+      ! the x-axis is flipped (taken negative) due the left-hand convention in RA
+      a(1,:) = [       refl, 0.0_REAL64 ]
       a(2,:) = [ 0.0_REAL64, 1.0_REAL64 ]
       b(1,:) = [ c,-s ]
       b(2,:) = [ s, c ]
-      pc = matmul(a,b) / scale
+      pc = matmul(b,a) / scale
+      pc(1,:) = - pc(1,:)
       do i = 1, 2
          do j = 1,2
             status = wcs_put(wcs,WCS_PC,pc(i,j),i,j)
