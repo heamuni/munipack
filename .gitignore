@@ -1,0 +1,5 @@
+# Build outputs (the Docker build runs bootstrap/configure inside the image)
+*.o
+*.mod
+*.a
+*.log
