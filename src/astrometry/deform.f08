@@ -435,6 +435,16 @@ contains
     s = p(0)
     pv(1,:) = p(1:npar)
     pv(2,:) = p(npar+1:)
+
+    ! The deformation has been fitted in the rectangular coordinates (u,v),
+    ! where u = -xi is flipped against the FITS intermediate world
+    ! coordinates (x' = -x, y' = y for x,y given by pix2uv, see get_fcd).
+    ! The TPV polynomials are xi = PV1(x',y'), eta = PV2(y',x'), so
+    ! PV1'(x',y') = -PV1(-x',y') and PV2'(x',y') = PV2(-x',y'):
+    ! the terms of PV1 even in x, and the terms of PV2 odd in x, change sign.
+    pv(1,[0,2,3,4,6,8,10,11]) = - pv(1,[0,2,3,4,6,8,10,11])
+    pv(2,[2,5,8,10]) = - pv(2,[2,5,8,10])
+
     dp = IEEE_VALUE(dp, IEEE_QUIET_NAN)
     do i = 0,2*npar
        if( B(i,i) > macheps ) dp(i) = sqrt(B(i,i)/(2*ndat - 2*npar-1))
