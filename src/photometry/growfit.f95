@@ -164,15 +164,17 @@ contains
 
     if( converge ) then
 
-       ! estimation of uncertainties (sigma is omited)
+       ! estimation of uncertainties: the covariance of the fit
+       ! propagated from the errors of the (correlated) aperture counts
+       ! (both the photon and the sky noise are included in dcts)
        call varpar(p,dp,sig)
 
        info = 0
        f = p(1)
        b = p(2)
-       df = dsig*dp(1)
-       df = sqrt(f)
-       db = dp(2)
+       ! keep initial estimates when the covariance is singular
+       if( dp(1) > 0 ) df = dp(1)
+       if( dp(2) > 0 ) db = dp(2)
     end if
 
 666 continue
@@ -361,13 +363,14 @@ contains
     real(dbl), dimension(:), intent(out) :: dp
     real(dbl), intent(out) :: sig
 
-    real(dbl), dimension(size(p),size(p)) :: jac,hess
-    real(dbl),dimension(:), allocatable :: f,df,r,ds
+    real(dbl), dimension(size(p),size(p)) :: jac,hess,cov
+    real(dbl),dimension(:), allocatable :: f,df,r,ds,w
+    real(dbl),dimension(:,:), allocatable :: x,g,c
     real(dbl) :: sum2,sum3
-    integer :: i,n
+    integer :: i,j,n
 
     n = size(aper)
-    allocate(r(n),f(n),df(n),ds(n))
+    allocate(r(n),f(n),df(n),ds(n),w(n),x(n,2),g(2,n),c(n,n))
     dp = -1
 
     call res(p(1),p(2),r,ds)
@@ -378,21 +381,44 @@ contains
 
     if( sum2 > 0 .and. sum3 > 0 .and. n > 2 ) then
 
-       ! The matrix is computed from second derivatives.
-       ! The variability scales - ds (converting sum of square roots
-       ! to chi2) - are ignored to provide a proper scale of errors.
-       jac(1,1) = sum(df*curve**2)
-       jac(1,2) = sum(df*curve*aper)
-       jac(2,1) = jac(1,2)
-       jac(2,2) = sum(df*(aper)**2)
+       ! Near the solution, the robust estimator behaves like the weighted
+       ! least squares with weights w = psi'(r/ds) / ds**2 (the matrix jac
+       ! is the second derivative of the robust function).
+       w = df / ds**2
+       x(:,1) = curve
+       x(:,2) = aper
+       do i = 1,2
+          do j = 1,2
+             jac(i,j) = sum(w*x(:,i)*x(:,j))
+          end do
+       end do
        call qrinv(jac,hess)
 
-       ! Huber (6.6)
+       ! The apertures are nested: the counts in an aperture include all
+       ! the pixels (and their noise) of smaller ones, so the measurements
+       ! are strongly correlated. The covariance of the counts in apertures
+       ! (sorted by radius) is approximated by cov(i,j) = dcts(min(i,j))**2
+       ! (photon noise of the star and the sky, the sky estimate error;
+       ! the last one, common for all apertures, is absorbed by b).
+       ! The covariance of the parameters is given by the sandwich formula
+       !   cov(p) = H X' W C W X H,  H = (X' W X)**(-1).
+       do i = 1,n
+          do j = 1,n
+             c(i,j) = dcts(min(i,j))**2
+          end do
+          c(i,i) = c(i,i) + (p(1)*curve_err(i))**2
+       end do
+       do i = 1,2
+          g(i,:) = (hess(i,1)*x(:,1) + hess(i,2)*x(:,2))*w
+       end do
+       cov = matmul(g,matmul(c,transpose(g)))
+
+       ! Huber (6.6), the scale of normalised residuals (informative)
        sig = rsig*sqrt(sum3/sum2*n/(n-1.0))
 
        do i = 1, 2
-          if( hess(i,i) > 0 ) then
-             dp(i) = sig * sqrt(hess(i,i))
+          if( cov(i,i) > 0 ) then
+             dp(i) = sqrt(cov(i,i))
           end if
        end do
 
@@ -402,13 +428,13 @@ contains
           end do
           write(*,*) 'jac:',real(jac(1,:))
           write(*,*) 'jac:',real(jac(2,:))
-          write(*,*) 'hess:',real(hess(1,:))
-          write(*,*) 'hess:',real(hess(2,:))
+          write(*,*) 'cov:',real(cov(1,:))
+          write(*,*) 'cov:',real(cov(2,:))
        end if
 
     end if
 
-    deallocate(r,f,df,ds)
+    deallocate(r,f,df,ds,w,x,g,c)
 
   end subroutine varpar
 
