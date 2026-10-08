@@ -626,12 +626,13 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption("","spread","seeing spread method: FFT, RANDOM, AUTO");
     AddOption("","gain","gain in e-/ADU",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","saturate","saturation in ADU",wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","cosmics-freq","frequency of cosmic rays",wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","cosmics-cmax","counts in the maximum of cosmics rays",
+    AddOption("","cosmics-freq","frequency of cosmic rays [1/s]",
+	      wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","cosmics-cmax","electrons in the maximum of cosmics rays",
 	      wxCMD_LINE_VAL_DOUBLE);
     AddOption("","cosmics-len","cosmics rays lengths",wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","hwhm","half width at half of maximum [pix]",
-	      wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","hwhm","PSF width [pix]: sigma for GAUSS and SEEING, "
+	      "alpha for MOFFAT",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","airy","radius of Airy spot [pix]",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","beta","Moffat exponent",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","eccentricity","of ellipsis (by default: circle)",
@@ -655,16 +656,22 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
 	      wxCMD_LINE_VAL_DOUBLE);
     AddOption("","sky-mag","sky brightness [mag/arcsec2]",
 	      wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","sky-grad-x","sky change in x direction [mag/arcsec2/pix]",
-	      wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","sky-grad-y","sky change in y direction [mag/arcsec2/pix]",
-	      wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","sky-grad-x","sky brightness gradient in x [mag/arcsec2/pix],"
+	      " positive is fainter",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","sky-grad-y","sky brightness gradient in y [mag/arcsec2/pix],"
+	      " positive is fainter",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","area","area of input aperture [m2]",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","diameter","diameter of input aperture [m]",
 	      wxCMD_LINE_VAL_DOUBLE);
     AddOption("","exptime","exposure time [s]",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","qeff","quantum efficiency",wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","gnoise","add gaussian noise",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","dark","dark current [e-/s/pix]",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","readnoise","read-out noise [e- rms]",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","gnoise","(deprecated) additional background rate "
+	      "[ph/s/m2/arcsec2], merged in quadrature with the sky",
+	      wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","seed","random generator seed (reproducible frames)",
+	      wxCMD_LINE_VAL_NUMBER);
     AddSwitch("","atmosphere","apply atmosphere modelling: extinction+seeing");
     AddOption("","extk","extinction coefficient",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","long","geographic longitude of station (+east)[deg]",
@@ -699,7 +706,7 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption("","col-epoch-ra","Reference epoch in Right Ascension column");
     AddOption("","col-epoch-dec","Reference epoch in Declination column");
     AddOption("","col-mag","Magnitude-like column");
-    AddSwitch("","disable-noise","noise free frames");
+    AddSwitch("","disable-noise","noise free frames (no photon and read noise)");
     AddOption("","photsys","photometry system");
     AddOption("","phsystab","photometry systems definition table");
     AddOption("","fits-keys-file","add FITS keys into a header");

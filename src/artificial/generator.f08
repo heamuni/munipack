@@ -30,14 +30,15 @@ module generator
 
 contains
 
-  subroutine spreadstars(spsf,xcoo,ycoo,flux,crpix,jitter,sky)
+  subroutine spreadstars(spsf,xcoo,ycoo,flux,crpix,sky)
 
-    use noise
+    ! Adds the noiseless (mean) star images to the frame,
+    ! the noise is added later on the whole frame.
+
     use spray
 
     class(SprayType), intent(in) :: spsf
     real(REAL64), dimension(:), intent(in) :: xcoo,ycoo,flux,crpix
-    logical, intent(in) :: jitter
     real(REAL64), dimension(:,:), intent(in out) :: sky
     integer, dimension(2) :: naxes
     real(REAL64), dimension(:,:), allocatable :: psf
@@ -65,13 +66,7 @@ contains
              if(  1 <= i .and. i <= naxes(1) .and. &
                   1 <= j .and. j <= naxes(2) ) then
                 f = psf(k,l)
-                if( f > 0 ) then
-                   if( jitter ) then
-                      sky(i,j) = sky(i,j) + pnoise(f)
-                   else
-                      sky(i,j) = sky(i,j) + f
-                   end if
-                end if
+                if( f > 0 ) sky(i,j) = sky(i,j) + f
              end if
           end do
        end do
@@ -195,30 +190,62 @@ contains
   end subroutine stardist
 
 
-  subroutine background(b,bgrad,jitter,sky)
+  subroutine background(b,grad,sky)
 
-    use noise
+    ! The noiseless (mean) sky background in electrons per pixel:
+    !
+    !   B(x,y) = b * 10**(-0.4*(grad(1)*(x - x0) + grad(2)*(y - y0)))
+    !
+    ! b is the level at the centre (x0,y0), grad is the gradient
+    ! of the sky brightness in mag/arcsec2/pix (positive values
+    ! makes the sky fainter in the direction).
 
     real(REAL64), intent(in) :: b
-    real(REAL64), dimension(:), intent(in) :: bgrad
-    logical, intent(in) :: jitter
+    real(REAL64), dimension(:), intent(in) :: grad
     real(REAL64), dimension(:,:), intent(out) :: sky
     integer :: i,j,ic,jc
-    real(REAL64) :: db,dx,dy,bg
+    real(REAL64) :: dx,dy
 
-    db = sqrt(b)
     ic = size(sky,1) / 2
     jc = size(sky,2) / 2
     do i = 1,size(sky,1)
-       dx = (i - ic)*bgrad(1)
+       dx = (i - ic)*grad(1)
        do j = 1,size(sky,2)
-          dy = (j - jc)*bgrad(2)
-          bg = b + dx + dy
-          if( jitter ) bg = gnoise(bg,db)
-          sky(i,j) = max(bg,epsilon(bg))
+          dy = (j - jc)*grad(2)
+          sky(i,j) = b * 10**(-0.4_REAL64*(dx + dy))
        end do
     end do
 
   end subroutine background
+
+
+  subroutine detector_noise(sky,readnoise)
+
+    ! The detector noise: the photon (Poisson) noise of the mean
+    ! number of electrons (all sources: sky, stars, dark current)
+    ! in every pixel, and the Gaussian read-out noise N(0,readnoise)
+    ! added afterwards, both in electrons.
+
+    use noise
+
+    real(REAL64), dimension(:,:), intent(in out) :: sky
+    real(REAL64), intent(in) :: readnoise
+    integer :: i,j
+
+    do j = 1,size(sky,2)
+       do i = 1,size(sky,1)
+          sky(i,j) = pnoise(max(sky(i,j),0.0_REAL64))
+       end do
+    end do
+
+    if( readnoise > 0 ) then
+       do j = 1,size(sky,2)
+          do i = 1,size(sky,1)
+             sky(i,j) = sky(i,j) + gnoise(0.0_REAL64,readnoise)
+          end do
+       end do
+    end if
+
+  end subroutine detector_noise
 
 end module generator
