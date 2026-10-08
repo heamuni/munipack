@@ -66,6 +66,7 @@ program kombine
   real :: exptime = 1            ! mean exposure time
   logical :: robust = .true.     ! output image is computed by robust mean
   logical :: background = .true. ! subtract background
+  logical :: fluxcons = .false.  ! scale by pixel areas to conserve total flux
   logical :: verbose = .false.   ! verbose output
   logical :: pipelog = .false.
 
@@ -203,6 +204,10 @@ program kombine
      else if( key == 'BACKGROUND' ) then
 
         read(val,*) background
+
+     else if( key == 'FLUXCONSERVE' ) then
+
+        read(val,*) fluxcons
 
      else if( key == 'NFILES' ) then
 
@@ -381,7 +386,7 @@ program kombine
 
        do n = 1, nfiles
           if( files(n)%loadimg() ) then
-             call files(n)%reproject(method,jdref,crmov,alpha,delta,img,mask)
+             call files(n)%reproject(method,jdref,crmov,alpha,delta,img,mask,fluxcons)
              where( mask )
                 bigimg(:,:,n) = img / (files(n)%exptime / exptime) ! area?
              elsewhere
@@ -422,7 +427,7 @@ program kombine
        ! compute by the arithmetic mean
        do n = 1, nfiles
           if( files(n)%loadimg() ) then
-             call files(n)%reproject(method,jdref,crmov,alpha,delta,img,mask)
+             call files(n)%reproject(method,jdref,crmov,alpha,delta,img,mask,fluxcons)
              where( mask )
                 IMAGE = IMAGE + img
                 IMGERR = IMGERR + img**2

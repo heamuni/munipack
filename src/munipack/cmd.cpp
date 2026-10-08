@@ -553,6 +553,7 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption("","reflex","[yes|no] set/unset reflection");
     AddOption("i","interpol","[near,bilinear,bicubic,bi3conv] interpol");
     AddSwitch("","disable-back","does not subtract background");
+    AddSwitch("","flux-conserve","scale by pixel areas (conserve total flux)");
     AddSwitch("","arith","compute average by arithmetical mean");
     COMMON_OPTIONS_SINGLE
     COMMON_OPTIONS_BITPIX

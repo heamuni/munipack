@@ -211,7 +211,11 @@ contains
 
   end function loadimg
 
-  subroutine reproject(this,method,jdref,crmov,alpha,delta,img,mask)
+  subroutine reproject(this,method,jdref,crmov,alpha,delta,img,mask,fluxcons)
+
+    ! The output is the surface brightness: values per input pixel area.
+    ! When fluxcons is .true., values are multiplied by the ratio of areas
+    ! of output and input pixels (the local Jacobian), conserving total flux.
 
     use interpol
     use oakleaf
@@ -223,8 +227,10 @@ contains
     real(REAL64), dimension(:,:), intent(in) :: alpha, delta
     real, dimension(:,:), intent(out) :: img
     logical, dimension(:,:), intent(out) :: mask
+    logical, intent(in), optional :: fluxcons
 
     real, dimension(:,:), allocatable :: fx,fy,fxy
+    real(REAL64), dimension(:,:), allocatable :: xs,ys
     integer :: i,j,n,m,i1,j1,nx,ny
     real :: x,y,back
     real(REAL64) :: xx,yy,dt,da,dd
@@ -255,10 +261,14 @@ contains
        call diff2(this%image,fxy)
     end if
 
+    allocate(xs(size(alpha,1),size(alpha,2)),ys(size(alpha,1),size(alpha,2)))
+
     do i = 1, size(alpha,1)
        do j = 1, size(alpha,2)
 
           call this % wcs % cel2pix(alpha(i,j)+da,delta(i,j)+dd,xx,yy)
+          xs(i,j) = xx
+          ys(i,j) = yy
 
           ! points outside of the frame (and NaNs) are skipped,
           ! pixel (n,m) covers the area n-0.5 .. n+0.5, m-0.5 .. m+0.5
@@ -304,6 +314,33 @@ contains
 
        end do
     end do
+
+    if( present(fluxcons) ) then
+       if( fluxcons ) then
+          ! the area of an output pixel in input pixels: |det(d(x,y)/d(i,j))|
+          ! by differences of neighbouring nodes (one-sided on edges)
+          block
+            integer :: i1,i2,j1,j2,mx,my
+            real(REAL64) :: xi,yi,xj,yj
+            mx = size(alpha,1)
+            my = size(alpha,2)
+            do i = 1, mx
+               i1 = max(i-1,1)
+               i2 = min(i+1,mx)
+               do j = 1, my
+                  if( .not. mask(i,j) ) cycle
+                  j1 = max(j-1,1)
+                  j2 = min(j+1,my)
+                  xi = (xs(i2,j) - xs(i1,j)) / max(i2 - i1,1)
+                  yi = (ys(i2,j) - ys(i1,j)) / max(i2 - i1,1)
+                  xj = (xs(i,j2) - xs(i,j1)) / max(j2 - j1,1)
+                  yj = (ys(i,j2) - ys(i,j1)) / max(j2 - j1,1)
+                  img(i,j) = real(img(i,j) * abs(xi*yj - xj*yi))
+               end do
+            end do
+          end block
+       end if
+    end if
 
   end subroutine reproject
 

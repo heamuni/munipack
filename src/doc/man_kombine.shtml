@@ -51,6 +51,24 @@ munipack kombine [..] files
   notwithstanding the values are computed by averadging.
 </p>
 
+<p class="indent">
+  The resampling interpolates values of input pixels, so the output
+  represents the <em>surface brightness</em> (the intensity per area
+  of an input pixel): the sky (background) level per pixel is preserved,
+  while the total flux of a star scales with the area of output pixels.
+  If the output scale differs from the input one, the total flux of stars
+  changes by the factor (s<sub>in</sub>/s<sub>out</sub>)<sup>2</sup>,
+  where the scales s are in pixels per degree; for instance,
+  the output with twice more pixels per degree (half-size pixels)
+  has four times larger total fluxes of stars.
+  The switch <samp>--flux-conserve</samp> multiplies the values by
+  the ratio of output to input pixel areas (determined from the local
+  Jacobian of the transformation), so the total fluxes of stars are
+  conserved, while the sky level per pixel changes by the same ratio.
+  Both variants are identical when the output scale equals
+  the input one.
+</p>
+
 <h2>The algorithm</h2>
 
 <ol>
@@ -123,6 +141,11 @@ munipack kombine [..] files
     Final frames, especially a mosaics, can contains unfolded regions
     with brighter and fainter backgrounds.
   </dd>
+  <dt><samp>--flux-conserve</samp></dt><dd>
+    scale the values by the ratio of output and input pixel areas
+    to conserve the total flux of objects; by default, the surface
+    brightness is conserved (see above).
+  </dd>
   <dt><samp>--arith</samp></dt><dd>
     Kombine computes the average by arithmetic mean per every single pixel.
     By default, the average is computed by robust mean, giving the brilliant
@@ -144,8 +167,10 @@ munipack kombine [..] files
   <dt><samp>--width xxx, --height yyy</samp></dt><dd>dimensions of the output
     frame in pixels</dd>
   <dt><samp>--xcen xxx.x, --ycen yyy.y</samp></dt>
-  <dd> centre of projection on result [pix] (default: width/2, height/2)</dd>
-  <dt><samp>--scale sss.sss</samp></dt><dd>scale [deg/pix]</dd>
+  <dd> centre of projection on result [pix] (default: the centre,
+    (width+1)/2, (height+1)/2; the centre of the first frame
+    is placed there)</dd>
+  <dt><samp>--scale sss.sss</samp></dt><dd>scale [pix/deg]</dd>
   <dt><samp>--angle ddd.ddd</samp></dt><dd>rotation angle [deg]</dd>
   <dt><samp>--reflex [yes|no]</samp></dt><dd>setup reflection</dd>
 </dl>
@@ -195,12 +220,17 @@ CD1_1   = -2.6589961865059603E-04
 CD1_2   = -6.0182917772180531E-06
 </pre>
 <p>
-  The frame scale is <i>√({CD1_1}<sup>2</sup> + {CD1_2}<sup>2</sup>)</i>
-  = 2.66e-4 deg/pix. The parameters are
+  The frame scale is <i>1/√({CD1_1}<sup>2</sup> + {CD1_2}<sup>2</sup>)</i>
+  = 3760 pix/deg. The parameters are
 </p>
 <code>
-$ munipack kombine --width 1000 --height 1000 --scale 5.32e-4  images*.fits
+$ munipack kombine --width 1000 --height 1000 --scale 1880  images*.fits
 </code>
+<p>
+  The total fluxes of stars are four times smaller on the result
+  (the surface brightness is conserved), add <samp>--flux-conserve</samp>
+  to keep them.
+</p>
 
 <p>
   A little bit uncommon example describes the tracking
