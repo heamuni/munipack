@@ -156,6 +156,19 @@ The gain will modify ranges of values and if the SATURATE keyword
 is found, one is adequately modified.
 </p>
 
+<p class="indent">
+Standard errors of the corrected values are stored in STDERR extension.
+They are computed as
+<i>σ</i><sup>2</sup> = [max(<i>e</i>,1) + <i>g</i><sup>2</sup>(<i>t</i><sup>2</sup><i>σ</i><sub>D</sub><sup>2</sup>
++ <i>σ</i><sub>B</sub><sup>2</sup> + <i>r</i><sup>2</sup>)] / <i>F</i><sup>2</sup>
++ (<i>c σ</i><sub>F</sub> / <i>F</i>)<sup>2</sup>,
+where <i>e</i> = <i>g</i>(<i>S</i> − <i>t D</i> − <i>B</i>) are electrons
+before flat-fielding, <i>c = e/F</i> is the corrected value, <i>g</i> gain,
+<i>σ</i><sub>D</sub>, <i>σ</i><sub>B</sub>, <i>σ</i><sub>F</sub> are standard
+errors of the dark, bias and flat frames and <i>r</i> is the readout noise
+in ADU given by READNS keyword of the frame (zero when it is missing).
+</p>
+
 
 <h2>Strategies For Corrections</h2>
 
