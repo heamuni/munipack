@@ -284,12 +284,15 @@ program kombine
       real(REAL64), dimension(2) :: xcrval, xcrpix
       real(REAL64) :: xscale, xrot, xrefl
 
+      ! the centre of the output frame is the centre of the first frame
+      ! (its CRVAL belongs to its CRPIX, which needn't be the centre)
       xcode = files(1)%code
-      xcrval = files(1)%crval
+      xcrpix = (naxes + 1) / 2.0_REAL64
+      call files(1)%wcs%pix2cel((files(1)%naxes(1) + 1) / 2.0_REAL64, &
+           (files(1)%naxes(2) + 1) / 2.0_REAL64, xcrval(1), xcrval(2))
       xscale = files(1)%scale
       xrot = files(1)%rot
       xrefl = files(1)%refl
-      xcrpix = naxes / 2
 
       if( init_sproj ) xcode = ptype
       if( init_crval ) xcrval = crval
