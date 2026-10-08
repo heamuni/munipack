@@ -111,7 +111,7 @@ New header keywords: `DARKCUR`, `RDNOISE`, `BIASLEV`, `ARTSEED`. The verificatio
 | A23 | `genstars` (no catalogue) applies a per-square-degree star count to the whole frame regardless of its size | wrong density for random fields | **open** | — |
 | A24 | `wxLogFatalError` (the project's usual error call) exits with code 139 | looks like a crash | **open** | — |
 | A25 | `--mproc` could not be tested: the Docker build has no coarray runtime (`-fcoarray=single`) | — | **open** (build) | — |
-| A26 | `--gnoise` was merged with the sky into one level, so the sky gradient and the airmass scaled the `--gnoise` part too | `--sky-mag 21 --gnoise 1000 --sky-grad-x 0.001`: whole 986 e⁻ level scaled by the gradient | fixed: the merged level is split into the sky part (gradient, airmass) and a uniform `--gnoise` part; same total without gradient or airmass (bit-identical); left−right difference now −20.56 e⁻ with or without `--gnoise` | see git log |
+| A26 | `--gnoise` was merged with the sky into one level, so the sky gradient and the airmass scaled the `--gnoise` part too | `--sky-mag 21 --gnoise 1000 --sky-grad-x 0.001`: whole 986 e⁻ level scaled by the gradient | fixed: the merged level is split into the sky part (gradient, airmass) and a uniform `--gnoise` part; same total without gradient or airmass (bit-identical); left−right difference now −20.56 e⁻ with or without `--gnoise` | `932ac64` |
 
 ---
 
