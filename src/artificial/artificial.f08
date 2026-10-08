@@ -76,6 +76,7 @@ program artificial
                                    ! [ph/s/m2/arcsec2] merged with skymag
   real(REAL64) :: dark = 0         ! dark current [e-/s/pix]
   real(REAL64) :: readnoise = 0    ! read-out noise [e-]
+  real(REAL64) :: bias = 0         ! bias level (pedestal) [ADU]
   logical      :: noise = .true.   ! data has added noise componets
   integer      :: seed = 0         ! random generator seed
   logical      :: seed_defined = .false.
@@ -236,6 +237,10 @@ program artificial
 
            read(val,*) readnoise
            if( readnoise < 0 ) stop 'Error: a negative read-out noise.'
+
+        else if( key == 'BIAS' ) then
+
+           read(val,*) bias
 
         else if( key == 'SEED' ) then
 
@@ -567,6 +572,7 @@ program artificial
              gnoise," [ph/s/m2/arcsec2] (deprecated)"
         write(error_unit,'(a,es10.3,a)') " Dark current = ",dark," [e-/s/pix]"
         write(error_unit,'(a,f0.3,a)') " Read-out noise = ",readnoise," [e-]"
+        write(error_unit,'(a,f0.3,a)') " Bias level (pedestal) = ",bias," [ADU]"
         write(error_unit,*) "Noise: ",noise
         if( seed_defined ) then
            write(error_unit,'(a,i0)') " Random generator seed = ",seed
@@ -665,6 +671,7 @@ program artificial
   call co_broadcast(gnoise,1)
   call co_broadcast(dark,1)
   call co_broadcast(readnoise,1)
+  call co_broadcast(bias,1)
   call co_broadcast(seed,1)
   call co_broadcast(seed_defined,1)
   call co_broadcast(noise,1)
@@ -996,7 +1003,8 @@ contains
     call cosmics(nevents,cosmics_cmax,cosmics_len,sky)
 
     ! make it realistic: analog-digital conversion
-    sky = sky / gain
+    sky = sky / gain + bias
+    ! the converter saturates on the total value, including bias
     if( bitpix > 0 ) sky = max(sky,0.0_REAL64)
     sky = min(sky,saturate)
 
@@ -1036,6 +1044,7 @@ contains
     call fits_write_key(fits,FITS_KEY_AREA,area,-2,'[m2] detection area',status)
     call fits_write_key(fits,'DARKCUR',dark,-7,'[e-/s/pix] dark current',status)
     call fits_write_key(fits,'RDNOISE',readnoise,-7,'[e-] read-out noise',status)
+    call fits_write_key(fits,'BIASLEV',bias,-15,'[ADU] bias level (pedestal)',status)
     if( seed_defined ) &
          call fits_write_key(fits,'ARTSEED',seed,'random generator seed',status)
     call fits_write_key(fits,FITS_KEY_HWHM,hwhms,-3, &

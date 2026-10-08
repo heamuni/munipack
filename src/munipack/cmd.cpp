@@ -667,6 +667,8 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption("","qeff","quantum efficiency",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","dark","dark current [e-/s/pix]",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","readnoise","read-out noise [e- rms]",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","bias","bias level (pedestal) added after gain [ADU]",
+	      wxCMD_LINE_VAL_DOUBLE);
     AddOption("","gnoise","(deprecated) additional background rate "
 	      "[ph/s/m2/arcsec2], merged in quadrature with the sky",
 	      wxCMD_LINE_VAL_DOUBLE);

@@ -308,7 +308,7 @@ These profiles known as point spread functions (PSF) are available:
   The frame with the noise is
 </p>
 <p>
-  <i>I(x,y) = [ Po(λ(x,y)) + N(0, σ<sub>R</sub>) ] / G</i>,
+  <i>I(x,y) = [ Po(λ(x,y)) + N(0, σ<sub>R</sub>) ] / G + P</i>,
 </p>
 <p>
   <i>Po(λ)</i> is a random number with the
@@ -320,13 +320,20 @@ These profiles known as point spread functions (PSF) are available:
     distribution</a> and the standard deviation <i>σ<sub>R</sub></i>
   in electrons (<samp>--readnoise</samp>), independent on the exposure
   time. Cosmic rays are added after the Poisson step. <i>G</i> is the gain
-  in electrons per ADU (<samp>--gain</samp>), the result is clipped
-  by the saturation (<samp>--saturate</samp>), and also at zero for integer
-  (<samp>-B 8, 16, 32</samp>) frames.
+  in electrons per ADU (<samp>--gain</samp>), <i>P</i> is the bias level
+  (pedestal) in ADU (<samp>--bias</samp>, zero by default).
+  The result, including the bias, is clipped
+  by the saturation (<samp>--saturate</samp>; the converter saturates on
+  the total value), and also at zero for integer
+  (<samp>-B 8, 16, 32</samp>) frames. The clipping at zero biases the mean
+  of low backgrounds with the read-out noise; a bias level of several
+  <i>σ<sub>R</sub>/G</i> is recommended for integer frames
+  with <samp>--readnoise</samp>.
   Both the Poisson and the read-out noise are switched-off
-  by <samp>--disable-noise</samp> (the frame is <i>λ(x,y)/G</i> then).
+  by <samp>--disable-noise</samp> (the frame is <i>λ(x,y)/G + P</i> then).
   The variance of a background pixel is
-  (<i>λ + σ<sub>R</sub><sup>2</sup></i>) / <i>G<sup>2</sup></i> in ADU².
+  (<i>λ + σ<sub>R</sub><sup>2</sup></i>) / <i>G<sup>2</sup></i> in ADU²
+  (with no clipping), its mean is <i>λ/G + P</i>.
 </p>
 
 <div class="table">
@@ -567,6 +574,14 @@ can be recommended in that case.
     noise and before the division by gain. It does not change the mean and does
     not depend on the exposure time. The value is recorded
     in the RDNOISE keyword.
+  </dd>
+  <dt><samp>--bias level</samp></dt><dd>
+    Bias level (pedestal) in ADU (default: 0). A constant added to every
+    pixel after the division by gain and before the clipping at zero
+    (integer frames) and the saturation, which applies to the total value.
+    It is recommended with <samp>--readnoise</samp> and integer
+    <samp>-B</samp> to prevent the clipping of negative values.
+    The value is recorded in the BIASLEV keyword.
   </dd>
   <dt><samp>--gnoise rate</samp></dt><dd>
     <b>Deprecated</b>, use <samp>--dark</samp> and <samp>--readnoise</samp>.

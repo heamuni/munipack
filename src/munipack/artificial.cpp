@@ -169,6 +169,9 @@ MuniArtificial::MuniArtificial(wxEvtHandler *han, const MuniCmdLineParser& cmd):
     Write("READNOISE = %.17g",x);
   }
 
+  if( cmd.Found("bias",&x) )
+    Write("BIAS = %.17g",x);
+
   if( cmd.Found("seed",&n) )
     Write("SEED = %ld",n);
 
