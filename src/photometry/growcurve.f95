@@ -217,10 +217,11 @@ contains
     ! estimate HWHM and energy within a radius as an indicator of actual spread
     rflux90 = estim_rflux90(raper,curve)
 
-    ! profile is derived from rectangle rule
-    prof(1) = curve(1)/raper(1)**2/(2*pi)
+    ! profile is derived from rectangle rule: the mean surface brightness
+    ! in the central disc (area pi*r**2) and in the annuli
+    prof(1) = curve(1)/raper(1)**2/pi
     do i = 2,naper
-       prof(i) = (curve(i) - curve(i-1)) / (2*pi * raper(i) * (raper(i) - raper(i-1)))
+       prof(i) = (curve(i) - curve(i-1)) / (pi * (raper(i)**2 - raper(i-1)**2))
        prof(i) = max(prof(i),0.0)
     end do
     ghwhm = estim_hwhm(raper,prof)
@@ -588,26 +589,35 @@ contains
     real, parameter :: q = 0.5
     real, dimension(:), intent(in) :: raper
     real(dbl), dimension(:), intent(in) :: prof
-    real, dimension(size(prof)) :: p
+    real, dimension(size(prof)) :: p, rm
     real :: d
     real(dbl) :: prof0
     integer :: i
 
+    ! The profile values are mean surface brightnesses in the central
+    ! disc and in the annuli between apertures; they are assigned to
+    ! radii splitting the area of the disc and the annuli in halves
+    ! (assigning them to the outer radius biases HWHM).
+    rm(1) = raper(1) / sqrt(2.0)
+    do i = 2,size(raper)
+       rm(i) = sqrt((raper(i)**2 + raper(i-1)**2) / 2)
+    end do
+
     ! extrapolate to raper == 0 with first and second point
     ! and the profile  prof(r) = a*r**2 + c
-    prof0 = (prof(1)*raper(2)**2 - prof(2)*raper(1)**2) / (raper(2)**2 - raper(1)**2)
+    prof0 = (prof(1)*rm(2)**2 - prof(2)*rm(1)**2) / (rm(2)**2 - rm(1)**2)
 
     p = real(prof / prof0)
 
     if( p(1) < q ) then
-       estim_hwhm = real(q*raper(1)/p(1))
+       estim_hwhm = real(q*rm(1)/p(1))
        return
     end if
 
     do i = 2,size(raper)
        if( p(i-1) >= q .and. q > p(i) ) then
-          d = (raper(i) - raper(i-1)) / (p(i) - p(i-1))
-          estim_hwhm = raper(i-1) + d*(q - p(i-1))
+          d = (rm(i) - rm(i-1)) / (p(i) - p(i-1))
+          estim_hwhm = rm(i-1) + d*(q - p(i-1))
           return
        end if
     end do
