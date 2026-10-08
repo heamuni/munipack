@@ -344,12 +344,13 @@ program kombine
        error stop 'Failed to allocate an image.'
     end if
 
-    ! determine nodes of sky coordinate grid
+    ! determine nodes of sky coordinate grid,
+    ! the nodes are centres of pixels: (i,j) in FITS (WCSLIB) convention
     do i = 1, naxes(1)
-       xgrid(i) = real(i,REAL64) - 0.5
+       xgrid(i) = real(i,REAL64)
     end do
     do j = 1, naxes(2)
-       ygrid = real(j,REAL64) - 0.5
+       ygrid = real(j,REAL64)
        call wcs % pix2cel(xgrid,ygrid,alpha(:,j),delta(:,j))
     end do
 
