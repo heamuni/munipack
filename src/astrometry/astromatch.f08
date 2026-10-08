@@ -35,7 +35,12 @@ contains
 
   subroutine astromatch(minmatch,maxmatch,type,rec,dec,rflux,xpix,ypix,flux, &
        acen,dcen,xcen,ycen,id1,id2,sig1,sig2,flxmin,flxmax,fluxtest,luckymatch,&
-       verbose,status)
+       verbose,status,nskip)
+
+    ! nskip (optional): on input, the number of chunk pairs to skip
+    ! (a match found there has been rejected by a previous attempt),
+    ! on output, the number of the chunk pair providing the match,
+    ! so a next call with it continues by next chunks of stars
 
     use matcher
     use astrotrafo
@@ -48,15 +53,19 @@ contains
          xpix, ypix, flux, rflux
     integer, dimension(:), allocatable, intent(out) :: id1,id2
     logical, intent(out) :: status
+    integer, intent(in out), optional :: nskip
 
     real(REAL64), parameter :: rad = 57.29577951308232_REAL64
 
     real(REAL64), dimension(:), allocatable :: u,v,x,y
     logical, dimension(:), allocatable :: idx1, idx2
     type(AstrometryProjection) :: tp
-    integer :: n1,n2,m,n,l,k
+    integer :: n1,n2,m,n,l,k,ichunk,maxskip
 
     status = .false.
+    ichunk = 0
+    maxskip = 0
+    if( present(nskip) ) maxskip = nskip
 
     if(verbose) write(error_unit,*) "=== Matching ==="
 
@@ -92,6 +101,12 @@ contains
        l = 1
        do n = 1, (size(u)-1)/maxmatch + 1
           n1 = min(maxmatch,size(u)-l+1) - 1
+          ichunk = ichunk + 1
+          if( ichunk <= maxskip ) then
+             ! this chunk pair has been already tried, the match rejected
+             l = l + maxmatch
+             cycle
+          end if
           if(verbose) write(error_unit,'(2(2(a,i0),a))') &
                " Reference stars ",l," -- ",l+n1,".", &
                " Frame stars ",k," -- ",k+n2,"."
@@ -102,6 +117,7 @@ contains
           if( status ) then
              id1 = l + id1 - 1
              id2 = k + id2 - 1
+             if( present(nskip) ) nskip = ichunk
              goto 99
           end if
           l = l + maxmatch

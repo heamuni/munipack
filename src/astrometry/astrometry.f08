@@ -517,8 +517,11 @@ contains
     real(REAL64), dimension(2) :: zcrval, dcrval, zcrpix
     real(REAL64) :: dscale = epsilon(1.0_REAL64), dangle=epsilon(1.0_REAL64), &
          a,da,b,db,s,ds, sm, epoch, rms=0.0_REAL64, zscale, zangle, zrefl
-    integer :: n,nmin
+    integer :: n,nmin,nskip,nattempt
     logical :: matched = .false., reliable, zwcs
+    real(REAL64), dimension(2) :: crval0
+    ! the maximum of attempts to find a reliable match
+    integer, parameter :: maxattempt = 20
 
     success = .false.
     if( ptype == 'TPV' ) then
@@ -553,6 +556,14 @@ contains
        dec = delta
     end if
 
+    ! When the solution by a match is rejected (it is unreliable, or not
+    ! significant; a false match), the next match is tried.
+    nskip = 0
+    nattempt = 0
+    crval0 = crval
+55  continue
+    nattempt = nattempt + 1
+
     if( mode == 'MATCH' ) then
 
        if( plog ) then
@@ -563,7 +574,7 @@ contains
        call astromatch(minmatch,maxmatch,pcode,rec,dec,rflux,x,y,flux, &
             crval(1),crval(2),crpix(1),crpix(2), &
             id1,id2,sig1,sig2,flxmin,flxmax,fluxtest,&
-            luckymatch,verbose,matched)
+            luckymatch,verbose,matched,nskip)
 !           write(*,'(a,f10.7)') "=MATCH> End "
 
     else if( mode == 'SEQUENCE' ) then
@@ -635,6 +646,14 @@ contains
             crpix(1),crpix(2),crval(1),dcrval(1),crval(2),dcrval(2),&
             scale,dscale,refl,rms,angle,dangle,pv,ares,dres,id1,id2,i1,i2, &
             rmscheck,verbose,plog,reliable)
+
+       if( .not. reliable .and. mode == 'MATCH' .and. nattempt < maxattempt ) then
+          ! try a next match, nskip is the chunk pair of the rejected one
+          crval = crval0
+          if( verbose ) write(error_unit,'(a,i0,a)') &
+               ' The solution is rejected, trying the next match (attempt #',nattempt+1,').'
+          goto 55
+       end if
 
        if( .not. reliable ) write(error_unit,*) &
             'Warning: The astrometry solution is unreliable for `',trim(filename),"'"
