@@ -115,6 +115,7 @@ program artificial
   logical :: fov_defined = .false.
   logical :: area_defined = .false.
   logical :: airy_defined = .false.
+  logical :: diameter_defined = .false.
 
   integer :: eq,n,m,i,istat
   character(len=81) :: errmsg
@@ -281,6 +282,8 @@ program artificial
         else if( key == 'DIAMETER' ) then
 
            read(val,*) diameter
+           if( .not. (diameter > 0) ) stop 'Error: a non-positive diameter.'
+           diameter_defined = .true.
 
         elseif( key == 'PROJECTION' ) then
 
@@ -412,16 +415,16 @@ program artificial
      else
         fov = naxes(2) / scale
      end if
-     if( area_defined ) then
+     ! The diameter defines the radius (and both the area and Airy disk
+     ! unless they are given explicitly); the area defines the radius
+     ! when the diameter is not given.
+     if( area_defined .and. .not. diameter_defined ) then
         radii = sqrt(area / pi)
      else
         radii = diameter / 2
-        area = pi*radii**2
      end if
-     if( .not. airy_defined ) then
-        radii = diameter / 2
-        airy = 7e-2 / radii
-     end if
+     if( .not. area_defined ) area = pi*radii**2
+     if( .not. airy_defined ) airy = 7e-2 / radii
 
      if( bitpix > 0 ) then
         if( bitpix > digits(bitpix) ) then
