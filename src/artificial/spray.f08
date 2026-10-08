@@ -226,25 +226,45 @@ contains
     complex(REAL64), dimension(:,:), allocatable :: bessel, kernel, qpsf, &
          zbessel, zkernel, zpsf
     real(REAL64), dimension(:,:), allocatable :: rkernel, rbessel
+    integer, dimension(:), allocatable :: icoo
+    integer :: i,j
+
+    ! The FFT convolution is circular: both the inputs are stored
+    ! with origin at the first element (the coordinates 0..n2-1
+    ! followed by -n2..-1, as ifftshift does), so the origin
+    ! of the result is at the first element too.
+    allocate(icoo(n))
+    do i = 1, n
+       if( i - 1 < n2 ) then
+          icoo(i) = i - 1
+       else
+          icoo(i) = i - 1 - n
+       end if
+    end do
 
     ! fill-up Bessel
     allocate(bessel(n,n),rbessel(-n2:n2,-n2:n2))
     call fill_bessel(n2,this%zoom*airy,rbessel)
-    bessel = rbessel(-n2+1:n2,-n2+1:n2)
-!    deallocate(rbessel)
+    do j = 1, n
+       do i = 1, n
+          bessel(i,j) = rbessel(icoo(i),icoo(j))
+       end do
+    end do
 
     ! fill-up Gaussian spread
     allocate(kernel(n,n),rkernel(-n2:n2,-n2:n2))
     call fill_gaussian(n2,this%zoom*hwhm,e,incl,rkernel)
     ! conversion Complex to Real numbers
-    kernel = rkernel(-n2+1:n2,-n2+1:n2)
-!    deallocate(rkernel)
+    do j = 1, n
+       do i = 1, n
+          kernel(i,j) = rkernel(icoo(i),icoo(j))
+       end do
+    end do
 
     ! forward FFT
     allocate(zbessel(n,n),zkernel(n,n))
     call ftra(bessel,zbessel,m,1)
     call ftra(kernel,zkernel,m,1)
-!    deallocate(bessel,kernel)
 
     ! the convolution
     allocate(zpsf(n,n),qpsf(n,n))
@@ -252,16 +272,13 @@ contains
 
     ! back FFT
     call ftra(zpsf,qpsf,m,-1)
-!    deallocate(zbessel,zkernel,zpsf)
 
-    ! fill PSF by re-arranged quarters
+    ! fill PSF by re-arranged quarters (the origin at the first element)
     psf = 0
     psf(    0:n2-1,    0:n2-1) = real(qpsf(1:n2,1:n2),REAL64)
-    psf(-n2+1:-1,      0:n2-1) = real(qpsf(n2+1:n-1,1:n2),REAL64)
-    psf(    0:n2-1,-n2+1:-1)   = real(qpsf(1:n2,n2+1:n-1),REAL64)
-    psf(-n2+1:-1,  -n2+1:-1)   = real(qpsf(n2+1:n-1,n2+1:n-1),REAL64)
-
-!    deallocate(qpsf)
+    psf(-n2+1:-1,      0:n2-1) = real(qpsf(n2+2:n,1:n2),REAL64)
+    psf(    0:n2-1,-n2+1:-1)   = real(qpsf(1:n2,n2+2:n),REAL64)
+    psf(-n2+1:-1,  -n2+1:-1)   = real(qpsf(n2+2:n,n2+2:n),REAL64)
 
   end subroutine fseeing
 
