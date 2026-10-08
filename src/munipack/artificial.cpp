@@ -28,10 +28,21 @@
 
 using namespace std;
 
+// both options of a pair (like --rcen, --dcen) must be given together
+static void CheckPair(const MuniCmdLineParser& cmd, const wxString& a,
+		      const wxString& b)
+{
+  if( cmd.Found(a) != cmd.Found(b) )
+    wxLogFatalError("Both --"+a+" and --"+b+" must be given together.");
+}
+
 MuniArtificial::MuniArtificial(wxEvtHandler *han, const MuniCmdLineParser& cmd):
   MuniAction(han,"artificial")
 {
 #ifdef HAVE_CAF
+  long np;
+  if( cmd.Found("mproc",&np) && np <= 0 )
+    wxLogFatalError("The number of parallel processes (--mproc) must be positive.");
   SetCAF(cmd);
 #endif
 
@@ -65,19 +76,19 @@ MuniArtificial::MuniArtificial(wxEvtHandler *han, const MuniCmdLineParser& cmd):
     Write("SPREAD = '" + a.Upper() + "'");
 
   if( cmd.Found("hwhm",&x) )
-    Write("HWHM = %lf",x);
+    Write("HWHM = %.17g",x);
 
   if( cmd.Found("eccentricity",&x) )
-    Write("ECCENTRICITY = %lf",x);
+    Write("ECCENTRICITY = %.17g",x);
 
   if( cmd.Found("inclination",&x) )
-    Write("INCLINATION = %lf",x);
+    Write("INCLINATION = %.17g",x);
 
   if( cmd.Found("airy",&x) )
-    Write("AIRY = %lf",x);
+    Write("AIRY = %.17g",x);
 
   if( cmd.Found("beta",&x) )
-    Write("BETA = %lf",x);
+    Write("BETA = %.17g",x);
 
   if( cmd.Found("maglim",&w) )
     Write("MAGLIM = %ld",w);
@@ -92,64 +103,83 @@ MuniArtificial::MuniArtificial(wxEvtHandler *han, const MuniCmdLineParser& cmd):
     Write("LCFOURIER = '" + a + "'");
 
   if( cmd.Found("lc-mag",&x) )
-    Write("LCMAG = %lf",x);
+    Write("LCMAG = %.17g",x);
 
   if( cmd.Found("lc-amp",&x) )
-    Write("LCAMP = %lf",x);
+    Write("LCAMP = %.17g",x);
 
   if( cmd.Found("lc-jd0",&x) )
-    Write("LCJD0 = %lf",x);
+    Write("LCJD0 = %.17g",x);
 
   if( cmd.Found("lc-per",&x) )
-    Write("LCPER = %lf",x);
+    Write("LCPER = %.17g",x);
 
+  CheckPair(cmd,"lc-ra","lc-dec");
   if( cmd.Found("lc-ra",&x) && cmd.Found("lc-dec",&y) )
-    Write("LCCOO = %20.15f %20.15f",x,y);
+    Write("LCCOO = %.17g %.17g",x,y);
 
   if( cmd.Found("sky-mag",&x) )
-    Write("SKYMAG = %lf",x);
+    Write("SKYMAG = %.17g",x);
 
   if( cmd.Found("sky-grad-x",&x) )
-    Write("SKYGRADX = %lf",x);
+    Write("SKYGRADX = %.17g",x);
 
   if( cmd.Found("sky-grad-y",&x) )
-    Write("SKYGRADY = %lf",x);
+    Write("SKYGRADY = %.17g",x);
 
   if( cmd.Found("area",&x) )
-    Write("AREA = %lf",x);
+    Write("AREA = %.17g",x);
 
   if( cmd.Found("diameter",&x) )
-    Write("DIAMETER = %lf",x);
+    Write("DIAMETER = %.17g",x);
 
   if( cmd.Found("exptime",&x) )
-    Write("EXPTIME = %lf",x);
+    Write("EXPTIME = %.17g",x);
 
   if( cmd.Found("qeff",&x) )
-    Write("QEFF = %lf",x);
+    Write("QEFF = %.17g",x);
 
   if( cmd.Found("gain",&x) )
-    Write("GAIN = %lf",x);
+    Write("GAIN = %.17g",x);
 
   if( cmd.Found("saturate",&x) )
-    Write("SATURATE = %lf",x);
+    Write("SATURATE = %.17g",x);
 
   if( cmd.Found("cosmics-freq",&x) )
-    Write("COSMICS_FREQ = %lf",x);
+    Write("COSMICS_FREQ = %.17g",x);
 
   if( cmd.Found("cosmics-cmax",&x) )
-    Write("COSMICS_CMAX = %lf",x);
+    Write("COSMICS_CMAX = %.17g",x);
 
   if( cmd.Found("cosmics-len",&x) )
-    Write("COSMICS_LEN = %lf",x);
+    Write("COSMICS_LEN = %.17g",x);
 
   if( cmd.Found("gnoise",&x) )
-    Write("GNOISE = %lf",x);
+    Write("GNOISE = %.17g",x);
+
+  if( cmd.Found("dark",&x) ) {
+    if( x < 0 )
+      wxLogFatalError("Dark current (--dark) must be non-negative.");
+    Write("DARK = %.17g",x);
+  }
+
+  if( cmd.Found("readnoise",&x) ) {
+    if( x < 0 )
+      wxLogFatalError("Read-out noise (--readnoise) must be non-negative.");
+    Write("READNOISE = %.17g",x);
+  }
+
+  if( cmd.Found("bias",&x) )
+    Write("BIAS = %.17g",x);
+
+  if( cmd.Found("seed",&n) )
+    Write("SEED = %ld",n);
 
   if( cmd.Found("extk",&x) )
-    Write("EXTINK = %lf",x);
+    Write("EXTINK = %.17g",x);
 
   if( cmd.Found("timestep",&x) )
-    Write("TIMESTEP = %lf",x);
+    Write("TIMESTEP = %.17g",x);
 
   if( cmd.Found("count",&n) )
     Write("NFILES = %ld",n);
@@ -165,7 +195,7 @@ MuniArtificial::MuniArtificial(wxEvtHandler *han, const MuniCmdLineParser& cmd):
   }
 
   if( cmd.Found("fov",&x) )
-    Write("FOV = %lf",x);
+    Write("FOV = %.17g",x);
 
   if( cmd.Found("p",&a) || cmd.Found("projection",&a) )
     Write("PROJECTION = '" + a.Upper() + "'");
@@ -173,20 +203,23 @@ MuniArtificial::MuniArtificial(wxEvtHandler *han, const MuniCmdLineParser& cmd):
   if( cmd.Found("f",&filter) || cmd.Found("filter",&filter) )
     Write("FILTER = '" + filter + "'");
 
+  CheckPair(cmd,"width","height");
   if( cmd.Found("width",&w) && cmd.Found("height",&h) )
     Write("NAXES = %ld %ld",w,h);
 
+  CheckPair(cmd,"rcen","dcen");
   if( cmd.Found("rcen",&x) && cmd.Found("dcen",&y) )
-    Write("CRVAL = %20.15f %20.15f",x,y);
+    Write("CRVAL = %.17g %.17g",x,y);
 
   if( cmd.Found("scale",&x) )
-    Write("SCALE = %25.15e",x);
+    Write("SCALE = %.17g",x);
 
   if( cmd.Found("angle",&x) )
-    Write("ANGLE = %20.15f",x);
+    Write("ANGLE = %.17g",x);
 
+  CheckPair(cmd,"long","lat");
   if( cmd.Found("long",&x) && cmd.Found("lat",&y) )
-    Write("GEOGRAPHIC = %20.15f %20.15f",x,y);
+    Write("GEOGRAPHIC = %.17g %.17g",x,y);
 
   if( cmd.Found("photsys",&a) )
     Write("PHOTSYS = '"+a+"'");

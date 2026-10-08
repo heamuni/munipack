@@ -29,6 +29,46 @@ module noise
 
 contains
 
+  subroutine noise_seed(seed,stream)
+
+    ! Initialises the random number generator by the pair (seed, stream),
+    ! the generated sequence is fully determined by the pair. The stream
+    ! is intended to distinguish independent tasks (like frames) so
+    ! the results does not depend on an order of their processing.
+    ! The seed array is filled by the minimal standard generator
+    ! (Park & Miller) to get well distributed non-zero values.
+
+    integer, intent(in) :: seed, stream
+
+    integer(INT64), parameter :: m = 2147483647_INT64, a = 48271_INT64
+    integer, dimension(:), allocatable :: put
+    integer(INT64) :: z
+    real(REAL64) :: x
+    integer :: n,i
+
+    call random_seed(size=n)
+    allocate(put(n))
+
+    z = modulo(int(seed,INT64)*1000003_INT64 + int(stream,INT64), m)
+    if( z == 0 ) z = 1
+    do i = 1, 3   ! warm-up
+       z = modulo(a*z,m)
+    end do
+    do i = 1, n
+       z = modulo(a*z,m)
+       put(i) = int(z)
+    end do
+
+    call random_seed(put=put)
+    deallocate(put)
+
+    ! burn-in to decorrelate sequences of near seeds
+    do i = 1, 64
+       call random_number(x)
+    end do
+
+  end subroutine noise_seed
+
   function gnoise(mean,sig)
 
     ! Gets noise from N(mean,sig), eg. Normal distribution.
@@ -75,12 +115,13 @@ contains
     ! which is valid only for exp(-lambda) > epsilon(1.0_REAL64),
     ! eg. lambda < 740. Normal distribution is used for larger
     ! values. Approximation of N(lambda,sqrt(lambda)) will also
-    ! valid with appropriate precision.
+    ! valid with appropriate precision. The result is rounded
+    ! to keep it integer (counts) for both the branches.
 
     if( lambda  < 500 ) then
        pnoise = pnoise_knuth(lambda)
     else
-       pnoise = gnoise(lambda,sqrt(lambda))
+       pnoise = max(anint(gnoise(lambda,sqrt(lambda))),0.0_REAL64)
     end if
 
   end function pnoise

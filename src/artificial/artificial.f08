@@ -72,8 +72,14 @@ program artificial
   real(REAL64), dimension(2) :: crval = 0 ! coordinates of centre [deg]
   real(REAL64) :: angle = 0  ! a rotation around the center
   real(REAL64) :: qefficiency = 1  ! quantum efficiency
-  real(REAL64) :: gnoise = 0       ! Gaussian noise instead of skymag
+  real(REAL64) :: gnoise = 0       ! additional background rate (deprecated),
+                                   ! [ph/s/m2/arcsec2] merged with skymag
+  real(REAL64) :: dark = 0         ! dark current [e-/s/pix]
+  real(REAL64) :: readnoise = 0    ! read-out noise [e-]
+  real(REAL64) :: bias = 0         ! bias level (pedestal) [ADU]
   logical      :: noise = .true.   ! data has added noise componets
+  integer      :: seed = 0         ! random generator seed
+  logical      :: seed_defined = .false.
   real(REAL64) :: extink = 0.1     ! extinction coefficient
   real(REAL64) :: longitude = 0    ! geographic longitude
   real(REAL64) :: latitude = 0     ! geographic latitude
@@ -81,7 +87,6 @@ program artificial
   real(REAL64) :: cosmics_freq = 0                 ! cosmics ray frequency in [s]
   real(REAL64) :: cosmics_cmax = 1e3  ! counts in maximum of cosmics ray
   real(REAL64) :: cosmics_len = 10    ! cosmics ray lengths
-  integer      :: cosmics_nevents = 0 ! Po(freq*exptime)
   real(REAL64) :: lcmag = 15                ! lc magnitude
   real(REAL64) :: lcamp = 1                 ! lc amplitude
   real(REAL64) :: lcjd0 = J2000             ! lc reference time
@@ -115,6 +120,7 @@ program artificial
   logical :: fov_defined = .false.
   logical :: area_defined = .false.
   logical :: airy_defined = .false.
+  logical :: diameter_defined = .false.
 
   integer :: eq,n,m,i,istat
   character(len=81) :: errmsg
@@ -175,10 +181,20 @@ program artificial
         else if( key == 'PROFILE' ) then
 
            read(val,*) profile
+           if( .not. any(profile == ['SEEING','MOFFAT','GAUSS ']) ) then
+              write(error_unit,*) "Error: unknown PSF `",trim(profile), &
+                   "' (use SEEING, MOFFAT or GAUSS)."
+              stop 'Error: unknown PSF.'
+           end if
 
         else if( key == 'SPREAD' ) then
 
            read(val,*) spread
+           if( .not. any(spread == ['AUTO  ','FFT   ','RANDOM','TEST  ']) ) then
+              write(error_unit,*) "Error: unknown spread method `", &
+                   trim(spread),"' (use AUTO, FFT or RANDOM)."
+              stop 'Error: unknown spread method.'
+           end if
 
         else if( key == 'NAXES' ) then
 
@@ -211,6 +227,25 @@ program artificial
         else if( key == 'GNOISE' ) then
 
            read(val,*) gnoise
+
+        else if( key == 'DARK' ) then
+
+           read(val,*) dark
+           if( dark < 0 ) stop 'Error: a negative dark current.'
+
+        else if( key == 'READNOISE' ) then
+
+           read(val,*) readnoise
+           if( readnoise < 0 ) stop 'Error: a negative read-out noise.'
+
+        else if( key == 'BIAS' ) then
+
+           read(val,*) bias
+
+        else if( key == 'SEED' ) then
+
+           read(val,*) seed
+           seed_defined = .true.
 
         else if( key == 'MAGLIM' ) then
 
@@ -281,6 +316,8 @@ program artificial
         else if( key == 'DIAMETER' ) then
 
            read(val,*) diameter
+           if( .not. (diameter > 0) ) stop 'Error: a non-positive diameter.'
+           diameter_defined = .true.
 
         elseif( key == 'PROJECTION' ) then
 
@@ -412,16 +449,16 @@ program artificial
      else
         fov = naxes(2) / scale
      end if
-     if( area_defined ) then
+     ! The diameter defines the radius (and both the area and Airy disk
+     ! unless they are given explicitly); the area defines the radius
+     ! when the diameter is not given.
+     if( area_defined .and. .not. diameter_defined ) then
         radii = sqrt(area / pi)
      else
         radii = diameter / 2
-        area = pi*radii**2
      end if
-     if( .not. airy_defined ) then
-        radii = diameter / 2
-        airy = 7e-2 / radii
-     end if
+     if( .not. area_defined ) area = pi*radii**2
+     if( .not. airy_defined ) airy = 7e-2 / radii
 
      if( bitpix > 0 ) then
         if( bitpix > digits(bitpix) ) then
@@ -445,10 +482,13 @@ program artificial
      ! photometry system, filter
      call phselect(phsystable,phsystem,phsys)
 
-     block
-       use noise
-       cosmics_nevents = int(pnoise(cosmics_freq*exptime))
-     end block
+     ! the reproducible random sequence for the star field
+     if( seed_defined ) then
+        block
+          use noise, only: noise_seed
+          call noise_seed(seed,0)
+        end block
+     end if
 
      ! stars
      if( cat /= '' ) then
@@ -528,7 +568,17 @@ program artificial
         write(error_unit,'(a,f0.1,a)') " Sky magnitude = ",skymag," mag/arcsec2"
         write(error_unit,'(a,2(g0.2,2x),a)') &
              " Sky gradient = ",skygrad," mag/arcsec2/pix"
-        write(error_unit,'(a,f0.2,a)') " Gaussian noise added = ",gnoise," [cts]"
+        write(error_unit,'(a,es10.3,a)') " Additional background rate (gnoise) = ", &
+             gnoise," [ph/s/m2/arcsec2] (deprecated)"
+        write(error_unit,'(a,es10.3,a)') " Dark current = ",dark," [e-/s/pix]"
+        write(error_unit,'(a,f0.3,a)') " Read-out noise = ",readnoise," [e-]"
+        write(error_unit,'(a,f0.3,a)') " Bias level (pedestal) = ",bias," [ADU]"
+        write(error_unit,*) "Noise: ",noise
+        if( seed_defined ) then
+           write(error_unit,'(a,i0)') " Random generator seed = ",seed
+        else
+           write(error_unit,*) "Random generator seed: undefined (random)"
+        end if
         write(error_unit,'(a,f0.3,a)') " Area = ",area," [m2]"
         write(error_unit,'(a,f0.3,a)') " Exposure time = ",exptime," [s]"
         write(error_unit,'(a,f0.3,a)') " Gain = ",gain," [e-/adu]"
@@ -553,7 +603,8 @@ program artificial
         end if
         write(error_unit,'(a,2f8.3,a)') " Observatory coordinates: ", &
              longitude, latitude," [deg]"
-        write(error_unit,'(a,i0)') " Cosmic ray events (max): #",cosmics_nevents
+        write(error_unit,'(a,es10.3,a)') " Cosmic ray events frequency = ", &
+             cosmics_freq," [1/s]"
         write(error_unit,*) "Galaxy catalogue: `",trim(galcat),"'"
         write(error_unit,*) "Flat model file: `",trim(flatmodelfile),"'"
         write(error_unit,*) "Additional FITS keywords by: `",trim(fitskeyfile),"'"
@@ -618,6 +669,11 @@ program artificial
   call co_broadcast(angle,1)
   call co_broadcast(qefficiency,1)
   call co_broadcast(gnoise,1)
+  call co_broadcast(dark,1)
+  call co_broadcast(readnoise,1)
+  call co_broadcast(bias,1)
+  call co_broadcast(seed,1)
+  call co_broadcast(seed_defined,1)
   call co_broadcast(noise,1)
   call co_broadcast(extink,1)
   call co_broadcast(longitude,1)
@@ -625,7 +681,7 @@ program artificial
   call co_broadcast(atmosphere,1)
   call co_broadcast(cosmics_cmax,1)
   call co_broadcast(cosmics_len,1)
-  call co_broadcast(cosmics_nevents,1)
+  call co_broadcast(cosmics_freq,1)
   call co_broadcast(phsys,1)
   call co_broadcast(lcmode,1)
   call co_broadcast(lcmag,1)
@@ -740,7 +796,7 @@ program artificial
        else
           file = mask
        end if
-       call artfits(file,jd0 + (i-1)*timestep)
+       call artfits(file,jd0 + (i-1)*timestep,i)
        mcaf[mp] = mcaf[mp] + 1
     end do
     if( verbose ) write(error_unit,'(2(a,i0))') 'finished process #',this_image(),&
@@ -767,7 +823,7 @@ program artificial
 
 contains
 
-  subroutine artfits(filename,jd)
+  subroutine artfits(filename,jd,iframe)
 
     use marker
     use astrosphere
@@ -778,15 +834,16 @@ contains
 
     character(len=*), intent(in) :: filename
     real(REAL64), intent(in) :: jd
+    integer, intent(in) :: iframe
 
     integer :: status
     character(len=FLEN_COMMENT) :: com
     character(len=FLEN_VALUE) :: datetime
     character(len=3) :: pcode
     real(REAL64), dimension(:,:), allocatable :: sky
-    real(REAL64) :: c,s,x,qe,see,extin,hwhms,jd2, sec, back, skyint, ccmag
-    integer :: year, month, day, hour, minute, m, i
-    real(REAL64), dimension(2) :: bgrad
+    real(REAL64) :: c,s,x,qe,see,extin,hwhms,jd2, sec, back, skyint, ccmag, &
+         darkc
+    integer :: year, month, day, hour, minute, m, i, nevents
     real(REAL64), dimension(:), allocatable :: xstar,ystar,fluxes,xvar, yvar, fvar
     type(fitsfiles) :: fits
     type(SprayType), target :: spsf
@@ -799,18 +856,34 @@ contains
     class(LightCurve), pointer :: lc => null()
     class(SprayType), pointer :: psf => null()
 
-    ! background at zenit
+    ! the reproducible random sequence for the frame, independent
+    ! on a distribution of frames over images
+    if( seed_defined ) then
+       block
+         use noise, only: noise_seed
+         call noise_seed(seed,iframe)
+       end block
+    end if
+
+    ! the time at half of exposure
+    jd2 = jd + exptime / 2.0_REAL64 / 86400.0_REAL64
+
+    ! The mean background at zenit in electrons per pixel: the sky and the
+    ! additional background rate (gnoise, deprecated) are merged
+    ! in quadrature, both in photons per second, square meter and arcsec2.
     skyint = magiconv(phsys,filter, [skymag])
     back = sqrt(skyint**2 + gnoise**2)
     back = back * exptime * area * qefficiency * (3600/scale)**2
-    bgrad = 1.086 * skygrad * back
+
+    ! dark current in electrons per pixel
+    darkc = dark * exptime
 
     if( atmosphere ) then
 
        ! compute airmass
-       x = xairmass(jd,longitude,latitude,crval(1),crval(2))
+       x = xairmass(jd2,longitude,latitude,crval(1),crval(2))
        if( x < 0 ) then
-          call jdatetime(jd,year,month,day,hour,minute,sec)
+          call jdatetime(jd2,year,month,day,hour,minute,sec)
           write(error_unit,'(a,i4.4,2(a,i2.2),a,2(i2.2,a),f6.3,a)') &
                "Warning: Airmass undefined (below horizon) for date  ", &
                year,"-",month,"-",day,"  and time ",hour,":",minute,":",sec," UT."
@@ -826,9 +899,12 @@ contains
        see = x**0.6
        hwhms = hwhm*see
 
-       ! sky increases by airmass
-       back  = back * extin
-       bgrad = 1.086 * skygrad * back
+       ! The sky brightness increases with airmass: the emitting layer
+       ! (airglow, scattered light) is seen through a longer path, ~ X
+       ! (the plane-parallel approximation), and the light is attenuated
+       ! by the extinction as the stars (Garstang 1989, Krisciunas &
+       ! Schaefer 1991). The sky magnitude is the zenit value.
+       back  = back * x * extin
 
        if( verbose ) write(error_unit,'(a,f15.5,f8.3,2f6.2)') &
             trim(filename),jd,x,extin,see
@@ -878,7 +954,7 @@ contains
            lc => lcfour
         end if
 
-        ccmag = lc%magvar(jd)
+        ccmag = lc%magvar(jd2)
         allocate(xvar(1),yvar(1),fvar(1))
         call rain(prjcode,[lc%coo(1)],[lc%coo(2)],[ccmag],scale,angle,crval,crpix, &
              phsys,filter,xvar,yvar,fvar)
@@ -886,11 +962,10 @@ contains
        allocate(xvar(0),yvar(0),fvar(0))
     end if
 
-    ! Frame generator
+    ! Frame generator: the mean (noiseless) frame in electrons
     allocate(sky(naxes(1),naxes(2)))
-    sky = 0
 
-    call background(back,bgrad,noise,sky)
+    call background(back,skygrad,sky)
 
     if( ngal > 0 ) then
        call galaxies%Render(prjcode,crval,crpix,scale,angle,exptime,area,qe, &
@@ -909,16 +984,28 @@ contains
     fluxes = fluxes * exptime * area * qe
 
     ! create the artificial sky
-    call spreadstars(psf,xstar,ystar,fluxes,crpix,noise,sky)
+    call spreadstars(psf,xstar,ystar,fluxes,crpix,sky)
 
-    ! flat model
+    ! flat model, the per pixel sensitivity of the light path
     if( all(flatmodel_naxes > 0) ) sky = sky * flatmodel
 
-    ! cosmics
-    call cosmics(cosmics_nevents,cosmics_cmax,cosmics_len,sky)
+    ! dark current, uniform
+    sky = sky + darkc
 
-    ! make it realistic
-    sky = sky / gain
+    ! photon (Poisson) noise of all the electrons and read-out noise
+    if( noise ) call detector_noise(sky,readnoise)
+
+    ! cosmics, the number of events is Po(freq*exptime) for every frame
+    block
+      use noise, only: pnoise
+      nevents = int(pnoise(cosmics_freq*exptime))
+    end block
+    call cosmics(nevents,cosmics_cmax,cosmics_len,sky)
+
+    ! make it realistic: analog-digital conversion
+    sky = sky / gain + bias
+    ! the converter saturates on the total value, including bias
+    if( bitpix > 0 ) sky = max(sky,0.0_REAL64)
     sky = min(sky,saturate)
 
     ! watermark
@@ -935,7 +1022,6 @@ contains
 
     ! convert JD to date
     call jdatetime(jd,year,month,day,hour,minute,sec)
-    jd2 = jd + exptime / 2.0_REAL64 / 86400.0_REAL64
 
     ! the artifical frame
     call fits_insert_image(fits,bitpix,size(naxes),naxes,status)
@@ -948,15 +1034,21 @@ contains
     call fits_write_key(fits,FITS_KEY_DATEOBS,datetime,'date and time in UT',&
          status)
     call fits_write_key(fits,FITS_KEY_FILTER,filter,'filter',status)
-    call fits_write_key(fits,FITS_KEY_GAIN,gain,-3,'gain',status)
-    call fits_write_key(fits,FITS_KEY_SATURATE,saturate,-3,'saturate value',status)
+    call fits_write_key(fits,FITS_KEY_GAIN,gain,-15,'[e-/ADU] gain',status)
+    call fits_write_key(fits,FITS_KEY_SATURATE,saturate,-15, &
+         '[ADU] saturate value',status)
     call fits_write_key(fits,FITS_KEY_JD,jd2,-16, &
          '[day] Julian date at half of exposure',status)
     call fits_write_key(fits,FITS_KEY_EXPTIME,exptime,-3,'[s] exposure time', &
          status)
     call fits_write_key(fits,FITS_KEY_AREA,area,-2,'[m2] detection area',status)
+    call fits_write_key(fits,'DARKCUR',dark,-7,'[e-/s/pix] dark current',status)
+    call fits_write_key(fits,'RDNOISE',readnoise,-7,'[e-] read-out noise',status)
+    call fits_write_key(fits,'BIASLEV',bias,-15,'[ADU] bias level (pedestal)',status)
+    if( seed_defined ) &
+         call fits_write_key(fits,'ARTSEED',seed,'random generator seed',status)
     call fits_write_key(fits,FITS_KEY_HWHM,hwhms,-3, &
-         '[pix] half with at half maximum',status)
+         '[pix] PSF width: sigma (alpha for MOFFAT)',status)
     call fits_write_key(fits,FITS_KEY_ECCENTRICITY,eccentricity,-3, &
          'eccentricity of ellipsis (0=circle)',status)
     call fits_write_key(fits,FITS_KEY_INCLINATION,inclination,-1, &
@@ -998,10 +1090,15 @@ contains
 
     call fits_write_comment(fits,'Artificial sky by Munipack.',status)
     call fits_write_comment(fits,'Parameters:',status)
-    write(com,'(a,es10.3,1x,2(g0.2,1x))') &
-         'Background: level, gradient = ',back,bgrad
+    write(com,'(a,es10.3)') 'Sky background level [e-/pix] = ',back
+    call fits_write_comment(fits,com,status)
+    write(com,'(a,2(1x,es10.3))') 'Sky gradient [mag/arcsec2/pix] = ',skygrad
+    call fits_write_comment(fits,com,status)
+    write(com,'(a,es10.3)') 'Dark current level [e-/pix] = ',darkc
     call fits_write_comment(fits,com,status)
     write(com,'(a,l2)') 'Noise: ',noise
+    call fits_write_comment(fits,com,status)
+    write(com,'(a,i0)') 'Cosmic ray events = ',nevents
     call fits_write_comment(fits,com,status)
     if( psffile == '' ) then
        write(com,'(2a)') 'PSF = ',trim(profile)
@@ -1081,7 +1178,13 @@ contains
       ttype(3) = FITS_COL_COUNT
       tform  = '1E'
       tunit = ''
+      tunit(1:2) = 'pix'
+      tunit(3) = 'electron'
       call fits_insert_btbl(fits,nrows,ttype,tform,tunit,'CATALOGUE',status)
+      call fits_write_comment(fits,'COUNT is the mean number of electrons ' // &
+           'of star (before flat, gain),',status)
+      call fits_write_comment(fits,'the image is in ADU: ' // &
+           'divide by gain (and apply the flat model).',status)
 
       call fits_get_rowsize(fits,srows,status)
       do i = 1, nrows, srows

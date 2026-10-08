@@ -76,7 +76,7 @@ contains
        allocate(this%psf(-n:n,-n:n))
        call this%moffat(hwhm,beta,eccentricity,inclination,n,this%psf)
 
-    else ! if( profile == 'SEEING' ) then
+    else if( profile == 'SEEING' ) then
 
        if( spread == 'RANDOM' ) then
 
@@ -104,6 +104,10 @@ contains
           call this%fseeing(hwhm,airy,eccentricity,inclination,n,m,n2,this%psf)
 
        end if
+
+    else
+       write(error_unit,*) "Error: unknown PSF `",trim(profile),"'."
+       stop 'Error: unknown PSF.'
     end if
 
     ! normalisation
@@ -140,9 +144,10 @@ contains
     ! fill-up by Bessel
     call fill_bessel(m,this%zoom*airy,bessel)
 
-    ! spread the profile by random shifts with N(0,s)
+    ! spread the profile by random shifts with N(0,sig),
+    ! gnoise2(0,1) gives N(0,1), the same sigma as fill_gaussian
     sig = hwhm*this%zoom
-    a = sqrt2*sig
+    a = sig
     b = a*sqrt(1 - e**2)
     c = cos(incl/rad)
     s = sin(incl/rad)
@@ -225,25 +230,45 @@ contains
     complex(REAL64), dimension(:,:), allocatable :: bessel, kernel, qpsf, &
          zbessel, zkernel, zpsf
     real(REAL64), dimension(:,:), allocatable :: rkernel, rbessel
+    integer, dimension(:), allocatable :: icoo
+    integer :: i,j
+
+    ! The FFT convolution is circular: both the inputs are stored
+    ! with origin at the first element (the coordinates 0..n2-1
+    ! followed by -n2..-1, as ifftshift does), so the origin
+    ! of the result is at the first element too.
+    allocate(icoo(n))
+    do i = 1, n
+       if( i - 1 < n2 ) then
+          icoo(i) = i - 1
+       else
+          icoo(i) = i - 1 - n
+       end if
+    end do
 
     ! fill-up Bessel
     allocate(bessel(n,n),rbessel(-n2:n2,-n2:n2))
     call fill_bessel(n2,this%zoom*airy,rbessel)
-    bessel = rbessel(-n2+1:n2,-n2+1:n2)
-!    deallocate(rbessel)
+    do j = 1, n
+       do i = 1, n
+          bessel(i,j) = rbessel(icoo(i),icoo(j))
+       end do
+    end do
 
     ! fill-up Gaussian spread
     allocate(kernel(n,n),rkernel(-n2:n2,-n2:n2))
     call fill_gaussian(n2,this%zoom*hwhm,e,incl,rkernel)
     ! conversion Complex to Real numbers
-    kernel = rkernel(-n2+1:n2,-n2+1:n2)
-!    deallocate(rkernel)
+    do j = 1, n
+       do i = 1, n
+          kernel(i,j) = rkernel(icoo(i),icoo(j))
+       end do
+    end do
 
     ! forward FFT
     allocate(zbessel(n,n),zkernel(n,n))
     call ftra(bessel,zbessel,m,1)
     call ftra(kernel,zkernel,m,1)
-!    deallocate(bessel,kernel)
 
     ! the convolution
     allocate(zpsf(n,n),qpsf(n,n))
@@ -251,16 +276,13 @@ contains
 
     ! back FFT
     call ftra(zpsf,qpsf,m,-1)
-!    deallocate(zbessel,zkernel,zpsf)
 
-    ! fill PSF by re-arranged quarters
+    ! fill PSF by re-arranged quarters (the origin at the first element)
     psf = 0
     psf(    0:n2-1,    0:n2-1) = real(qpsf(1:n2,1:n2),REAL64)
-    psf(-n2+1:-1,      0:n2-1) = real(qpsf(n2+1:n-1,1:n2),REAL64)
-    psf(    0:n2-1,-n2+1:-1)   = real(qpsf(1:n2,n2+1:n-1),REAL64)
-    psf(-n2+1:-1,  -n2+1:-1)   = real(qpsf(n2+1:n-1,n2+1:n-1),REAL64)
-
-!    deallocate(qpsf)
+    psf(-n2+1:-1,      0:n2-1) = real(qpsf(n2+2:n,1:n2),REAL64)
+    psf(    0:n2-1,-n2+1:-1)   = real(qpsf(1:n2,n2+2:n),REAL64)
+    psf(-n2+1:-1,  -n2+1:-1)   = real(qpsf(n2+2:n,n2+2:n),REAL64)
 
   end subroutine fseeing
 
@@ -366,7 +388,9 @@ contains
     ! The default lower dimension in subroutine is 1 (allocatable array?),
     ! we pass the dimensions which we needs.
 
-    integer :: x0,y0,k,l,i,j,k1,k2,l1,l2,m,m2,nmax,kk,ll
+    integer :: x0,y0,k,l,i,j,k1,k2,l1,l2,m,m2,nmax
+    real(REAL64), dimension(:), allocatable :: wx, wy
+    real(REAL64) :: we
 
     nmax = ubound(this%psf,1)
     x0 = nint(this%zoom*dx)
@@ -374,22 +398,40 @@ contains
     m = this%zoom
     m2 = m / 2
 
+    ! A pixel is integrated over the window k-m2 .. k+m2 of sub-pixels.
+    ! For even zoom, the window has zoom+1 elements, the edge sub-pixels
+    ! are shared by neighbouring pixels, so the trapezoid rule (weights 1/2
+    ! on the edges) is used to conserve the total flux.
+    if( mod(m,2) == 0 ) then
+       we = 0.5_REAL64
+    else
+       we = 1
+    end if
+    allocate(wx(-m2:m2),wy(-m2:m2))
+
     xpsf = 0
     do i = -n,n
        k = i*m + x0
        k1 = max(k - m2,-nmax)
        k2 = min(k + m2, nmax)
-       kk = k2 - k1 + 1
+       if( k1 > k2 ) cycle
+       wx = 1
+       wx(-m2) = we
+       wx(m2) = we
        do j = -n,n
           l = j*m + y0
           l1 = max(l - m2,-nmax)
           l2 = min(l + m2, nmax)
-          ll = l2 - l1 + 1
-          if( kk > 0 .and. ll > 0 ) then
-             xpsf(i,j) = sum(this%psf(k1:k2,l1:l2)) / (kk*ll)
-          end if
+          if( l1 > l2 ) cycle
+          wy = 1
+          wy(-m2) = we
+          wy(m2) = we
+          xpsf(i,j) = dot_product(wx(k1-k:k2-k), &
+               matmul(this%psf(k1:k2,l1:l2),wy(l1-l:l2-l))) / m**2
        end do
     end do
+
+    deallocate(wx,wy)
 
   end subroutine PixelizePsf
 

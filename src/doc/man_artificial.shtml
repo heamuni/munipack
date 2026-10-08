@@ -43,7 +43,7 @@ munipack artificial [.. parameters ..]
   <li><a href="https://en.wikipedia.org/wiki/Astronomical_seeing">Astronomical Seeing</a>
     </li>
   <li>Point spread functions (PSF): Gaussian, Moffat and seeing.</li>
-  <li>Background noise</li>
+  <li>Sky background, dark current, photon (Poisson) and read-out noise</li>
   <li>Light curves: plain wave, Algol-like, δ Cep and user defined</li>
   <li>Field stars: by a catalogue or generated randomly.
   <!--
@@ -92,11 +92,15 @@ munipack artificial [.. parameters ..]
 </p>
 
 <p>
-  The sky brightness (see below) is modelled by the same way
+  The sky brightness (see below) increases with air-mass:
+  the light emitting layer (air-glow, scattered light)
+  is seen through a longer path, proportional to <i>X</i>
+  in the plane-parallel approximation,
+  while the light is attenuated by the extinction as for stars
   (<i>b<sub>Z</sub></i> is its zenit value)
 </p>
 <p>
-  <i>b(X) = b<sub>Z</sub> e<sup>-k(X-1)</sup></i>
+  <i>b(X) = b<sub>Z</sub> X e<sup>-k(X-1)</sup></i>.
 </p>
 
 <h3>Modelling of seeing</h3>
@@ -146,7 +150,7 @@ These profiles known as point spread functions (PSF) are available:
     which is commonly used for rough description of observed profiles.
   </li>
   <li>
-    Gaussian profiles exp<i>(-r<sup>2</sup>/r<sup>2</sup><sub>0</sub>)</i>
+    Gaussian profiles exp<i>(-r<sup>2</sup>/2σ<sup>2</sup>)</i>
     which is the basic estimator. It is ideal for
     theoretical work; any practical use is limited on extra-atmospheric
     applications, such as spacecraft or Moon base observatories, without
@@ -252,39 +256,84 @@ These profiles known as point spread functions (PSF) are available:
 </figure>
 
 
-<h3>Modelling of Background</h3>
+<h3>Modelling of Background and Detector Noise</h3>
 
 <p>
-  Background <i>B(x,y)</i> is modelled as a plane
+  The frame is generated in electrons (photo-electrons and thermal
+  electrons). The mean (noiseless) number of electrons
+  in the pixel <i>x, y</i> is
 </p>
 <p>
-  <i>b(x,y) = B<sub>0</sub> + ΔB<sub>x</sub> (x - x<sub>0</sub>) +
-    ΔB<sub>y</sub> (y - y<sub>0</sub>)</i>
+  <i>λ(x,y) = F(x,y) [ B(x,y) + S(x,y) ] + D t</i>,
 </p>
 <p>
-  <i>
-    B(x,y) =  N( b(x,y), Δb)
-  </i>
+  where <i>S(x,y)</i> are stars (and galaxies),
+  <i>F(x,y)</i> is the flat-field model (<samp>--flat-model-file</samp>,
+  unity by default), <i>D</i> is the dark current in electrons per second
+  and pixel (<samp>--dark</samp>) and <i>t</i> is the exposure time.
+  The dark current is uniform: it is not affected
+  by the flat-field, the sky gradient, air-mass, area or quantum efficiency.
+</p>
+
+<p>
+  The sky background is
 </p>
 <p>
-  where <i>B<sub>0</sub></i> is a mean level (derived
-  from <samp>--skymag</samp>)
-  at centre of the picture <i>x<sub>0</sub>, y<sub>0</sub></i>,
-  <i>N(b, Δb)</i> is a function which makes a noise with
+  <i>B(x,y) = B<sub>0</sub>
+    10<sup>-0.4 [g<sub>x</sub> (x - x<sub>0</sub>) + g<sub>y</sub> (y - y<sub>0</sub>)]</sup></i>,
+</p>
+<p>
+  where <i>B<sub>0</sub></i> is the level at the centre of the frame
+  <i>x<sub>0</sub>, y<sub>0</sub></i>
+  and <i>g<sub>x</sub>, g<sub>y</sub></i> are the gradients
+  of the sky brightness in magnitudes per square arcsecond and pixel
+  (<samp>--sky-grad-x, --sky-grad-y</samp>); positive values mean
+  a fainter sky (less counts) in the direction. The gradient can
+  model a light pollution (by Moon). The common values for gradients are
+  of order 0.0001 … 0.001 mag/arcsec²/pix.
+  The level is
+</p>
+<p>
+  <i>B<sub>0</sub> = √(b² + g²) t A η s²</i>,
+</p>
+<p>
+  where <i>b</i> is the photon rate of the sky (per second, square meter
+  and square arcsecond) derived from <samp>--sky-mag</samp> for the filter,
+  <i>g</i> is the additional (deprecated) background rate given by
+  <samp>--gnoise</samp> in the same units, <i>A</i> is the area, <i>η</i>
+  the quantum efficiency and <i>s</i> is the pixel size in arcseconds.
+</p>
+
+<p>
+  The frame with the noise is
+</p>
+<p>
+  <i>I(x,y) = [ Po(λ(x,y)) + N(0, σ<sub>R</sub>) ] / G + P</i>,
+</p>
+<p>
+  <i>Po(λ)</i> is a random number with the
+  <a href="https://en.wikipedia.org/wiki/Poisson_distribution">Poisson
+    distribution</a> (the photon or shot noise of all the electrons;
+  the variance equals to the mean <i>λ</i>), <i>N(0, σ<sub>R</sub>)</i>
+  is the read-out noise with the
   <a href="https://en.wikipedia.org/wiki/Normal_distribution">Normal
-    distribution</a>.
-  The parameters are mean level <i>b</i> and standard deviation <i>Δb</i>,
-  which is computed as <i>Δb = √ B<sub>0</sub></i>.
-  <i>B(x,y)</i> is allways set to be non-zero.
-</p>
-
-<p>
-  The optional gradient in background in counts per pixels is given
-  by terms <i>ΔB<sub>x</sub>, ΔB<sub>y</sub></i>
-  (<samp>--sky-grad-x, --sky-grad-y</samp>). It can do modelling of
-  a light pollution (by Moon). The common values for gradients are
-  of order 0.0001 … 0.001 (negative values means negative slope of
-  the plane in given direction).
+    distribution</a> and the standard deviation <i>σ<sub>R</sub></i>
+  in electrons (<samp>--readnoise</samp>), independent on the exposure
+  time. Cosmic rays are added after the Poisson step. <i>G</i> is the gain
+  in electrons per ADU (<samp>--gain</samp>), <i>P</i> is the bias level
+  (pedestal) in ADU (<samp>--bias</samp>, zero by default).
+  The result, including the bias, is clipped
+  by the saturation (<samp>--saturate</samp>; the converter saturates on
+  the total value), and also at zero for integer
+  (<samp>-B 8, 16, 32</samp>) frames. The clipping at zero biases the mean
+  of low backgrounds with the read-out noise; a bias level of several
+  <i>σ<sub>R</sub>/G</i> is recommended for integer frames
+  with <samp>--readnoise</samp>.
+  Both the Poisson and the read-out noise are switched-off
+  by <samp>--disable-noise</samp> (the frame is <i>λ(x,y)/G + P</i> then).
+  The variance of a background pixel is
+  (<i>λ + σ<sub>R</sub><sup>2</sup></i>) / <i>G<sup>2</sup></i> in ADU²
+  (with no clipping), its mean is <i>λ/G + P</i>.
 </p>
 
 <div class="table">
@@ -319,7 +368,8 @@ These profiles known as point spread functions (PSF) are available:
   Rectangular (without projection) coordinates of the stars has
   <a href="https://en.wikipedia.org/wiki/Uniform_distribution_(continuous)">
     uniform distribution</a> in ranges given by a frame size.
-  The standard Fortran random number generator, with no initial seed, is used.
+  The standard Fortran random number generator is used. It is initialised
+  randomly, unless <samp>--seed</samp> is given.
 </p>
 
 <p>
@@ -421,7 +471,7 @@ can be recommended in that case.
 <dl>
   <dt><samp>--psf [SEEING|MOFFAT|GAUSS]</samp></dt><dd>
     Selects PSF function: SEEING (the best, slow, default), MOFFAT (commonly used),
-    GAUSS (basic model, fast)
+    GAUSS (basic model, fast). Other names are rejected.
     </dd>
   <dt><samp>--psf-file filename</samp></dt><dd>
     PSF by the external FITS file
@@ -432,9 +482,14 @@ can be recommended in that case.
     FFT (fast, smooth), RANDOM (slow, natural look) or AUTO (the RANDOM
     is selected for exposures shorter than 3 seconds)
   </dd>
-  <dt><samp>--hwhm hwhm</samp></dt><dd>
-    Half with of half of maximum of spread Gaussian in pixels. It represents
-    half of seeing parameter. The parameter is common for all PSF.
+  <dt><samp>--hwhm width</samp></dt><dd>
+    The width parameter of PSF in pixels, common for all PSF.
+    Despite its name, it is not the half-width at half of maximum:
+    it is the standard deviation σ of the Gaussian for GAUSS
+    and of the seeing spread for SEEING
+    (HWHM = 1.1774 σ), and the parameter α
+    of <i>(1 + r²/α²)<sup>-β</sup></i> for MOFFAT
+    (HWHM = α √(2<sup>1/β</sup> - 1)).
   </dd>
   <dt><samp>--airy airy</samp></dt><dd>
     Radius of Airy spot in pixels. It is useful for seeing PSF.
@@ -485,12 +540,13 @@ can be recommended in that case.
   <dt><samp>--lc-jd0 jd0, --lc-per period </samp></dt><dd>
     Time elements of the light curve: jd0 is a reference time in
     Julian date (exact meaning depends on the kind of the curve), period in
-    days. Don't use modified JD.
+    days. Don't use modified JD. The light curve (as well as the air-mass)
+    is evaluated at the half of exposure (the JD keyword).
   </dd>
   <dt><samp>--lc-ra α, --lc-dec δ</samp></dt><dd>
     A Right Ascension and Declination of the variable source. If the coordinates
     are undefined, the centre of projection (as <samp>--rcen, --dcen</samp>)
-    is used.
+    is used. Both the coordinates must be given together.
   </dd>
   <dt><samp>--sky-mag skymag</samp></dt><dd>
     Set sky brightness in magnitudes per square arcsecond.
@@ -498,25 +554,67 @@ can be recommended in that case.
     Set <samp>--sky-mag 99</samp> to effectivelly switch it off.
   </dd>
   <dt><samp>--sky-grad-x xmag, --sky-grad-y ymag</samp></dt><dd>
-    Background change in magnitues per square arcsecond and pixel
-    in given direction.
+    Gradient of the sky brightness in magnitudes per square arcsecond
+    and pixel in given direction, relative to the frame centre;
+    positive values make the sky fainter in the direction.
     The order of common values is in the interval 0.0001 … 0.001.
     It simulates a light pollution (by Moon).
+    The dark current is not affected.
   </dd>
-  <dt><samp>--gnoise dispersion</samp></dt><dd>
-    Set the dispersion of gaussian noise per pixel. The parameter is intended
-    to simulate various sources of noise like dark current, readout noise,
-    noise of background,  etc. The value of gnoise is merged with skymag.
+  <dt><samp>--dark rate</samp></dt><dd>
+    Dark current in electrons per second and pixel (default: 0).
+    It adds <i>rate × exptime</i> electrons to the mean of every pixel,
+    uniformly (unaffected by the sky gradient, air-mass, area,
+    quantum efficiency or the flat-field). Its noise is Poisson,
+    together with the sky. The value is recorded in the DARKCUR keyword.
+  </dd>
+  <dt><samp>--readnoise σ</samp></dt><dd>
+    Read-out noise in electrons (rms, default: 0). A Gaussian noise
+    <i>N(0,σ)</i> is added independently to every pixel after the Poisson
+    noise and before the division by gain. It does not change the mean and does
+    not depend on the exposure time. The value is recorded
+    in the RDNOISE keyword.
+  </dd>
+  <dt><samp>--bias level</samp></dt><dd>
+    Bias level (pedestal) in ADU (default: 0). A constant added to every
+    pixel after the division by gain and before the clipping at zero
+    (integer frames) and the saturation, which applies to the total value.
+    It is recommended with <samp>--readnoise</samp> and integer
+    <samp>-B</samp> to prevent the clipping of negative values.
+    The value is recorded in the BIASLEV keyword.
+  </dd>
+  <dt><samp>--gnoise rate</samp></dt><dd>
+    <b>Deprecated</b>, use <samp>--dark</samp> and <samp>--readnoise</samp>.
+    Despite its name, it is not a Gaussian noise: it is an additional
+    background photon rate in photons per second, square meter and square
+    arcsecond, which is merged in quadrature with the sky rate (given by
+    <samp>--sky-mag</samp>): the background level is
+    √(sky² + gnoise²) × exptime × area × qeff × pixel area [arcsec²].
+    It is handled as the sky (including the gradient and air-mass).
+    The noise is Poisson on the total.
+  </dd>
+  <dt><samp>--seed n</samp></dt><dd>
+    An integer seed of the random number generator.
+    With the seed, the generator is re-initialised
+    from the pair (seed, frame index) at the start of every frame
+    (and by the seed for the random star field), so the frames
+    are reproducible and independent on the number of parallel processes
+    (<samp>--mproc</samp>). Without the seed, the generator is initialised
+    randomly. The value is recorded in the ARTSEED keyword.
   </dd>
   <dt><samp>--area area</samp></dt><dd>
     The detection area of a simulated telescope in square meters.
-    It is 1m² by default (see <samp>--diameter</samp> option).
-    This is equivalent area for 56 cm (22 inch) diameter telescope.
+    It is 0.985 m² by default, the area of 1.12 m diameter
+    (see <samp>--diameter</samp> option).
+    If <samp>--diameter</samp> is not given, the area also determines
+    the radius of the aperture used for the Airy radius
+    (unless <samp>--airy</samp> is given).
   </dd>
   <dt><samp>--diameter diameter</samp></dt><dd>
     Sets diameter (twice of radius) of a telescope in meters. If set,
-    the area (<samp>--area</samp>) and Airy radius (<samp>--airy</samp>)
-    is (re-)defined.
+    the area (unless <samp>--area</samp> is given)
+    and the Airy radius (unless <samp>--airy</samp> is given)
+    are derived from it.
   </dd>
   <dt><samp>--exptime time</samp></dt><dd>
     The exposure time of generated frames in seconds.
@@ -525,8 +623,10 @@ can be recommended in that case.
     The quantum efficiency of a whole apparatus (<i>0 ≤ η ≤ 1</i>).
   </dd>
   <dt><samp>--disable-noise</samp></dt><dd>
-    Switch-off including of these sources of noise: photon, and background
-    noise. This switch is intended for some algorithm testing.
+    Switch-off all the sources of noise: the photon (Poisson) noise
+    of stars, sky and dark current and the read-out noise; the frames
+    contain the mean values. Cosmic rays are not affected.
+    This switch is intended for some algorithm testing.
   </dd>
   <dt><samp>--atmosphere</samp></dt><dd>
     Switch-on modelling of the atmosphere. The model includes
@@ -540,6 +640,7 @@ can be recommended in that case.
     Geographic coordinates of a station in degrees (+east, +north).
     Coordinates of <a href="https://en.wikipedia.org/wiki/List_of_observatory_codes">Brno observatory</a> are specified as
     <samp>--long +16.6, --lat +49.2</samp>.
+    Both the coordinates must be given together.
   </dd>
   <dt><samp>--date YYYY-MM-DD, --time HH:MM:SS</samp></dt><dd>
     Date as YYYY-MM-DD and time as HH:MM:SS of (initial) frame.
@@ -555,16 +656,21 @@ can be recommended in that case.
   </dd>
   <dt><samp>--gain gain</samp></dt><dd>
     The value of gain meaning (photo-)electrons per ADU.
+    The frames are in ADU while the COUNT column of the CATALOGUE
+    extension is the mean number of electrons of the star
+    (before the flat-field and gain).
   </dd>
   <dt><samp>--saturate saturate</samp></dt><dd>
     The saturation, or the maximal value in the frame,
     the equivalent of the full-well capacity.
   </dd>
   <dt><samp>--cosmics-freq freq</samp></dt><dd>
-    Cosmic-rays frequency per one second.
+    Cosmic-rays frequency per one second. The number of events
+    is drawn from the Poisson distribution
+    with the mean <i>freq × exptime</i> for every frame.
   </dd>
-  <dt><samp>--cosmics-fmax fmax</samp></dt><dd>
-    The cosmic-rays maximal intensity in counts.
+  <dt><samp>--cosmics-cmax cmax</samp></dt><dd>
+    The cosmic-rays maximal intensity in electrons.
   </dd>
   <dt><samp>--cosmics-len length</samp></dt><dd>
     The maximal lengths of cosmics rays.
@@ -585,17 +691,18 @@ can be recommended in that case.
   </dd>
   <dt><samp>--rcen α, --dcen δ</samp></dt><dd>
     Centre of the field of view in Right Ascension and Declination
-    in degrees.
+    in degrees. Both the coordinates must be given together.
   </dd>
   <dt><samp>--scale s</samp></dt><dd>
-    Scale of the frame in degrees per pixel.
+    Scale of the frame in pixels per degree (3600 by default, meaning
+    one arcsecond per pixel).
   </dd>
   <dt><samp>--angle φ</samp></dt><dd>
     Angle of rotation of the frame around the centre in degrees.
     Clockwise direction is positive.
   </dd>
   <dt><samp>--width width, --height height</samp></dt><dd>
-    Dimensions of output frame in pixels.
+    Dimensions of output frame in pixels. Both must be given together.
   </dd>
   <dt><samp>--fits-keys-file file</samp></dt><dd>
     The file contains additional FITS keys.
