@@ -225,20 +225,20 @@ contains
     logical, dimension(:,:), intent(out) :: mask
 
     real, dimension(:,:), allocatable :: fx,fy,fxy
-    integer :: i,j,n,m,i1,i2,j1,j2,nx,ny,mx,my
+    integer :: i,j,n,m,i1,j1,nx,ny
     real :: x,y,back
-    real(REAL64) :: xx,yy,dt
+    real(REAL64) :: xx,yy,dt,da,dd
 
     nx = size(this%image,1)
     ny = size(this%image,2)
-    mx = size(img,1)
-    my = size(img,2)
 
     mask = .false.
 
-    ! proper motion
+    ! proper motion: the frame is sampled at positions shifted
+    ! by the motion since the reference time jdref
     dt = this % midjd() - jdref
-    this % crval = this % crval - dt* crmov
+    da = dt * crmov(1)
+    dd = dt * crmov(2)
 
     ! background
     if( this%background ) then
@@ -255,52 +255,51 @@ contains
        call diff2(this%image,fxy)
     end if
 
-    do i = 2, size(alpha,1)-1
-       do j = 2, size(delta,2)-1
+    do i = 1, size(alpha,1)
+       do j = 1, size(alpha,2)
 
-          call this % wcs % cel2pix(alpha(i,j),delta(i,j),xx,yy)
+          call this % wcs % cel2pix(alpha(i,j)+da,delta(i,j)+dd,xx,yy)
 
-          if( abs(xx) > mx .or. abs(yy) > my ) cycle
+          ! points outside of the frame (and NaNs) are skipped,
+          ! pixel (n,m) covers the area n-0.5 .. n+0.5, m-0.5 .. m+0.5
+          if( .not. (0.5 <= xx .and. xx < nx + 0.5 .and. &
+               0.5 <= yy .and. yy < ny + 0.5) ) cycle
 
           x = real(xx)
           y = real(yy)
           i1 = int(x)
-          i2 = i1 + 1
           j1 = int(y)
-          j2 = j1 + 1
 
-          if( method == 'BI3CONV' ) then
-             i2 = i2 + 2
-             j2 = j2 + 2
+          ! The stencil of the interpolation must lie inside of the frame,
+          ! the bilinear and the nearest neighbourhood methods are used
+          ! near the edges of the frame where the stencil is out of the frame.
+          ! The derivatives (bicubic) are valid on 2 .. n-1.
+          if( method == 'BICUBIC' .and. &
+               2 <= i1 .and. i1 + 1 < nx .and. 2 <= j1 .and. j1 + 1 < ny ) then
+
+             img(i,j) = bicubic(x-i1,y-j1,this%image(i1:i1+1,j1:j1+1), &
+                  fx(i1:i1+1,j1:j1+1),fy(i1:i1+1,j1:j1+1),fxy(i1:i1+1,j1:j1+1))
+
+          else if( method == 'BI3CONV' .and. &
+               2 <= i1 .and. i1 + 2 <= nx .and. 2 <= j1 .and. j1 + 2 <= ny ) then
+
+             ! the stencil -1 .. 2 around i1, j1
+             img(i,j) = bi3conv(x-i1,y-j1,this%image(i1-1:i1+2,j1-1:j1+2))
+
+          else if( method /= 'NEAR' .and. &
+               1 <= i1 .and. i1 < nx .and. 1 <= j1 .and. j1 < ny ) then
+
+             img(i,j) = bilinear(x-i1,y-j1,this%image(i1:i1+1,j1:j1+1))
+
+          else
+
+             ! nearest neighbourhood
+             n = min(max(nint(x),1),nx)
+             m = min(max(nint(y),1),ny)
+             img(i,j) = this%image(n,m)
+
           end if
-
-          if(  1 <= i1 .and. i2 <= nx .and. 1 <= j1 .and. j2 <= ny ) then
-
-             if( method == 'NEAR' ) then
-
-                n = nint(x)
-                m = nint(y)
-                img(i,j) = this%image(n,m) -  back
-
-             else if( method == 'BILINEAR' ) then
-
-                img(i,j) = bilinear(x-i1,y-j1,this%image(i1:i2,j1:j2)) - back
-
-             else if( method == 'BICUBIC' ) then
-
-                img(i,j) = bicubic(x-i1,y-j1,this%image(i1:i2,j1:j2), &
-                     fx(i1:i2,j1:j2),fy(i1:i2,j1:j2),fxy(i1:i2,j1:j2)) - back
-
-             else if( method == 'BI3CONV' ) then
-
-                img(i,j) = bi3conv(x-i1,y-j1,this%image(i1:i2,j1:j2)) -  back
-
-             else
-
-                call random_number(img(i,j)) ! noise
-
-             end if
-          end if
+          img(i,j) = img(i,j) - back
           mask(i,j) = .true.
 
        end do
