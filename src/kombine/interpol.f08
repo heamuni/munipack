@@ -122,7 +122,7 @@ contains
     f2 = 0
     do i = 2, size(f,1) - 1
        do j = 2, size(f,2) - 1
-          f2(i,j) = (f(i+1,j+1) + f(i-1,j-1) - 2*f(i,j)) / h**2
+          f2(i,j) = (f(i+1,j+1) - f(i+1,j-1) - f(i-1,j+1) + f(i-1,j-1)) / (4*h**2)
        end do
     end do
 
