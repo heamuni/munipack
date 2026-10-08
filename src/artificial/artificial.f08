@@ -1094,7 +1094,13 @@ contains
       ttype(3) = FITS_COL_COUNT
       tform  = '1E'
       tunit = ''
+      tunit(1:2) = 'pix'
+      tunit(3) = 'electron'
       call fits_insert_btbl(fits,nrows,ttype,tform,tunit,'CATALOGUE',status)
+      call fits_write_comment(fits,'COUNT is the mean number of electrons ' // &
+           'of star (before flat, gain),',status)
+      call fits_write_comment(fits,'the image is in ADU: ' // &
+           'divide by gain (and apply the flat model).',status)
 
       call fits_get_rowsize(fits,srows,status)
       do i = 1, nrows, srows
