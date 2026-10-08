@@ -232,7 +232,12 @@ contains
 
 
   subroutine readfile(filename, key_dateobs, maxstar, &
-       xcoo, ycoo, flux, crpix, epoch, radesys, crval,status,alpha,delta)
+       xcoo, ycoo, flux, crpix, epoch, radesys, crval,status,alpha,delta, &
+       scale,rot,refl,wcsok)
+
+    ! On output, crval are spherical coordinates of the reference point crpix
+    ! (the centre of the frame) by its astrometry calibration (if any);
+    ! scale, rot and refl describe the calibration, wcsok indicates its presence.
 
     character(len=*), intent(in) :: filename, key_dateobs
     integer, intent(in) :: maxstar
@@ -242,6 +247,8 @@ contains
     real(REAL64), intent(out) :: epoch
     integer,intent(out) :: status
     real(REAL64), allocatable, dimension(:), intent(out), optional :: alpha, delta
+    real(REAL64), intent(out), optional :: scale, rot, refl
+    logical, intent(out), optional :: wcsok
 
     integer :: naxis, bitpix, nrows, n, ns, i, l, srows, frow, wstatus
     integer, dimension(2) :: naxes
@@ -253,10 +260,13 @@ contains
     integer :: col1, col2, nkeys
     character(len=FLEN_CARD), dimension(0) :: exclist
     character(len=:), allocatable :: header
+    character(len=FLEN_VALUE) :: code
     type(AstroWCS) :: wcs
     type(fitsfiles) :: fits
 
     status = 0
+    wstatus = -1
+    if( present(wcsok) ) wcsok = .false.
     call fits_open_image(fits,filename,FITS_READONLY,status)
     if( status /= 0 ) then
        write(error_unit,*) &
@@ -292,9 +302,16 @@ contains
     if( status == 0 ) then
        call wcs % init(header,nkeys,wstatus)
        if( wstatus == 0 ) then
-          call wcs % get_crval(crval)
-!          call wcs % get_crpix(crpix)
+          ! a celestial calibration is required
+          call wcs % get_code(code)
+          if( code == '' ) wstatus = -1
+       end if
+       if( wstatus == 0 ) then
+          call wcs % pix2cel(crpix(1),crpix(2),crval(1),crval(2))
           call wcs % get_radesys(radesys)
+          if( present(scale) .and. present(rot) .and. present(refl) ) &
+               call wcs % get_affines(scale,rot,refl)
+          if( present(wcsok) ) wcsok = .true.
        else
           crval = -999.999
        end if
