@@ -384,7 +384,9 @@ contains
     ! The default lower dimension in subroutine is 1 (allocatable array?),
     ! we pass the dimensions which we needs.
 
-    integer :: x0,y0,k,l,i,j,k1,k2,l1,l2,m,m2,nmax,kk,ll
+    integer :: x0,y0,k,l,i,j,k1,k2,l1,l2,m,m2,nmax
+    real(REAL64), dimension(:), allocatable :: wx, wy
+    real(REAL64) :: we
 
     nmax = ubound(this%psf,1)
     x0 = nint(this%zoom*dx)
@@ -392,22 +394,40 @@ contains
     m = this%zoom
     m2 = m / 2
 
+    ! A pixel is integrated over the window k-m2 .. k+m2 of sub-pixels.
+    ! For even zoom, the window has zoom+1 elements, the edge sub-pixels
+    ! are shared by neighbouring pixels, so the trapezoid rule (weights 1/2
+    ! on the edges) is used to conserve the total flux.
+    if( mod(m,2) == 0 ) then
+       we = 0.5_REAL64
+    else
+       we = 1
+    end if
+    allocate(wx(-m2:m2),wy(-m2:m2))
+
     xpsf = 0
     do i = -n,n
        k = i*m + x0
        k1 = max(k - m2,-nmax)
        k2 = min(k + m2, nmax)
-       kk = k2 - k1 + 1
+       if( k1 > k2 ) cycle
+       wx = 1
+       wx(-m2) = we
+       wx(m2) = we
        do j = -n,n
           l = j*m + y0
           l1 = max(l - m2,-nmax)
           l2 = min(l + m2, nmax)
-          ll = l2 - l1 + 1
-          if( kk > 0 .and. ll > 0 ) then
-             xpsf(i,j) = sum(this%psf(k1:k2,l1:l2)) / (kk*ll)
-          end if
+          if( l1 > l2 ) cycle
+          wy = 1
+          wy(-m2) = we
+          wy(m2) = we
+          xpsf(i,j) = dot_product(wx(k1-k:k2-k), &
+               matmul(this%psf(k1:k2,l1:l2),wy(l1-l:l2-l))) / m**2
        end do
     end do
+
+    deallocate(wx,wy)
 
   end subroutine PixelizePsf
 
