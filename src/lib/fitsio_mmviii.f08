@@ -62,19 +62,18 @@ contains
     integer, intent(in out) :: status
 
     character(len=*), parameter :: com = 'value = BSCALE*image + BZERO'
-    integer :: bzero
+    real(REAL64) :: bzero
 
     call fits_insert_img(fitsfile,bitpix,naxis,naxes,status)
 
-    ! the image is scaled to the appropriate numerical range by default
-    if( bitpix > 0 ) then
-       if( bitpix > digits(bitpix) ) then
-          bzero = huge(bitpix)
-       else
-          bzero = 2**(bitpix-1)
-       end if
+    ! The integer image is scaled to the unsigned numerical range by
+    ! the FITS convention (Pence et al. 2010, Table 11): BZERO = 2**(bitpix-1)
+    ! for 16 and 32 bit integers. BITPIX = 8 is unsigned by definition,
+    ! so no offset is applied (BZERO = 128 would turn it to signed bytes).
+    if( bitpix > 8 ) then
+       bzero = 2.0_REAL64**(bitpix-1)   ! 32768, 2147483648 exactly
        call fits_write_key(fitsfile,'BSCALE',1,com,status)
-       call fits_write_key(fitsfile,'BZERO',bzero,com,status)
+       call fits_write_key(fitsfile,'BZERO',bzero,-20,com,status)
     endif
 
   end subroutine fits_insert_image
