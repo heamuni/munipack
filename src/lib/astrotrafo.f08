@@ -1,6 +1,11 @@
 !
 ! Astrometry related transformations
 !
+! NOTE: obsolete, not built (see lib/Makefile.am). The module `astrotrafo'
+! used by the code is defined in astrowcs.f08 (WCSLIB-based) with
+! a different API; do not link both. astrometry/lsfit.f08 and
+! astrometry/absfit.f08 use this old API and are not built either.
+!
 ! Copyright © 2011-2026 F.Hroch (hroch@physics.muni.cz)
 !
 ! This file is part of Munipack.

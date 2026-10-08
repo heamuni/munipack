@@ -1,6 +1,8 @@
 !
 ! lsfit - least square fit
 !
+! NOTE: obsolete, not built; uses the old API of lib/astrotrafo.f08.
+!
 !
 ! Copyright © 2011-3, 2015-6, 2018 F.Hroch (hroch@physics.muni.cz)
 !
