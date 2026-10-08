@@ -7,6 +7,7 @@ How the fixes were checked:
 - Results were checked against independent calculations (astropy, numpy and analytic formulas).
 - The fix was then shown to remove the discrepancy.
 - An end-to-end run (`artificial` → `find` → `aphot` → `astrometry` → `phcal`) gives the same results before and after the fixes on unsaturated frames: astrometry RMS 0.08″, `phcal` MAG − V = −0.016 mag on 156 stars.
+- Saturated 16-bit frames, where the pre-fix build failed astrometry, now solve: 0.12″ RMS, 0.05 px from truth, MAG − V = +0.005 on 60 stars.
 
 Status values:
 - **fixed**: verified by experiment.
@@ -153,7 +154,7 @@ New header keywords: `DARKCUR`, `RDNOISE`, `BIASLEV`, `ARTSEED`. The verificatio
 | S13 | `kombine` output centre uses integer `naxes/2` with the first frame's CRVAL | output shifted, 60% empty when CRPIX is off-centre | fixed | `9a5306d` |
 | S14 | `kombine` output is surface brightness: star flux scales by (s_in/s_out)² when rescaling | 0.24× flux at 2″/px from 1″/px | documented; new `--flux-conserve` switch (0.998) | `0325a92` |
 | S15 | Two modules named `astrotrafo` (old `lib/astrotrafo.f08`, unbuilt `lsfit.f08`, `absfit.f08`) | accidental-linking hazard | marked with comments | `37e5787` |
-| S16 | Saturated frames: astrometry now accepts a **false** 6-object solution (scale 0.54×, rotated 50°, mirrored, 82 px off). The pre-fix build rejected the frame. | wrong WCS, `phcal` then matches 3 stars | **open (in progress)** | — |
+| S16 | Saturated frames: astrometry accepted a **false** 6-object solution (scale 0.54×, rotated 50°, mirrored, 82 px off). The old build rejected the frame only because mirrored fits could not converge; no test checked whether a match was real. The saturated brightest stars are missing from the frame, so the first catalogue chunk can only match by chance | wrong WCS, `phcal` then matched 3 stars | fixed: Poisson significance test of the match count against chance coincidences (disabled by `--disable-rms-check`), plus a retry with the next star chunks. Now 120 objects, 0.12″ RMS, 0.05 px from truth; `phcal` 60 stars, MAG − V = +0.005 | `3341812`, `8871072` |
 | S17 | `munipack astrometry -m cross` is parsed as the `cross` action (`--mode=cross` works) | — | **open** | — |
 | S18 | `wcsreport`/`--report` print debug output; index can overrun | — | **open** | — |
 | S19 | Large TPV distortions (≈8 px) on rotated frames fit poorly at field edges | max 10 px | **open** | — |
@@ -171,6 +172,7 @@ New header keywords: `DARKCUR`, `RDNOISE`, `BIASLEV`, `ARTSEED`. The verificatio
   - RANDOM spread is narrower;
   - FFT PSF centring changed by up to 0.1 px.
   - Noiseless frames with `--gnoise` and no gradient, airmass or flat are bit-identical to hg1653.
+- **`astrometry` rejects statistically insignificant matches.** Solutions with few matched stars that the old code would have accepted can now fail; `--disable-rms-check` switches the test off.
 - **`--scale` is pix/deg** in `artificial`, `astrometry` and `kombine` (an upstream change in hg1653; only the help text was fixed here).
 
 ---
