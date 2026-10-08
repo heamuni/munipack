@@ -842,7 +842,7 @@ contains
     character(len=3) :: pcode
     real(REAL64), dimension(:,:), allocatable :: sky
     real(REAL64) :: c,s,x,qe,see,extin,hwhms,jd2, sec, back, skyint, ccmag, &
-         darkc
+         darkc, skyback, gback
     integer :: year, month, day, hour, minute, m, i, nevents
     real(REAL64), dimension(:), allocatable :: xstar,ystar,fluxes,xvar, yvar, fvar
     type(fitsfiles) :: fits
@@ -871,9 +871,14 @@ contains
     ! The mean background at zenit in electrons per pixel: the sky and the
     ! additional background rate (gnoise, deprecated) are merged
     ! in quadrature, both in photons per second, square meter and arcsec2.
+    ! The merged level is split back into the sky part (skyback), which
+    ! follows the sky gradient and the airmass, and the gnoise part (gback),
+    ! which is uniform over the frame and independent of the airmass.
     skyint = magiconv(phsys,filter, [skymag])
     back = sqrt(skyint**2 + gnoise**2)
     back = back * exptime * area * qefficiency * (3600/scale)**2
+    skyback = skyint * exptime * area * qefficiency * (3600/scale)**2
+    gback = max(back - skyback, 0.0_REAL64)
 
     ! dark current in electrons per pixel
     darkc = dark * exptime
@@ -904,7 +909,7 @@ contains
        ! (the plane-parallel approximation), and the light is attenuated
        ! by the extinction as the stars (Garstang 1989, Krisciunas &
        ! Schaefer 1991). The sky magnitude is the zenit value.
-       back  = back * x * extin
+       skyback = skyback * x * extin
 
        if( verbose ) write(error_unit,'(a,f15.5,f8.3,2f6.2)') &
             trim(filename),jd,x,extin,see
@@ -915,6 +920,9 @@ contains
        if( verbose ) &
             write(error_unit,'(a,f15.5)') trim(filename),jd
     endif
+
+    ! the total background at the centre of the frame
+    back = skyback + gback
 
     ! simulate profile
     if( psffile == '' ) then
@@ -965,7 +973,8 @@ contains
     ! Frame generator: the mean (noiseless) frame in electrons
     allocate(sky(naxes(1),naxes(2)))
 
-    call background(back,skygrad,sky)
+    call background(skyback,skygrad,sky)
+    sky = sky + gback
 
     if( ngal > 0 ) then
        call galaxies%Render(prjcode,crval,crpix,scale,angle,exptime,area,qe, &

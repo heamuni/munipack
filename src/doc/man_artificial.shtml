@@ -279,22 +279,25 @@ These profiles known as point spread functions (PSF) are available:
   The sky background is
 </p>
 <p>
-  <i>B(x,y) = B<sub>0</sub>
-    10<sup>-0.4 [g<sub>x</sub> (x - x<sub>0</sub>) + g<sub>y</sub> (y - y<sub>0</sub>)]</sup></i>,
+  <i>B(x,y) = S<sub>0</sub>
+    10<sup>-0.4 [g<sub>x</sub> (x - x<sub>0</sub>) + g<sub>y</sub> (y - y<sub>0</sub>)]</sup>
+    + G<sub>0</sub></i>,
 </p>
 <p>
-  where <i>B<sub>0</sub></i> is the level at the centre of the frame
-  <i>x<sub>0</sub>, y<sub>0</sub></i>
+  where <i>S<sub>0</sub></i> is the sky level at the centre of the frame
+  <i>x<sub>0</sub>, y<sub>0</sub></i>, <i>G<sub>0</sub></i> is the uniform
+  level of the deprecated <samp>--gnoise</samp> rate (see below)
   and <i>g<sub>x</sub>, g<sub>y</sub></i> are the gradients
   of the sky brightness in magnitudes per square arcsecond and pixel
   (<samp>--sky-grad-x, --sky-grad-y</samp>); positive values mean
   a fainter sky (less counts) in the direction. The gradient can
   model a light pollution (by Moon). The common values for gradients are
   of order 0.0001 … 0.001 mag/arcsec²/pix.
-  The level is
+  The levels are
 </p>
 <p>
-  <i>B<sub>0</sub> = √(b² + g²) t A η s²</i>,
+  <i>S<sub>0</sub> = b t A η s²</i>, &nbsp;
+  <i>G<sub>0</sub> = (√(b² + g²) − b) t A η s²</i>,
 </p>
 <p>
   where <i>b</i> is the photon rate of the sky (per second, square meter
@@ -302,6 +305,9 @@ These profiles known as point spread functions (PSF) are available:
   <i>g</i> is the additional (deprecated) background rate given by
   <samp>--gnoise</samp> in the same units, <i>A</i> is the area, <i>η</i>
   the quantum efficiency and <i>s</i> is the pixel size in arcseconds.
+  The sum <i>S<sub>0</sub> + G<sub>0</sub></i> is the level of the merged
+  rates of the previous versions, but only the sky part follows the gradient
+  and the air-mass.
 </p>
 
 <p>
@@ -559,7 +565,8 @@ can be recommended in that case.
     positive values make the sky fainter in the direction.
     The order of common values is in the interval 0.0001 … 0.001.
     It simulates a light pollution (by Moon).
-    The dark current is not affected.
+    Only the sky is affected, not the <samp>--gnoise</samp> part
+    of the background nor the dark current.
   </dd>
   <dt><samp>--dark rate</samp></dt><dd>
     Dark current in electrons per second and pixel (default: 0).
@@ -590,8 +597,9 @@ can be recommended in that case.
     arcsecond, which is merged in quadrature with the sky rate (given by
     <samp>--sky-mag</samp>): the background level is
     √(sky² + gnoise²) × exptime × area × qeff × pixel area [arcsec²].
-    It is handled as the sky (including the gradient and air-mass).
-    The noise is Poisson on the total.
+    The part of the level above the sky alone is uniform over the frame:
+    it is not affected by the sky gradient or the air-mass (it is affected
+    by the flat-field, as a light). The noise is Poisson on the total.
   </dd>
   <dt><samp>--seed n</samp></dt><dd>
     An integer seed of the random number generator.
