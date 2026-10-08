@@ -84,12 +84,14 @@ contains
             "#: {seq1} -> {seq2} | scale, rel.flux: sq.(angle, scale) < Xi2(0.95)"
     end if
 
+    ! the stars are processed in chunks k..k+n2 (l..l+n1) of maxmatch
+    ! length at most, the last chunk contains the remaining stars
     k = 1
-    do m = 1, min(size(x)/maxmatch + 1, maxloop)
-       n2 = min(maxmatch,size(x)-k) - 1
+    do m = 1, min((size(x)-1)/maxmatch + 1, maxloop)
+       n2 = min(maxmatch,size(x)-k+1) - 1
        l = 1
-       do n = 1, size(u)/maxmatch + 1
-          n1 = min(maxmatch,size(u)-l) - 1
+       do n = 1, (size(u)-1)/maxmatch + 1
+          n1 = min(maxmatch,size(u)-l+1) - 1
           if(verbose) write(error_unit,'(2(2(a,i0),a))') &
                " Reference stars ",l," -- ",l+n1,".", &
                " Frame stars ",k," -- ",k+n2,"."
