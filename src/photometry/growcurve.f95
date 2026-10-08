@@ -509,9 +509,10 @@ contains
              c(n) = curve(j)
              dc(n) = curve_err(j)
              r(n) = raper(j)
+             ! the valid aperture nearest to hwhm
              if( abs(r(n) - hwhm) < rbest ) then
                 m = n
-                rbest = r(n)
+                rbest = abs(r(n) - hwhm)
              end if
           end if
        end do
@@ -531,7 +532,7 @@ contains
           if( n > nhwhm + 1 ) then
 !             a = apcount(i)
              !             aerr = apcount_err(i)
-             call fmean(cts(:n),dcts(:n),curve(:n),curve_err(:n),a,aerr)
+             call fmean(cts(:n),dcts(:n),c(:n),dc(:n),a,aerr)
              ! only 1:nhwhm ?
              call growfit(r(1:n),cts(1:n),dcts(1:n),c(1:n),dc(1:n),sky_sig(i), &
                   a,aerr,b,berr,sig,info)
