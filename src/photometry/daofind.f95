@@ -590,7 +590,7 @@ contains
                       ( 1 <= iy  .and. iy <= nrow )
                  inrange = .false.
                  if( inside ) &
-                      inrange = (lobad <= d(ix,iy) .and. d(ix,iy) <= hibad )
+                      inrange = (lobad <= d(ix,iy) .and. d(ix,iy) < hibad )
 !                 if( ( 1 <= ix  .and. ix <= ncol ) .and. &
 !                     ( 1 <= iy  .and. iy <= nrow ) ) then
                  !                    if( (lobad <= d(ix,iy) .and. d(ix,iy) <= hibad ) )then
@@ -774,7 +774,7 @@ contains
 !        n = 0
         sharp = 0.0
         datum = d(jx,jy)
-        if( lobad <= datum .and. datum <= hibad ) then
+        if( lobad <= datum .and. datum < hibad ) then
            p = 0.0
            do ix = jx - nhalf, jx + nhalf
               if( 1 <= ix .and. ix <= ncol ) then
@@ -786,7 +786,7 @@ contains
                        !                    if( 1 <= i .and. i <= ncol .and. 1 <= j .and. j <= nrow)then
                        if ( .not. skip(i,j) )then
                           datum = d(ix,iy)
-                          if ((datum >= lobad) .and. (datum <= hibad)) then
+                          if ((datum >= lobad) .and. (datum < hibad)) then
                              temp = temp + (datum - skymod)
                              p = p + 1.0
 !                             n = n + 1
@@ -922,7 +922,7 @@ contains
               ky = iy + j
               if( 1 <= kx .and. kx <= ncol .and. 1 <= ky .and. ky <= nrow ) then
                  datum = d(kx,ky)
-                 if ((datum >= lobad) .and. (datum <= hibad)) then
+                 if ((datum >= lobad) .and. (datum < hibad)) then
                     sd = sd + (datum - skymod)*wt
                     sg = sg + g(i,j)*wt
                  end if
@@ -989,7 +989,7 @@ contains
               kx = ix + i
               if( 1 <= kx .and. kx <= ncol .and. 1 <= ky .and. ky <= nrow ) then
                  datum = d(kx,ky)
-                 if ( lobad <= datum .and. datum <= hibad ) then
+                 if ( lobad <= datum .and. datum < hibad ) then
                     sd = sd + (datum - skymod)*wt
                     sg = sg + g(i,j)*wt
                  end if

@@ -242,7 +242,7 @@ contains
 !
 !           write(*,*) r,rin,rout,datum,lobad,hibad
              if( rin <= r .and. r <= rout .and. &
-                  lobad <= datum .and. datum <= hibad ) then
+                  lobad <= datum .and. datum < hibad ) then
                 nsky = nsky + 1
                 sky(nsky) = datum
                 dsky(nsky) = derr(i,j)
@@ -305,7 +305,7 @@ contains
 ! If the pixel is bad, set the total counts in this aperture to a number
 ! so negative that it will never be positive again.
 !                                                          ! Null magnitude
-                      if (datum < lobad .or. datum > hibad ) apsum(k)=-huge(1.0)
+                      if (datum < lobad .or. datum >= hibad ) apsum(k)=-huge(1.0)
                       apsum(k) = apsum(k) + fractn*datum
                       area(k) = area(k) + fractn
                    endif
