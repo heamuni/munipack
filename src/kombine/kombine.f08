@@ -442,9 +442,13 @@ program kombine
        where( fill ) IMGERR = IEEE_VALUE(IMGERR, IEEE_QUIET_NAN)
     end if
 
-    ! untouched pixels are filled by a mean
+    ! untouched pixels are filled by a mean of the touched ones
     n = max(minval(naxes) / 1000, 1)
-    call rmean(pack(IMAGE(::n,::n),.true.),amean)
+    if( any(.not. fill(::n,::n)) ) then
+       call rmean(pack(IMAGE(::n,::n),.not. fill(::n,::n)),amean)
+    else
+       amean = 0
+    end if
     where( fill ) IMAGE = amean
 
     ! scale on proper values
