@@ -213,6 +213,8 @@ contains
        id1_final = id1
        id2_final = id2
     else
+       ! the solution is rejected, no residuals are available
+       reliable = .false.
        allocate(id1_final(0),id2_final(0))
        if( verbose ) then
           write(error_unit,*) 'rms*scale < xsig*sig: ',rms*sc,xsig*sig
