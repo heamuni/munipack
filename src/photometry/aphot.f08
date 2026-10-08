@@ -229,7 +229,9 @@ contains
     hibad = saturate
     nstep = max(int(log(float(size(data))/4e4) / log(2.0)),1)
     call daosky(data,nstep,verbose,hibad,skyavg,skyerr,skysig)
-    lobad = max(0.0,skyavg - 3*skysig)
+    ! the same low-bad threshold as in find (lothresh = 5 sigma), not clamped
+    ! to zero (it would cut half of the sky on sky-subtracted frames)
+    lobad = skyavg - 5*skysig
 
     nrow = size(xstar)
     allocate(apcts(nrow,naper),apcts_err(nrow,naper),sky(nrow),sky_err(nrow))
