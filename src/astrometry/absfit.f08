@@ -1,6 +1,8 @@
 !
 ! absfit - fitting absolute deviations
 !
+! NOTE: obsolete, not built; uses the old API of lib/astrotrafo.f08.
+!
 !
 ! Copyright © 2011-2, 2015-8 F.Hroch (hroch@physics.muni.cz)
 !

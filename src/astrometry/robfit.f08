@@ -123,8 +123,9 @@ contains
       end do
     end associate
 
+    ! d xx/d rot = refl*yy, d yy/d rot = -refl*xx
     fgrad(3) = fgrad(3) / c
-    fgrad(4) = fgrad(4) / rad
+    fgrad(4) = this % refl * fgrad(4) / rad
     fgrad = -2*fgrad
 
   end subroutine lgradient
@@ -162,17 +163,17 @@ contains
          fhess(2,2) = fhess(2,2) + dfy
          fhess(2,3) = fhess(2,3) + dfy*yy
          fhess(2,4) = fhess(2,4) + dfy*xx
-         fhess(3,3) = fhess(3,3) + dfx*yy**2 + dfy*xx**2
-         fhess(4,4) = fhess(4,4) + dfx*xx**2 + dfy*yy**2
+         fhess(3,3) = fhess(3,3) + dfx*xx**2 + dfy*yy**2
+         fhess(4,4) = fhess(4,4) + dfx*yy**2 + dfy*xx**2
       end do
 
     end associate
 
     fhess = 2*fhess
     fhess(1,3) = fhess(1,3) / c
-    fhess(1,4) = fhess(1,4) / rad
+    fhess(1,4) = this % refl * fhess(1,4) / rad
     fhess(2,3) = fhess(2,3) / c
-    fhess(2,4) =-fhess(2,4) / rad
+    fhess(2,4) =-this % refl * fhess(2,4) / rad
     fhess(3,3) = fhess(3,3) / c**2
     fhess(3,4) = fhess(3,4) / c
     fhess(4,4) = fhess(4,4) / rad**2
@@ -266,7 +267,7 @@ contains
     end associate
 
     fgrad(3:4) = fgrad(3:4) / c
-    fgrad(4) = c*fgrad(4) / rad
+    fgrad(4) = this % refl * c*fgrad(4) / rad
     fgrad(1:)= -fgrad(1:) / (n*s)
     fgrad(0) = -fgrad(0)  / (n*s**2) + 1 / s
 
@@ -333,21 +334,22 @@ contains
          fhess(2,2) = fhess(2,2) + dfy
          fhess(2,3) = fhess(2,3) + dfy*yy
          fhess(2,4) = fhess(2,4) + dfy*xx
-         fhess(3,3) = fhess(3,3) + dfx*yy**2 + dfy*xx**2
+         fhess(3,3) = fhess(3,3) + dfx*xx**2 + dfy*yy**2
          fhess(3,4) = fhess(3,4) + (dfx -  dfy)*xx*yy
-         fhess(4,4) = fhess(4,4) + dfx*xx**2 + dfy*yy**2
+         fhess(4,4) = fhess(4,4) + dfx*yy**2 + dfy*xx**2
       end do
+      ! the derivatives by rotation: d xx/d rot = refl*yy, d yy/d rot = -refl*xx
       fhess = fhess / (n*s**2)
       fhess(0,0) = fhess(0,0) + 1 / s**2
       fhess(0,3) = fhess(0,3) / c
-      fhess(0,4) = fhess(0,4) / rad
+      fhess(0,4) = this % refl * fhess(0,4) / rad
       fhess(0,1:) = fhess(0,1:) / s
       fhess(1,3) = fhess(1,3) / c
-      fhess(1,4) = fhess(1,4) / rad
+      fhess(1,4) = this % refl * fhess(1,4) / rad
       fhess(2,3) = fhess(2,3) / c
-      fhess(2,4) =-fhess(2,4) / rad
+      fhess(2,4) =-this % refl * fhess(2,4) / rad
       fhess(3,3) = fhess(3,3) / c**2
-      fhess(3,4) = fhess(3,4) / c / rad
+      fhess(3,4) = this % refl * fhess(3,4) / c / rad
       fhess(4,4) = fhess(4,4) / rad**2
 
       do i = lbound(fhess,1), ubound(fhess,1)
@@ -495,7 +497,7 @@ contains
 
     fval = ravg / n + log(s)
     fgrad(3:4) = fgrad(3:4) / c
-    fgrad(4) = c*fgrad(4) / rad
+    fgrad(4) = this % refl * c*fgrad(4) / rad
     fgrad(1:)= -fgrad(1:) / (n*s)
     fgrad(0) = -fgrad(0)  / (n*s**2) + 1 / s
 

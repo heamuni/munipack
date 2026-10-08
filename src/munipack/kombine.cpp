@@ -74,5 +74,8 @@ MuniKombine::MuniKombine(wxEvtHandler *han, const MuniCmdLineParser& cmd):
   if( cmd.Found("disable-back") )
     Write("BACKGROUND = F");
 
+  if( cmd.Found("flux-conserve") )
+    Write("FLUXCONSERVE = T");
+
   WriteFilesSingle(cmd.GetFiles());
 }

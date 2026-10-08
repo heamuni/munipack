@@ -1282,10 +1282,12 @@ contains
     w = what
     status = wcsget(wcs % ptr,w,ptr)
     if( status == 0 ) then
+       ! WCSLIB's Fortran wrapper (wcsget_) returns matrices (PC, CD)
+       ! already converted to Fortran column-major order
        call c_f_pointer(ptr,d,[n*m])
-       do i = 1, n
-          j = (i-1)*m
-          val(i,:) = d(j+1:j+m)
+       do j = 1, m
+          i = (j-1)*n
+          val(:,j) = d(i+1:i+n)
        end do
     else
        val = 0

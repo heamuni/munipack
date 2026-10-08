@@ -117,10 +117,10 @@ contains
     b(2,:) = [-s, c ]
     t%cd = scale * matmul(a,b)
 
-    ! .. and the inverse
+    ! .. and the inverse: (A*B)^-1 = B^T * A^-1 = B^T * A
     b(1,:) = [ c,-s]
     b(2,:) = [ s, c]
-    t%icd = matmul(a,b) / scale
+    t%icd = matmul(b,a) / scale
 
   end subroutine initgeom
 
@@ -360,13 +360,15 @@ contains
       c = cos(f)
       s = sin(f)
 
-      ! the affine projection matrix
-      ! it's taken negative, flipping of x-axis, due the left-hand convention in RA
-      a(1,:) =-[       refl, 0.0_REAL64 ]
+      ! the affine projection matrix, the inverse of AstrometryGeometry%cd,
+      ! pc = diag(-1,1) * B^T * diag(refl,1) / scale;
+      ! the x-axis is flipped (taken negative) due the left-hand convention in RA
+      a(1,:) = [       refl, 0.0_REAL64 ]
       a(2,:) = [ 0.0_REAL64, 1.0_REAL64 ]
       b(1,:) = [ c,-s ]
       b(2,:) = [ s, c ]
-      pc = matmul(a,b) / scale
+      pc = matmul(b,a) / scale
+      pc(1,:) = - pc(1,:)
       do i = 1, 2
          do j = 1,2
             status = wcs_put(wcs,WCS_PC,pc(i,j),i,j)
@@ -552,35 +554,35 @@ contains
     end if
     if( any(cdelt == 0) ) stop 'Error: CDELT zero in get_affines().'
 
-    ! un-flip spherical to rectangular coordinates
-    mi(1,:) = real([ -1, 0 ],REAL64)
-    mi(2,:) = real([  0, 1 ],REAL64)
+    ! the full linear transformation CD = diag(cdelt) * PC
+    ! (WCSLIB stores CDi_j as PC with unit CDELT),
+    ! un-flip spherical to rectangular coordinates: m = diag(-1,1) * CD,
+    ! m is the inverse of AstrometryGeometry%cd: m = B^T * diag(refl,1) / scale
+    mi(1,:) = [ -cdelt(1), 0.0_REAL64 ]
+    mi(2,:) = [ 0.0_REAL64, cdelt(2) ]
     m = matmul(mi,pc)
 
-    ! the reflection (flip, mirror) is determined by diagonal elements
-    ! having non-corresponding signs
-    refl = sign(1.0_REAL64,m(1,1)*m(2,2))
+    ! the reflection (flip, mirror) is determined by the orientation
+    ! of the transformation, the sign of its determinant
+    refl = sign(1.0_REAL64,m(1,1)*m(2,2) - m(1,2)*m(2,1))
 
     ! transform-out reflex
     mi(1,:) = [    refl, 0.0_REAL64 ]
     mi(2,:) = [ 0.0_REAL64, 1.0_REAL64 ]
     m = matmul(m,mi)
 
+    ! m = [[c,-s],[s,c]] / scale, the average over both elements
     c = (m(1,1) + m(2,2)) / 2
     s = (m(2,1) - m(1,2)) / 2
 
-    scale = hypot(s,c) * (sum(abs(cdelt)) / size(cdelt))
+    scale = hypot(s,c)
     if( scale > 0 ) then
        scale = 1 / scale ! in pix per deg
     else
        stop 'Error in get_affines(): the scale is undefined.'
     end if
 
-    if( abs(c) == 0 ) then
-       rot = 0
-    else
-       rot = rad*(atan2(-m(1,2),m(1,1)) + atan2(m(2,1),m(2,2))) / 2
-    end if
+    rot = rad*atan2(s,c)
 
   end subroutine get_affines
 

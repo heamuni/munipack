@@ -66,6 +66,7 @@ program kombine
   real :: exptime = 1            ! mean exposure time
   logical :: robust = .true.     ! output image is computed by robust mean
   logical :: background = .true. ! subtract background
+  logical :: fluxcons = .false.  ! scale by pixel areas to conserve total flux
   logical :: verbose = .false.   ! verbose output
   logical :: pipelog = .false.
 
@@ -204,6 +205,10 @@ program kombine
 
         read(val,*) background
 
+     else if( key == 'FLUXCONSERVE' ) then
+
+        read(val,*) fluxcons
+
      else if( key == 'NFILES' ) then
 
         read(val,*) nfiles
@@ -284,12 +289,15 @@ program kombine
       real(REAL64), dimension(2) :: xcrval, xcrpix
       real(REAL64) :: xscale, xrot, xrefl
 
+      ! the centre of the output frame is the centre of the first frame
+      ! (its CRVAL belongs to its CRPIX, which needn't be the centre)
       xcode = files(1)%code
-      xcrval = files(1)%crval
+      xcrpix = (naxes + 1) / 2.0_REAL64
+      call files(1)%wcs%pix2cel((files(1)%naxes(1) + 1) / 2.0_REAL64, &
+           (files(1)%naxes(2) + 1) / 2.0_REAL64, xcrval(1), xcrval(2))
       xscale = files(1)%scale
       xrot = files(1)%rot
       xrefl = files(1)%refl
-      xcrpix = naxes / 2
 
       if( init_sproj ) xcode = ptype
       if( init_crval ) xcrval = crval
@@ -344,12 +352,13 @@ program kombine
        error stop 'Failed to allocate an image.'
     end if
 
-    ! determine nodes of sky coordinate grid
+    ! determine nodes of sky coordinate grid,
+    ! the nodes are centres of pixels: (i,j) in FITS (WCSLIB) convention
     do i = 1, naxes(1)
-       xgrid(i) = real(i,REAL64) - 0.5
+       xgrid(i) = real(i,REAL64)
     end do
     do j = 1, naxes(2)
-       ygrid = real(j,REAL64) - 0.5
+       ygrid = real(j,REAL64)
        call wcs % pix2cel(xgrid,ygrid,alpha(:,j),delta(:,j))
     end do
 
@@ -377,7 +386,7 @@ program kombine
 
        do n = 1, nfiles
           if( files(n)%loadimg() ) then
-             call files(n)%reproject(method,jdref,crmov,alpha,delta,img,mask)
+             call files(n)%reproject(method,jdref,crmov,alpha,delta,img,mask,fluxcons)
              where( mask )
                 bigimg(:,:,n) = img / (files(n)%exptime / exptime) ! area?
              elsewhere
@@ -418,7 +427,7 @@ program kombine
        ! compute by the arithmetic mean
        do n = 1, nfiles
           if( files(n)%loadimg() ) then
-             call files(n)%reproject(method,jdref,crmov,alpha,delta,img,mask)
+             call files(n)%reproject(method,jdref,crmov,alpha,delta,img,mask,fluxcons)
              where( mask )
                 IMAGE = IMAGE + img
                 IMGERR = IMGERR + img**2
@@ -438,9 +447,13 @@ program kombine
        where( fill ) IMGERR = IEEE_VALUE(IMGERR, IEEE_QUIET_NAN)
     end if
 
-    ! untouched pixels are filled by a mean
+    ! untouched pixels are filled by a mean of the touched ones
     n = max(minval(naxes) / 1000, 1)
-    call rmean(pack(IMAGE(::n,::n),.true.),amean)
+    if( any(.not. fill(::n,::n)) ) then
+       call rmean(pack(IMAGE(::n,::n),.not. fill(::n,::n)),amean)
+    else
+       amean = 0
+    end if
     where( fill ) IMAGE = amean
 
     ! scale on proper values

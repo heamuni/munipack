@@ -69,6 +69,7 @@ program astrometry
   integer :: minmatch = 5, maxmatch = 42, maxstars = 250
   integer :: luckymatch = 3
   logical :: fcrpix = .false., fcrval = .false., reflex = .false. ,&
+       fscale = .false., fangle = .false., &
        initpar = .true., rmscheck = .true., &
        fluxtest = .true., verbose = .false., wcssave = .true., &
        plog = .false., init_match = .false., report = .false., success
@@ -148,10 +149,12 @@ program astrometry
         else if( key == 'SCALE' ) then
 
            read(val,*) scale
+           fscale = .true.
 
         else if( key == 'ANGLE' ) then
 
            read(val,*) angle
+           fangle = .true.
 
         else if( key == 'REFLEX' ) then
 
@@ -302,7 +305,10 @@ program astrometry
   call co_broadcast(fcrval,1)
   call co_broadcast(scale,1)
   call co_broadcast(angle,1)
+  call co_broadcast(fscale,1)
+  call co_broadcast(fangle,1)
   call co_broadcast(reflex,1)
+  if( reflex ) refl = -1.0_REAL64
   call co_broadcast(sig1,1)
   call co_broadcast(sig2,1)
   call co_broadcast(flxmin,1)
@@ -510,9 +516,9 @@ contains
     character(len=FLEN_VALUE) :: pcode, xframe
     real(REAL64), dimension(2) :: zcrval, dcrval, zcrpix
     real(REAL64) :: dscale = epsilon(1.0_REAL64), dangle=epsilon(1.0_REAL64), &
-         a,da,b,db,s,ds, sm, epoch, rms=0.0_REAL64, refangle, refrefl
+         a,da,b,db,s,ds, sm, epoch, rms=0.0_REAL64, zscale, zangle, zrefl
     integer :: n,nmin
-    logical :: matched = .false., reliable
+    logical :: matched = .false., reliable, zwcs
 
     success = .false.
     if( ptype == 'TPV' ) then
@@ -528,7 +534,7 @@ contains
 
     status = 0
     call readfile(filename,key_dateobs,maxstars,x,y,flux,zcrpix,epoch,xframe,&
-         zcrval,status)
+         zcrval,status,scale=zscale,rot=zangle,refl=zrefl,wcsok=zwcs)
     if( status /= 0 ) then
        write(error_unit,*) "Error: Failed to open  `" //trim(filename)//"'"
        goto 77
@@ -578,16 +584,36 @@ contains
 
        block
          use nearmatch
-         real(REAL64) :: refscale
-         refscale = scale
-!         write(*,*) sig2,xsig
-!         write(*,*) crval(1),crval(2),crpix(1),crpix(2),refscale,refangle,refrefl
-!         write(*,*) pmalpha
-!         write(*,*) type,tepoch,jd,xsig*sig2*refscale
-         call listmatch(pcode,rec,dec,x,y,crval(1),crval(2),crpix(1),crpix(2), &
-              1/refscale,refangle,refrefl,xsig*sig2*refscale,id1,id2,matched)
+         real(REAL64) :: xscale, xangle, xrefl, tol
 
-!         write(*,*) id1,matched,id2
+         ! The approximate calibration is given by --scale, --angle, --reflex
+         ! (and --rcen, --dcen, else the reference centre is used), or,
+         ! when neither scale nor angle is given, it is taken from
+         ! the current astrometry calibration of the frame.
+         xscale = scale
+         xangle = angle
+         xrefl = refl
+         if( .not. (fscale .or. fangle) ) then
+            if( zwcs ) then
+               xscale = zscale
+               xangle = zangle
+               xrefl = zrefl
+               if( .not. fcrval ) crval = zcrval
+               if( .not. fcrpix ) crpix = zcrpix
+            else
+               write(error_unit,*) "Error: cross-match of `",trim(filename), &
+                    "' requires --scale and --angle, or an astrometry calibration."
+               goto 77
+            end if
+         end if
+
+         ! the cross-match tolerance [deg], xsig*sig2 [pix]
+         tol = xsig*sig2 / xscale
+         if( verbose ) write(error_unit,'(a,2f13.7,a,2f9.2,a,f0.3,a,f0.3,a,f3.0,a,f0.2,a)') &
+              ' Cross-match by crval=',crval,' crpix=',crpix,' scale=',xscale, &
+              ' [pix/deg] angle=',xangle,' refl=',xrefl,' tolerance=',tol*xscale,' [pix]'
+         call listmatch(pcode,rec,dec,x,y,crval(1),crval(2),crpix(1),crpix(2), &
+              xscale,xangle,xrefl,tol,id1,id2,matched)
        end block
     else
        write(error_unit,*) 'astrometry: unspecified match method.'
@@ -932,10 +958,9 @@ contains
          rframe,idcat,repoch,verbose,status)
     if( status /= 0 ) stop "Failed to open the catalogue file."
 
-    if( initpar ) then
-       xcrval(1) = median(alpha)
-       xcrval(2) = median(delta)
-    end if
+    ! a default centre of projection, --rcen, --dcen takes precedence
+    xcrval(1) = median(alpha)
+    xcrval(2) = median(delta)
     xcrpix = 0
 
   end subroutine read_cat
