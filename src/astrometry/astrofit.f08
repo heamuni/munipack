@@ -184,7 +184,14 @@ contains
 
          ! calculate residuals
          call wcs % pix2cel(x(id2),y(id2),a,d)
-         ares = (alpha - a) !* cos(delta / rad) ! [deg]
+         if( ptype /= '' ) then
+            ! RA residuals as arcs on the sky (scaled by cos(delta)),
+            ! the difference is reduced into [-180,180) to handle 0/360 wrap
+            ares = (modulo(alpha - a + 180, 360.0_REAL64) - 180) * cos(delta / rad) ! [deg]
+         else
+            ! relative astrometry: rectangular coordinates [pix]
+            ares = alpha - a
+         end if
          dres = delta - d  ! [deg]
 
        end block
