@@ -28,10 +28,21 @@
 
 using namespace std;
 
+// both options of a pair (like --rcen, --dcen) must be given together
+static void CheckPair(const MuniCmdLineParser& cmd, const wxString& a,
+		      const wxString& b)
+{
+  if( cmd.Found(a) != cmd.Found(b) )
+    wxLogFatalError("Both --"+a+" and --"+b+" must be given together.");
+}
+
 MuniArtificial::MuniArtificial(wxEvtHandler *han, const MuniCmdLineParser& cmd):
   MuniAction(han,"artificial")
 {
 #ifdef HAVE_CAF
+  long np;
+  if( cmd.Found("mproc",&np) && np <= 0 )
+    wxLogFatalError("The number of parallel processes (--mproc) must be positive.");
   SetCAF(cmd);
 #endif
 
@@ -65,19 +76,19 @@ MuniArtificial::MuniArtificial(wxEvtHandler *han, const MuniCmdLineParser& cmd):
     Write("SPREAD = '" + a.Upper() + "'");
 
   if( cmd.Found("hwhm",&x) )
-    Write("HWHM = %lf",x);
+    Write("HWHM = %.17g",x);
 
   if( cmd.Found("eccentricity",&x) )
-    Write("ECCENTRICITY = %lf",x);
+    Write("ECCENTRICITY = %.17g",x);
 
   if( cmd.Found("inclination",&x) )
-    Write("INCLINATION = %lf",x);
+    Write("INCLINATION = %.17g",x);
 
   if( cmd.Found("airy",&x) )
-    Write("AIRY = %lf",x);
+    Write("AIRY = %.17g",x);
 
   if( cmd.Found("beta",&x) )
-    Write("BETA = %lf",x);
+    Write("BETA = %.17g",x);
 
   if( cmd.Found("maglim",&w) )
     Write("MAGLIM = %ld",w);
@@ -165,7 +176,7 @@ MuniArtificial::MuniArtificial(wxEvtHandler *han, const MuniCmdLineParser& cmd):
   }
 
   if( cmd.Found("fov",&x) )
-    Write("FOV = %lf",x);
+    Write("FOV = %.17g",x);
 
   if( cmd.Found("p",&a) || cmd.Found("projection",&a) )
     Write("PROJECTION = '" + a.Upper() + "'");
@@ -173,20 +184,23 @@ MuniArtificial::MuniArtificial(wxEvtHandler *han, const MuniCmdLineParser& cmd):
   if( cmd.Found("f",&filter) || cmd.Found("filter",&filter) )
     Write("FILTER = '" + filter + "'");
 
+  CheckPair(cmd,"width","height");
   if( cmd.Found("width",&w) && cmd.Found("height",&h) )
     Write("NAXES = %ld %ld",w,h);
 
+  CheckPair(cmd,"rcen","dcen");
   if( cmd.Found("rcen",&x) && cmd.Found("dcen",&y) )
-    Write("CRVAL = %20.15f %20.15f",x,y);
+    Write("CRVAL = %.17g %.17g",x,y);
 
   if( cmd.Found("scale",&x) )
-    Write("SCALE = %25.15e",x);
+    Write("SCALE = %.17g",x);
 
   if( cmd.Found("angle",&x) )
-    Write("ANGLE = %20.15f",x);
+    Write("ANGLE = %.17g",x);
 
+  CheckPair(cmd,"long","lat");
   if( cmd.Found("long",&x) && cmd.Found("lat",&y) )
-    Write("GEOGRAPHIC = %20.15f %20.15f",x,y);
+    Write("GEOGRAPHIC = %.17g %.17g",x,y);
 
   if( cmd.Found("photsys",&a) )
     Write("PHOTSYS = '"+a+"'");

@@ -176,10 +176,20 @@ program artificial
         else if( key == 'PROFILE' ) then
 
            read(val,*) profile
+           if( .not. any(profile == ['SEEING','MOFFAT','GAUSS ']) ) then
+              write(error_unit,*) "Error: unknown PSF `",trim(profile), &
+                   "' (use SEEING, MOFFAT or GAUSS)."
+              stop 'Error: unknown PSF.'
+           end if
 
         else if( key == 'SPREAD' ) then
 
            read(val,*) spread
+           if( .not. any(spread == ['AUTO  ','FFT   ','RANDOM','TEST  ']) ) then
+              write(error_unit,*) "Error: unknown spread method `", &
+                   trim(spread),"' (use AUTO, FFT or RANDOM)."
+              stop 'Error: unknown spread method.'
+           end if
 
         else if( key == 'NAXES' ) then
 

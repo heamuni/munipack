@@ -310,7 +310,7 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption("","rcen","centre of FOV in Right Ascension [deg]",
 	      wxCMD_LINE_VAL_DOUBLE);
     AddOption("","dcen","center of FOV in Declination [deg]",wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","scale","scale [deg/pix]",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","scale","scale [pix/deg]",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","angle","rotation angle [deg], clockwise positive",
 	      wxCMD_LINE_VAL_DOUBLE);
     AddSwitch("","reflex","set reflection");
@@ -548,7 +548,7 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption("","pm-jdref","proper motion reference JD",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","width","width of output [pix]",wxCMD_LINE_VAL_NUMBER);
     AddOption("","height","height of output [pix]",wxCMD_LINE_VAL_NUMBER);
-    AddOption("","scale","scale [deg/pix]",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","scale","scale [pix/deg]",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","angle","position angle [deg]",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","reflex","[yes|no] set/unset reflection");
     AddOption("i","interpol","[near,bilinear,bicubic,bi3conv] interpol");
@@ -687,7 +687,7 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
 	      wxCMD_LINE_VAL_DOUBLE);
     AddOption(wxEmptyString,"dcen","centre of FOV in Declination [deg]",
 	      wxCMD_LINE_VAL_DOUBLE);
-    AddOption(wxEmptyString,"scale","scale [deg/pix]",wxCMD_LINE_VAL_DOUBLE);
+    AddOption(wxEmptyString,"scale","scale [pix/deg]",wxCMD_LINE_VAL_DOUBLE);
     AddOption(wxEmptyString,"angle","rotation angle [deg], clockwise positive",
 	      wxCMD_LINE_VAL_DOUBLE);
     AddOption("","width","width of output [pix]",wxCMD_LINE_VAL_NUMBER);

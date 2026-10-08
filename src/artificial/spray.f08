@@ -76,7 +76,7 @@ contains
        allocate(this%psf(-n:n,-n:n))
        call this%moffat(hwhm,beta,eccentricity,inclination,n,this%psf)
 
-    else ! if( profile == 'SEEING' ) then
+    else if( profile == 'SEEING' ) then
 
        if( spread == 'RANDOM' ) then
 
@@ -104,6 +104,10 @@ contains
           call this%fseeing(hwhm,airy,eccentricity,inclination,n,m,n2,this%psf)
 
        end if
+
+    else
+       write(error_unit,*) "Error: unknown PSF `",trim(profile),"'."
+       stop 'Error: unknown PSF.'
     end if
 
     ! normalisation
