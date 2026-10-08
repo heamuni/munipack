@@ -103,6 +103,10 @@ contains
          sky,skyerr,skycorr,skyerrcorr,apcts,apcts_err,status)
     if( status /= 0 ) goto 666
 
+    ! The growth-curve routines use the width as the Gaussian sigma
+    ! (their `hwhm' argument), while the HWHM keyword is a true HWHM.
+    hwhm = hwhm / sqrt(2*log(2.0))
+
     naper = size(raper)
     nrows = size(xcens)
     allocate(gcount(nrows),gcount_err(nrows), growflag(nrows), &

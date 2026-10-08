@@ -356,7 +356,8 @@ contains
           do i = 1, naper
              call fits_make_keyn(FITS_KEY_APER,i,key,status)
              call fits_read_key(fits,key,aper,status)
-             if( aper > 2*hwhm ) then
+             ! the first aperture larger than 2*sigma of Gaussian profile
+             if( aper > 2*hwhm / sqrt(2*log(2.0)) ) then
                 maper = i
                 exit
              end if

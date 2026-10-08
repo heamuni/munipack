@@ -196,7 +196,7 @@ contains
 
     ! estimate of width parameter for Gaussian
     call estim_hwhm(data,xcens,ycens,sky,fwhm,lobad,hibad,hwhm)
-    if( hwhm < 0 ) hwhm = fwhm / (2*sqrt(2*log(2.0)))
+    if( hwhm < 0 ) hwhm = fwhm / 2
 
     call fits_aphot_save(filename, output, hwhm, ecc, incl, raper, ring, &
          xcens, ycens, apcts,apcts_err,sky,sky_err, status)
