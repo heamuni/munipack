@@ -103,6 +103,10 @@ contains
          sky,skyerr,skycorr,skyerrcorr,apcts,apcts_err,status)
     if( status /= 0 ) goto 666
 
+    ! The growth-curve routines use the width as the Gaussian sigma
+    ! (their `hwhm' argument), while the HWHM keyword is a true HWHM.
+    hwhm = hwhm / sqrt(2*log(2.0))
+
     naper = size(raper)
     nrows = size(xcens)
     allocate(gcount(nrows),gcount_err(nrows), growflag(nrows), &
@@ -123,10 +127,13 @@ contains
          gcount,gcount_err,skycorr,skyerrcorr,curve,curve_err,growflag, &
          prof,rflux90,ghwhm,verbose,reporter)
 
-    ! update sky
-    sky = sky - skycorr
+    ! update sky: the growth-curve fit models the aperture counts
+    ! as f*curve + b*area, so b (skycorr) is the residual background
+    ! per pixel left after subtraction of the sky; it is added back.
+    ! The uncertainty of the sky estimate and of b are combined.
+    sky = sky + skycorr
     where( skyerr > 0 .and. skyerrcorr > 0 )
-       skyerr = sqrt(skyerr**2 + skyerrcorr**2) / 1.414
+       skyerr = sqrt(skyerr**2 + skyerrcorr**2)
 !    elsewhere
 !       skyerr = 0
     end where

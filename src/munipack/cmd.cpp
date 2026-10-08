@@ -54,7 +54,7 @@
   AddOption("th","threshold","threshold in counts",wxCMD_LINE_VAL_DOUBLE);
 
 #define COMMON_OPTIONS_PHQ \
-    AddOption("q","quantity","select: PHOTRATE,FNU,FLAM,ABMAG,STMAG");
+    AddOption("q","quantity","select: PHOTON,PHOTRATE,PHOTNU,PHOTLAM,FLUX,FNU,FLAM,MAG,ABMAG,STMAG (default FLUX,MAG)");
 //    AddOption("q","quantity","instrumental: COUNT,RATE,MAG\n\tcalibrated: PHOTON,PHOTRATE,PHOTNU,PHOTLAM,FLUX,FNU,FLAM,MAG,ABMAG,STMAG");
 
 #ifdef HAVE_CAF

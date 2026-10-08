@@ -34,9 +34,10 @@ usually created by <samp>-c,-C</samp> options. Useful for relative photometry.</
           (catalogue)</dd>
 <dt><samp>--photsys-instr</samp></dt><dd>instrumental photometric system (frames)</dd>
 <dt><samp>-q, --quantity</samp></dt><dd>
-     calibrated quantities by default: PHRATE, FLUX, FNU, FLAM, MAG, ABMAG, STMAG
+     calibrated quantities: PHOTON, PHOTRATE, PHOTNU, PHOTLAM, FLUX, FNU, FLAM,
+                 MAG, ABMAG, STMAG; FLUX, MAG by default
                  (<a href="dataform_photometry.html#phquantities">see description</a>),
-            multiple quantities can be used, separated by colon</dd>
+            multiple quantities can be used, separated by comma</dd>
 </dl>
 
 <h3>Photometric system:</h3>

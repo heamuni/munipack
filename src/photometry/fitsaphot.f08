@@ -321,8 +321,12 @@ contains
     real, intent(in) :: fwhm,lobad,hibad
     real, intent(out) :: hwhm
 
+    ! estimate of HWHM (half width at half of maximum) of stars:
+    ! the second moments of the brightest stars give the Gaussian sigma,
+    ! HWHM = sqrt(2*ln(2)) * sigma
+
     real, dimension(:), allocatable :: xhwhm, w0
-    real :: sx,sy,w,sw
+    real :: sx,sy,w,sw,sigma
     integer :: nx,ny,i,j,l,m,n,nmin,i0,j0
 
     allocate(xhwhm(size(xcens)),w0(13))
@@ -367,7 +371,7 @@ contains
                 nmin = minloc(w0,1)
                 if( data(i0,j0) - sky(l) > w0(nmin) ) then
                    w0(nmin) = data(i0,j0) - sky(l)
-                   xhwhm(n) = (sqrt(sx/sw) + sqrt(sy/sw)) / 2
+                   xhwhm(nmin) = (sqrt(sx/sw) + sqrt(sy/sw)) / 2
                 end if
              end if
           end if
@@ -375,7 +379,8 @@ contains
     end do
 
     if( n > 1 ) then
-       call rmean(xhwhm(1:n),hwhm,w)
+       call rmean(xhwhm(1:n),sigma,w)
+       hwhm = sqrt(2*log(2.0)) * sigma
     else
        hwhm = -1
     end if

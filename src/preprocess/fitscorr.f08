@@ -35,6 +35,7 @@ module fitscorr
      real :: saturate = huge(1.0)*(1.0-10*epsilon(1.0))
      real :: temper = -666
      real :: gain = 1
+     real :: readns = 0              ! readout noise [ADU]
      logical :: saturate_set = .false.
      logical :: gain_set = .false.
      logical :: exptime_set = .false.
@@ -137,6 +138,15 @@ contains
           call fits_clear_errmark
           status = 0
           fits%gain = 1
+       end if
+
+       ! readout noise
+       call fits_write_errmark
+       call fits_read_key(fitsfile,FITS_KEY_READNS,fits%readns,status)
+       if( status == FITS_KEYWORD_NOT_FOUND ) then
+          call fits_clear_errmark
+          status = 0
+          fits%readns = 0
        end if
 
        ! imagetyp

@@ -196,7 +196,7 @@ contains
 
     ! estimate of width parameter for Gaussian
     call estim_hwhm(data,xcens,ycens,sky,fwhm,lobad,hibad,hwhm)
-    if( hwhm < 0 ) hwhm = fwhm / (2*sqrt(2*log(2.0)))
+    if( hwhm < 0 ) hwhm = fwhm / 2
 
     call fits_aphot_save(filename, output, hwhm, ecc, incl, raper, ring, &
          xcens, ycens, apcts,apcts_err,sky,sky_err, status)
@@ -229,7 +229,9 @@ contains
     hibad = saturate
     nstep = max(int(log(float(size(data))/4e4) / log(2.0)),1)
     call daosky(data,nstep,verbose,hibad,skyavg,skyerr,skysig)
-    lobad = max(0.0,skyavg - 3*skysig)
+    ! the same low-bad threshold as in find (lothresh = 5 sigma), not clamped
+    ! to zero (it would cut half of the sky on sky-subtracted frames)
+    lobad = skyavg - 5*skysig
 
     nrow = size(xstar)
     allocate(apcts(nrow,naper),apcts_err(nrow,naper),sky(nrow),sky_err(nrow))

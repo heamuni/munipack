@@ -133,7 +133,7 @@ every star is estimated.
 <caption>Keywords</caption>
 <tr><th>Keyword</th><th>Units</th><th>Description</th></tr>
 <tr><td>EXTNAME</td><td></td><td>APERPHOT as the identifier of this table</td></tr>
-<tr><td>HWHM</td><td></td><td>HWHM estimated by momentum method</td></tr>
+<tr><td>HWHM</td><td>pix</td><td>HWHM (half width at half of maximum) estimated by the second moments of bright stars, HWHM = 1.1774 σ</td></tr>
 <tr><td>NAPER</td><td></td><td>Count of apertures</td></tr>
 <tr><td>APER<i>i</i></td><td>pix</td><td>Radius of <i>i</i>-th aperture, <i>i</i> = 1..NAPER</td></tr>
 <tr><td>ANNULUS1</td><td>pix</td><td>inner sky annulus radius in pixels</td></tr>

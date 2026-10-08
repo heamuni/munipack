@@ -259,7 +259,7 @@ contains
     character(len=FLEN_CARD) :: buf
     character(len=4*FLEN_FILENAME) :: flattext, darktext, biastext
     real, dimension(:,:), allocatable :: FLAT, BIAS, DARK, MASK, OUT, &
-         DFLAT, DBIAS, DDARK, DOUT
+         DFLAT, DBIAS, DDARK, DOUT, VAR
     type(CorrFits) :: scifits
     type(fitsfiles) :: fits, cfits
     character(len=80) :: msg
@@ -298,7 +298,7 @@ contains
     n = scifits%naxes(1)
     m = scifits%naxes(2)
     allocate(OUT(n,m),DOUT(n,m),FLAT(n,m),DFLAT(n,m),BIAS(n,m),DBIAS(n,m), &
-         DARK(n,m),DDARK(n,m),MASK(n,m),stat=stat,errmsg=msg)
+         DARK(n,m),DDARK(n,m),MASK(n,m),VAR(n,m),stat=stat,errmsg=msg)
     if( stat /= 0 ) then
        write(error_unit,*) 'allocate() in phcorr: ',trim(msg)
        error stop 'Error: an insufficient memory.'
@@ -401,13 +401,15 @@ contains
 
     ! the corrections, we are sure that FLAT > 0
     OUT = gain*(scifits%image - (t*DARK + BIAS)) / FLAT
-    where( OUT > 0 )
-       DOUT = sqrt(OUT + gain2*((t*DDARK)**2 + DBIAS**2))
-       DOUT = abs(OUT)*sqrt((DOUT/OUT)**2 + (DFLAT/FLAT)**2)
-    elsewhere
-       ! dark pixels
-       DOUT = 0
-    end where
+
+    ! Variance of electrons before flat-fielding: Poisson noise of the
+    ! signal (at least one electron, non-positive pixels are not given
+    ! an infinite weight), the readout noise of the frame (READNS [ADU]
+    ! when available) and the errors of the dark and bias frames.
+    ! The flat-field divides the noise and adds its own relative error.
+    VAR = max(gain*(scifits%image - (t*DARK + BIAS)), 1.0) + &
+         gain2*((t*DDARK)**2 + DBIAS**2 + scifits%readns**2)
+    DOUT = sqrt(VAR / FLAT**2 + (OUT*DFLAT/FLAT)**2)
     ! YES, this small piece of code is the full correction!!!
     ! All other staff is just a practise in reading and writing of FITS files.
 
@@ -435,7 +437,7 @@ contains
 
           block
             integer :: i,j,h,i1,i2,j1,j2
-            h = min(box / 2, 1)
+            h = max(box / 2, 1)
 
             do i = 1, size(MASK,1)
                do j = 1, size(MASK,2)

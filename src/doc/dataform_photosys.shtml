@@ -99,7 +99,10 @@ filter transmissivity.
 
 <p id="lfwhm">
 <sup><a href="#lfwhm">[3]</a></sup>
-Passband full width at half of maximum (FWHM) given in wavelengths.
+Passband width given in wavelengths. Note the convention used by Munipack:
+the passband is approximated by a Gaussian profile and the LAM_FWHM is
+interpreted as 2<i>σ</i> of the Gaussian (not as its true FWHM =
+2.355<i>σ</i>), see <a href="#width">below</a>.
 </p>
 
 <p id="neff">
@@ -125,6 +128,28 @@ in Hertz is <i>f<sub>ν</sub></i> = (<i>λ</i><sup>2</sup>/c) <i>f<sub>λ</sub><
 </p>
 </div>
 
+
+<h2 id="width">Passband Width Convention</h2>
+
+<p>
+Only the wavelength columns LAM_EFF, LAM_FWHM and FLAM_REF
+enter the photometric calibration and derived quantities
+(NU_EFF, NU_FWHM and FNU_REF are informative only).
+The passband is approximated by a Gaussian with the standard deviation
+<i>σ</i> = LAM_FWHM / 2, so its effective (equivalent) width is
+</p>
+<p class="formula">
+<i>W</i> = √(2π) <i>σ</i> = √(π/2) LAM_FWHM = 1.2533 LAM_FWHM
+</p>
+<p>
+(a Gaussian with LAM_FWHM as its true FWHM would give 1.0645 LAM_FWHM).
+The photon flux of a star of magnitude <i>m</i> is
+<i>ϕ</i> = FLAM_REF · 10<sup>-0.4 <i>m</i></sup> · <i>W</i> · LAM_EFF / (<i>h c</i>),
+with <i>W</i> in nm. The derived quantities (PHOTLAM, FLAM, FNU,
+PHOTNU, ABMAG, STMAG) use the same width <i>W</i> and the frequency width
+<i>W<sub>ν</sub></i> = <i>c W</i> / LAM_EFF<sup>2</sup>
+(see <a href="dataform_photometry.html#phquantities">quantities</a>).
+</p>
 
 <h2>Modification of Photometric System Table</h2>
 

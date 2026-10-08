@@ -292,6 +292,17 @@ program phcal
 
 20 continue
 
+  ! check of requested quantities before any output is created,
+  ! PHRATE is an alias of PHOTRATE
+  do n = 1, size(qlabels)
+     if( qlabels(n) == 'PHRATE' ) qlabels(n) = 'PHOTRATE'
+     if( .not. any(qlabels(n) == [ character(len=8) :: 'PHOTON', &
+          'PHOTRATE', 'PHOTNU', 'PHOTLAM', 'FLUX', 'FNU', 'FLAM', 'MAG', &
+          'ABMAG', 'STMAG' ]) ) then
+        write(error_unit,*) "Error: unknown quantity `",trim(qlabels(n)),"'."
+        stop 'An unknown quantity for calibrated data requested.'
+     end if
+  end do
 
   if( list ) then
 
@@ -400,9 +411,12 @@ contains
        call phsysmagph(phsyscal,filters,pairs,mag(1:ncat,:),dmag(1:ncat,:), &
             refph,drefph)
 
+       ! photon rates [ph/s/m2] to expected photons on n-th frame;
+       ! columns of refph corresponds to frames (both ordered by filters)
        do n = 1,nfiles
           q = exptime(n)*areas(n)
-          refph = q*refph
+          refph(:,n) = q*refph(:,n)
+          drefph(:,n) = q*drefph(:,n)
        end do
 
     else
@@ -786,6 +800,7 @@ contains
        forall(n=1:size(tr,1))
           tr(n,n) = 1.0_dbl
        end forall
+       tr1 = tr
     end if
 
     catid = ''
