@@ -140,9 +140,10 @@ contains
     ! fill-up by Bessel
     call fill_bessel(m,this%zoom*airy,bessel)
 
-    ! spread the profile by random shifts with N(0,s)
+    ! spread the profile by random shifts with N(0,sig),
+    ! gnoise2(0,1) gives N(0,1), the same sigma as fill_gaussian
     sig = hwhm*this%zoom
-    a = sqrt2*sig
+    a = sig
     b = a*sqrt(1 - e**2)
     c = cos(incl/rad)
     s = sin(incl/rad)
