@@ -117,7 +117,32 @@ contains
          write(error_unit,'(a,f0.2)') '# Cross match limit for stars [pix]: ',dlim*sc
     call listmatch(pcode,a,d,x,y,acen,dcen,xcen,ycen,sc,rot,refl,dlim,id1,id2,status)
     n = size(id1)
-    if( .not. n > 1 ) return
+    if( .not. n > 1 ) then
+       reliable = .false.
+       return
+    end if
+
+    ! The number of cross-matched stars must be significantly larger
+    ! than the number of chance coincidences (a false match gives
+    ! a few stars only, comparable with the chance).
+    if( rmscheck ) then
+       block
+         real(REAL64) :: lambda, pval
+         real(REAL64), parameter :: pmax = 1e-6
+         call chance(pcode,a,d,x,y,acen,dcen,xcen,ycen,sc,rot,refl,dlim*sc, &
+              n,lambda,pval)
+         if( verbose ) write(error_unit,'(a,i0,a,f0.2,a,es8.1)') &
+              '# cross-matched stars: ',n,', expected by chance: ',lambda, &
+              ', probability by chance: ',pval
+         if( pval > pmax ) then
+            if( verbose ) write(error_unit,'(a)') &
+                 '# the match is not significant against chance coincidences, rejected.'
+            reliable = .false.
+            allocate(id1_final(0),id2_final(0))
+            return
+         end if
+       end block
+    end if
     if( size(id1) /= size(id2) ) stop 'Error in astrofit(): unconformed sequences.'
     allocate(alpha(n),delta(n),xstar(n),ystar(n))
     alpha = a(id1)
@@ -232,5 +257,70 @@ contains
     deallocate(id1,id2)
 
   end subroutine astrofit
+
+  subroutine chance(type,a,d,x,y,acen,dcen,xcen,ycen,sc,rot,refl,r, &
+       n,lambda,pval)
+
+    ! The expected number lambda of chance coincidences of frame stars
+    ! (x,y) with catalogue stars (a,d) within the radius r [pix],
+    ! and the Poisson probability pval to get n or more such coincidences.
+    ! The stars are supposed to be distributed uniformly
+    ! over the area covered by frame stars.
+
+    use astrotrafo
+
+    character(len=*), intent(in) :: type
+    real(REAL64), dimension(:), intent(in) :: a,d,x,y
+    real(REAL64), intent(in) :: acen,dcen,xcen,ycen,sc,rot,refl,r
+    integer, intent(in) :: n
+    real(REAL64), intent(out) :: lambda, pval
+
+    real(REAL64), parameter :: pi = 3.14159265358979323846_REAL64
+    real(REAL64), dimension(size(a)) :: u,v,xc,yc
+    real(REAL64) :: xmin,xmax,ymin,ymax,area,p,t
+    type(AstrometryProjection) :: tp
+    type(AstrometryGeometry) :: tg
+    integer :: ncat,k
+
+    call tp % init(type,acen,dcen)
+    call tp % proj(a,d,u,v)
+    call tg % init(sc,rot,refl)
+    call tg % uv2pix(u,v,xc,yc)
+    xc = xc + xcen
+    yc = yc + ycen
+
+    xmin = minval(x)
+    xmax = maxval(x)
+    ymin = minval(y)
+    ymax = maxval(y)
+    area = (xmax - xmin)*(ymax - ymin)
+    ncat = count(xmin <= xc .and. xc <= xmax .and. ymin <= yc .and. yc <= ymax)
+
+    if( .not. (area > 0) ) then
+       lambda = 0
+       pval = 0
+       return
+    end if
+
+    ! probability of a chance coincidence for a frame star
+    p = min(ncat*pi*r**2 / area, 1.0_REAL64)
+    lambda = size(x)*p
+
+    ! the upper tail of Poisson distribution, P(N >= n)
+    if( n <= lambda ) then
+       pval = 1
+    else if( lambda > 0 ) then
+       pval = 0
+       do k = n, n + 1000
+          t = exp(k*log(lambda) - lambda - log_gamma(k + 1.0_REAL64))
+          pval = pval + t
+          if( t < epsilon(t)*pval ) exit
+       end do
+       pval = min(pval,1.0_REAL64)
+    else
+       pval = 0
+    end if
+
+  end subroutine chance
 
 end module astrofitting
