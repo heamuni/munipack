@@ -46,7 +46,8 @@ module psffit
        FLAG_POSFIXED  = 4, & ! position not fitted (faint, or moved too far)
        FLAG_NOCONV    = 8, & ! not converged
        FLAG_FAILED    = 16,& ! fit failed, the flux is not valid
-       FLAG_CROWDED   = 32   ! a neighbour within the fitting radius
+       FLAG_CROWDED   = 32,& ! a neighbour within the fitting radius
+       FLAG_ADDED     = 64   ! a saturated star added (not detected by find)
 
   type, public :: PsfType
      integer :: ptype = PSF_GAUSS
@@ -79,7 +80,7 @@ module psffit
      real(REAL64) :: x, y, flux, sky
      real(REAL64) :: xerr = -1, yerr = -1, fluxerr = -1, skyerr = -1
      real(REAL64) :: chi2 = -1, sharp = 0, round = 0
-     real(REAL64) :: fitrad = 0
+     real(REAL64) :: fitrad = 0, satrad = 0
      integer :: npix = 0, flag = 0, modrad = 0
      logical :: modelled = .false.
   end type StarFit

@@ -64,8 +64,9 @@ program psfphot
   type(StarFit), dimension(:), allocatable :: stars
   real(REAL64), dimension(:), allocatable :: fwhms, snr
   integer, dimension(:), allocatable :: order, cell_head, cell_next
+  real(REAL64), dimension(:), allocatable :: satrad
   real(REAL64) :: cell
-  integer :: nstars, ncx, ncy
+  integer :: nstars, ncx, ncy, nfind
 
   fkeys = [ character(len=FLEN_KEYWORD) :: &
        FITS_KEY_SATURATE, FITS_KEY_READNS, FITS_KEY_GAIN ]
@@ -226,6 +227,7 @@ contains
     fr = fr0
     psf = psf0
     if( allocated(stars) ) deallocate(stars,order,fwhms,snr,cell_head,cell_next)
+    if( allocated(satrad) ) deallocate(satrad)
 
     exitus = .false.
     status = 0
@@ -265,9 +267,15 @@ contains
     fr%valid = fr%data < frame%saturate .and. fr%data > frame%lobad &
          .and. fr%data == fr%data
 
+    ! saturated stars are not detected by find: they are added, so they
+    ! are modelled and subtracted from their neighbours
+    nfind = nstars
+    call add_saturated
+
     if( verbose ) then
-       write(error_unit,'(a,i0,a,i0,a,i0)') ' Frame ',frame%naxes(1),'x', &
-            frame%naxes(2),', stars: ',nstars
+       write(error_unit,'(a,i0,a,i0,a,i0,a,i0,a)') ' Frame ',frame%naxes(1),'x', &
+            frame%naxes(2),', stars: ',nfind,' (+',nstars-nfind, &
+            ' saturated not found by find)'
        write(error_unit,'(a,g0.6,3a)') ' Gain: ',frame%gain,' e-/ADU (', &
             trim(frame%gaininfo),')'
        write(error_unit,'(a,g0.6,3a)') ' Read noise: ',frame%readns,' ADU (', &
@@ -335,6 +343,7 @@ contains
        stars(k)%y = frame%y(k)
        stars(k)%flux = 0
        stars(k)%flag = 0
+       stars(k)%satrad = satrad(k)
     end do
     call set_radii
 
@@ -443,6 +452,7 @@ contains
     do k = 1, nstars
        if( neighbour(k,stars(k)%fitrad) > 0 ) &
             stars(k)%flag = stars(k)%flag + FLAG_CROWDED
+       if( k > nfind ) stars(k)%flag = stars(k)%flag + FLAG_ADDED
     end do
 
     ! output
@@ -535,9 +545,130 @@ contains
          else
             stars(k)%fitrad = max(1.5_REAL64*f,3.0_REAL64)
          end if
+         ! a saturated star is fitted by the wings around the saturated area
+         if( stars(k)%satrad > 0 ) &
+              stars(k)%fitrad = max(stars(k)%fitrad,stars(k)%satrad + 1.5_REAL64*f)
       end do
 
     end subroutine set_radii
+
+    subroutine add_saturated
+
+      ! Connected areas of saturated pixels; those without a detected star
+      ! are added to the list (at their centroid). The radius of the area
+      ! is kept for all stars on it.
+
+      real(REAL64), parameter :: cs = 16
+      integer, dimension(:), allocatable :: stack, chead, cnext, px, py
+      logical, dimension(:,:), allocatable :: seen
+      real(REAL64), dimension(:), allocatable :: tx, ty, ts, te, tr
+      real(REAL64) :: xc, yc, r, d, dmin
+      integer :: nx, ny, i, j, k, l, m, n, ns, top, i0, j0, gx, gy, ci, cj, &
+           nadd, kmin
+
+      nx = frame%naxes(1)
+      ny = frame%naxes(2)
+      allocate(satrad(nstars))
+      satrad = 0
+      if( .not. any(fr%satur) ) return
+
+      ! a grid of detected stars
+      gx = int(nx / cs) + 1
+      gy = int(ny / cs) + 1
+      allocate(chead(gx*gy),cnext(nstars))
+      chead = 0
+      do k = 1, nstars
+         l = 1 + min(max(int(frame%x(k)/cs),0),gx-1) + gx*min(max(int(frame%y(k)/cs),0),gy-1)
+         cnext(k) = chead(l)
+         chead(l) = k
+      end do
+
+      allocate(seen(nx,ny),stack(nx*ny/4+16),px(nx*ny/4+16),py(nx*ny/4+16))
+      allocate(tx(0),ty(0),tr(0))
+      seen = .false.
+      nadd = 0
+      do j0 = 1, ny
+         do i0 = 1, nx
+            if( .not. fr%satur(i0,j0) .or. seen(i0,j0) ) cycle
+            ! flood fill (8-connected)
+            ns = 0
+            top = 1
+            stack(1) = i0 + nx*(j0 - 1)
+            seen(i0,j0) = .true.
+            do while( top > 0 )
+               m = stack(top)
+               top = top - 1
+               i = 1 + mod(m - 1,nx)
+               j = 1 + (m - 1) / nx
+               if( ns < size(px) ) then
+                  ns = ns + 1
+                  px(ns) = i
+                  py(ns) = j
+               end if
+               do l = max(j-1,1), min(j+1,ny)
+                  do k = max(i-1,1), min(i+1,nx)
+                     if( fr%satur(k,l) .and. .not. seen(k,l) .and. &
+                          top < size(stack) ) then
+                        seen(k,l) = .true.
+                        top = top + 1
+                        stack(top) = k + nx*(l - 1)
+                     end if
+                  end do
+               end do
+            end do
+            xc = sum(px(1:ns)) / real(ns,REAL64)
+            yc = sum(py(1:ns)) / real(ns,REAL64)
+            r = 0.5_REAL64
+            do n = 1, ns
+               r = max(r,hypot(px(n) - xc,py(n) - yc) + 0.5_REAL64)
+            end do
+
+            ! the detected stars on the area
+            dmin = huge(dmin)
+            kmin = 0
+            ci = min(max(int(xc/cs),0),gx-1)
+            cj = min(max(int(yc/cs),0),gy-1)
+            m = ceiling((r + 2) / cs)
+            do l = max(cj - m,0), min(cj + m,gy-1)
+               do k = max(ci - m,0), min(ci + m,gx-1)
+                  n = chead(1 + k + gx*l)
+                  do while( n > 0 )
+                     d = hypot(frame%x(n) - xc,frame%y(n) - yc)
+                     if( d < r + 2 ) satrad(n) = max(satrad(n),r)
+                     if( d < dmin ) then
+                        dmin = d
+                        kmin = n
+                     end if
+                     n = cnext(n)
+                  end do
+               end do
+            end do
+            if( dmin < r + 2 ) cycle
+
+            nadd = nadd + 1
+            tx = [tx, xc]
+            ty = [ty, yc]
+            tr = [tr, r]
+         end do
+      end do
+
+      if( nadd == 0 ) return
+
+      ! append the added stars
+      n = nstars + nadd
+      allocate(ts(n),te(n))
+      ts(1:nstars) = frame%sky
+      te(1:nstars) = frame%skyerr
+      ts(nstars+1:) = -1
+      te(nstars+1:) = -1
+      call move_alloc(ts,frame%sky)
+      call move_alloc(te,frame%skyerr)
+      frame%x = [frame%x, tx]
+      frame%y = [frame%y, ty]
+      satrad = [satrad, tr]
+      nstars = n
+
+    end subroutine add_saturated
 
     real(REAL64) function rcoreof(k)
 

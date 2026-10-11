@@ -139,6 +139,7 @@ New header keywords: `DARKCUR`, `RDNOISE`, `BIASLEV`, `ARTSEED`. The verificatio
 | P14 | `readframes` sorts frames by the photometric system's filter order, while catalogue columns follow the user's `-f` order | possible mismatch when `-f` is not in system order | **open** | — |
 | P15 | `pphot` (2013 stub, built but no front-end action) did nothing | no PSF photometry | replaced by `psfphot` (see README, PSF photometry) | `f6afeda` |
 | P16 | The `aphot` sky (robust mean in the 20–30 px annulus) includes the light of neighbours | +0.4 ADU on a 500-star Gaussian test field, +2.7 ADU with Moffat β=2.5 wings: −0.3% and −1.6% flux at S/N 50 when used as a fixed sky | `psfphot` re-estimates the sky on the frame with fitted stars subtracted (≤0.1%); `aphot` itself **open** | `53828cb` |
+| P17 | (psfphot, found in review) Saturated stars are not in FIND (find excludes saturated pixels, P13), so their light was not subtracted from neighbours | crowded 16-bit field with 36% saturated stars: flux errors underestimated, pull robust std 1.37 (fixed sky) / 1.16 (local); 5.2 for stars next to an undetected saturated one | fixed: saturated areas without a FIND star are added as stars (FLAG 64), fitted from the wings and subtracted; pull 0.92–1.06 | this branch |
 
 ---
 

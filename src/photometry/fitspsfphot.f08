@@ -399,7 +399,8 @@ contains
          '2 pixels excluded (bad, saturated, edge),',status)
     call fits_write_comment(fits,'  4 position fixed (faint or run away), ' // &
          '8 not converged, 16 failed (no valid flux),',status)
-    call fits_write_comment(fits,'  32 a neighbour within the fitting radius.',status)
+    call fits_write_comment(fits,'  32 a neighbour within the fitting radius, ' // &
+         '64 a saturated star added (not found by find).',status)
     call fits_write_comment(fits,'SHARP: relative residual in the core ' // &
          '(>0 sharper than PSF), ROUND: ellipticity data - model.',status)
 

@@ -45,6 +45,13 @@ munipack psfphot [.. parameters ..] file(s)
 <li>Pixels at or above the saturation, or below LOWBAD of the FIND
   extension, are excluded (the same rule as find and aphot).
 </li>
+<li>Saturated stars are not detected by find. Every connected area of
+  saturated pixels without a detected star is added as a star (at its
+  centroid, FLAG 64) so that it is fitted from its wings and subtracted
+  from its neighbours; the fitting radius of saturated stars extends
+  1.5 FWHM beyond the saturated area. The added stars are appended
+  after the rows of the FIND extension.
+</li>
 <li>The PSF is prepared: an analytic PSF of the given FWHM, or the PSF
   with the width (and Moffat β, ellipticity) fitted on up to thirty
   bright (S/N &gt; 50), isolated, unsaturated stars in the radius
@@ -165,10 +172,12 @@ munipack psfphot [.. parameters ..] file(s)
 <h2>Output</h2>
 
 <p>
-  The PSFPHOT table has a row for every row of the FIND extension:
+  The PSFPHOT table has a row for every row of the FIND extension
+  (in the same order), followed by the added saturated stars:
 </p>
 
 <dl>
+  <dt></dt><dd>(Saturated stars added by psfphot follow as further rows.)</dd>
   <dt>X, Y, XERR, YERR</dt><dd>The fitted position and its errors [pix]
     (the errors are -1 when the position is not fitted).</dd>
   <dt>PSFCOUNT, PSFCOUNTERR</dt><dd>The total flux of the star (the integral
@@ -186,7 +195,8 @@ munipack psfphot [.. parameters ..] file(s)
     estimated from the wings only), 2 pixels in the fitting radius excluded
     (bad, saturated, out of the frame), 4 the position is not fitted,
     8 not converged, 16 the fit failed (the flux is not valid),
-    32 another star within the fitting radius.</dd>
+    32 another star within the fitting radius, 64 a saturated star added
+    (not detected by find).</dd>
 </dl>
 
 <p>
