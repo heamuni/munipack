@@ -12,9 +12,11 @@
 
 <p class="abstract">
   PSF photometry fits every detected star by a point spread function
-  (PSF): an analytic one (Gauss, Moffat), or the field-dependent PSF
-  given by a file, the same one which simulates frames in
-  <a href="man_artificial.html">artificial</a>.
+  (PSF): an analytic one (Gauss, Moffat), the field-dependent PSF
+  given by a file (the same one which simulates frames in
+  <a href="man_artificial.html">artificial</a>), or an empirical PSF
+  built from the stars of the frame. Close stars are fitted simultaneously
+  in groups, and stars missed by find can be detected in the residuals.
 </p>
 
 <h2>Synopsis</h2>
@@ -55,7 +57,8 @@ munipack psfphot [.. parameters ..] file(s)
 <li>The PSF is prepared: an analytic PSF of the given FWHM, or the PSF
   with the width (and Moffat β, ellipticity) fitted on up to thirty
   bright (S/N &gt; 50), isolated, unsaturated stars in the radius
-  of 3 FWHM (the medians of their fits are used), or the PSF by the file.
+  of 3 FWHM (the medians of their fits are used), or the PSF by the file,
+  or the empirical PSF (see below).
 </li>
 <li>The initial fluxes are fitted at the detected positions; the stars are
   ordered by their brightness.
@@ -78,6 +81,35 @@ munipack psfphot [.. parameters ..] file(s)
   from the data. The next passes (three in total, by default) refit every
   star with all others subtracted. The sum of the models is kept in an
   image, so the time is proportional to the number of stars.
+</li>
+<li>Stars closer than the link distance (<samp>--group</samp>, 1.5 FWHM
+  by default) are fitted simultaneously: the fluxes and positions of all
+  members of a group (and a common sky with <samp>--sky=local</samp>) in
+  the union of their fitting circles, the other stars subtracted. The
+  groups are formed before every pass by the current positions (a chain
+  of close stars is one group). A group larger than fifteen stars is
+  split by shorter links (0.8 times, repeatedly); the stars left alone
+  are fitted alone. The members too faint for a position, or running
+  away, are fitted at their detected positions (FLAG 4), as single stars.
+  When the normal equations of a group are singular, its members are
+  fitted one by one. Iterative subtraction alone does not separate the
+  stars closer than about 1.5 FWHM (their fluxes are biased by tens
+  of per cent at 1 FWHM), the simultaneous fit does.
+</li>
+<li>With <samp>--residual-detect n</samp>, stars are searched in the
+  residuals (the frame with all fitted stars subtracted) after the passes,
+  added (FLAG 128), and all stars are refitted (two passes); repeated
+  n times. The detection is that of find: the amplitude of the lowered
+  Gaussian of the (median) FWHM must be significant above the threshold
+  of find (THRESH of the FIND extension), its sharpness within the limits
+  of find (SHRPLO, SHRPHI), on a local maximum, farther than 0.75 FWHM
+  from all stars and not on saturated areas. The significance is
+  computed against the noise predicted by the model, with the PSF
+  mismatch added (its relative level measured on the bright stars),
+  and it is scaled down by the scatter of the amplitude observed in the
+  annulus of 2-4 FWHM around the candidate when it exceeds the predicted
+  one (the residuals of bright and saturated stars). The added stars
+  follow the saturated stars added by psfphot in the table.
 </li>
 <li>Stars too faint for a reliable position (S/N &lt; 3 at the detected
   position), or whose fit moves by more than a half of the fitting radius
@@ -115,6 +147,8 @@ munipack psfphot [.. parameters ..] file(s)
     integer division, as in artificial; <samp>--psf-centre</samp>) divided
     by the scale [pix/deg] (the WCS of the frame, <samp>--scale</samp>).
   </dd>
+  <dt>EMPIRICAL</dt>
+  <dd>The PSF built from the stars of the frame (below).</dd>
 </dl>
 
 <p>
@@ -126,13 +160,142 @@ munipack psfphot [.. parameters ..] file(s)
   same functions.
 </p>
 
+<h2>Empirical PSF</h2>
+
+<p>
+  The empirical PSF (<samp>--psf EMPIRICAL</samp>, in the manner of
+  DAOPHOT) is a base plus residual tables:
+</p>
+<p>
+  <i>PSF(x,y) = B + Σ<sub>t</sub> P<sub>t</sub>(x,y) R<sub>t</sub></i>,
+</p>
+<p>
+  where <i>B</i> is an analytic core (<samp>--psf-core</samp>, Moffat by
+  default) with its width, β, axis ratio and angle fitted on bright
+  isolated stars, or the PSF of a file (<samp>--psf-file</samp>, the
+  correction mode). The tables <i>R<sub>t</sub></i> are sampled with
+  ZOOM samples per pixel, as the core, so the empirical PSF has the same
+  representation as a PSF file. <i>P<sub>t</sub></i> are the terms of
+  a polynomial of the order 0, 1 or 2 (<samp>--psf-var</samp>; 1, 3
+  or 6 terms: 1, x, y, x², xy, y²) in the coordinates normalised to
+  ±1 over the frame (DAOPHOT VARIABLE = 0, 1, 2).
+</p>
+
+<ul>
+<li>The PSF stars: by a list (<samp>--psf-list</samp>; the nearest star
+  within 2 pixels), or automatically the brightest (by S/N, at least 30)
+  of the stars which are not saturated, have no bad pixels and no
+  saturated star in the table radius, lie inside of the frame with the
+  whole table, have no brighter neighbour within the table and no
+  neighbour brighter than 10% within 3 FWHM, and have the sharpness and
+  roundness within 4σ of the median; up to <samp>--psf-stars</samp> (100).
+  With <samp>--verbose</samp>, the stars are listed. The stars with χ²
+  above the median + 5σ (and 1.5 times the median) after the second
+  iteration are not used further.
+</li>
+<li>The tables are fitted by the weighted linear least squares on the
+  pixels of the PSF stars within the table radius, with the exact model:
+  the pixel of a star is the integral of the interpolated samples over
+  the pixel at the sub-pixel position of the star (the same as for
+  fitting and in artificial). Every star samples the grid at its own
+  phase; the solution combines them without interpolating the data
+  to the grid, so the result has no sub-pixel bias. The neighbours of
+  the PSF stars are subtracted, the fluxes, positions and sky of the PSF
+  stars are fixed by their fits, the weights are the inverse variances
+  of the model, outlying pixels are clipped at 5σ. A light
+  regularisation by the squared Laplacian of the tables
+  (<samp>--psf-smooth</samp>, relative to the mean of the diagonal of the
+  normal matrix) keeps them smooth where few stars sample the grid.
+  The system is solved by the preconditioned conjugate gradients.
+</li>
+<li>The tables carry no flux and do not move the centroid: after every
+  build they are corrected by a combination of the base and its
+  derivatives so that their sums and first moments are zero, and the
+  model is rescaled accordingly. The flux of the PSF is the flux of the
+  base (the analytic core is normalised to the unit flux over the whole
+  plane, the light beyond the table is in its wings); the centre of the
+  PSF is the centroid of the base (for a symmetric core, the centroid
+  of the star; in the correction mode, the convention of the file).
+  The tables are zero outside of their radius, where no data constrain
+  them.
+</li>
+<li>Iterations (three): all stars are fitted by the current PSF
+  (neighbours subtracted, groups fitted simultaneously), the tables are
+  rebuilt; then the usual passes follow.
+</li>
+<li>The zoom is 4 for FWHM &lt; 5 pixels and 2 otherwise
+  (<samp>--psf-zoom</samp>), the zoom of the file in the correction mode.
+  The table radius is 4 FWHM (<samp>--psf-radius</samp>); in the
+  correction mode it covers also 99.5% of the flux of the base at the
+  centre and at the corners of the frame (within its stamps).
+</li>
+<li>The variation of the order 1 or 2 requires three stars per term
+  (9, 18); with fewer stars a lower order is used with a warning. The
+  analytic core does not vary over the field, the tables absorb the
+  variation of the width (as in DAOPHOT).
+</li>
+<li><samp>--psf-save file</samp> writes the empirical PSF in the
+  <a href="dataform_artpsf.html">PSF file format</a>, so it can be used by
+  <samp>psfphot --psf-file</samp> and <samp>artificial --psf-file</samp>.
+  A constant PSF with an analytic core is one stamp at the field centre.
+  A varying PSF (or a correction of a file) is sampled on rings around
+  the field centre (NAXIS/2 or <samp>--psf-centre</samp>, the same
+  convention as for PSF files) up to the farthest corner of the frame:
+  2 rings by 16 angles for the order 0 or 1, 12 rings by 32 angles
+  for the order 2 (plus the rings of the base file inside of the frame).
+  RADCOO is the distance in pixels divided by the scale of the frame
+  [pix/deg] (WCS or <samp>--scale</samp>); without a scale, RADCOO is in
+  pixels (the scale 1) and the file is used with <samp>--scale 1</samp>.
+  The primary header records PSFCEN1, PSFCEN2, PSFSCALE, FWHM and PSFRAD.
+  The file interpolates linearly between the rings and angles: the saved
+  PSF of the order 2 reproduces the fluxes of the internal one to
+  0.05% (99% of stars), the constant one to 0.001%. The stamps contain
+  the core out to 99.9% of its flux.
+</li>
+</ul>
+
+<p>
+  Limitations: the polynomial represents smooth variations (focus,
+  astigmatism, coma growing over the field). A PSF which changes its
+  structure over the field (for example a sharp core and a wide halo
+  mixed linearly with the radius) is not a low-order polynomial;
+  the correction mode with a model of the PSF (from the laboratory or
+  an optics simulation) as the base is suitable for it. The wings
+  beyond the table radius are those of the core. The PSF stars must be
+  mostly single: in a field where most stars are unresolved blends the
+  PSF is too broad.
+</p>
+
 <h2>Parameters</h2>
 
 <dl>
-  <dt><samp>--psf GAUSS|MOFFAT|FILE</samp></dt>
+  <dt><samp>--psf GAUSS|MOFFAT|FILE|EMPIRICAL</samp></dt>
   <dd>The PSF, GAUSS by default (FILE when <samp>--psf-file</samp> is given).</dd>
   <dt><samp>--psf-file file</samp></dt>
-  <dd>The PSF file (the same as for <samp>artificial --psf-file</samp>).</dd>
+  <dd>The PSF file (the same as for <samp>artificial --psf-file</samp>);
+    with EMPIRICAL the base corrected by the residual tables.</dd>
+  <dt><samp>--psf-core MOFFAT|GAUSS</samp></dt>
+  <dd>The analytic core of the empirical PSF, MOFFAT by default: its
+    wings carry the light beyond the table, β is fitted (up to 10, which
+    is a Gaussian for this purpose). A Gaussian core on stars with Moffat
+    wings loses that light (−0.7% for β = 2.5).</dd>
+  <dt><samp>--psf-zoom n</samp></dt>
+  <dd>The samples per pixel of the empirical PSF: 4 for FWHM &lt; 5
+    pixels, 2 otherwise.</dd>
+  <dt><samp>--psf-radius r</samp></dt>
+  <dd>The radius of the residual tables in pixels, 4 FWHM by default.</dd>
+  <dt><samp>--psf-var 0|1|2</samp></dt>
+  <dd>The order of the polynomial variation over the field, 0 by default.</dd>
+  <dt><samp>--psf-stars n</samp></dt>
+  <dd>The maximum of the PSF stars, 100 by default.</dd>
+  <dt><samp>--psf-list file</samp></dt>
+  <dd>The PSF stars: x y [pix] per line (# for comments), or a FITS table
+    (.fits, .fit, .fts) with the columns X, Y.</dd>
+  <dt><samp>--psf-smooth s</samp></dt>
+  <dd>The regularisation of the tables, 0.01 by default.</dd>
+  <dt><samp>--psf-save file</samp></dt>
+  <dd>Save the empirical PSF to the PSF file (overwritten); for a single
+    input file.</dd>
   <dt><samp>--fwhm f</samp></dt>
   <dd>FWHM of the analytic PSF in pixels. If not given, the PSF shape is
     fitted (the result is printed with <samp>--verbose</samp> and written
@@ -162,6 +325,13 @@ munipack psfphot [.. parameters ..] file(s)
   <dd>Override the header: saturation [ADU], gain [e-/ADU], read noise [ADU].</dd>
   <dt><samp>--scale s</samp>, <samp>--psf-centre x,y</samp></dt>
   <dd>The scale [pix/deg] and the field centre [pix] for the PSF file.</dd>
+  <dt><samp>--group d</samp></dt>
+  <dd>The link distance of groups in units of FWHM, 1.5 by default;
+    0 fits every star alone (the iterative subtraction only, as before).</dd>
+  <dt><samp>--residual-detect n</samp></dt>
+  <dd>The passes of the detection of stars in the residuals, 0 by
+    default (the output has the rows of FIND and of the saturated stars
+    only, matching aphot and gphot; the detection costs two more passes).</dd>
   <dt><samp>--residual file</samp></dt>
   <dd>Save the frame with all fitted stars subtracted (the sky is kept);
     for a single input file.</dd>
@@ -173,11 +343,11 @@ munipack psfphot [.. parameters ..] file(s)
 
 <p>
   The PSFPHOT table has a row for every row of the FIND extension
-  (in the same order), followed by the added saturated stars:
+  (in the same order), followed by the added saturated stars and the
+  stars found in the residuals:
 </p>
 
 <dl>
-  <dt></dt><dd>(Saturated stars added by psfphot follow as further rows.)</dd>
   <dt>X, Y, XERR, YERR</dt><dd>The fitted position and its errors [pix]
     (the errors are -1 when the position is not fitted).</dd>
   <dt>PSFCOUNT, PSFCOUNTERR</dt><dd>The total flux of the star (the integral
@@ -190,21 +360,31 @@ munipack psfphot [.. parameters ..] file(s)
     FWHM): positive for objects sharper than PSF (cosmic rays, hot pixels),
     negative for extended ones (galaxies, blends).</dd>
   <dt>ROUND</dt><dd>The ellipticity of the data minus that of the model.</dd>
-  <dt>NPIX</dt><dd>The number of fitted pixels.</dd>
+  <dt>NPIX</dt><dd>The number of fitted pixels (in the fitting circle of the
+    star).</dd>
   <dt>FLAG</dt><dd>The sum of: 1 saturated pixel(s) in the core (the flux is
     estimated from the wings only), 2 pixels in the fitting radius excluded
     (bad, saturated, out of the frame), 4 the position is not fitted,
     8 not converged, 16 the fit failed (the flux is not valid),
     32 another star within the fitting radius, 64 a saturated star added
-    (not detected by find).</dd>
+    (not detected by find), 128 a star found in the residuals.</dd>
+  <dt>GROUP, GSIZE</dt><dd>The group of the simultaneous fit in the last
+    pass (0 for a star fitted alone) and its size.</dd>
 </dl>
 
 <p>
   The header keywords: PSFTYPE, PSFFILE, FWHM, HWHM [pix], PSFSIGMA or
   PSFALPHA and PSFBETA, PSFAXRAT, PSFPA [deg], PSFNSTAR (stars of the
   shape fit), PSFCEN1, PSFCEN2, PSFSCALE (the PSF file geometry),
-  PSFZOOM, FITRAD, SKYMODE, NPASS and the detector parameters used for
-  the weights: GAIN, READNS, BIASLEV, SATURATE.
+  PSFZOOM, FITRAD, SKYMODE, NPASS, GROUPDST (the link distance [FWHM]),
+  NGROUPS, MAXGROUP, RESDETEC, NRESID (stars found in the residuals) and
+  the detector parameters used for the weights: GAIN, READNS, BIASLEV,
+  SATURATE. The empirical PSF adds PSFCORE (GAUSS, MOFFAT, FILE), PSFVAR,
+  PSFNSTAR (the PSF stars), PSFNSHAP (stars of the core fit), PSFRAD
+  [pix], PSFRESRM (the rms of the constant table relative to the peak of
+  the core), PSFCHI2 (the median χ² of the PSF stars), PSFITER and
+  PSFSAVED; FWHM is that of the empirical PSF at the field centre and
+  PSFSIGMA (PSFALPHA, PSFBETA), PSFAXRAT, PSFPA describe the core.
 </p>
 
 <p>
@@ -235,16 +415,33 @@ $ munipack astrometry -c cat.fits artificial.fits<br>
 $ munipack phcal --photometry=psf -c cat.fits ... artificial.fits
 </code>
 
+<p>
+  The empirical PSF, varying to the second order over the field, saved
+  for a later use (and the simulation):
+</p>
+<code>
+$ munipack psfphot --psf EMPIRICAL --psf-var 2 --psf-save epsf.fits --verbose frame.fits<br>
+$ munipack psfphot --psf-file epsf.fits other.fits<br>
+$ munipack artificial --psf-file epsf.fits -c cat.fits ...
+</code>
+
+<p>
+  A laboratory PSF corrected by the stars of the frame, the frame
+  searched for the stars missed by find:
+</p>
+<code>
+$ munipack psfphot --psf EMPIRICAL --psf-file lab.fits --residual-detect 1 frame.fits
+</code>
+
 <h2>Limitations</h2>
 
 <ul>
-  <li>Stars are fitted one by one (with neighbours subtracted), not in
-    groups; very close pairs (below about one FWHM) are not separated
-    reliably.</li>
-  <li>Only stars detected by find are fitted, no new stars are searched in
-    the residuals.</li>
-  <li>The PSF file is used as it is; an empirical PSF is not built from the
-    frame.</li>
+  <li>Stars closer than about 0.5 FWHM are not separated (find, and the
+    detection in the residuals, see one star).</li>
+  <li>The polynomial of the empirical PSF does not represent PSFs which
+    change their structure over the field (see Empirical PSF).</li>
+  <li>The time is dominated by sampling and pixelising the PSF again for
+    every fit of every star (no cache of PSFs, a single thread).</li>
 </ul>
 
 <h2>See Also</h2>
