@@ -200,9 +200,13 @@ munipack psfphot [.. parameters ..] file(s)
   fitting and in artificial). Every star samples the grid at its own
   phase; the solution combines them without interpolating the data
   to the grid, so the result has no sub-pixel bias. The neighbours of
-  the PSF stars are subtracted, the fluxes, positions and sky of the PSF
+  the PSF stars are subtracted, the fluxes and positions of the PSF
   stars are fixed by their fits, the weights are the inverse variances
-  of the model, outlying pixels are clipped at 5σ. A light
+  of the model, outlying pixels are clipped at 5σ. A sky offset of every
+  PSF star is fitted together with the tables, on its pixels and a ring
+  just outside of the table radius (a quarter of it, at least 3 pixels),
+  where the tables are zero: inside of the table a sky error cannot be
+  told from a pedestal of the tables. A light
   regularisation by the squared Laplacian of the tables
   (<samp>--psf-smooth</samp>, relative to the mean of the diagonal of the
   normal matrix) keeps them smooth where few stars sample the grid.

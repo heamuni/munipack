@@ -100,12 +100,13 @@ contains
 
     type(EmpStar), dimension(:), allocatable :: es
     real(REAL64), dimension(:,:,:), allocatable :: x, r, z, p, q, b, diag
+    real(REAL64), dimension(:), allocatable :: xs, rs, zz, ps, qs, bs, ds
     real(REAL64), dimension(:,:), allocatable :: sub, pold, pbase, reff, pm, cb, &
          supp
     real(REAL64), dimension(:), allocatable :: lam, eta, zs
     real(REAL64), dimension(3,3) :: cm
     real(REAL64), dimension(3) :: mom, coef
-    real(REAL64) :: rz, rznew, alpha, bnorm, rnorm, s, h, sig
+    real(REAL64) :: rz, rznew, alpha, bnorm, rnorm, s, h, sig, rsky
     integer :: ns, nt, ntab, zoom, npoly, k, i, j, l, t, n, nsub, iter, i0, j0
     logical :: ok
 
@@ -127,9 +128,13 @@ contains
        end do
     end do
 
-    ! the data of stars
+    ! the data of stars: the pixels within the table radius and a ring
+    ! outside of it, where the tables are zero: the ring fixes the sky of
+    ! the star, fitted together with the tables (a sky error would be
+    ! absorbed by a pedestal of the tables otherwise)
     allocate(es(ns))
-    nt = ceiling(rt) + 1
+    rsky = rt + max(3.0_REAL64,rt / 4)
+    nt = ceiling(rsky) + 1
     do k = 1, ns
        associate(e => es(k), st => stars(k))
          e%n = nt
@@ -166,7 +171,7 @@ contains
             do i = -nt, nt
                i0 = e%i0 + i
                j0 = e%j0 + j
-               if( (i0 - st%x)**2 + (j0 - st%y)**2 > rt**2 ) cycle
+               if( (i0 - st%x)**2 + (j0 - st%y)**2 > rsky**2 ) cycle
                if( i0 < 1 .or. j0 < 1 .or. i0 > size(frame%data,1) .or. &
                     j0 > size(frame%data,2) ) cycle
                if( .not. frame%valid(i0,j0) ) cycle
@@ -196,9 +201,10 @@ contains
             pm = (e%t - e%flux*pm)*sqrt(e%w)
             zs = pack(pm,e%w > 0)
             if( size(zs) < 10 ) cycle
-            sig = 1.4826_REAL64*median(abs(zs - median(zs)))
+            h = median(zs)
+            sig = 1.4826_REAL64*median(abs(zs - h))
             sig = 5*max(sig,1.0_REAL64)
-            where( abs(pm) > sig ) e%w = 0
+            where( abs(pm - h) > sig ) e%w = 0
           end associate
        end do
        deallocate(reff,pm)
@@ -208,11 +214,15 @@ contains
     allocate(b(-ntab:ntab,-ntab:ntab,npoly),diag(-ntab:ntab,-ntab:ntab,npoly), &
          r(-ntab:ntab,-ntab:ntab,npoly),z(-ntab:ntab,-ntab:ntab,npoly), &
          p(-ntab:ntab,-ntab:ntab,npoly),q(-ntab:ntab,-ntab:ntab,npoly), &
-         reff(-ntab:ntab,-ntab:ntab),pm(-nt:nt,-nt:nt),lam(npoly),eta(npoly))
+         reff(-ntab:ntab,-ntab:ntab),pm(-nt:nt,-nt:nt),lam(npoly),eta(npoly), &
+         xs(ns),rs(ns),zz(ns),ps(ns),qs(ns),bs(ns),ds(ns))
     b = 0
     diag = 0
+    xs = 0
     do k = 1, ns
        associate(e => es(k))
+         bs(k) = sum(e%w*e%t)
+         ds(k) = max(sum(e%w),tiny(1.0_REAL64))
          pm = e%flux*e%w*e%t
          call adjoint(e,pm,reff,.false.)
          do t = 1, npoly
@@ -235,27 +245,34 @@ contains
        b(:,:,t) = supp*b(:,:,t)
     end do
 
-    ! the preconditioned conjugate gradients
-    call operator(x,q)
+    ! the preconditioned conjugate gradients (the tables and the skies)
+    call operator(x,xs,q,qs)
     r = b - q
+    rs = bs - qs
     z = r / diag
+    zz = rs / ds
     p = z
-    rz = sum(r*z)
-    bnorm = sqrt(sum(b**2))
+    ps = zz
+    rz = sum(r*z) + sum(rs*zz)
+    bnorm = sqrt(sum(b**2) + sum(bs**2))
     niter = 0
     do iter = 1, maxiter
        niter = iter
-       rnorm = sqrt(sum(r**2))
+       rnorm = sqrt(sum(r**2) + sum(rs**2))
        if( .not. (rnorm > tol*bnorm) ) exit
-       call operator(p,q)
-       s = sum(p*q)
+       call operator(p,ps,q,qs)
+       s = sum(p*q) + sum(ps*qs)
        if( .not. (s > 0) ) exit
        alpha = rz / s
        x = x + alpha*p
+       xs = xs + alpha*ps
        r = r - alpha*q
+       rs = rs - alpha*qs
        z = r / diag
-       rznew = sum(r*z)
+       zz = rs / ds
+       rznew = sum(r*z) + sum(rs*zz)
        p = z + (rznew / rz)*p
+       ps = zz + (rznew / rz)*ps
        rz = rznew
     end do
 
@@ -299,7 +316,7 @@ contains
          call combine(x,e%pt,reff)
          call forward(e,reff,pm)
          l = count(e%w > 0)
-         chi2(k) = sum(e%w*(e%t - e%flux*pm)**2) / max(l - 3,1)
+         chi2(k) = sum(e%w*(e%t - e%flux*pm - xs(k))**2) / max(l - 4,1)
        end associate
     end do
 
@@ -319,13 +336,15 @@ contains
 
     end subroutine combine
 
-    subroutine operator(v,av)
+    subroutine operator(v,vs,av,avs)
 
-      ! the normal matrix times v: sum over stars of A'WA, the polynomial
-      ! terms, and the regularisation
+      ! the normal matrix times (v,vs): sum over stars of A'WA, the
+      ! polynomial terms, the skies of stars vs, and the regularisation
 
       real(REAL64), dimension(-ntab:,-ntab:,:), intent(in) :: v
+      real(REAL64), dimension(:), intent(in) :: vs
       real(REAL64), dimension(-ntab:,-ntab:,:), intent(out) :: av
+      real(REAL64), dimension(:), intent(out) :: avs
 
       real(REAL64), dimension(-ntab:ntab,-ntab:ntab) :: reff, g, lap
       real(REAL64), dimension(-nt:nt,-nt:nt) :: pm
@@ -337,7 +356,9 @@ contains
          associate(e => es(k))
            call combine(v,e%pt,reff)
            call forward(e,reff,pm)
-           pm = e%flux**2*e%w*pm
+           pm = e%w*(e%flux*pm + vs(k))
+           avs(k) = sum(pm)
+           pm = e%flux*pm
            call adjoint(e,pm,g,.false.)
            do t = 1, npoly
               av(:,:,t) = av(:,:,t) + e%pt(t)*g
