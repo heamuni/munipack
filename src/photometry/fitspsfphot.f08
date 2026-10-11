@@ -53,6 +53,7 @@ module fitspsfphot
      real(REAL64), dimension(:), allocatable :: x, y, sky, skyerr
      real(REAL64) :: fwhm = -1, lobad = -huge(1.0_REAL64), hibad = huge(1.0_REAL64)
      real(REAL64) :: aphwhm = -1
+     real(REAL64), dimension(2) :: ring = -1
      logical :: have_aper = .false.
   end type PsfFrame
 
@@ -256,6 +257,8 @@ contains
     else if( status == 0 ) then
        call fits_get_num_rows(fits,l,status)
        call fits_read_key(fits,FITS_KEY_HWHM,frame%aphwhm,status)
+       call fits_read_key(fits,trim(FITS_KEY_ANNULUS)//'1',frame%ring(1),status)
+       call fits_read_key(fits,trim(FITS_KEY_ANNULUS)//'2',frame%ring(2),status)
        call fits_get_colnum(fits,.true.,FITS_COL_SKY,scol,status)
        call fits_get_colnum(fits,.true.,FITS_COL_SKYERR,ecol,status)
        if( status /= 0 ) goto 666

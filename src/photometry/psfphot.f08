@@ -216,7 +216,7 @@ contains
     integer, dimension(:), allocatable :: flags, npix
     character(len=FLEN_VALUE), dimension(ncols) :: ttype, tunit
     character(len=FLEN_VALUE) :: cunit
-    real(REAL64) :: fwhm, t0, t1
+    real(REAL64) :: fwhm, t0, t1, rmod
     integer :: n, k, l, pass, status, nmod, nshape
     logical :: shape_fit, localsky
     type(FrameType) :: fr0
@@ -366,7 +366,7 @@ contains
     hdr%fwhm_fitted = shape_fit
     nshape = 0
     if( shape_fit ) then
-       call psf%prepare(nint(maxval(stars%fitrad,1,nstars > 0)) + 2)
+       call psf%prepare(ceiling(max(3*fwhm,6.0_REAL64)) + 4)
        call estimate_shape(nshape)
        call set_radii
     end if
@@ -376,7 +376,11 @@ contains
        nmod = nbox / zoom + 1
     else
        fwhm = psf_analytic_fwhm(psf%ptype,psf%width,psf%beta,psf%q)
-       nmod = min(nint(max(2*maxval(stars%fitrad,1,nstars > 0),3*fwhm)) + 1,64)
+       rmod = max(2*maxval(stars%fitrad,1,nstars > 0),3*fwhm)
+       ! Moffat wings: the radius with 0.5% of the flux outside
+       if( psf%ptype == PSF_MOFFAT ) &
+            rmod = max(rmod,psf%width*sqrt(0.005_REAL64**(1/(1-psf%beta)) - 1))
+       nmod = min(nint(rmod) + 1,64)
        call psf%prepare(nmod)
     end if
     do k = 1, nstars
@@ -409,6 +413,13 @@ contains
 
     ! passes over all stars: subtract the fitted neighbours
     do pass = 1, npass
+       ! the fixed sky in the annulus of the residual frame (all fitted
+       ! stars subtracted, their light does not bias the sky)
+       if( .not. localsky .and. pass > 1 ) then
+          do k = 1, nstars
+             call annulus_sky(stars(k))
+          end do
+       end if
        do n = 1, nstars
           k = order(n)
           if( stars(k)%modelled ) call add_model(fr,psf,stars(k),-1)
@@ -537,6 +548,60 @@ contains
       rcoreof = max(fwhms(k) / 2,1.0_REAL64)
 
     end function rcoreof
+
+    subroutine annulus_sky(star)
+
+      ! The sky by the clipped mean in the annulus (of aphot) of the frame
+      ! with all fitted stars subtracted.
+
+      type(StarFit), intent(in out) :: star
+
+      real(REAL64), dimension(:), allocatable :: s
+      logical, dimension(:), allocatable :: keep
+      real(REAL64) :: r1, r2, r, mean, sig
+      integer :: i, j, n, m, iter
+
+      if( frame%ring(1) > 0 .and. frame%ring(2) > frame%ring(1) ) then
+         r1 = frame%ring(1)
+         r2 = frame%ring(2)
+      else
+         r1 = star%fitrad + 2
+         r2 = r1 + max(5.0_REAL64,star%fitrad)
+      end if
+      m = ceiling(r2)
+      allocate(s((2*m+1)**2))
+      n = 0
+      do j = nint(star%y) - m, nint(star%y) + m
+         do i = nint(star%x) - m, nint(star%x) + m
+            if( i < 1 .or. j < 1 .or. i > size(fr%data,1) .or. &
+                 j > size(fr%data,2) ) cycle
+            if( .not. fr%valid(i,j) ) cycle
+            r = hypot(i - star%x,j - star%y)
+            if( r1 <= r .and. r <= r2 ) then
+               n = n + 1
+               s(n) = fr%data(i,j) - fr%mstar(i,j)
+            end if
+         end do
+      end do
+      if( n < 10 ) return
+
+      ! the mean clipped at 3 sigma (the residual sky is nearly symmetric,
+      ! the mean is not biased like the median of Poisson counts)
+      mean = median(s(1:n))
+      sig = 1.4826_REAL64*median(abs(s(1:n) - mean))
+      allocate(keep(n))
+      keep = .true.
+      do iter = 1, 5
+         if( .not. (sig > 0) ) exit
+         keep = abs(s(1:n) - mean) < 3*sig
+         if( count(keep) < 10 ) exit
+         mean = sum(s(1:n),keep) / count(keep)
+         sig = sqrt(sum((s(1:n) - mean)**2,keep) / (count(keep) - 1))
+      end do
+      star%sky = mean
+      star%skyerr = sig / sqrt(real(count(keep),REAL64))
+
+    end subroutine annulus_sky
 
     subroutine local_sky(star)
 
@@ -695,7 +760,7 @@ contains
       real(REAL64), dimension(:,:), allocatable :: shapes
       real(REAL64), dimension(4) :: pshape
       type(StarFit) :: star
-      real(REAL64) :: snrmin, c1, c2
+      real(REAL64) :: snrmin, c1, c2, rs
       integer :: n, k, i, j, m
       logical :: ok, sat
 
@@ -717,15 +782,16 @@ contains
          k = order(n)
          if( nshape >= maxshape ) exit
          if( snr(k) < snrmin ) cycle
+         ! the shape is fitted in the radius of 3 FWHM (the wings)
+         rs = max(3*fwhms(k),6.0_REAL64)
          ! inside of the frame
-         if( stars(k)%x - 2*stars(k)%fitrad < 1 .or. &
-              stars(k)%y - 2*stars(k)%fitrad < 1 .or. &
-              stars(k)%x + 2*stars(k)%fitrad > frame%naxes(1) .or. &
-              stars(k)%y + 2*stars(k)%fitrad > frame%naxes(2) ) cycle
+         if( stars(k)%x - rs - 2 < 1 .or. stars(k)%y - rs - 2 < 1 .or. &
+              stars(k)%x + rs + 2 > frame%naxes(1) .or. &
+              stars(k)%y + rs + 2 > frame%naxes(2) ) cycle
          ! isolated
-         if( neighbour(k,2*stars(k)%fitrad + 2) > 0 ) cycle
+         if( neighbour(k,rs + 2*fwhms(k)) > 0 ) cycle
          ! no saturated or bad pixels
-         m = ceiling(2*stars(k)%fitrad)
+         m = ceiling(rs) + 1
          sat = .false.
          do j = nint(stars(k)%y) - m, nint(stars(k)%y) + m
             do i = nint(stars(k)%x) - m, nint(stars(k)%x) + m
@@ -740,6 +806,7 @@ contains
          if( sat ) cycle
 
          star = stars(k)
+         star%fitrad = rs
          call linear_flux(fr,psf,star,.true.)
          pshape = [psf%width, psf%beta, 0.0_REAL64, 0.0_REAL64]
          call fit_shape(fr,psf,star,psf%ptype == PSF_MOFFAT .and. beta_par < 0, &
