@@ -194,6 +194,12 @@ program phcal
 
         read(val,*) saper
 
+     else if( key == 'PHOTOMETRY' ) then
+
+        read(val,*) phmethod
+        if( .not. (phmethod == 'APER' .or. phmethod == 'GROW' .or. &
+             phmethod == 'PSF') ) stop 'Error: photometry is APER, GROW or PSF.'
+
      else if( key == 'AREA' ) then
 
         read(val,*) area

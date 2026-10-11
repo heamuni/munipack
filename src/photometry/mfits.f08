@@ -29,6 +29,10 @@ module mfits
   real(dbl), parameter, private :: rad = 57.295779513082322865_dbl
   real(dbl), parameter, private :: pi = 3.14159265359_dbl
 
+  ! the photometry method selected by phcal: APER, GROW, PSF, or empty
+  ! (GROW when its extension is present, otherwise APER)
+  character(len=FLEN_VALUE) :: phmethod = ''
+
 
 contains
 
@@ -165,7 +169,7 @@ contains
     real(dbl) :: nullval
     real :: hwhm
     logical :: anyf
-    logical :: undef_airmass, have_grow, have_ap
+    logical :: undef_airmass, have_grow, have_ap, have_psf
 !    type(AstroTrafoProj) :: tproj
     type(fitsfiles) :: fits
     type(AstroWCS) :: wcs
@@ -308,9 +312,32 @@ contains
 
 
 
+    have_psf = phmethod == 'PSF'
+    if( have_psf ) then
+
+       ! the PSF photometry extension
+       call fits_movnam_hdu(fits,FITS_BINARY_TBL,PSFEXTNAME,0,status)
+       if( status == FITS_BAD_HDU_NUM ) then
+          write(error_unit,*) &
+               "Error: Failed to find a PSF photometry extension: ", &
+               trim(filename)
+          goto 666
+       end if
+       have_grow = .false.
+       have_ap = .false.
+
+    else
+
     ! try to select grow-curve photometry table
     call fits_movnam_hdu(fits,FITS_BINARY_TBL,GROWEXTNAME,0,status)
     have_grow = .not. (status == FITS_BAD_HDU_NUM)
+    if( phmethod == 'GROW' .and. .not. have_grow ) then
+       write(error_unit,*) &
+            "Error: Failed to find a growth-curve photometry extension: ", &
+            trim(filename)
+       goto 666
+    end if
+    if( phmethod == 'APER' ) have_grow = .false.
 
     ! try to select the aperture photometry extension
     if( .not. have_grow ) then
@@ -328,6 +355,8 @@ contains
        goto 666
     end if
 
+    end if
+
     ! key for HWHM is presented in all photometry extensions
     ! (methods for their estimates are different)
     call fits_read_key(fits,FITS_KEY_HWHM,hwhm,status)
@@ -337,13 +366,21 @@ contains
     keycts = ''
     keyerr = ''
 
-    if( have_grow .and. saper == 0 ) then
+    if( have_psf ) then
+       keycts = FITS_COL_PSFCOUNT
+       keyerr = FITS_COL_PSFCOUNTERR
+       ! the area of the selection threshold: the circle of radius FWHM
+       aper = 2*hwhm
+    end if
+
+    if( have_grow .and. (saper == 0 .or. phmethod == 'GROW') ) then
        keycts = FITS_COL_GCOUNT
        keyerr = FITS_COL_GCOUNTERR
        call fits_read_key(fits,FITS_KEY_RF90,aper,status)
     end if
 
-    if( (.not. have_grow .and. have_ap) .or. (have_ap .and. saper > 0) ) then
+    if( (.not. have_grow .and. have_ap) .or. &
+         (have_ap .and. saper > 0 .and. phmethod /= 'GROW') ) then
 
        call fits_movnam_hdu(fits,FITS_BINARY_TBL,APEREXTNAME,0,status)
 
@@ -393,6 +430,24 @@ contains
        call fits_read_col(fits,colnum(5),frow,nullval,dct(i:l),anyf,status)
        if( status /= 0 ) goto 666
     end do
+
+    ! PSF photometry: stars with a saturated core or a failed fit
+    ! (FLAG 1, 16) are not used
+    if( have_psf ) then
+       block
+         integer, dimension(:), allocatable :: flag
+         integer :: fcol
+         allocate(flag(nrows))
+         call fits_get_colnum(fits,.true.,'FLAG',fcol,status)
+         do i = 1, nrows, srows
+            frow = i
+            l = min(i+srows,nrows)
+            call fits_read_col(fits,fcol,frow,0,flag(i:l),anyf,status)
+         end do
+         if( status /= 0 ) goto 666
+         where( iand(flag,17) /= 0 ) ct = -1
+       end block
+    end if
 
     ! select stars acceptable for photometry
     spot = pi*aper**2

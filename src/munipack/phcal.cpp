@@ -110,6 +110,13 @@ MuniPhcal::MuniPhcal(wxEvtHandler *h, const MuniCmdLineParser& cmd):
     if( cmd.Found("saper",&n) )
       Write("SAPER = %ld",n);
 
+    if( cmd.Found("photometry",&a) ) {
+      wxString ph = a.Upper();
+      if( ! (ph == "APER" || ph == "GROW" || ph == "PSF") )
+	wxLogFatalError("Unknown photometry `%s' (aper, grow, psf).",a);
+      Write("PHOTOMETRY = '" + ph + "'");
+    }
+
     if( cmd.Found("th",&x) || cmd.Found("threshold",&x))
       Write("THRESHOLD = %e",x);
 
