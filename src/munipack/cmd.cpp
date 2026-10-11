@@ -85,6 +85,7 @@ MuniCmdLineParser::MuniCmdLineParser(int xargc, wxChar *xargv[]):
 		 " find\t\tSearch for stars on frames\n"
 		 " aphot\t\tAperture photometry\n"
 		 " gphot\t\tGrowth-Curve photometry\n"
+		 " psfphot\tPSF photometry\n"
 		 " phcal\t\tPhotometry calibration\n"
 		 " artificial\tArtificial frames\n"
 		 " phfotran\tDetermine photometry system transformation\n"
@@ -401,6 +402,41 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddParam("file(s)[,results(s)]",wxCMD_LINE_VAL_STRING,wxCMD_LINE_PARAM_MULTIPLE);
   }
 
+  else if( action == "psfphot" ) {
+
+    AddUsageText("Usage: munipack "+action+" [options] file(s)");
+    AddUsageText("* PSF photometry (stars by find, sky by aphot)");
+
+    AddOption("","psf","PSF: GAUSS (default), MOFFAT, FILE");
+    AddOption("","psf-file","PSF file (field-dependent PSF, as artificial)");
+    AddOption("","fwhm","FWHM [pix] of analytic PSF (default: fitted)",
+	      wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","beta","Moffat exponent (default: fitted)",
+	      wxCMD_LINE_VAL_DOUBLE);
+    AddSwitch("","elliptic","fit an elliptic analytic PSF");
+    AddOption("","fitrad","fitting radius [pix] (default: 1.5*FWHM, min. 3)",
+	      wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","sky","fixed (by aphot, default) or local (fitted)");
+    AddOption("","maxiter","maximum of iterations (default: 50)",
+	      wxCMD_LINE_VAL_NUMBER);
+    AddOption("","npass","passes over stars (default: 3)",
+	      wxCMD_LINE_VAL_NUMBER);
+    AddOption("","saturate","saturation [ADU] (default: header)",
+	      wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","gain","gain [e-/ADU] (default: header)",
+	      wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","read-noise","read noise [ADU] (default: header)",
+	      wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","scale","scale [pix/deg] for PSF file (default: header)",
+	      wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","psf-centre","x,y field centre of PSF file [pix] "
+	      "(default: NAXIS/2)");
+    AddOption("","residual","save the residual frame (single file only)");
+    COMMON_OPTIONS_MULTIPLE
+    AddParam("file(s)",wxCMD_LINE_VAL_STRING,
+	     wxCMD_LINE_PARAM_OPTIONAL|wxCMD_LINE_PARAM_MULTIPLE);
+  }
+
     /*
   case ID_CALIBRATE:
     AddParam("calibrate",wxCMD_LINE_VAL_STRING);
@@ -587,6 +623,7 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddSwitch(wxEmptyString,"list","show available photometry systems");
     AddOption(wxEmptyString,"tol","search radius [deg]",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","saper","select aperture number",wxCMD_LINE_VAL_NUMBER);
+    AddOption("","photometry","aper, grow or psf (default: grow when present, else aper)");
     AddOption("","vocat","VO catalogue config file (column IDs)");
     COMMON_OPTIONS_MULTIPLE
     AddParam("file(s)[,results(s)]",wxCMD_LINE_VAL_STRING,

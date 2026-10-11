@@ -43,7 +43,7 @@ bool Munipack::OnInit()
   // implemented actions
   const char *actions[] = {
     "bias", "dark", "flat", "phcorr", "colouring", "cone", "astrometry", "phcal",
-    "votable", "aphot", "gphot", "find", "timeseries", "fits", "kombine",
+    "votable", "aphot", "gphot", "psfphot", "find", "timeseries", "fits", "kombine",
     "phfotran", "cross", "artificial", "sesame", 0
   };
 
@@ -101,6 +101,8 @@ bool Munipack::OnInit()
       proc = new MuniAphot(this,cmd);
     else if ( action == "gphot" )
       proc = new MuniGphot(this,cmd);
+    else if ( action == "psfphot" )
+      proc = new MuniPsfphot(this,cmd);
     else if ( action == "find" )
       proc = new MuniFind(this,cmd);
     else if ( action == "kombine" )

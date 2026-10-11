@@ -112,6 +112,10 @@ New header keywords: `DARKCUR`, `RDNOISE`, `BIASLEV`, `ARTSEED`. The verificatio
 | A24 | `wxLogFatalError` (the project's usual error call) exits with code 139 | looks like a crash | **open** | — |
 | A25 | `--mproc` could not be tested: the Docker build has no coarray runtime (`-fcoarray=single`) | — | **open** (build) | — |
 | A26 | `--gnoise` was merged with the sky into one level, so the sky gradient and the airmass scaled the `--gnoise` part too | `--sky-mag 21 --gnoise 1000 --sky-grad-x 0.001`: whole 986 e⁻ level scaled by the gradient | fixed: the merged level is split into the sky part (gradient, airmass) and a uniform `--gnoise` part; same total without gradient or airmass (bit-identical); left−right difference now −20.56 e⁻ with or without `--gnoise` | `932ac64` |
+| A27 | `--psf-file`: the loader put the PSF centre at the sample NAXIS/2+1, while the PSF generators (`doc/artpsf.f08`, the field-PSF generator of `dpsf.fits`) and `CRPIX` of frames use NAXIS/2 | every star rendered with `dpsf.fits` offset by −0.50 px in x and y from its catalogue (WCS) position | fixed: the centre is NAXIS/2 or `CRPIX1/2` of the extension; centroid − catalogue position 0.0002 px | `c72d8a3` |
+| A28 | Stars were pixelised at positions rounded to the PSF sample grid (`nint(zoom*dx)`) | position errors up to 1/(2·ZOOM) px: ±0.25 px with `dpsf.fits` (ZOOM=2), ±0.031 px (rms 0.018) for GAUSS/MOFFAT/SEEING (ZOOM=16) | fixed: exact pixel integral of the interpolated samples at any position (trapezoid/midpoint rule on the grid, so grid-aligned stars are unchanged: 1 of 262144 pixels differs by one float32 ulp); rms 0.0004 px | `c72d8a3` |
+| A29 | `psfinterpol` supports one ring of exactly eight angles: `l = min(int(r/rgrid),0)` is always 0, the indices 2..9 are hard-coded, the loader reads 360/AGRID+1 extensions in file order | other grids (more rings, other angles, extensions in another order) silently wrong | fixed: N rings × M angles from RADCOO/ANGCOO (linear in angle with wrapping and in radius, centre PSF inside the first ring, outermost ring beyond), stamps of different sizes, other extensions ignored; agrees with an independent implementation to 2×10⁻⁵ of the peak (2 rings, 8 and 6 angles, ZOOM=3) | `c72d8a3` |
+| A30 | PSF file documentation: described a single-image format the loader rejected (it required RGRID, AGRID) and recommended a sum of 1, while the loader takes a sum of ZOOM² as the whole flux; the template `doc/artpsf.f08` normalised to 1 | a template PSF (ZOOM=4) gives stars 16× too faint | fixed: format and normalisation documented (sum = ZOOM², a warning otherwise), the single-image format is accepted, the template normalised to ZOOM² | `c72d8a3`, this branch |
 
 ---
 
@@ -133,6 +137,9 @@ New header keywords: `DARKCUR`, `RDNOISE`, `BIASLEV`, `ARTSEED`. The verificatio
 | P12 | `sfits`: every frame got the sky of the last file; RF90 ×scale instead of ÷scale (pix/deg); CRDER never read | SKYMEAN 278.6 for both B and V (202/277); RADFLX90 12630 "deg"; 18/79 stars matched | fixed: 79/79 | `34076f1` |
 | P13 | `find`/`aphot` accept pixels *equal* to the saturation level as valid (`datum <= hibad`), while `daosky` uses `<` | saturated stars detected and measured on real 16-bit data (pixels read exactly 65535); 311 instead of 136 detections on a test frame | fixed | `5d96c1d` |
 | P14 | `readframes` sorts frames by the photometric system's filter order, while catalogue columns follow the user's `-f` order | possible mismatch when `-f` is not in system order | **open** | — |
+| P15 | `pphot` (2013 stub, built but no front-end action) did nothing | no PSF photometry | replaced by `psfphot` (see README, PSF photometry) | `f6afeda` |
+| P16 | The `aphot` sky (robust mean in the 20–30 px annulus) includes the light of neighbours | +0.4 ADU on a 500-star Gaussian test field, +2.7 ADU with Moffat β=2.5 wings: −0.3% and −1.6% flux at S/N 50 when used as a fixed sky | `psfphot` re-estimates the sky on the frame with fitted stars subtracted (≤0.1%); `aphot` itself **open** | `53828cb` |
+| P17 | (psfphot, found in review) Saturated stars are not in FIND (find excludes saturated pixels, P13), so their light was not subtracted from neighbours | crowded 16-bit field with 36% saturated stars: flux errors underestimated, pull robust std 1.37 (fixed sky) / 1.16 (local); 5.2 for stars next to an undetected saturated one | fixed: saturated areas without a FIND star are added as stars (FLAG 64), fitted from the wings and subtracted; pull 0.92–1.06 | this branch |
 
 ---
 
@@ -172,6 +179,8 @@ New header keywords: `DARKCUR`, `RDNOISE`, `BIASLEV`, `ARTSEED`. The verificatio
   - the sky now rises with airmass;
   - RANDOM spread is narrower;
   - FFT PSF centring changed by up to 0.1 px.
+  - stars are rendered at their exact sub-pixel positions (A28): changes of up to 1/(2·ZOOM) px, i.e. 0.031 px for the analytic PSFs; stars on the sample grid are unchanged;
+  - `--psf-file`: with files centred at NAXIS/2 (such as `dpsf.fits`) the stars move by +0.5 px in x and y to their catalogue positions (A27). A file centred at NAXIS/2+1 keeps the old placement with `CRPIX1/2` = NAXIS/2+1 in its extensions.
   - Noiseless frames with `--gnoise` and no gradient, airmass or flat are bit-identical to hg1653.
 - **`astrometry` rejects statistically insignificant matches.** Solutions with few matched stars that the old code would have accepted can now fail; `--disable-rms-check` switches the test off.
 - **`--scale` is pix/deg** in `artificial`, `astrometry` and `kombine` (an upstream change in hg1653; only the help text was fixed here).

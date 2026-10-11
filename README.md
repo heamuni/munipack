@@ -68,6 +68,26 @@ docker run --rm -u $(id -u):$(id -g) -v "$PWD":/data munipack:0.6.2-hg1653-fixes
   --exptime 20 --dark 6.7e-3 --readnoise 0.37 --gain 0.101 --bias 100 -B 16 --seed 1
 ```
 
+## PSF photometry
+
+`munipack psfphot` (new; it replaces the unused `pphot` stub) fits every star found by `find` with a PSF:
+
+```bash
+munipack find frame.fits
+munipack aphot frame.fits                      # the sky annulus
+munipack psfphot frame.fits                    # Gaussian, width fitted on bright isolated stars
+munipack psfphot --psf MOFFAT frame.fits       # Moffat, width and beta fitted
+munipack psfphot --psf-file psf.fits frame.fits   # the field-dependent PSF of artificial --psf-file
+munipack phcal --photometry psf -c cone.fits ... frame.fits
+```
+
+- **One PSF code for simulation and analysis.** `src/lib/psfmodel.f08` loads, interpolates and pixelises PSFs for both `artificial` and `psfphot`, so frames simulated with a PSF file are fitted with exactly the same PSF.
+- **PSF file:** primary `ZOOM`; every extension with `RADCOO` [deg] and `ANGCOO` [deg] is one PSF of the grid (any number of rings and angles). The PSF centre is the pixel NAXIS/2 or `CRPIX1/2` of the extension; the stamp should sum to ZOOM² (the whole flux). See `src/doc/dataform_artpsf.shtml`.
+- **Field position** for a PSF file: pixel offsets from NAXIS/2 of the frame (as `artificial`), divided by the WCS scale [pix/deg]; `--psf-centre`, `--scale` override them.
+- **Fit:** flux, position (and a constant sky with `--sky local`) by weighted least squares; the weights come from the model, (model − BIASLEV)/GAIN + read noise² (READNS [ADU] or RDNOISE [e⁻]). Neighbours are subtracted; three passes. The fixed sky is re-estimated in the `aphot` annulus on the frame with the fitted stars subtracted.
+- **Output:** a `PSFPHOT` table: X, Y, XERR, YERR, PSFCOUNT, PSFCOUNTERR (total flux in ADU, like GCOUNT), SKY, SKYERR, CHI2, SHARP, ROUND, NPIX, FLAG (1 saturated core, 2 excluded pixels, 4 position fixed, 8 not converged, 16 failed, 32 crowded, 64 a saturated star not found by `find`, added so that it is subtracted from its neighbours). `--residual` saves the star-subtracted frame.
+- **Validation** on simulated frames (8 seeds, realistic noise): flux bias < 0.02% and position bias < 0.001 px for S/N > 50, reported errors 0.90–1.10 × the scatter, for Gauss and Moffat (shape fitted) and for PSF files (`dpsf.fits`, a 2-ring file). Stars with a neighbour of equal brightness within 2 FWHM: bias +0.07%, scatter 2.5% (aperture: +20%, 37%). End-to-end `phcal` MAG − V = 0.000 ± 0.0003, scatter 0.0017 (aperture 0.0020). A 2048² frame with 1700 stars takes 5–7 s.
+
 ## Known limitations
 
 - `--mproc` (coarray multiprocessing) is not available: the image is built with `-fcoarray=single`.

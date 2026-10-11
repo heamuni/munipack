@@ -23,7 +23,7 @@
 noinst_LIBRARIES = libminpacks.a libtitsio.a libsort.a \
                    liblmin.a libstat.a libfmm.a libmfitsio.a \
                    libastrotrafo.a libastrosphere.a libphotometry.a \
-                   libpppack.a libnoise.a
+                   libpppack.a libnoise.a libpsfmodel.a
 #                   libphio.a libpppack.a libnoise.a
 
 .NOTPARALLEL:
@@ -42,6 +42,7 @@ libphotometry_a_SOURCES = photoconv.f08 phsysfits.f08
 #libphio_a_SOURCES = phio.f08
 libpppack_a_SOURCES = pppack.f90
 libnoise_a_SOURCES = noise.f08
+libpsfmodel_a_SOURCES = psfmodel.f08
 
 noinst_HEADERS = mfitsio.h
 EXTRA_DIST = fversion.inc

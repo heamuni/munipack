@@ -1,0 +1,263 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<!-- #include virtual="/meta.shtml" -->
+<title>Munipack ‒ PSF Photometry</title>
+</head>
+<body>
+<!-- #include virtual="/head.shtml" -->
+<section>
+
+<h1>PSF Photometry</h1>
+
+<p class="abstract">
+  PSF photometry fits every detected star by a point spread function
+  (PSF): an analytic one (Gauss, Moffat), or the field-dependent PSF
+  given by a file, the same one which simulates frames in
+  <a href="man_artificial.html">artificial</a>.
+</p>
+
+<h2>Synopsis</h2>
+
+<code>
+munipack psfphot [.. parameters ..] file(s)
+</code>
+
+<p>
+  The frames must contain the FIND extension
+  (<a href="man_find.html">find</a>); the APERPHOT extension
+  (<a href="man_aphot.html">aphot</a>) gives the sky of stars.
+  A new PSFPHOT extension is added to the frames.
+</p>
+
+<h2>Algorithm</h2>
+
+<ul>
+<li>The detector parameters are read from the header: the saturation
+  (SATURATE; by default 2<sup>BITPIX</sup>-1 for integer frames), the gain
+  (GAIN [e-/ADU]; 1 when it is missing or when BUNIT is COUNTS, the frames
+  converted to electrons by phcorr), the read noise (READNS [ADU], or
+  RDNOISE [e-] written by artificial, divided by the gain) and the bias
+  (BIASLEV [ADU], 0 when missing). The keywords for saturation, read noise
+  and gain can be redefined by <a href="man_env.html">environment
+  variables</a> FITS_KEY_SATURATE, FITS_KEY_READNOISE, FITS_KEY_GAIN.
+</li>
+<li>Pixels at or above the saturation, or below LOWBAD of the FIND
+  extension, are excluded (the same rule as find and aphot).
+</li>
+<li>Saturated stars are not detected by find. Every connected area of
+  saturated pixels without a detected star is added as a star (at its
+  centroid, FLAG 64) so that it is fitted from its wings and subtracted
+  from its neighbours; the fitting radius of saturated stars extends
+  1.5 FWHM beyond the saturated area. The added stars are appended
+  after the rows of the FIND extension.
+</li>
+<li>The PSF is prepared: an analytic PSF of the given FWHM, or the PSF
+  with the width (and Moffat β, ellipticity) fitted on up to thirty
+  bright (S/N &gt; 50), isolated, unsaturated stars in the radius
+  of 3 FWHM (the medians of their fits are used), or the PSF by the file.
+</li>
+<li>The initial fluxes are fitted at the detected positions; the stars are
+  ordered by their brightness.
+</li>
+<li>Every star is fitted for its flux, position (and the sky with
+  <samp>--sky=local</samp>) by the weighted least squares
+  (Levenberg-Marquardt) in the circle of the fitting radius. The weights
+  are inverse variances predicted by the model, not by the data,
+  <p>
+  <i>σ<sup>2</sup> = (m - b)/g + r<sup>2</sup></i> [ADU<sup>2</sup>],
+  </p>
+  where <i>m</i> is the model of the pixel (the sky plus all stars),
+  <i>b</i> the bias, <i>g</i> the gain and <i>r</i> the read noise in ADU
+  (1/12 ADU<sup>2</sup> of the quantisation is added for integer frames).
+  The weights are iterated with the model, so faint stars are not biased
+  (the estimate is the Poisson maximum likelihood without read noise).
+</li>
+<li>The fitted neighbours are subtracted: the stars are fitted from the
+  brightest, the models of the already fitted stars are subtracted
+  from the data. The next passes (three in total, by default) refit every
+  star with all others subtracted. The sum of the models is kept in an
+  image, so the time is proportional to the number of stars.
+</li>
+<li>Stars too faint for a reliable position (S/N &lt; 3 at the detected
+  position), or whose fit moves by more than a half of the fitting radius
+  (at least one pixel), are fitted for the flux only at the detected
+  position (FLAG 4).
+</li>
+<li>The errors are given by the covariance matrix of the fit; the error of
+  the fixed sky (SKYERR by aphot) is propagated to the flux error.
+</li>
+</ul>
+
+<h2>PSF</h2>
+
+<p>
+  All PSFs are sampled with ZOOM samples per pixel (16 for analytic PSFs,
+  the value of ZOOM of a PSF file). The value of a pixel is the integral
+  of the linearly interpolated samples (for odd ZOOM, of the samples
+  taken as constant in their cells) over the pixel area, for any
+  sub-pixel position of the star; the flux is conserved exactly.
+  This is the same code which renders stars in
+  <a href="man_artificial.html">artificial</a>, so frames simulated with
+  a PSF are fitted by exactly the same PSF.
+</p>
+
+<dl>
+  <dt>GAUSS</dt>
+  <dd><i>exp(-(x²/2σ²) - (y²/2σ²q²))</i>, FWHM = 2.3548 σ √q.</dd>
+  <dt>MOFFAT</dt>
+  <dd><i>(1 + x²/α² + y²/α²q²)<sup>-β</sup></i>,
+    FWHM = 2α √(2<sup>1/β</sup>-1) √q.</dd>
+  <dt>FILE</dt>
+  <dd>The field-dependent PSF in the
+    <a href="dataform_artpsf.html">PSF file format</a>. The position in the
+    field is given by the pixel offsets from the field centre (NAXIS/2,
+    integer division, as in artificial; <samp>--psf-centre</samp>) divided
+    by the scale [pix/deg] (the WCS of the frame, <samp>--scale</samp>).
+  </dd>
+</dl>
+
+<p>
+  <i>x, y</i> are along the major and the minor axis, the major axis is
+  inclined by the position angle from the x-axis (counter-clockwise);
+  <i>q</i> is the axis ratio (1 for circular PSF). The analytic PSFs of
+  artificial (<samp>--hwhm</samp> is σ or α, <samp>--eccentricity e</samp>
+  is <i>q</i> = √(1-e²), <samp>--inclination</samp> is the angle) are the
+  same functions.
+</p>
+
+<h2>Parameters</h2>
+
+<dl>
+  <dt><samp>--psf GAUSS|MOFFAT|FILE</samp></dt>
+  <dd>The PSF, GAUSS by default (FILE when <samp>--psf-file</samp> is given).</dd>
+  <dt><samp>--psf-file file</samp></dt>
+  <dd>The PSF file (the same as for <samp>artificial --psf-file</samp>).</dd>
+  <dt><samp>--fwhm f</samp></dt>
+  <dd>FWHM of the analytic PSF in pixels. If not given, the PSF shape is
+    fitted (the result is printed with <samp>--verbose</samp> and written
+    to the header). Moffat β is 2.5 when FWHM is given and β is not.</dd>
+  <dt><samp>--beta β</samp></dt>
+  <dd>Moffat exponent (fitted when not given, together with the width).</dd>
+  <dt><samp>--elliptic</samp></dt>
+  <dd>Fit also the axis ratio and the position angle of the analytic PSF.</dd>
+  <dt><samp>--fitrad r</samp></dt>
+  <dd>The fitting radius in pixels. The default is 1.5 FWHM (at least
+    3 pixels) of the local PSF.</dd>
+  <dt><samp>--sky fixed|local</samp></dt>
+  <dd><samp>fixed</samp> (default): the sky in the annulus of aphot
+    (ANNULUS1, ANNULUS2 of APERPHOT; without APERPHOT, the annulus from
+    the fitting radius + 2 pixels, at least 5 pixels wide). The first pass
+    uses the sky of aphot (or a median in the annulus); before the next
+    passes, the sky is re-estimated in the annulus of the frame with all
+    fitted stars subtracted (the mean clipped at 3σ), so the light of
+    neighbours (and of the star itself) does not bias it.
+    <samp>local</samp>: a constant sky is fitted for every star.</dd>
+  <dt><samp>--maxiter n</samp></dt>
+  <dd>The maximum of iterations of a fit, 50 by default.</dd>
+  <dt><samp>--npass n</samp></dt>
+  <dd>The number of passes over all stars, 3 by default.</dd>
+  <dt><samp>--saturate s</samp>, <samp>--gain g</samp>,
+    <samp>--read-noise r</samp></dt>
+  <dd>Override the header: saturation [ADU], gain [e-/ADU], read noise [ADU].</dd>
+  <dt><samp>--scale s</samp>, <samp>--psf-centre x,y</samp></dt>
+  <dd>The scale [pix/deg] and the field centre [pix] for the PSF file.</dd>
+  <dt><samp>--residual file</samp></dt>
+  <dd>Save the frame with all fitted stars subtracted (the sky is kept);
+    for a single input file.</dd>
+</dl>
+
+<p>See <a href="man_com.html">Common options</a> for input/output filenames.</p>
+
+<h2>Output</h2>
+
+<p>
+  The PSFPHOT table has a row for every row of the FIND extension
+  (in the same order), followed by the added saturated stars:
+</p>
+
+<dl>
+  <dt></dt><dd>(Saturated stars added by psfphot follow as further rows.)</dd>
+  <dt>X, Y, XERR, YERR</dt><dd>The fitted position and its errors [pix]
+    (the errors are -1 when the position is not fitted).</dd>
+  <dt>PSFCOUNT, PSFCOUNTERR</dt><dd>The total flux of the star (the integral
+    of the PSF) and its error in the units of the frame (ADU), the same
+    quantity as GCOUNT of <a href="man_gphot.html">gphot</a> or
+    aperture-corrected APCOUNT. PSFCOUNTERR is -1 when the fit failed.</dd>
+  <dt>SKY, SKYERR</dt><dd>The sky and its error [ADU].</dd>
+  <dt>CHI2</dt><dd>The reduced χ² of the fit (about 1 for a good fit).</dd>
+  <dt>SHARP</dt><dd>The relative residual in the core (inside the half of
+    FWHM): positive for objects sharper than PSF (cosmic rays, hot pixels),
+    negative for extended ones (galaxies, blends).</dd>
+  <dt>ROUND</dt><dd>The ellipticity of the data minus that of the model.</dd>
+  <dt>NPIX</dt><dd>The number of fitted pixels.</dd>
+  <dt>FLAG</dt><dd>The sum of: 1 saturated pixel(s) in the core (the flux is
+    estimated from the wings only), 2 pixels in the fitting radius excluded
+    (bad, saturated, out of the frame), 4 the position is not fitted,
+    8 not converged, 16 the fit failed (the flux is not valid),
+    32 another star within the fitting radius, 64 a saturated star added
+    (not detected by find).</dd>
+</dl>
+
+<p>
+  The header keywords: PSFTYPE, PSFFILE, FWHM, HWHM [pix], PSFSIGMA or
+  PSFALPHA and PSFBETA, PSFAXRAT, PSFPA [deg], PSFNSTAR (stars of the
+  shape fit), PSFCEN1, PSFCEN2, PSFSCALE (the PSF file geometry),
+  PSFZOOM, FITRAD, SKYMODE, NPASS and the detector parameters used for
+  the weights: GAIN, READNS, BIASLEV, SATURATE.
+</p>
+
+<p>
+  <a href="man_phcal.html">phcal</a> calibrates the PSF photometry with
+  <samp>--photometry=psf</samp>.
+</p>
+
+<h2>Examples</h2>
+
+<p>
+  PSF photometry with a Gaussian PSF of fitted width:
+</p>
+<code>
+$ munipack find frame.fits<br>
+$ munipack aphot frame.fits<br>
+$ munipack psfphot --verbose frame.fits
+</code>
+
+<p>
+  The field-dependent PSF which simulated the frames:
+</p>
+<code>
+$ munipack artificial --psf-file psf.fits -c cat.fits ...<br>
+$ munipack find artificial.fits<br>
+$ munipack aphot artificial.fits<br>
+$ munipack psfphot --psf-file psf.fits --residual res.fits artificial.fits<br>
+$ munipack astrometry -c cat.fits artificial.fits<br>
+$ munipack phcal --photometry=psf -c cat.fits ... artificial.fits
+</code>
+
+<h2>Limitations</h2>
+
+<ul>
+  <li>Stars are fitted one by one (with neighbours subtracted), not in
+    groups; very close pairs (below about one FWHM) are not separated
+    reliably.</li>
+  <li>Only stars detected by find are fitted, no new stars are searched in
+    the residuals.</li>
+  <li>The PSF file is used as it is; an empirical PSF is not built from the
+    frame.</li>
+</ul>
+
+<h2>See Also</h2>
+<p>
+<a href="man_aphot.html">Aperture Photometry</a>,
+<a href="man_gphot.html">Growth-curve photometry</a>,
+<a href="man_find.html">Find Stars</a>,
+<a href="dataform_artpsf.html">PSF file format</a>,
+<a href="man_com.html">Common options</a>,
+<a href="dataform_photometry.html">Photometry Format</a>.
+</p>
+
+</section>
+<!-- #include virtual="/foot.shtml" -->
+</body>
+</html>

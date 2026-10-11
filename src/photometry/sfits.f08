@@ -386,6 +386,7 @@ contains
 
     ! this is candidate for merge with the analogical subroutine in mfits.f95
 
+    use mfits, only: phmethod
     use astrotrafo
     use astrosphere
     use trajd
@@ -524,11 +525,16 @@ contains
 
     ! move to aperture photometry extension
     call fits_movnam_hdu(fitsfile,FITS_BINARY_TBL,APEREXTNAME,0,status)
-    if( status == FITS_BAD_HDU_NUM ) then
+    if( status == FITS_BAD_HDU_NUM .and. phmethod == 'PSF' ) then
+       ! PSF photometry without aperture photometry: no annulus
+       status = 0
+       fits%annuls = 0
+       fits%aper = -1
+    else if( status == FITS_BAD_HDU_NUM ) then
        write(error_unit,*) &
             "Failed to find an aperture photometry extension in ",trim(filename)
        goto 666
-    end if
+    else
 
     ! sky annulus
     do i = 1, 2
@@ -557,6 +563,8 @@ contains
     call fits_read_key(fitsfile,key,fits%aper,status)
     fits%aper = fits%aper / scale !* tastr%scale
 
+    end if
+
     ! move to growth-curve photometry extension
     call fits_movnam_hdu(fitsfile,FITS_BINARY_TBL,GROWEXTNAME,0,status)
     have_grow = .not. (status == FITS_BAD_HDU_NUM)
@@ -565,7 +573,25 @@ contains
        status = 0
     end if
 
-    if( .not. have_grow .or. saper > 0 ) then
+    if( phmethod == 'PSF' ) then
+       call fits_movnam_hdu(fitsfile,FITS_BINARY_TBL,PSFEXTNAME,0,status)
+       if( status == FITS_BAD_HDU_NUM ) then
+          write(error_unit,*) &
+               "Failed to find a PSF photometry extension in ",trim(filename)
+          goto 666
+       end if
+       call fits_read_key(fitsfile,FITS_KEY_HWHM,hwhm,status)
+       call fits_get_colnum(fitsfile,.true.,FITS_COL_PSFCOUNT,ccol,status)
+       call fits_get_colnum(fitsfile,.true.,FITS_COL_PSFCOUNTERR,dcol,status)
+       fits%radf90 = -1
+       fits%aper = -1
+       fits%phtype = 'PSFPHOT'
+    else if( phmethod == 'GROW' .and. .not. have_grow ) then
+       write(error_unit,*) &
+            "Failed to find a growth-curve photometry extension in ",trim(filename)
+       goto 666
+    else if( .not. have_grow .or. (saper > 0 .and. phmethod /= 'GROW') &
+         .or. phmethod == 'APER' ) then
        call fits_movnam_hdu(fitsfile,FITS_BINARY_TBL,APEREXTNAME,0,status)
        write(key,'(a,i0)') FITS_COL_APCOUNT,maper
        call fits_get_colnum(fitsfile,.true.,key,ccol,status)

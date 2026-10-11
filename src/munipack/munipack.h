@@ -159,6 +159,12 @@ public:
   MuniGphot(wxEvtHandler *, const MuniCmdLineParser&);
 };
 
+class MuniPsfphot: public MuniAction
+{
+public:
+  MuniPsfphot(wxEvtHandler *, const MuniCmdLineParser&);
+};
+
 class MuniFind: public MuniAction
 {
 public:

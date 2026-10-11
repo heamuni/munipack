@@ -30,6 +30,7 @@ program artpsf
   integer, parameter :: height = width
   integer, parameter :: i0 = width / 2
   integer, parameter :: j0 = height / 2
+  integer, parameter :: zoom = 4
   integer :: status, nelements, i, j
   real, dimension(width,height) :: psf
   type(fitsfiles) :: fits
@@ -43,15 +44,16 @@ program artpsf
      end do
   end do
 
-  ! normalisation
+  ! normalisation: the sum of samples is zoom**2 (the unit flux),
+  ! the centre of the star is the pixel (width/2, height/2)
   s = sum(psf)
-  psf = real(psf / s)
+  psf = real(psf / s * zoom**2)
 
   status = 0
   nelements = width*height
   call fits_create_file(fits,'!artpsf.fits',status)
   call fits_insert_img(fits,-32,2,[width,height],status)
-  call fits_write_key(fits,'ZOOM',4,'',status)
+  call fits_write_key(fits,'ZOOM',zoom,'',status)
   call fits_write_img(fits,1,1,nelements,pack(psf,.true.),status)
   call fits_close_file(fits,status)
   call fits_report_error(error_unit,status)

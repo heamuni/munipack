@@ -28,7 +28,7 @@ artificial_SOURCES = ftransform.f08 spray.f08 catio.f08 lcio.f08 generator.f08 \
                      artpicture.f95 lcparams.f08 lcurves.f08 marker.f08 \
                      galaxy.f08 cosmics.f08 flatmodule.f08 fitskeys.f08 \
                      artificial.f08
-artificial_LDADD   = $(ldir)/libnoise.a $(ldir)/libastrotrafo.a \
+artificial_LDADD   = $(ldir)/libpsfmodel.a $(ldir)/libnoise.a $(ldir)/libastrotrafo.a \
                      $(ldir)/libphotometry.a $(ldir)/libastrosphere.a \
                      $(ldir)/libpppack.a $(ldir)/libtitsio.a \
                      $(CAF_LIBS) $(LIBCFITSIO) $(LIBM)

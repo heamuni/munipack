@@ -35,7 +35,7 @@ TARGETS = munipack.html features.html download.html docs.html notfound.html \
          man_intro.html man_help.html man_colouring.html \
          man_bias.html man_dark.html man_flat.html man_phcorr.html \
          man_cone.html man_astrometry.html man_phcal.html man_aphot.html \
-         man_gphot.html \
+         man_gphot.html man_psfphot.html \
          man_list.html man_fits.html man_votable.html man_com.html  \
          man_env.html man_kombine.html man_timeseries.html man_setup.html \
          man_backup.html man_i18n.html \
@@ -64,7 +64,7 @@ EXTRA_DIST = munipack.shtml features.shtml download.shtml docs.shtml notfound.sh
          man_intro.shtml man_help.shtml man_colouring.shtml \
          man_bias.shtml man_dark.shtml man_flat.shtml man_phcorr.shtml \
          man_cone.shtml man_astrometry.shtml man_phcal.shtml man_aphot.shtml \
-         man_gphot.shtml \
+         man_gphot.shtml man_psfphot.shtml \
          man_list.shtml man_fits.shtml man_votable.shtml man_com.shtml  \
          man_env.shtml man_kombine.shtml man_timeseries.shtml man_setup.shtml \
          man_backup.shtml man_i18n.shtml \

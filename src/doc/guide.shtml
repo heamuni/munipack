@@ -82,6 +82,7 @@ the definitive user manual.</p>
 <li><a href="man_find.html">Find stars</a></li>
 <li><a href="man_aphot.html">Aperture photometry</a></li>
 <li><a href="man_gphot.html">Growth-curve photometry</a></li>
+<li><a href="man_psfphot.html">PSF photometry</a></li>
 <li><a href="man_astrometry.html">Astrometry calibration</a></li>
 <li><a href="man_phcal.html">Photometry calibration</a></li>
 <li><a href="man_phfotran.html">Photometry systems transformation</a></li>

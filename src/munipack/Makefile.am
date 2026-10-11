@@ -40,7 +40,7 @@ munipack_SOURCES = munipack.cpp cmd.cpp action.cpp fitsfn.cpp \
                    bias.cpp dark.cpp flat.cpp phcorr.cpp \
                    colouring.cpp cone.cpp timeseries.cpp fits.cpp \
                    astrometry.cpp phcal.cpp votable.cpp find.cpp \
-		   kombine.cpp aphot.cpp gphot.cpp  \
+		   kombine.cpp aphot.cpp gphot.cpp psfphot.cpp \
                    phfotran.cpp cross.cpp artificial.cpp sesame.cpp
 # calibrate.cpp list.cpp grow_report.cpp
 munipack_LDADD = libmprocess.a ../vo/libvocatconf.a \

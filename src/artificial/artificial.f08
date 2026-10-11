@@ -136,7 +136,6 @@ program artificial
 
   real(REAL64), dimension(:,:,:), allocatable :: mpsf
   real(REAL64), dimension(:), allocatable :: rcoo, acoo
-  real(REAL64) :: rgrid, agrid
   integer :: nbox, zoom
   integer, dimension(3) :: mpsf_shape = 0
 
@@ -500,7 +499,13 @@ program artificial
      nstars_coo = size(xcoo)
 
      if( psffile /= '' ) then
-        call LoadSprayFile(psffile,mpsf,rcoo,acoo,rgrid,agrid,zoom,nbox)
+        block
+          use psfmodel, only: psf_file_load
+          integer :: status
+          status = 0
+          call psf_file_load(psffile,mpsf,rcoo,acoo,zoom,nbox,verbose,status)
+          if( status /= 0 ) stop 'Error: failed to read a FITS file with PSF.'
+        end block
         mpsf_shape = shape(mpsf)
      end if
 
@@ -696,8 +701,6 @@ program artificial
   call co_broadcast(nlc_tab,1)
   call co_broadcast(nbox,1)
   call co_broadcast(zoom,1)
-  call co_broadcast(rgrid,1)
-  call co_broadcast(agrid,1)
   call co_broadcast(mpsf_shape,1)
   call co_broadcast(ngal,1)
   call co_broadcast(nstars_coo,1)
@@ -712,9 +715,9 @@ program artificial
      allocate(xcoo(n),ycoo(n),flux(n))
 
      if( all(mpsf_shape > 0) ) then
-        m = mpsf_shape(1)
+        m = mpsf_shape(3)
         n = nbox
-        allocate(mpsf(m,-n:n,-n:n),rcoo(m),acoo(m))
+        allocate(mpsf(-n:n,-n:n,m),rcoo(m),acoo(m))
      end if
      if( ngal > 0 ) allocate(galaxies%gs(ngal))
      if( nlc_tab > 0 ) &
@@ -929,7 +932,7 @@ contains
        call spsf%SprayMe(profile,spread,hwhms,eccentricity,inclination,airy,beta)
        psf => spsf
     else
-       call fpsf%SprayCan(mpsf,rcoo,acoo,rgrid,agrid,scale,zoom,nbox)
+       call fpsf%SprayCan(mpsf,rcoo,acoo,scale,zoom,nbox)
        psf => fpsf
     end if
 
