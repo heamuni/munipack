@@ -13,59 +13,117 @@
   This document describes the format of a point spread function (PSF)
   FITS file intended for simulation in
   <a href="artific.html">Artificial sky tool</a>
-  (<a href="man_artificial.html">manual</a>).
+  (<a href="man_artificial.html">manual</a>) and for
+  <a href="man_psfphot.html">PSF photometry</a>. The PSF may vary over
+  the field of view.
 </p>
 
 <h2>Structure</h2>
 
 <p>
-  PSF is specified by a FITS file having one single primary image extension.
-  The image data represent intensities in projected coordinates.
+  The primary header contains the keyword
+</p>
+<dl>
+  <dt>ZOOM</dt><dd>(integer) the number of PSF samples per pixel along
+    each axis.</dd>
+</dl>
+<p>
+  The keywords RGRID and AGRID of older files are not used.
+</p>
+
+<p>
+  Every image extension having both keywords
+</p>
+<dl>
+  <dt>RADCOO</dt><dd>[deg] the angular distance from the field centre,</dd>
+  <dt>ANGCOO</dt><dd>[deg] the position angle, atan2(<i>y</i>,<i>x</i>) of
+    the pixel offsets from the field centre (counter-clockwise from the
+    <i>x</i>-axis, any value, taken modulo 360)</dd>
+</dl>
+<p>
+  is the PSF at the field position. The extension with RADCOO = 0 is the PSF
+  at the centre. The PSFs with an equal RADCOO form a ring; the number of
+  rings and the number of angles on each ring are arbitrary and the angles of
+  different rings may differ. The order of extensions is not important.
+  Extensions without both keywords are ignored.
+</p>
+
+<p>
+  A file without such extensions, with a two-dimensional primary image and
+  ZOOM, is a single PSF valid in the whole field (the older format).
 </p>
 
 <h2>PSF</h2>
 
 <p>
-  PSF is a two-dimensional array of real values.
-  PSF is recommended to be normalised; the total intensity
-  under the surface can be equal to one, which
-  helps to keep the photometry information.
+  The PSF is a two-dimensional array of real values: the intensity
+  sampled with ZOOM samples per pixel (any size, the sizes of extensions may
+  differ). The sample at the 1-based pixel (CRPIX1, CRPIX2) of the extension,
+  when present, otherwise at (NAXIS1/2, NAXIS2/2) (integer division), is the
+  centre of the star: the star is placed at its catalogue position by this
+  sample. (The template generator below and the generator of field-dependent
+  PSFs place the centre there.)
 </p>
 
 <p>
-  The extension should have included parameter ZOOM which maps
-  PSF on a simulated image.
+  <b>Normalisation:</b> the sum of the samples should be ZOOM² (e.g. 4 for
+  ZOOM = 2); a star then gets its whole flux. The data are used as they are:
+  a sum <i>s</i> gives the fraction <i>s</i>/ZOOM² of the flux (the light
+  outside the stamp can be modelled this way), a warning is printed when
+  the sum differs from ZOOM² by more than 0.1%.
 </p>
 
+<h2>Interpolation over the field</h2>
+
 <p>
-  Processing follows the way:
+  The position of a star in the field is given by its pixel offsets
+  <i>(x,y)</i> from the field centre (the pixel NAXIS/2 of the frame,
+  integer division, which is the reference pixel CRPIX of artificial frames),
+  the radius is <i>r</i> = √(<i>x</i>²+<i>y</i>²) / scale, where scale is
+  in pixels per degree, the angle is atan2(<i>y</i>,<i>x</i>).
 </p>
 <ol>
-  <li>PSF centre is shifted to the centre of a star,</li>
-  <li>PSF is pixelised. Final dimensions are in width: NAXIS1/ZOOM,
-    and in height: NAXIS2/ZOOM,</li>
-  <li>than PSF is directly copied on the right place of the simulated frame.
+  <li>On every ring, the PSF is interpolated linearly in the angle between
+    the two neighbouring PSFs (periodically over 360°; a ring with a single
+    PSF is constant).</li>
+  <li>Inside the first ring, the PSF is interpolated linearly in the radius
+    between the centre PSF and the first ring.</li>
+  <li>Between two rings, it is interpolated linearly in the radius.</li>
+  <li>Beyond the outermost ring, the outermost ring is used.
+    (Without the centre PSF, the first ring is used inside of it.)</li>
 </ol>
 
+<h2>Pixelisation</h2>
+
+<p>
+  The image of a star in detector pixels is the integral over the pixels
+  of the interpolant of the samples: linear between samples for even ZOOM,
+  constant in the cells of samples for odd ZOOM. The integral is exact for
+  any sub-pixel position of the star and it conserves the flux
+  (the sum of pixels is the sum of samples / ZOOM²). For a star at a position
+  on the sample grid, it is the trapezoid rule (even ZOOM) or the midpoint
+  rule (odd ZOOM) over the samples in a pixel.
+  The analytic PSFs of artificial and psfphot are sampled with ZOOM = 16
+  and pixelised in the same way.
+</p>
 
 <h3>Limitations</h3>
 
-<p>
-  There are those limitations:
-</p>
 <ul>
-  <li>Data array should cover a square, eg. NAXIS=2, NAXIS1=NAXIS2.</li>
-  <li>ZOOM should by an integer number.</li>
+  <li>Data arrays are two-dimensional.</li>
+  <li>ZOOM should by an integer number, the same for all PSFs.</li>
+  <li>Non-integer CRPIX is rounded to the nearest sample.</li>
 </ul>
 
 <h2>See Also</h2>
 <p>
   <a href="artific.html#egal">Artificial sky tool</a>,
-  <a href="man_artificial.html">manual</a>.
+  <a href="man_artificial.html">manual</a>,
+  <a href="man_psfphot.html">PSF photometry</a>.
 </p>
 <p>
   <a href="artpsf.f08">artpsf.f08</a> does generate the template
-  <a href="artpsf.lst">artpsf.lst</a> of PSF file;
+  <a href="artpsf.lst">artpsf.lst</a> of a single PSF file;
   run <samp>munipack fits --restore artpsf.lst</samp> to make FITS itself.
 </p>
 

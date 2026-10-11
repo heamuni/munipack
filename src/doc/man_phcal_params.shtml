@@ -79,6 +79,15 @@ phfotran</a>.</dd>
 <dt><samp>--area</samp></dt><dd>Area of telescope aperture in square meters [m2].</dd>
 <dt><samp>--saper</samp></dt><dd>selects appropriate aperture from PHOTOMETRY
     extension. By default, flux in infinite aperture is used.</dd>
+<dt><samp>--photometry aper|grow|psf</samp></dt><dd>selects the photometry:
+    <samp>aper</samp> the aperture photometry (APERPHOT, the aperture by
+    <samp>--saper</samp> or the first one larger than 2σ of the profile),
+    <samp>grow</samp> the growth-curve photometry (GROWPHOT,
+    <a href="man_gphot.html">gphot</a>),
+    <samp>psf</samp> the PSF photometry (PSFPHOT,
+    <a href="man_psfphot.html">psfphot</a>; stars with a saturated core
+    or a failed fit are not used for the calibration).
+    By default, GROWPHOT is used when present, APERPHOT otherwise.</dd>
   <dt><samp>--apcorr</samp></dt><dd>sets the aperture correction.
     This correction converts fluxes in an aperture to the total flux
     (infinite aperture). The value of correction should be obtained
