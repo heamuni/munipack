@@ -21,7 +21,7 @@ AM_FCFLAGS = $(FC_MODINC). $(FC_MODINC)../lib $(AM_FC_MODINC)
 ldir = ../lib
 FITSADD = $(ldir)/libtitsio.a $(LIBCFITSIO)
 
-pkglibexec_PROGRAMS = find aphot gphot phcal phfotran pphot
+pkglibexec_PROGRAMS = find aphot gphot phcal phfotran psfphot
 noinst_PROGRAMS = aphottester
 
 .NOTPARALLEL:
@@ -55,8 +55,8 @@ phfotran_LDADD   = $(ldir)/libastrotrafo.a $(ldir)/libphotometry.a \
                    $(LIBOAKLEAF) $(LIBMINPACK) $(FITSADD)
 # $(ldir)/libphio.a
 
-pphot_SOURCES = psf.f08 fitspphot.f08 pphot.f95
-pphot_LDADD   = $(ldir)/liblmin.a $(FITSADD)
+psfphot_SOURCES = fitspsfphot.f08 psffit.f08 psfphot.f08
+psfphot_LDADD   = $(ldir)/libpsfmodel.a $(FITSADD)
 
 dist_pkgdata_DATA = photosystems.lst
 dist_html_DATA = grow_report.sh grow_report.py
