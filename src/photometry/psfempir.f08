@@ -40,7 +40,9 @@
 !  combines all of them without a sub-pixel bias (nor the smoothing of
 !  an interpolation). The weights are the inverse variances of the
 !  model, outliers (cosmic rays, neighbours not subtracted) are clipped
-!  at 5 sigma. A light regularisation by the squared Laplacian keeps the
+!  at 5 sigma. A sky offset of every star is fitted too, on a ring of
+!  pixels just outside of the tables (inside, a sky error would be a
+!  pedestal of the tables). A light regularisation by the squared Laplacian keeps the
 !  tables smooth where the stars sample the grid sparsely, and pulls
 !  them to zero at the edge of the table.
 !

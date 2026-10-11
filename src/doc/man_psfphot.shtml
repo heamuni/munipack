@@ -230,8 +230,8 @@ munipack psfphot [.. parameters ..] file(s)
 <li>The zoom is 4 for FWHM &lt; 5 pixels and 2 otherwise
   (<samp>--psf-zoom</samp>), the zoom of the file in the correction mode.
   The table radius is 4 FWHM (<samp>--psf-radius</samp>); in the
-  correction mode it covers also 99.5% of the flux of the base at the
-  centre and at the corners of the frame (within its stamps).
+  correction mode it covers the whole stamps of the file (a halo of
+  the field PSFs can reach far beyond 4 FWHM).
 </li>
 <li>The variation of the order 1 or 2 requires three stars per term
   (9, 18); with fewer stars a lower order is used with a warning. The
@@ -282,7 +282,7 @@ munipack psfphot [.. parameters ..] file(s)
   <dd>The analytic core of the empirical PSF, MOFFAT by default: its
     wings carry the light beyond the table, β is fitted (up to 10, which
     is a Gaussian for this purpose). A Gaussian core on stars with Moffat
-    wings loses that light (−0.7% for β = 2.5).</dd>
+    wings loses that light (−0.9% for β = 2.5).</dd>
   <dt><samp>--psf-zoom n</samp></dt>
   <dd>The samples per pixel of the empirical PSF: 4 for FWHM &lt; 5
     pixels, 2 otherwise.</dd>

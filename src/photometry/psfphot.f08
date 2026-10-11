@@ -508,10 +508,9 @@ contains
           psfrad = psfrad_par
        else
           psfrad = 4*fwhm
-          ! a file: also the radius of 99.5% of the flux at the centre and
-          ! the corners (a halo of the field PSFs), within the stamps
-          if( psf%ptype == PSF_FILE ) psfrad = max(psfrad,min(base_radius(), &
-               real(nbox / zoom,REAL64)))
+          ! a file: the whole stamps (the PSF of the file may have a halo
+          ! far beyond 4 FWHM; the sky of PSF stars is fitted outside)
+          if( psf%ptype == PSF_FILE ) psfrad = max(psfrad,real(nbox / zoom,REAL64))
        end if
        psf%ntab = psf%zoom*ceiling(psfrad)
        nvar = psfvar
@@ -1204,51 +1203,6 @@ contains
       end if
 
     end subroutine estimate_shape
-
-    real(REAL64) function base_radius()
-
-      ! the largest radius [pix] of 99.5% of the flux of the base PSF
-      ! at the field centre and the corners of the frame
-
-      real(REAL64), dimension(:,:), allocatable :: sub
-      real(REAL64), dimension(:), allocatable :: r, f
-      integer, dimension(:), allocatable :: idx, tmp
-      real(REAL64), dimension(5) :: xs, ys
-      real(REAL64) :: total, cum
-      integer :: nsub, k, i, j, l, m
-
-      xs = [psf%xcen, 1.0_REAL64, real(frame%naxes(1),REAL64), 1.0_REAL64, &
-           real(frame%naxes(1),REAL64)]
-      ys = [psf%ycen, 1.0_REAL64, 1.0_REAL64, real(frame%naxes(2),REAL64), &
-           real(frame%naxes(2),REAL64)]
-      base_radius = 0
-      do k = 1, 5
-         if( allocated(sub) ) deallocate(sub)
-         call psf%sampled_base(xs(k),ys(k),sub,nsub)
-         m = (2*nsub + 1)**2
-         allocate(r(m),f(m))
-         l = 0
-         do j = -nsub, nsub
-            do i = -nsub, nsub
-               l = l + 1
-               r(l) = hypot(real(i,REAL64),real(j,REAL64)) / psf%zoom
-               f(l) = sub(i,j)
-            end do
-         end do
-         total = sum(f)
-         ! the order by radius (merge sort, descending by -r)
-         idx = [(l, l = 1, m)]
-         call msort(idx,-r,tmp)
-         cum = 0
-         do l = 1, m
-            cum = cum + f(idx(l))
-            if( cum >= 0.995_REAL64*total ) exit
-         end do
-         base_radius = max(base_radius,r(idx(min(l,m))))
-         deallocate(r,f,idx,tmp)
-      end do
-
-    end function base_radius
 
     pure integer function npoly_of(nvar)
 
