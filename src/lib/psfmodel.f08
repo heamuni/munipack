@@ -58,9 +58,9 @@ module psfmodel
   ! the sampling of the analytic PSFs, the same as in artificial
   integer, parameter, public :: PSF_DEFZOOM = 16
 
-  public :: psf_file_load, psf_field_interpolate, psf_pixelize, &
-       psf_analytic_sample, psf_analytic_fwhm, psf_sampled_fwhm, &
-       psf_moffat_alpha
+  public :: psf_file_load, psf_file_save, psf_field_interpolate, &
+       psf_pixelize, psf_pixel_weights, psf_analytic_sample, &
+       psf_analytic_fwhm, psf_sampled_fwhm, psf_moffat_alpha
 
 contains
 
@@ -268,6 +268,69 @@ contains
   end subroutine psf_file_load
 
 
+  subroutine psf_file_save(filename,stamps,rcoo,acoo,zoom,keys,vals,coms, &
+       comments,status)
+
+    ! Writes the PSFs stamps(-nbox:nbox,-nbox:nbox,m) (centres at the
+    ! element (0,0)) at the field positions rcoo, acoo [deg] in the format
+    ! read by psf_file_load: the primary header with ZOOM (and the optional
+    ! real keywords keys = vals / coms and comments), one image extension
+    ! with RADCOO, ANGCOO, CRPIX1, CRPIX2 for each PSF. An existing file
+    ! is overwritten.
+
+    use titsio
+
+    character(len=*), intent(in) :: filename
+    real(REAL64), dimension(:,:,:), intent(in) :: stamps
+    real(REAL64), dimension(:), intent(in) :: rcoo, acoo
+    integer, intent(in) :: zoom
+    character(len=*), dimension(:), intent(in) :: keys, coms, comments
+    real(REAL64), dimension(:), intent(in) :: vals
+    integer, intent(in out) :: status
+
+    type(fitsfiles) :: fits
+    integer :: k, n
+
+    if( status /= 0 ) return
+
+    call fits_create_file(fits,'!'//trim(filename),status)
+    if( status /= 0 ) then
+       write(error_unit,*) "Error: failed to create the PSF file `", &
+            trim(filename),"'."
+       return
+    end if
+
+    call fits_insert_img(fits,-32,0,[0],status)
+    call fits_write_key(fits,'ZOOM',zoom,'PSF samples per pixel',status)
+    do k = 1, size(keys)
+       call fits_write_key(fits,keys(k),vals(k),-10,coms(k),status)
+    end do
+    do k = 1, size(comments)
+       call fits_write_comment(fits,comments(k),status)
+    end do
+    call fits_write_comment(fits,'Every extension is the PSF at the field '// &
+         'position RADCOO, ANGCOO,',status)
+    call fits_write_comment(fits,'the sum of samples is ZOOM**2 for the '// &
+         'unit flux (see dataform_artpsf).',status)
+
+    n = size(stamps,1)
+    do k = 1, size(stamps,3)
+       call fits_insert_img(fits,-32,2,[n,n],status)
+       call fits_write_key(fits,'RADCOO',rcoo(k),-10, &
+            '[deg] radial distance from the field centre',status)
+       call fits_write_key(fits,'ANGCOO',acoo(k),-10, &
+            '[deg] position angle, atan2(y,x)',status)
+       call fits_write_key(fits,'CRPIX1',(n + 1)/2,'centre of the PSF',status)
+       call fits_write_key(fits,'CRPIX2',(n + 1)/2,'centre of the PSF',status)
+       call fits_write_image(fits,0,real(stamps(:,:,k)),status)
+    end do
+
+    call fits_close_file(fits,status)
+    call fits_report_error(error_unit,status)
+
+  end subroutine psf_file_save
+
+
   subroutine psf_ref_pixel(fits,naxes,refs,status)
 
     ! the reference pixel (the PSF centre) of the current HDU
@@ -468,8 +531,8 @@ contains
 
     allocate(wx(0:zoom+2,-n:n),wy(0:zoom+2,-n:n), &
          dwx(0:zoom+2,-n:n),dwy(0:zoom+2,-n:n))
-    call weights(u,sx,lx,wx,dwx)
-    call weights(v,sy,ly,wy,dwy)
+    call psf_pixel_weights(nmax,zoom,n,u,sx,lx,wx,dwx)
+    call psf_pixel_weights(nmax,zoom,n,v,sy,ly,wy,dwy)
 
     ! the range of samples needed along x
     s1 = nmax + 1
@@ -521,50 +584,59 @@ contains
        end do
     end do
 
+  end subroutine psf_pixelize
+
+
+  pure subroutine psf_pixel_weights(nmax,zoom,n,u,sw,lw,w,dw)
+
+    ! The weights of the samples -nmax..nmax along one axis for the pixels
+    ! -n..n, whose centres are at i+u pixels from the star centre: the
+    ! pixel i is the sum of samples sw(i) .. sw(i)+lw(i)-1 times w(0:,i)
+    ! (divided by zoom along each axis, see psf_pixelize); dw are the
+    ! derivatives of the weights by u. The interpolant of samples is
+    ! linear (even zoom) or constant over the sample cells (odd zoom).
+    ! The pixelisation is separable: the image of a star is
+    !   p(i,j) = sum_k sum_l wx(k-sx(i),i) wy(l-sy(j),j) psf(k,l) / zoom**2.
+
+    integer, intent(in) :: nmax, zoom, n
+    real(REAL64), intent(in) :: u
+    integer, dimension(-n:), intent(out) :: sw, lw
+    real(REAL64), dimension(0:,-n:), intent(out) :: w, dw
+
+    real(REAL64) :: a, b, h
+    integer :: i, s, k1, k2
+
+    ! the half-width of the interpolation kernel in samples
+    if( mod(zoom,2) == 0 ) then
+       h = 1
+    else
+       h = 0.5_REAL64
+    end if
+
+    do i = -n, n
+       ! the pixel borders in samples
+       a = zoom*(i + u - 0.5_REAL64)
+       b = zoom*(i + u + 0.5_REAL64)
+       k1 = max(ceiling(a - h),-nmax)
+       k2 = min(floor(b + h),nmax)
+       ! remove samples of zero weights on both ends
+       do while( k1 <= k2 )
+          if( b - k1 > -h .and. a - k1 < h ) exit
+          k1 = k1 + 1
+       end do
+       do while( k2 >= k1 )
+          if( b - k2 > -h .and. a - k2 < h ) exit
+          k2 = k2 - 1
+       end do
+       sw(i) = k1
+       lw(i) = max(k2 - k1 + 1,0)
+       do s = k1, k2
+          w(s-k1,i) = cumkernel(b - s) - cumkernel(a - s)
+          dw(s-k1,i) = zoom*(kernel(b - s) - kernel(a - s))
+       end do
+    end do
+
   contains
-
-    pure subroutine weights(u,sw,lw,w,dw)
-
-      ! weights of samples sw .. sw+lw-1 for pixels -n..n
-
-      real(REAL64), intent(in) :: u
-      integer, dimension(-n:), intent(out) :: sw, lw
-      real(REAL64), dimension(0:,-n:), intent(out) :: w, dw
-
-      real(REAL64) :: a, b, h
-      integer :: i, s, k1, k2
-
-      ! the half-width of the interpolation kernel in samples
-      if( mod(zoom,2) == 0 ) then
-         h = 1
-      else
-         h = 0.5_REAL64
-      end if
-
-      do i = -n, n
-         ! the pixel borders in samples
-         a = zoom*(i + u - 0.5_REAL64)
-         b = zoom*(i + u + 0.5_REAL64)
-         k1 = max(ceiling(a - h),-nmax)
-         k2 = min(floor(b + h),nmax)
-         ! remove samples of zero weights on both ends
-         do while( k1 <= k2 )
-            if( b - k1 > -h .and. a - k1 < h ) exit
-            k1 = k1 + 1
-         end do
-         do while( k2 >= k1 )
-            if( b - k2 > -h .and. a - k2 < h ) exit
-            k2 = k2 - 1
-         end do
-         sw(i) = k1
-         lw(i) = max(k2 - k1 + 1,0)
-         do s = k1, k2
-            w(s-k1,i) = cumkernel(b - s) - cumkernel(a - s)
-            dw(s-k1,i) = zoom*(kernel(b - s) - kernel(a - s))
-         end do
-      end do
-
-    end subroutine weights
 
     pure real(REAL64) function cumkernel(x)
 
@@ -606,7 +678,7 @@ contains
 
     end function kernel
 
-  end subroutine psf_pixelize
+  end subroutine psf_pixel_weights
 
 
   pure subroutine psf_analytic_sample(ptype,width,beta,q,pa,zoom,nmax,psf)
