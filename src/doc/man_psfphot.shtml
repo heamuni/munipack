@@ -223,6 +223,20 @@ munipack psfphot [.. parameters ..] file(s)
   The tables are zero outside of their radius, where no data constrain
   them.
 </li>
+<li>The correction of a PSF file shrinks towards zero where the data
+  do not support it, so a correct base is not changed by the noise: the
+  tables are built also on eight interleaved subsets of the PSF stars;
+  in radial zones (0, 1, 1.5, 2, 3, 4, 6, 8, 11, 15, 21, 30 pixels) and
+  for every polynomial term, the mean of the table (a change of the
+  encircled energy) and the fluctuation about it are kept when their
+  power exceeds four times the variance by the subsets (2σ), zeroed
+  below twice it, linearly between. The variance of the mean includes a
+  systematic floor of 0.05% of the flux per zone: the background and
+  the crowding of a frame are not known better (a correct dpsf.fits
+  base gained up to ±0.25% without it). Corrections below that level
+  are not applied: a 10% broader base is corrected from +2.2% to
+  about ±0.3%, an asymmetric one from +0.9% to +0.05–0.13%.
+</li>
 <li>Iterations (three): all stars are fitted by the current PSF
   (neighbours subtracted, groups fitted simultaneously), the tables are
   rebuilt; then the usual passes follow.

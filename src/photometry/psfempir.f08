@@ -102,14 +102,16 @@ contains
 
     type(EmpStar), dimension(:), allocatable :: es
     real(REAL64), dimension(:,:,:), allocatable :: x, r, z, p, q, b, diag
-    real(REAL64), dimension(:), allocatable :: xs, rs, zz, ps, qs, bs, ds
+    real(REAL64), dimension(:), allocatable :: xs, rs, zz, ps, qs, bs, ds, xsa
+    real(REAL64), dimension(:,:,:,:), allocatable :: xk
+    logical, dimension(:), allocatable :: inuse
     real(REAL64), dimension(:,:), allocatable :: sub, pold, pbase, reff, pm, cb, &
          supp
     real(REAL64), dimension(:), allocatable :: lam, eta, zs
     real(REAL64), dimension(3,3) :: cm
     real(REAL64), dimension(3) :: mom, coef
     real(REAL64) :: rz, rznew, alpha, bnorm, rnorm, s, h, sig, rsky
-    integer :: ns, nt, ntab, zoom, npoly, k, i, j, l, t, n, nsub, iter, i0, j0
+    integer :: ns, nt, ntab, zoom, npoly, k, i, j, l, t, n, nsub, iter, i0, j0, nk
     logical :: ok
 
     ns = size(stars)
@@ -212,74 +214,18 @@ contains
        deallocate(reff,pm)
     end if
 
-    ! the right side, the diagonal of the normal matrix
     allocate(b(-ntab:ntab,-ntab:ntab,npoly),diag(-ntab:ntab,-ntab:ntab,npoly), &
          r(-ntab:ntab,-ntab:ntab,npoly),z(-ntab:ntab,-ntab:ntab,npoly), &
          p(-ntab:ntab,-ntab:ntab,npoly),q(-ntab:ntab,-ntab:ntab,npoly), &
          reff(-ntab:ntab,-ntab:ntab),pm(-nt:nt,-nt:nt),lam(npoly),eta(npoly), &
-         xs(ns),rs(ns),zz(ns),ps(ns),qs(ns),bs(ns),ds(ns))
-    b = 0
-    diag = 0
+         xs(ns),rs(ns),zz(ns),ps(ns),qs(ns),bs(ns),ds(ns),inuse(ns))
+
+    ! the tables by all stars
     xs = 0
-    do k = 1, ns
-       associate(e => es(k))
-         bs(k) = sum(e%w*e%t)
-         ds(k) = max(sum(e%w),tiny(1.0_REAL64))
-         pm = e%flux*e%w*e%t
-         call adjoint(e,pm,reff,.false.)
-         do t = 1, npoly
-            b(:,:,t) = b(:,:,t) + e%pt(t)*reff
-         end do
-         pm = e%flux**2*e%w
-         call adjoint(e,pm,reff,.true.)
-         do t = 1, npoly
-            diag(:,:,t) = diag(:,:,t) + e%pt(t)**2*reff
-         end do
-       end associate
-    end do
+    inuse = .true.
+    call cgsolve(x,xs,niter)
 
-    ! the regularisation relative to the mean of the diagonal
-    do t = 1, npoly
-       s = sum(diag(:,:,t),diag(:,:,t) > 0) / max(count(diag(:,:,t) > 0),1)
-       lam(t) = smooth*s
-       eta(t) = 1e-6_REAL64*s
-       diag(:,:,t) = diag(:,:,t) + 20*lam(t) + eta(t)
-       b(:,:,t) = supp*b(:,:,t)
-    end do
-
-    ! the preconditioned conjugate gradients (the tables and the skies)
-    call operator(x,xs,q,qs)
-    r = b - q
-    rs = bs - qs
-    z = r / diag
-    zz = rs / ds
-    p = z
-    ps = zz
-    rz = sum(r*z) + sum(rs*zz)
-    bnorm = sqrt(sum(b**2) + sum(bs**2))
-    niter = 0
-    do iter = 1, maxiter
-       niter = iter
-       rnorm = sqrt(sum(r**2) + sum(rs**2))
-       if( .not. (rnorm > tol*bnorm) ) exit
-       call operator(p,ps,q,qs)
-       s = sum(p*q) + sum(ps*qs)
-       if( .not. (s > 0) ) exit
-       alpha = rz / s
-       x = x + alpha*p
-       xs = xs + alpha*ps
-       r = r - alpha*q
-       rs = rs - alpha*qs
-       z = r / diag
-       zz = rs / ds
-       rznew = sum(r*z) + sum(rs*zz)
-       p = z + (rznew / rz)*p
-       ps = zz + (rznew / rz)*ps
-       rz = rznew
-    end do
-
-    ! no flux, no shift: the tables minus a combination of the base at
-    ! the field centre and its derivatives have zero sum and moments
+    ! the base at the field centre and its derivatives (the constraints)
     call psf%sampled_base(psf%pxc,psf%pyc,sub,nsub)
     allocate(cb(-ntab:ntab,-ntab:ntab),pold(-ntab:ntab,-ntab:ntab), &
          pbase(-ntab:ntab,-ntab:ntab))
@@ -294,20 +240,29 @@ contains
     call moments(cb,cm(:,1))
     call moments(pold,cm(:,2))
     call moments(pbase,cm(:,3))
-    ! the model of the constant term is rescaled to the unit flux
-    ! (and shifted), the other terms by the same factor
-    call moments(x(:,:,1),mom)
-    call solve3(cm,mom,coef,ok)
-    if( ok ) then
-       h = 1 / (1 + coef(1)*sum(cb) / sum(sub))
-    else
-       h = 1
+    call project(x)
+
+    ! The shrinkage (a correction of a PSF file): the tables by nk
+    ! subsets of the stars (interleaved by brightness) estimate the
+    ! noise of the tables; in every radial zone and for every term, the
+    ! table is kept where it is significant and shrinks towards zero
+    ! where it is not (see shrink), so an exact base is not changed by
+    ! the noise of the stars.
+    nk = min(8,ns / 4)
+    if( psf%ptype == PSF_FILE .and. nk >= 2 ) then
+       allocate(xk(-ntab:ntab,-ntab:ntab,npoly,nk),xsa(ns))
+       do l = 1, nk
+          xk(:,:,:,l) = x
+          xsa = xs
+          inuse = [(mod(k - 1,nk) == l - 1, k = 1, ns)]
+          call cgsolve(xk(:,:,:,l),xsa,i)
+          call project(xk(:,:,:,l))
+       end do
+       inuse = .true.
+       call shrink(x,xk)
+       call project(x)
     end if
-    do t = 1, npoly
-       call moments(x(:,:,t),mom)
-       call solve3(cm,mom,coef,ok)
-       if( ok ) x(:,:,t) = h*(x(:,:,t) - coef(1)*cb - coef(2)*pold - coef(3)*pbase)
-    end do
+
     h = maxval(cb)
     resrms = sqrt(sum(x(:,:,1)**2,supp > 0) / count(supp > 0)) / h
     psf%res = x
@@ -323,6 +278,182 @@ contains
     end do
 
   contains
+
+    subroutine cgsolve(x,xs,niter)
+
+      ! the tables x and the skies xs by the stars inuse (the initial
+      ! values on input), by the preconditioned conjugate gradients
+
+      real(REAL64), dimension(-ntab:,-ntab:,:), intent(in out) :: x
+      real(REAL64), dimension(:), intent(in out) :: xs
+      integer, intent(out) :: niter
+
+      real(REAL64) :: rz, rznew, alpha, bnorm, rnorm, s
+      integer :: k, t, iter
+
+      ! the right side, the diagonal of the normal matrix
+      b = 0
+      diag = 0
+      bs = 0
+      ds = 1
+      do k = 1, ns
+         if( .not. inuse(k) ) cycle
+         associate(e => es(k))
+           bs(k) = sum(e%w*e%t)
+           ds(k) = max(sum(e%w),tiny(1.0_REAL64))
+           pm = e%flux*e%w*e%t
+           call adjoint(e,pm,reff,.false.)
+           do t = 1, npoly
+              b(:,:,t) = b(:,:,t) + e%pt(t)*reff
+           end do
+           pm = e%flux**2*e%w
+           call adjoint(e,pm,reff,.true.)
+           do t = 1, npoly
+              diag(:,:,t) = diag(:,:,t) + e%pt(t)**2*reff
+           end do
+         end associate
+      end do
+      where( .not. inuse ) xs = 0
+
+      ! the regularisation relative to the mean of the diagonal
+      do t = 1, npoly
+         s = sum(diag(:,:,t),diag(:,:,t) > 0) / max(count(diag(:,:,t) > 0),1)
+         lam(t) = smooth*s
+         eta(t) = 1e-6_REAL64*s
+         diag(:,:,t) = diag(:,:,t) + 20*lam(t) + eta(t)
+         b(:,:,t) = supp*b(:,:,t)
+      end do
+
+      call operator(x,xs,q,qs)
+      r = b - q
+      rs = bs - qs
+      z = r / diag
+      zz = rs / ds
+      p = z
+      ps = zz
+      rz = sum(r*z) + sum(rs*zz)
+      bnorm = sqrt(sum(b**2) + sum(bs**2))
+      niter = 0
+      do iter = 1, maxiter
+         niter = iter
+         rnorm = sqrt(sum(r**2) + sum(rs**2))
+         if( .not. (rnorm > tol*bnorm) ) exit
+         call operator(p,ps,q,qs)
+         s = sum(p*q) + sum(ps*qs)
+         if( .not. (s > 0) ) exit
+         alpha = rz / s
+         x = x + alpha*p
+         xs = xs + alpha*ps
+         r = r - alpha*q
+         rs = rs - alpha*qs
+         z = r / diag
+         zz = rs / ds
+         rznew = sum(r*z) + sum(rs*zz)
+         p = z + (rznew / rz)*p
+         ps = zz + (rznew / rz)*ps
+         rz = rznew
+      end do
+
+    end subroutine cgsolve
+
+    subroutine project(x)
+
+      ! no flux, no shift: the tables minus a combination of the base at
+      ! the field centre and its derivatives have zero sum and moments;
+      ! the model of the constant term is rescaled to the flux of the
+      ! base (and shifted), the other terms by the same factor
+
+      real(REAL64), dimension(-ntab:,-ntab:,:), intent(in out) :: x
+      real(REAL64), dimension(3) :: mom, coef
+      real(REAL64) :: h
+      integer :: t
+      logical :: ok
+
+      call moments(x(:,:,1),mom)
+      call solve3(cm,mom,coef,ok)
+      if( ok ) then
+         h = 1 / (1 + coef(1)*sum(cb) / sum(sub))
+      else
+         h = 1
+      end if
+      do t = 1, npoly
+         call moments(x(:,:,t),mom)
+         call solve3(cm,mom,coef,ok)
+         if( ok ) x(:,:,t) = h*(x(:,:,t) - coef(1)*cb - coef(2)*pold - coef(3)*pbase)
+      end do
+
+    end subroutine project
+
+    subroutine shrink(x,xk)
+
+      ! The shrinkage of the tables by radial zones: in every zone, the
+      ! mean (the coherent part, it carries the flux) and the fluctuation
+      ! about it are multiplied by min(1,max(0,(rho - 2)/2)), where rho
+      ! is their power relative to the variance estimated by the scatter
+      ! of the tables of the subsets: a zone without a significant
+      ! correction (below 1.4 sigma) is zero, a significant one (above
+      ! 2 sigma) is kept as it is.
+
+      real(REAL64), dimension(-ntab:,-ntab:,:), intent(in out) :: x
+      real(REAL64), dimension(-ntab:,-ntab:,:,:), intent(in) :: xk
+      real(REAL64), dimension(*), parameter :: edges = [0.0_REAL64, 1.0_REAL64, &
+           1.5_REAL64, 2.0_REAL64, 3.0_REAL64, 4.0_REAL64, 6.0_REAL64, 8.0_REAL64, &
+           11.0_REAL64, 15.0_REAL64, 21.0_REAL64, 30.0_REAL64, 1e9_REAL64]
+      logical, dimension(-ntab:ntab,-ntab:ntab) :: zone
+      real(REAL64), dimension(-ntab:ntab,-ntab:ntab) :: rr, xbar, dev
+      real(REAL64), dimension(size(xk,4)) :: mk
+      real(REAL64) :: mx, mbar, vm, vf, fm, ff
+      real(REAL64), parameter :: fluxfloor = 5e-4_REAL64
+      integer :: i, j, t, m, n, kk, nk
+
+      nk = size(xk,4)
+      do j = -ntab, ntab
+         do i = -ntab, ntab
+            rr(i,j) = hypot(real(i,REAL64),real(j,REAL64)) / zoom
+         end do
+      end do
+      do t = 1, npoly
+         xbar = sum(xk(:,:,t,:),dim=3) / nk
+         do m = 1, size(edges) - 1
+            zone = rr >= edges(m) .and. rr < edges(m+1) .and. supp > 0
+            n = count(zone)
+            if( n == 0 ) cycle
+            mx = sum(x(:,:,t),zone) / n
+            do kk = 1, nk
+               mk(kk) = sum(xk(:,:,t,kk),zone) / n
+            end do
+            mbar = sum(mk) / nk
+            ! the variances of the mean of all stars
+            vm = sum((mk - mbar)**2) / (nk*(nk - 1))
+            ! the systematic floor: 0.1% of the flux in the zone (the
+            ! background and the crowding of the frame are not known
+            ! better, a smaller change of the profile is not trusted)
+            vm = vm + (fluxfloor*zoom**2 / n)**2
+            vf = 0
+            do kk = 1, nk
+               dev = xk(:,:,t,kk) - mk(kk) - (xbar - mbar)
+               vf = vf + sum(dev**2,zone)
+            end do
+            vf = vf / (nk*(nk - 1))
+            fm = ramp(mx**2,vm)
+            ff = ramp(sum((x(:,:,t) - mx)**2,zone),vf)
+            where( zone ) x(:,:,t) = fm*mx + ff*(x(:,:,t) - mx)
+         end do
+      end do
+
+    end subroutine shrink
+
+    real(REAL64) function ramp(power,noise)
+
+      real(REAL64), intent(in) :: power, noise
+
+      if( noise > 0 ) then
+         ramp = min(1.0_REAL64,max(0.0_REAL64,(power / noise - 2) / 2))
+      else
+         ramp = 1
+      end if
+
+    end function ramp
 
     subroutine combine(x,pt,reff)
 
@@ -354,7 +485,9 @@ contains
 
       ! (the input is zero outside of the support)
       av = 0
+      avs = 0
       do k = 1, ns
+         if( .not. inuse(k) ) cycle
          associate(e => es(k))
            call combine(v,e%pt,reff)
            call forward(e,reff,pm)
