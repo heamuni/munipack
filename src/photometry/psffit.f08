@@ -47,7 +47,8 @@ module psffit
        FLAG_NOCONV    = 8, & ! not converged
        FLAG_FAILED    = 16,& ! fit failed, the flux is not valid
        FLAG_CROWDED   = 32,& ! a neighbour within the fitting radius
-       FLAG_ADDED     = 64   ! a saturated star added (not detected by find)
+       FLAG_ADDED     = 64,& ! a saturated star added (not detected by find)
+       FLAG_RESID     = 128  ! a star found in the residuals (not by find)
 
   type, public :: PsfType
      integer :: ptype = PSF_GAUSS
@@ -62,8 +63,16 @@ module psffit
      real(REAL64), dimension(:,:,:), allocatable :: stamps
      real(REAL64), dimension(:), allocatable :: rcoo, acoo
      real(REAL64) :: xcen = 0, ycen = 0, scale = 1
+     ! the empirical PSF: the base (analytic or file PSF above) plus
+     ! the residual tables res(-ntab:ntab,-ntab:ntab,npoly) sampled with
+     ! the same zoom, the terms of the polynomial in the normalised field
+     ! coordinates (x - pxc)/pxs, (y - pyc)/pys: 1, x, y, x**2, x*y, y**2
+     logical :: empirical = .false.
+     integer :: ntab = 0, npoly = 1
+     real(REAL64), dimension(:,:,:), allocatable :: res
+     real(REAL64) :: pxc = 0, pyc = 0, pxs = 1, pys = 1
    contains
-     procedure :: sampled, prepare, fwhm
+     procedure :: sampled, sampled_base, prepare, fwhm, poly_terms
   end type PsfType
 
   type, public :: FrameType
@@ -82,10 +91,12 @@ module psffit
      real(REAL64) :: chi2 = -1, sharp = 0, round = 0
      real(REAL64) :: fitrad = 0, satrad = 0
      integer :: npix = 0, flag = 0, modrad = 0
+     ! the group of the simultaneous fit (0 when fitted alone), its size
+     integer :: group = 0, gsize = 1
      logical :: modelled = .false.
   end type StarFit
 
-  public :: fit_star, add_model, fit_shape, linear_flux
+  public :: fit_star, fit_group, add_model, fit_shape, linear_flux
 
 contains
 
@@ -108,25 +119,91 @@ contains
 
   subroutine sampled(this,x,y,sub,nsub)
 
-    ! the sampled PSF for a star at x,y
+    ! the sampled PSF for a star at x,y (the empirical PSF: the base
+    ! plus the residual tables)
 
     class(PsfType), intent(in) :: this
     real(REAL64), intent(in) :: x,y
     real(REAL64), dimension(:,:), allocatable, intent(in out) :: sub
     integer, intent(out) :: nsub
 
+    real(REAL64), dimension(:), allocatable :: pt
+    integer :: t, n
+
+    call this%sampled_base(x,y,sub,nsub)
+    if( this%empirical ) then
+       n = this%ntab
+       allocate(pt(this%npoly))
+       call this%poly_terms(x,y,pt)
+       do t = 1, this%npoly
+          sub(-n:n,-n:n) = sub(-n:n,-n:n) + pt(t)*this%res(:,:,t)
+       end do
+    end if
+
+  end subroutine sampled
+
+
+  subroutine sampled_base(this,x,y,sub,nsub)
+
+    ! the sampled PSF for a star at x,y without the residual tables
+    ! of the empirical PSF (the size covers them)
+
+    class(PsfType), intent(in) :: this
+    real(REAL64), intent(in) :: x,y
+    real(REAL64), dimension(:,:), allocatable, intent(in out) :: sub
+    integer, intent(out) :: nsub
+
+    real(REAL64), dimension(:,:), allocatable :: tmp
+    integer :: n
+
     if( this%ptype == PSF_FILE ) then
        nsub = this%nbox
+       if( this%empirical ) nsub = max(nsub,this%ntab)
        if( .not. allocated(sub) ) allocate(sub(-nsub:nsub,-nsub:nsub))
-       call psf_field_interpolate(this%stamps,this%rcoo,this%acoo, &
-            x - this%xcen,y - this%ycen,this%scale,sub)
+       if( nsub == this%nbox ) then
+          call psf_field_interpolate(this%stamps,this%rcoo,this%acoo, &
+               x - this%xcen,y - this%ycen,this%scale,sub)
+       else
+          n = this%nbox
+          allocate(tmp(-n:n,-n:n))
+          call psf_field_interpolate(this%stamps,this%rcoo,this%acoo, &
+               x - this%xcen,y - this%ycen,this%scale,tmp)
+          sub = 0
+          sub(-n:n,-n:n) = tmp
+       end if
     else
        nsub = this%nsub
        if( .not. allocated(sub) ) allocate(sub(-nsub:nsub,-nsub:nsub))
        sub = this%sub
     end if
 
-  end subroutine sampled
+  end subroutine sampled_base
+
+
+  pure subroutine poly_terms(this,x,y,pt)
+
+    ! the terms of the polynomial of the empirical PSF at x,y
+
+    class(PsfType), intent(in) :: this
+    real(REAL64), intent(in) :: x,y
+    real(REAL64), dimension(:), intent(out) :: pt
+
+    real(REAL64) :: u, v
+
+    u = (x - this%pxc) / this%pxs
+    v = (y - this%pyc) / this%pys
+    pt(1) = 1
+    if( size(pt) >= 3 ) then
+       pt(2) = u
+       pt(3) = v
+    end if
+    if( size(pt) >= 6 ) then
+       pt(4) = u**2
+       pt(5) = u*v
+       pt(6) = v**2
+    end if
+
+  end subroutine poly_terms
 
 
   real(REAL64) function fwhm(this,x,y)
@@ -138,7 +215,7 @@ contains
     real(REAL64), dimension(:,:), allocatable :: sub
     integer :: nsub
 
-    if( this%ptype == PSF_FILE ) then
+    if( this%ptype == PSF_FILE .or. this%empirical ) then
        call this%sampled(x,y,sub,nsub)
        fwhm = psf_sampled_fwhm(sub,this%zoom)
     else
@@ -561,6 +638,381 @@ contains
   end subroutine fit_star
 
 
+  subroutine fit_group(frame,psf,stars,localsky,maxiter,snrpos,rcore,ok)
+
+    ! The simultaneous fit of a group of stars with overlapping fitting
+    ! regions: the fluxes and positions of all members (and a common sky
+    ! with localsky) in the union of their fitting circles. The models
+    ! of the members must not be included in mstar. The faint members
+    ! (S/N < snrpos at the initial positions) and the members which run
+    ! away (more than a half of the fitting radius, or a non-positive
+    ! flux) are fitted at their initial positions. ok is false when the
+    ! normal equations are singular; the caller fits the members alone.
+
+    type(FrameType), intent(in) :: frame
+    type(PsfType), intent(in) :: psf
+    type(StarFit), dimension(:), intent(in out) :: stars
+    logical, intent(in) :: localsky
+    integer, intent(in) :: maxiter
+    real(REAL64), intent(in) :: snrpos
+    real(REAL64), dimension(:), intent(in) :: rcore
+    logical, intent(out) :: ok
+
+    type MemberPsf
+       real(REAL64), dimension(:,:), allocatable :: sub
+       integer :: nsub, n
+    end type MemberPsf
+
+    type(MemberPsf), dimension(:), allocatable :: mp
+    real(REAL64), dimension(:), allocatable :: d, b, w, m, mt, par, ptry, g, &
+         dp, sb, x0, y0, flim, mpart
+    real(REAL64), dimension(:,:), allocatable :: jac, jact, a, ad, cov, mm
+    integer, dimension(:), allocatable :: ii, jj
+    logical, dimension(:), allocatable :: free, posfixed, runaway
+    logical, dimension(:,:), allocatable :: inside
+    real(REAL64) :: chi2, chi2try, lambda, step, sum1, sum2, skyerr, r2
+    integer :: nm, np, npix, mx, k, l, i, j, iter, ntry, ix1, ix2, jy1, jy2, &
+         nfree, restart
+    logical :: converged
+
+    ok = .false.
+    nm = size(stars)
+    np = 3*nm + 1
+
+    allocate(x0(nm),y0(nm),flim(nm),posfixed(nm),runaway(nm),mp(nm))
+    do l = 1, nm
+       stars(l)%flag = 0
+       x0(l) = stars(l)%x
+       y0(l) = stars(l)%y
+       call region_flags(frame,stars(l),rcore(l))
+       flim(l) = max(stars(l)%fitrad / 2,1.0_REAL64)
+    end do
+
+    ! the union of the fitting circles (valid pixels)
+    ix1 = huge(ix1)
+    ix2 = -huge(ix2)
+    jy1 = huge(jy1)
+    jy2 = -huge(jy2)
+    do l = 1, nm
+       ix1 = min(ix1,floor(stars(l)%x - stars(l)%fitrad))
+       ix2 = max(ix2,ceiling(stars(l)%x + stars(l)%fitrad))
+       jy1 = min(jy1,floor(stars(l)%y - stars(l)%fitrad))
+       jy2 = max(jy2,ceiling(stars(l)%y + stars(l)%fitrad))
+    end do
+    ix1 = max(ix1,1)
+    jy1 = max(jy1,1)
+    ix2 = min(ix2,size(frame%data,1))
+    jy2 = min(jy2,size(frame%data,2))
+    k = max((ix2 - ix1 + 1)*(jy2 - jy1 + 1),1)
+    allocate(ii(k),jj(k),inside(k,nm))
+    npix = 0
+    do j = jy1, jy2
+       do i = ix1, ix2
+          if( .not. frame%valid(i,j) ) cycle
+          npix = npix + 1
+          ii(npix) = i
+          jj(npix) = j
+          do l = 1, nm
+             r2 = (i - stars(l)%x)**2 + (j - stars(l)%y)**2
+             inside(npix,l) = r2 <= stars(l)%fitrad**2
+          end do
+          if( .not. any(inside(npix,:)) ) npix = npix - 1
+       end do
+    end do
+    do l = 1, nm
+       stars(l)%npix = count(inside(1:npix,l))
+    end do
+    if( npix < np + 3 .or. any(stars%npix < 4) ) return
+
+    ! the PSFs of members, the pixelisation boxes covering all pixels
+    mx = max(ix2 - ix1,jy2 - jy1)
+    do l = 1, nm
+       call psf%sampled(stars(l)%x,stars(l)%y,mp(l)%sub,mp(l)%nsub)
+       mp(l)%n = mx + ceiling(flim(l)) + 2
+    end do
+
+    allocate(d(npix),b(npix),w(npix),m(npix),mt(npix),mpart(npix), &
+         jac(npix,np),jact(npix,np),mm(npix,nm),par(np),ptry(np),g(np), &
+         dp(np),sb(np),a(np,np),ad(np,np),cov(np,np),free(np))
+    do k = 1, npix
+       d(k) = frame%data(ii(k),jj(k)) - frame%mstar(ii(k),jj(k))
+       b(k) = frame%mstar(ii(k),jj(k))
+    end do
+
+    do l = 1, nm
+       par(3*l-2:3*l) = [max(stars(l)%flux,0.0_REAL64), stars(l)%x, stars(l)%y]
+    end do
+    if( localsky ) then
+       par(np) = sum(stars%sky) / nm
+       skyerr = -1
+    else
+       par(np) = sum(stars%sky) / nm
+       if( all(stars%skyerr > 0) ) then
+          skyerr = sum(stars%skyerr) / nm
+       else
+          skyerr = -1
+       end if
+    end if
+
+    ! the linear fit of fluxes at the initial positions decides on the
+    ! position fits
+    posfixed = .true.
+    call set_free
+    do iter = 1, 3
+       call evaluate(par,m,jac)
+       w = 1 / frame%variance(b + m + par(np))
+       call normal(par,m,w,chi2,a,g)
+       call solve(a,g,dp,ok)
+       if( .not. ok ) return
+       par = par + dp
+    end do
+    call invert(a,cov,ok)
+    if( .not. ok ) return
+    do l = 1, nm
+       posfixed(l) = .not. (cov(3*l-2,3*l-2) > 0 .and. &
+            par(3*l-2) > snrpos*sqrt(cov(3*l-2,3*l-2)))
+    end do
+
+    do restart = 1, nm + 1
+
+       call set_free
+       lambda = 1e-3_REAL64
+       converged = .false.
+       ok = .true.
+
+       do iter = 1, maxiter
+
+          call evaluate(par,m,jac)
+          w = 1 / frame%variance(b + m + par(np))
+          call normal(par,m,w,chi2,a,g)
+
+          do ntry = 1, 12
+             ad = a
+             do i = 1, np
+                ad(i,i) = a(i,i)*(1 + lambda)
+             end do
+             call solve(ad,g,dp,ok)
+             if( .not. ok ) exit
+             ! limit the shifts of positions
+             step = 0
+             do l = 1, nm
+                step = max(step,abs(dp(3*l-1)),abs(dp(3*l)))
+             end do
+             if( step > 0.5_REAL64 ) dp = dp * (0.5_REAL64 / step)
+             ptry = par + dp
+             call evaluate(ptry,mt,jact)
+             chi2try = sum(w*(d - mt - ptry(np))**2)
+             if( chi2try <= chi2 ) then
+                lambda = max(lambda / 10,1e-12_REAL64)
+                exit
+             else
+                lambda = lambda * 10
+             end if
+          end do
+          if( .not. ok ) exit
+          if( chi2try > chi2 ) then
+             converged = .true.
+             exit
+          end if
+          par = ptry
+
+          converged = abs(dp(np)) < 1e-4_REAL64*sqrt(max(1/a(np,np),0.0_REAL64))
+          do l = 1, nm
+             converged = converged .and. abs(dp(3*l-1)) < 1e-4_REAL64 .and. &
+                  abs(dp(3*l)) < 1e-4_REAL64 .and. abs(dp(3*l-2)) < &
+                  1e-6_REAL64*abs(par(3*l-2)) + 1e-3_REAL64*sqrt(1/a(3*l-2,3*l-2))
+          end do
+          if( converged ) exit
+       end do
+       if( .not. ok ) return
+
+       ! members which run away are fitted at the initial positions
+       do l = 1, nm
+          runaway(l) = .not. posfixed(l) .and. &
+               (hypot(par(3*l-1) - x0(l),par(3*l) - y0(l)) > flim(l) .or. &
+               .not. (par(3*l-2) > 0))
+       end do
+       if( .not. any(runaway) ) exit
+       do l = 1, nm
+          if( runaway(l) ) then
+             posfixed(l) = .true.
+             par(3*l-1) = x0(l)
+             par(3*l) = y0(l)
+             par(3*l-2) = max(stars(l)%flux,0.0_REAL64)
+          end if
+       end do
+    end do
+
+    ! covariance by the weights of the final model
+    call evaluate(par,m,jac)
+    w = 1 / frame%variance(b + m + par(np))
+    call normal(par,m,w,chi2,a,g)
+    call invert(a,cov,ok)
+    if( .not. ok ) return
+    if( .not. localsky .and. skyerr > 0 ) then
+       do i = 1, np
+          sb(i) = sum(w*jac(:,i))
+       end do
+       sb = matmul(cov,sb)
+    else
+       sb = 0
+    end if
+
+    nfree = count(free)
+    do l = 1, nm
+       stars(l)%flux = par(3*l-2)
+       stars(l)%x = par(3*l-1)
+       stars(l)%y = par(3*l)
+       stars(l)%sky = par(np)
+       if( localsky ) then
+          stars(l)%skyerr = sqrt(max(cov(np,np),0.0_REAL64))
+       end if
+       if( posfixed(l) ) stars(l)%flag = stars(l)%flag + FLAG_POSFIXED
+       if( .not. converged ) stars(l)%flag = stars(l)%flag + FLAG_NOCONV
+       stars(l)%fluxerr = sqrt(max(cov(3*l-2,3*l-2),0.0_REAL64))
+       if( skyerr > 0 ) stars(l)%fluxerr = hypot(stars(l)%fluxerr,sb(3*l-2)*skyerr)
+       if( .not. posfixed(l) ) then
+          stars(l)%xerr = sqrt(max(cov(3*l-1,3*l-1),0.0_REAL64))
+          stars(l)%yerr = sqrt(max(cov(3*l,3*l),0.0_REAL64))
+       else
+          stars(l)%xerr = -1
+          stars(l)%yerr = -1
+       end if
+
+       ! chi2, sharpness and roundness in the circle of the member,
+       ! the other members subtracted
+       mpart = par(3*l-2)*jac(:,3*l-2)
+       k = stars(l)%npix
+       chi2 = sum(w*(d - m - par(np))**2,inside(1:npix,l))
+       stars(l)%chi2 = chi2 / max(k - count(free(3*l-2:3*l)),1)
+       sum1 = 0
+       sum2 = 0
+       do k = 1, npix
+          if( .not. inside(k,l) ) cycle
+          if( hypot(ii(k) - par(3*l-1),jj(k) - par(3*l)) <= rcore(l) ) then
+             sum1 = sum1 + (d(k) - m(k) - par(np))
+             sum2 = sum2 + mpart(k)
+          end if
+       end do
+       if( sum2 > 0 ) then
+          stars(l)%sharp = sum1 / sum2
+       else
+          stars(l)%sharp = 0
+       end if
+       stars(l)%round = ellipticity(d - par(np) - (m - mpart),l) - &
+            ellipticity(mpart,l)
+    end do
+    ok = .true.
+
+  contains
+
+    subroutine set_free
+
+      integer :: l
+
+      free = .true.
+      do l = 1, nm
+         free(3*l-1:3*l) = .not. posfixed(l)
+      end do
+      free(np) = localsky
+
+    end subroutine set_free
+
+    subroutine evaluate(par,m,jac)
+
+      ! the model of all members (without sky) and its derivatives
+
+      real(REAL64), dimension(:), intent(in) :: par
+      real(REAL64), dimension(:), intent(out) :: m
+      real(REAL64), dimension(:,:), intent(out) :: jac
+
+      real(REAL64), dimension(:,:), allocatable :: p, pu, pv
+      integer :: i0, j0, k, i, j, l, n
+
+      m = 0
+      jac = 0
+      do l = 1, nm
+         n = mp(l)%n
+         allocate(p(-n:n,-n:n),pu(-n:n,-n:n),pv(-n:n,-n:n))
+         i0 = nint(par(3*l-1))
+         j0 = nint(par(3*l))
+         call psf_pixelize(mp(l)%sub,mp(l)%nsub,psf%zoom,i0 - par(3*l-1), &
+              j0 - par(3*l),n,p,pu,pv)
+         do k = 1, npix
+            i = ii(k) - i0
+            j = jj(k) - j0
+            if( abs(i) <= n .and. abs(j) <= n ) then
+               m(k) = m(k) + par(3*l-2)*p(i,j)
+               jac(k,3*l-2) = p(i,j)
+               jac(k,3*l-1) = -par(3*l-2)*pu(i,j)
+               jac(k,3*l) = -par(3*l-2)*pv(i,j)
+            end if
+         end do
+         deallocate(p,pu,pv)
+      end do
+      jac(:,np) = 1
+
+    end subroutine evaluate
+
+    subroutine normal(par,m,w,chi2,a,g)
+
+      real(REAL64), dimension(:), intent(in) :: par, m, w
+      real(REAL64), intent(out) :: chi2
+      real(REAL64), dimension(:,:), intent(out) :: a
+      real(REAL64), dimension(:), intent(out) :: g
+
+      real(REAL64), dimension(npix) :: r
+      integer :: i, j
+
+      r = d - m - par(np)
+      chi2 = sum(w*r**2)
+      a = 0
+      g = 0
+      do i = 1, np
+         if( .not. free(i) ) then
+            a(i,i) = 1
+            cycle
+         end if
+         g(i) = sum(w*jac(:,i)*r)
+         do j = 1, i
+            if( .not. free(j) ) cycle
+            a(i,j) = sum(w*jac(:,i)*jac(:,j))
+            a(j,i) = a(i,j)
+         end do
+      end do
+
+    end subroutine normal
+
+    real(REAL64) function ellipticity(f,l)
+
+      real(REAL64), dimension(:), intent(in) :: f
+      integer, intent(in) :: l
+      real(REAL64) :: sxx, syy, sxy, u, v, q
+      integer :: k
+
+      sxx = 0
+      syy = 0
+      sxy = 0
+      do k = 1, npix
+         if( .not. inside(k,l) ) cycle
+         q = max(f(k),0.0_REAL64)
+         u = ii(k) - par(3*l-1)
+         v = jj(k) - par(3*l)
+         sxx = sxx + q*u**2
+         syy = syy + q*v**2
+         sxy = sxy + q*u*v
+      end do
+      if( sxx + syy > 0 ) then
+         ellipticity = sqrt((sxx - syy)**2 + 4*sxy**2) / (sxx + syy)
+      else
+         ellipticity = 0
+      end if
+
+    end function ellipticity
+
+  end subroutine fit_group
+
+
   subroutine region_flags(frame,star,rcore)
 
     ! saturated pixels in the core, excluded pixels in the fitting radius
@@ -597,12 +1049,15 @@ contains
   end subroutine region_flags
 
 
-  subroutine fit_shape(frame,psf,star,fitbeta,elliptic,maxiter,pshape,ok)
+  subroutine fit_shape(frame,psf,star,fitbeta,elliptic,maxiter,pshape,ok,betamax)
 
     ! The fit of an isolated star by the analytic PSF with free shape:
     ! pshape = [width, beta, c1, c2], where the axis ratio and the angle
     ! are q = 1 - hypot(c1,c2), pa = atan2(c2,c1)/2. The sky is local.
     ! The width (and beta, c1, c2) on input are the initial values.
+    ! The optional betamax is the largest beta: a Moffat profile with
+    ! beta = 10 is Gaussian to 1e-6 of the flux beyond 4 FWHM, while beta
+    ! converges slowly towards infinity for Gaussian stars.
 
     type(FrameType), intent(in) :: frame
     type(PsfType), intent(in) :: psf
@@ -614,6 +1069,7 @@ contains
 
     integer, parameter :: npar = 8
     real(REAL64), parameter :: rad = 45 / atan(1.0_REAL64)
+    real(REAL64), intent(in), optional :: betamax
     real(REAL64), dimension(:), allocatable :: d, w, m, mt
     real(REAL64), dimension(:,:), allocatable :: jac, jact
     integer, dimension(:), allocatable :: ii, jj
@@ -658,6 +1114,7 @@ contains
           if( dp(5) < -0.5_REAL64*par(5) ) dp = dp * (-0.5_REAL64*par(5) / dp(5))
           ptry = par + dp
           if( ptry(6) < 1.05_REAL64 ) ptry(6) = 1.05_REAL64
+          if( present(betamax) ) ptry(6) = min(ptry(6),betamax)
           if( hypot(ptry(7),ptry(8)) > 0.8_REAL64 ) &
                ptry(7:8) = ptry(7:8) * 0.8_REAL64 / hypot(ptry(7),ptry(8))
           call evaluate(ptry,mt,jact)
@@ -674,6 +1131,10 @@ contains
           exit
        end if
        par = ptry
+       if( present(betamax) ) then
+          ! a Gaussian profile: beta at the limit
+          if( free(6) .and. par(6) >= betamax ) free(6) = .false.
+       end if
        if( maxval(abs(dp(2:3))) < 1e-4_REAL64 .and. &
             abs(dp(5)) < 1e-5_REAL64*par(5) .and. abs(dp(6)) < 1e-4_REAL64 .and. &
             maxval(abs(dp(7:8))) < 1e-5_REAL64 ) then
