@@ -1011,14 +1011,15 @@ contains
     end block
     call cosmics(nevents,cosmics_cmax,cosmics_len,sky)
 
+    ! watermark, in electrons like the background level; before the
+    ! conversion, so the saturation applies to it too
+    call watermark(sky,5*sqrt(back))
+
     ! make it realistic: analog-digital conversion
     sky = sky / gain + bias
     ! the converter saturates on the total value, including bias
     if( bitpix > 0 ) sky = max(sky,0.0_REAL64)
     sky = min(sky,saturate)
-
-    ! watermark
-    call watermark(sky,5*sqrt(back))
 
     ! save the generated artificial sky to FITS file
     status = 0

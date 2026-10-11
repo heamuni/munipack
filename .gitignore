@@ -4,3 +4,4 @@
 *.a
 *.log
 .claude/
+.vscode/
