@@ -306,7 +306,11 @@ contains
        call fits_write_key(fits,keys(k),vals(k),-10,coms(k),status)
     end do
     do k = 1, size(comments)
-       call fits_write_comment(fits,comments(k),status)
+       ! (in pieces which fit to the cards)
+       do n = 1, len_trim(comments(k)), 70
+          call fits_write_comment(fits,comments(k)(n:min(n+69, &
+               len_trim(comments(k)))),status)
+       end do
     end do
     call fits_write_comment(fits,'Every extension is the PSF at the field '// &
          'position RADCOO, ANGCOO,',status)

@@ -2123,7 +2123,7 @@ contains
       real(REAL64), dimension(:,:), allocatable :: sub
       real(REAL64), dimension(:), allocatable :: rr, rc, ac
       real(REAL64) :: scale, rmax, x, y, a
-      character(len=FLEN_CARD), dimension(3) :: comments
+      character(len=200), dimension(3) :: comments
       integer :: nsub, nr, na, k, l, m, ns
 
       scale = psf%scale
@@ -2189,10 +2189,10 @@ contains
          end do
       end do
 
-      write(comments(1),'(3a)') 'Empirical PSF by munipack psfphot from ', &
-           trim(filename),'.'
+      write(comments(1),'(2a)') 'Empirical PSF by psfphot from ', &
+           trim(shortname(filename))
       if( psf%ptype == PSF_FILE ) then
-         write(comments(2),'(3a,i0,a,i0,a)') 'Base: FILE ',trim(psffile), &
+         write(comments(2),'(3a,i0,a,i0,a)') 'Base: FILE ',trim(shortname(psffile)), &
               ', variation order ',nvar,', ',npsfsel,' PSF stars.'
       else
          write(comments(2),'(3a,i0,a,i0,a)') 'Base: ',trim(psfcore), &

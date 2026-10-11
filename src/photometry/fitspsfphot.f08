@@ -364,7 +364,7 @@ contains
     call fits_write_key(fits,FITS_KEY_PSFTYPE,hdr%psftype, &
          'PSF: GAUSS, MOFFAT, FILE or EMPIRICAL',status)
     if( hdr%psffile /= '' ) &
-         call fits_write_key(fits,FITS_KEY_PSFFILE,hdr%psffile,'PSF file',status)
+         call fits_write_key(fits,FITS_KEY_PSFFILE,shortname(hdr%psffile),'PSF file',status)
     if( hdr%fwhm_fitted ) then
        com = '[pix] FWHM of PSF (fitted)'
     else
@@ -391,7 +391,7 @@ contains
        call fits_write_key(fits,'PSFITER',hdr%nbuild, &
             'iterations of the PSF build',status)
        if( hdr%psfsave /= '' ) call fits_write_key(fits,'PSFSAVED', &
-            hdr%psfsave,'the empirical PSF saved to',status)
+            shortname(hdr%psfsave),'the empirical PSF saved to',status)
     end if
     if( hdr%psftype == 'GAUSS' .or. hdr%core == 'GAUSS' ) then
        call fits_write_key(fits,'PSFSIGMA',hdr%width,-6, &
@@ -524,5 +524,23 @@ contains
     call fits_report_error(error_unit,status)
 
   end subroutine fits_psfphot_residual
+
+  function shortname(name)
+
+    ! a file name for a keyword value (at most 68 characters, a longer
+    ! one keeps its end: the value would not fit to a FITS card)
+
+    character(len=*), intent(in) :: name
+    character(len=68) :: shortname
+    integer :: n
+
+    n = len_trim(name)
+    if( n <= 68 ) then
+       shortname = name(:n)
+    else
+       shortname = '...'//name(n-64:n)
+    end if
+
+  end function shortname
 
 end module fitspsfphot
