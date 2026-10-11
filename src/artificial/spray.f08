@@ -42,7 +42,7 @@ module spray
   end type SprayType
 
   type, extends(SprayType), public :: FileSprayType
-     real(REAL64) :: rgrid = 0, agrid = 0, scale = 0
+     real(REAL64) :: scale = 0
      real(REAL64), dimension(:,:,:), allocatable :: mpsf
      real(REAL64), dimension(:), allocatable :: rcoo, acoo
    contains
@@ -50,7 +50,7 @@ module spray
      procedure :: Pixelize => PixelizeFile
   end type FileSprayType
 
-  public :: SprayMe, SprayCan, LoadSprayFile, PixelizePsf, PixelizeFile
+  public :: SprayMe, SprayCan, PixelizePsf, PixelizeFile
 
 contains
 
@@ -381,127 +381,56 @@ contains
 
   subroutine PixelizePsf(this,x,y,dx,dy,xpsf,n)
 
+    ! The PSF integrated over pixels; the pixel centres are at dx,dy
+    ! (any real numbers) from the star, see psf_pixelize.
+
+    use psfmodel
+
     class(SprayType) :: this
     real(REAL64), intent(in) :: x,y,dx, dy
     real(REAL64), dimension(-n:n,-n:n), intent(out) :: xpsf
     integer, intent(in) :: n
-    ! The default lower dimension in subroutine is 1 (allocatable array?),
-    ! we pass the dimensions which we needs.
 
-    integer :: x0,y0,k,l,i,j,k1,k2,l1,l2,m,m2,nmax
-    real(REAL64), dimension(:), allocatable :: wx, wy
-    real(REAL64) :: we
-
-    nmax = ubound(this%psf,1)
-    x0 = nint(this%zoom*dx)
-    y0 = nint(this%zoom*dy)
-    m = this%zoom
-    m2 = m / 2
-
-    ! A pixel is integrated over the window k-m2 .. k+m2 of sub-pixels.
-    ! For even zoom, the window has zoom+1 elements, the edge sub-pixels
-    ! are shared by neighbouring pixels, so the trapezoid rule (weights 1/2
-    ! on the edges) is used to conserve the total flux.
-    if( mod(m,2) == 0 ) then
-       we = 0.5_REAL64
-    else
-       we = 1
-    end if
-    allocate(wx(-m2:m2),wy(-m2:m2))
-
-    xpsf = 0
-    do i = -n,n
-       k = i*m + x0
-       k1 = max(k - m2,-nmax)
-       k2 = min(k + m2, nmax)
-       if( k1 > k2 ) cycle
-       wx = 1
-       wx(-m2) = we
-       wx(m2) = we
-       do j = -n,n
-          l = j*m + y0
-          l1 = max(l - m2,-nmax)
-          l2 = min(l + m2, nmax)
-          if( l1 > l2 ) cycle
-          wy = 1
-          wy(-m2) = we
-          wy(m2) = we
-          xpsf(i,j) = dot_product(wx(k1-k:k2-k), &
-               matmul(this%psf(k1:k2,l1:l2),wy(l1-l:l2-l))) / m**2
-       end do
-    end do
-
-    deallocate(wx,wy)
+    call psf_pixelize(this%psf,ubound(this%psf,1),this%zoom,dx,dy,n,xpsf)
 
   end subroutine PixelizePsf
 
   subroutine PixelizeFile(this,x,y,dx,dy,xpsf,n)
+
+    ! x,y are offsets from the field centre in pixels
+
+    use psfmodel
 
     class(FileSprayType) :: this
     real(REAL64), intent(in) :: x,y, dx, dy
     real(REAL64), dimension(-n:n,-n:n), intent(out) :: xpsf
     integer, intent(in) :: n
 
-    call psfinterpol(this%mpsf,x,y,this%rgrid,this%agrid,this%scale,this%psf)
+    call psf_field_interpolate(this%mpsf,this%rcoo,this%acoo,x,y,this%scale, &
+         this%psf)
     call PixelizePsf(this,x,y,dx,dy,xpsf,n)
 
   end subroutine PixelizeFile
 
-  pure subroutine psfinterpol(mpsf,x,y,rgrid,agrid,scale,obr)
+  subroutine SprayCan(this,mpsf,rcoo,acoo,scale,zoom,nbox)
 
-    real(REAL64), dimension(:,:,:), intent(in) :: mpsf
-    real(REAL64), intent(in) :: x,y,rgrid,agrid,scale
-    real(REAL64), dimension(:,:), intent(out) :: obr
-    real(REAL64) :: r,a,df,dr
-    integer :: m,l,k,i0,j1,j2
-
-    r = hypot(x,y) / scale
-    m = size(mpsf,1)
-    l = min(int(r / rgrid),0)
-    i0 = 1 + l
-    a = rad*atan2(y,x)
-    if( a < 0 ) a = a + 360
-    k = int(a / agrid)
-!    write(*,*) a,k,k*agrid
-    j1 = k+2
-    if( k > 9 ) j1 = 1 + mod(k,9)
-    j2 = j1 + 1
-    if( j2 > 9 ) j2 = 2
-!    if( idx(3) > 9 ) idx(3) = 2 + mod(k,9)
-!    write(*,*) 'idx=',idx,mpsf(idx)%acoo,k,x,y
-
-    dr = (r - l*rgrid) / rgrid
-    df = (a - k*agrid) / agrid
-
-    obr = (1 - df)*mpsf(j1,:,:) + df*mpsf(j2,:,:)
-!    write(*,*) x,y,i0,j1,j2,k,dr,df,r,a
-
-    if( dr < 1 ) then
-       obr = (1 - dr)*mpsf(i0,:,:) + dr*obr
-    end if
-
-  end subroutine psfinterpol
-
-  subroutine SprayCan(this,mpsf,rcoo,acoo,rgrid,agrid,scale,zoom,nbox)
+    ! mpsf(-nbox:nbox,-nbox:nbox,:) are PSFs loaded by psf_file_load
 
     class(FileSprayType) :: this
     real(REAL64), dimension(:,:,:), intent(in) :: mpsf
     real(REAL64), dimension(:), intent(in) :: rcoo,acoo
-    real(REAL64), intent(in) :: rgrid, agrid, scale
+    real(REAL64), intent(in) :: scale
     integer, intent(in) :: zoom, nbox
     integer :: n,m
-    integer, dimension(3) :: dims
 
-    this%rgrid = rgrid
-    this%agrid = agrid
     this%zoom = zoom
-    this%nbox = nbox
     this%scale = scale
+    ! the half-size of the pixelised PSF in pixels
+    this%nbox = nbox / zoom + 2
 
-    dims = shape(mpsf)
-    m = dims(1)
+    m = size(mpsf,3)
     n = nbox
-    allocate(this%psf(-n:n,-n:n),this%mpsf(m,-n:n,-n:n),this%rcoo(m),this%acoo(m))
+    allocate(this%psf(-n:n,-n:n),this%mpsf(-n:n,-n:n,m),this%rcoo(m),this%acoo(m))
     this%psf = 0
     this%mpsf = mpsf
     this%rcoo = rcoo
@@ -509,71 +438,5 @@ contains
 
   end subroutine SprayCan
 
-  subroutine LoadSprayFile(filename,mpsf,rcoo,acoo,rgrid,agrid,zoom,nbox)
-
-    use titsio
-
-    character(len=*), intent(in) :: filename
-    real(REAL64), dimension(:,:,:), allocatable, intent(out) :: mpsf
-    real(REAL64), dimension(:), allocatable, intent(out) :: rcoo, acoo
-    real(REAL64), intent(out) :: rgrid, agrid
-    integer, intent(out) :: zoom,nbox
-    type(fitsfiles) :: fits
-    integer :: naxis,status,k,n,n1,nhdu, hdutype
-    integer, dimension(2) :: naxes
-    logical :: anynull
-
-    status = 0
-    call fits_open_file(fits,filename,FITS_READONLY,status)
-    if( status /= 0 ) goto 666
-
-    call fits_read_key(fits,'RGRID',rgrid,status)
-    call fits_read_key(fits,'AGRID',agrid,status)
-    call fits_read_key(fits,'ZOOM',zoom,status)
-    if( status == FITS_KEYWORD_NOT_FOUND ) goto 666
-
-    nhdu = nint(360 / agrid) + 1
-
-    allocate(rcoo(nhdu),acoo(nhdu))
-
-    do k = 1, nhdu
-
-       call fits_movrel_hdu(fits,1,hdutype,status)
-       if( status == FITS_BAD_HDU_NUM ) goto 666
-       call fits_read_key(fits,'RADCOO',rcoo(k),status)
-       call fits_read_key(fits,'ANGCOO',acoo(k),status)
-       if( status == FITS_KEYWORD_NOT_FOUND ) goto 666
-
-       call fits_get_img_dim(fits,naxis,status)
-       if( naxis /= 2 ) stop 'spray.Load(): PSF should by 2D image array.'
-       call fits_get_image_size(fits,naxes,status)
-       if( naxes(1) /= naxes(2) ) stop 'spray.Load(): PSF should be a square.'
-
-       n = naxes(1) / 2
-       n1 = naxes(1) - (n + 1)
-       if( k == 1 ) then
-          nbox = n
-          allocate(mpsf(nhdu,-n:n1,-n:n1))
-       else
-          if( nbox /= n ) then
-             write(error_unit,*) 'spray.Load() is speaking:', &
-                  ' All PSF pieces should have equal dimensions.'
-             goto 666
-          end if
-       end if
-
-       call fits_read_image(fits,1,0.0_REAL64,mpsf(k,:,:),anynull,status)
-    end do
-
-    call fits_close_file(fits,status)
-    call fits_report_error(error_unit,status)
-
-    return
-
-666 continue
-    call fits_report_error(error_unit,status)
-    if( status /= 0 ) stop 'Error: spray.Load() failed to read a FITS file with PSF.'
-
-  end subroutine LoadSprayFile
 
 end module spray
