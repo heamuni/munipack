@@ -407,8 +407,23 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddUsageText("Usage: munipack "+action+" [options] file(s)");
     AddUsageText("* PSF photometry (stars by find, sky by aphot)");
 
-    AddOption("","psf","PSF: GAUSS (default), MOFFAT, FILE");
-    AddOption("","psf-file","PSF file (field-dependent PSF, as artificial)");
+    AddOption("","psf","PSF: GAUSS (default), MOFFAT, FILE, EMPIRICAL");
+    AddOption("","psf-file","PSF file (field-dependent PSF, as artificial; "
+	      "with EMPIRICAL the base corrected by the frame)");
+    AddOption("","psf-core","core of EMPIRICAL PSF: MOFFAT (default), GAUSS");
+    AddOption("","psf-zoom","EMPIRICAL: samples per pixel "
+	      "(default: 4 for FWHM < 5 pix, else 2)",wxCMD_LINE_VAL_NUMBER);
+    AddOption("","psf-radius","EMPIRICAL: radius of the residual table [pix] "
+	      "(default: 4*FWHM)",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","psf-var","EMPIRICAL: order of the spatial variation "
+	      "0, 1, 2 (default: 0)",wxCMD_LINE_VAL_NUMBER);
+    AddOption("","psf-stars","EMPIRICAL: maximum of PSF stars (default: 100)",
+	      wxCMD_LINE_VAL_NUMBER);
+    AddOption("","psf-list","EMPIRICAL: PSF stars by a list (x y per line, "
+	      "or a FITS table with X, Y)");
+    AddOption("","psf-save","EMPIRICAL: save the PSF to a PSF file");
+    AddOption("","psf-smooth","EMPIRICAL: regularisation of the residual "
+	      "table (default: 0.01)",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","fwhm","FWHM [pix] of analytic PSF (default: fitted)",
 	      wxCMD_LINE_VAL_DOUBLE);
     AddOption("","beta","Moffat exponent (default: fitted)",
@@ -431,6 +446,10 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
 	      wxCMD_LINE_VAL_DOUBLE);
     AddOption("","psf-centre","x,y field centre of PSF file [pix] "
 	      "(default: NAXIS/2)");
+    AddOption("","group","stars closer than this [FWHM] are fitted "
+	      "simultaneously (default: 1.5, 0 off)",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","residual-detect","passes of the detection of stars "
+	      "in residuals (default: 0)",wxCMD_LINE_VAL_NUMBER);
     AddOption("","residual","save the residual frame (single file only)");
     COMMON_OPTIONS_MULTIPLE
     AddParam("file(s)",wxCMD_LINE_VAL_STRING,

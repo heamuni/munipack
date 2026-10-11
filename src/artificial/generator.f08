@@ -65,8 +65,11 @@ contains
              l = j - y
              if(  1 <= i .and. i <= naxes(1) .and. &
                   1 <= j .and. j <= naxes(2) ) then
+                ! negative values (PSFs measured or built empirically
+                ! have them in the wings) are added too, the flux is
+                ! conserved (the mean image is clipped for the noise)
                 f = psf(k,l)
-                if( f > 0 ) sky(i,j) = sky(i,j) + f
+                sky(i,j) = sky(i,j) + f
              end if
           end do
        end do

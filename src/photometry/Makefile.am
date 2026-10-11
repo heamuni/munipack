@@ -55,8 +55,12 @@ phfotran_LDADD   = $(ldir)/libastrotrafo.a $(ldir)/libphotometry.a \
                    $(LIBOAKLEAF) $(LIBMINPACK) $(FITSADD)
 # $(ldir)/libphio.a
 
-psfphot_SOURCES = fitspsfphot.f08 psffit.f08 psfphot.f08
+psfphot_SOURCES = fitspsfphot.f08 psffit.f08 psfempir.f08 psfphot.f08
 psfphot_LDADD   = $(ldir)/libpsfmodel.a $(FITSADD)
+# the module dependencies (for parallel builds)
+psffit.$(OBJEXT): fitspsfphot.$(OBJEXT)
+psfempir.$(OBJEXT): psffit.$(OBJEXT)
+psfphot.$(OBJEXT): psfempir.$(OBJEXT)
 
 dist_pkgdata_DATA = photosystems.lst
 dist_html_DATA = grow_report.sh grow_report.py

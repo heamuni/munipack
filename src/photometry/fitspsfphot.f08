@@ -37,6 +37,8 @@ module fitspsfphot
   character(len=*), parameter :: FITS_COL_CHI2 = 'CHI2'
   character(len=*), parameter :: FITS_COL_NPIX = 'NPIX'
   character(len=*), parameter :: FITS_COL_PSFFLAG = 'FLAG'
+  character(len=*), parameter :: FITS_COL_GROUP = 'GROUP'
+  character(len=*), parameter :: FITS_COL_GSIZE = 'GSIZE'
 
   type :: PsfFrame
      real(REAL64), dimension(:,:), allocatable :: data
@@ -52,6 +54,8 @@ module fitspsfphot
      ! detected stars (FIND), their sky (APERPHOT)
      real(REAL64), dimension(:), allocatable :: x, y, sky, skyerr
      real(REAL64) :: fwhm = -1, lobad = -huge(1.0_REAL64), hibad = huge(1.0_REAL64)
+     ! the detection limits of find
+     real(REAL64) :: threshold = 4, shrplo = 0.2_REAL64, shrphi = 1
      real(REAL64) :: aphwhm = -1
      real(REAL64), dimension(2) :: ring = -1
      logical :: have_aper = .false.
@@ -66,6 +70,17 @@ module fitspsfphot
      real(REAL64) :: scale = -1
      integer :: zoom = 0, nshape = 0, npass = 0
      logical :: fwhm_fitted = .false.
+     ! the empirical PSF: the base (GAUSS, MOFFAT, FILE), the order of
+     ! the spatial variation, PSF stars, the table radius [pix], the rms
+     ! of the residual table (relative to the peak), median chi2 of PSF
+     ! stars, the iterations of the build
+     character(len=FLEN_VALUE) :: core = ''
+     character(len=FLEN_FILENAME) :: psfsave = ''
+     integer :: nvar = 0, npsfstar = 0, nbuild = 0
+     real(REAL64) :: psfrad = -1, resrms = -1, psfchi2 = -1
+     ! grouping (the link distance in FWHM, 0 off), the residual detection
+     real(REAL64) :: group = 0
+     integer :: ngroups = 0, maxgroup = 0, resdetect = 0, nresid = 0
   end type PsfHeader
 
 contains
@@ -231,6 +246,14 @@ contains
     call fits_read_key(fits,FITS_KEY_LOWBAD,frame%lobad,status)
     call fits_read_key(fits,FITS_KEY_HIGHBAD,frame%hibad,status)
     call fits_read_key(fits,FITS_KEY_FWHM,frame%fwhm,status)
+    call fits_write_errmark
+    call fits_read_key(fits,FITS_KEY_THRESHOLD,frame%threshold,status)
+    call fits_read_key(fits,FITS_KEY_SHRPLO,frame%shrplo,status)
+    call fits_read_key(fits,FITS_KEY_SHRPHI,frame%shrphi,status)
+    if( status == FITS_KEYWORD_NOT_FOUND ) then
+       call fits_clear_errmark
+       status = 0
+    end if
     call fits_get_colnum(fits,.true.,FITS_COL_X,xcol,status)
     call fits_get_colnum(fits,.true.,FITS_COL_Y,ycol,status)
     if( status /= 0 ) goto 666
@@ -286,16 +309,16 @@ contains
 
 
   subroutine fits_psfphot_save(filename,output,hdr,ttype,tunit,table,npix, &
-       flags,status)
+       flags,group,gsize,status)
 
     ! The table columns are real: X, Y, XERR, YERR, PSFCOUNT, PSFCOUNTERR,
-    ! SKY, SKYERR, CHI2, SHARP, ROUND, and integer: NPIX, FLAG
+    ! SKY, SKYERR, CHI2, SHARP, ROUND, and integer: NPIX, FLAG, GROUP, GSIZE
 
     character(len=*), intent(in) :: filename, output
     type(PsfHeader), intent(in) :: hdr
     character(len=*), dimension(:), intent(in) :: ttype, tunit
     real(REAL64), dimension(:,:), intent(in) :: table
-    integer, dimension(:), intent(in) :: flags, npix
+    integer, dimension(:), intent(in) :: flags, npix, group, gsize
     integer, intent(in out) :: status
 
     type(fitsfiles) :: fits
@@ -334,38 +357,61 @@ contains
     ncols = size(ttype)
     allocate(tform(ncols))
     tform = '1D'
-    tform(ncols-1:ncols) = '1J'
+    tform(ncols-3:ncols) = '1J'
     nrows = size(table,1)
     call fits_insert_btbl(fits,nrows,ttype,tform,tunit,PSFEXTNAME,status)
 
     call fits_write_key(fits,FITS_KEY_PSFTYPE,hdr%psftype, &
-         'PSF: GAUSS, MOFFAT or FILE',status)
+         'PSF: GAUSS, MOFFAT, FILE or EMPIRICAL',status)
     if( hdr%psffile /= '' ) &
-         call fits_write_key(fits,FITS_KEY_PSFFILE,hdr%psffile,'PSF file',status)
+         call fits_write_key(fits,FITS_KEY_PSFFILE,shortname(hdr%psffile),'PSF file',status)
     if( hdr%fwhm_fitted ) then
        com = '[pix] FWHM of PSF (fitted)'
     else
        com = '[pix] FWHM of PSF'
     end if
-    if( hdr%psftype == 'FILE' ) com = '[pix] FWHM of PSF at the field centre'
+    if( hdr%psftype == 'FILE' .or. hdr%psftype == 'EMPIRICAL' ) &
+         com = '[pix] FWHM of PSF at the field centre'
     call fits_write_key(fits,FITS_KEY_FWHM,hdr%fwhm,-5,com,status)
     call fits_write_key(fits,FITS_KEY_HWHM,hdr%fwhm/2,-5, &
          '[pix] half width at half of maximum',status)
-    if( hdr%psftype == 'GAUSS' ) then
+    if( hdr%psftype == 'EMPIRICAL' ) then
+       call fits_write_key(fits,'PSFCORE',hdr%core, &
+            'base of empirical PSF: GAUSS, MOFFAT, FILE',status)
+       call fits_write_key(fits,'PSFVAR',hdr%nvar, &
+            'order of the spatial variation of PSF',status)
+       call fits_write_key(fits,'PSFNSTAR',hdr%npsfstar, &
+            'stars used to build the PSF',status)
+       call fits_write_key(fits,'PSFRAD',hdr%psfrad,-4, &
+            '[pix] radius of the residual table',status)
+       call fits_write_key(fits,'PSFRESRM',hdr%resrms,-4, &
+            'rms of residual table / peak of the core',status)
+       call fits_write_key(fits,'PSFCHI2',hdr%psfchi2,-4, &
+            'median reduced chi2 of PSF stars',status)
+       call fits_write_key(fits,'PSFITER',hdr%nbuild, &
+            'iterations of the PSF build',status)
+       if( hdr%psfsave /= '' ) call fits_write_key(fits,'PSFSAVED', &
+            shortname(hdr%psfsave),'the empirical PSF saved to',status)
+    end if
+    if( hdr%psftype == 'GAUSS' .or. hdr%core == 'GAUSS' ) then
        call fits_write_key(fits,'PSFSIGMA',hdr%width,-6, &
             '[pix] Gaussian sigma (major axis)',status)
-    else if( hdr%psftype == 'MOFFAT' ) then
+    else if( hdr%psftype == 'MOFFAT' .or. hdr%core == 'MOFFAT' ) then
        call fits_write_key(fits,'PSFALPHA',hdr%width,-6, &
             '[pix] Moffat alpha (major axis)',status)
        call fits_write_key(fits,'PSFBETA',hdr%beta,-6,'Moffat beta',status)
     end if
-    if( hdr%psftype /= 'FILE' ) then
+    if( hdr%psftype /= 'FILE' .and. hdr%core /= 'FILE' ) then
        call fits_write_key(fits,'PSFAXRAT',hdr%q,-5, &
             'axis ratio of PSF (minor/major)',status)
        call fits_write_key(fits,'PSFPA',hdr%pa,-3, &
             '[deg] position angle of the major axis from x',status)
-       if( hdr%fwhm_fitted ) call fits_write_key(fits,'PSFNSTAR',hdr%nshape, &
+       if( hdr%fwhm_fitted .and. hdr%psftype /= 'EMPIRICAL' ) &
+            call fits_write_key(fits,'PSFNSTAR',hdr%nshape, &
             'stars used to fit the PSF shape',status)
+       if( hdr%fwhm_fitted .and. hdr%psftype == 'EMPIRICAL' ) &
+            call fits_write_key(fits,'PSFNSHAP',hdr%nshape, &
+            'stars used to fit the shape of the core',status)
     else
        call fits_write_key(fits,'PSFCEN1',hdr%psfcen(1),-5, &
             '[pix] field centre of the PSF grid, x',status)
@@ -384,6 +430,15 @@ contains
     end if
     call fits_write_key(fits,'SKYMODE',hdr%skymode,'sky: FIXED or LOCAL',status)
     call fits_write_key(fits,'NPASS',hdr%npass,'passes over stars',status)
+    call fits_write_key(fits,'GROUPDST',hdr%group,-3, &
+         '[FWHM] link distance of groups (0: no groups)',status)
+    call fits_write_key(fits,'NGROUPS',hdr%ngroups, &
+         'groups fitted simultaneously',status)
+    call fits_write_key(fits,'MAXGROUP',hdr%maxgroup,'the largest group',status)
+    call fits_write_key(fits,'RESDETEC',hdr%resdetect, &
+         'passes of the detection in residuals',status)
+    call fits_write_key(fits,'NRESID',hdr%nresid, &
+         'stars found in residuals (FLAG 128)',status)
     call fits_write_key(fits,FITS_KEY_GAIN,hdr%gain,-6, &
          '[e-/ADU] gain used for weights',status)
     call fits_write_key(fits,FITS_KEY_READNS,hdr%readns,-6, &
@@ -400,16 +455,22 @@ contains
     call fits_write_comment(fits,'  4 position fixed (faint or run away), ' // &
          '8 not converged, 16 failed (no valid flux),',status)
     call fits_write_comment(fits,'  32 a neighbour within the fitting radius, ' // &
-         '64 a saturated star added (not found by find).',status)
+         '64 a saturated star added (not found by find),',status)
+    call fits_write_comment(fits,'  128 a star found in the residuals ' // &
+         '(not found by find).',status)
+    call fits_write_comment(fits,'GROUP: the group of the simultaneous fit ' // &
+         '(0 fitted alone), GSIZE: its size.',status)
     call fits_write_comment(fits,'SHARP: relative residual in the core ' // &
          '(>0 sharper than PSF), ROUND: ellipticity data - model.',status)
 
     if( nrows > 0 ) then
-       do i = 1, ncols - 2
+       do i = 1, ncols - 4
           call fits_write_col(fits,i,1,table(:,i),status)
        end do
-       call fits_write_col(fits,ncols-1,1,npix,status)
-       call fits_write_col(fits,ncols,1,flags,status)
+       call fits_write_col(fits,ncols-3,1,npix,status)
+       call fits_write_col(fits,ncols-2,1,flags,status)
+       call fits_write_col(fits,ncols-1,1,group,status)
+       call fits_write_col(fits,ncols,1,gsize,status)
     end if
 
 666 continue
@@ -463,5 +524,23 @@ contains
     call fits_report_error(error_unit,status)
 
   end subroutine fits_psfphot_residual
+
+  function shortname(name)
+
+    ! a file name for a keyword value (at most 68 characters, a longer
+    ! one keeps its end: the value would not fit to a FITS card)
+
+    character(len=*), intent(in) :: name
+    character(len=68) :: shortname
+    integer :: n
+
+    n = len_trim(name)
+    if( n <= 68 ) then
+       shortname = name(:n)
+    else
+       shortname = '...'//name(n-64:n)
+    end if
+
+  end function shortname
 
 end module fitspsfphot

@@ -107,6 +107,24 @@
   and pixelised in the same way.
 </p>
 
+<h2>Empirical PSF files</h2>
+
+<p>
+  <samp>psfphot --psf EMPIRICAL --psf-save file</samp> writes the empirical
+  PSF of a frame in this format: a single PSF at the centre (RADCOO = 0)
+  for a constant PSF, or the PSFs on rings around the field centre up to
+  the farthest corner of the frame (2 rings by 16 angles for the
+  variation of the order 0 or 1 or for a corrected PSF file, 12 rings by
+  32 angles for the order 2). The stamps are centred at CRPIX1, CRPIX2
+  of each extension and sum to ZOOM² (the core is sampled out to
+  99.9% of its flux). The primary header has also PSFCEN1, PSFCEN2 (the
+  field centre [pix] used for RADCOO, ANGCOO), PSFSCALE (the scale
+  [pix/deg]; 1 when the frame has no WCS, RADCOO is then in pixels and
+  the file is used with <samp>--scale 1</samp>), FWHM and PSFRAD [pix].
+  The field centre is NAXIS/2 of the frame (as for artificial), so the
+  file applies to frames of the same size and scale.
+</p>
+
 <h3>Limitations</h3>
 
 <ul>
