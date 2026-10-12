@@ -42,7 +42,7 @@ module daofotometr
 
   integer, parameter, private :: dbl = selected_real_kind(14)
 
-  private :: circfrac, sqcover
+  private :: circfrac, sqcover, pixgeom, pixfrac
 
 contains
 
@@ -103,7 +103,7 @@ contains
     real, dimension(:), allocatable :: sky, dsky
     real, dimension(3) :: error
     real :: skymod, skysig, sigsq, skyvar, skyerr, datum, r, rsq, fractn, &
-         edge, apmxsq, rout, dysq, xc, yc, e,c,s,sqrte,u,v,x,y,phi,q,rin
+         edge, apmxsq, rout, dysq, xc, yc, e,c,s,sqrte,x,y,phi,q,rin
     integer :: i, j, k, n, naper, nstar, lx, ly, nx, ny, mx, my, &
          nsky, ncol, nrow, iflag
 
@@ -224,18 +224,7 @@ contains
              datum = d(i,j)
 
              ! elliptic apertures
-             u = i - xc
-             v = j - yc
-             x = c*u + s*v
-             y =-s*u + c*v
-             if( abs(x) > 0 .or. abs(y) > 0 ) then
-                r = sqrt(x**2 + y**2)
-                phi = atan2(y,x*sqrte)
-             else
-                r = 0
-                phi = 0
-             end if
-             q = sqrt(1 - e**2*sin(phi)**2)
+             call pixgeom(i,j,xc,yc,e,c,s,sqrte,x,y,r,phi,q)
 
 !
 ! Is this pixel within the sky annulus?
@@ -280,23 +269,7 @@ contains
                     ! determination of fraction of pixel in circular
                     ! apertures uses traditional estimator, while
                     ! the elliptic the improved one
-                      if( abs(e) < epsilon(e) ) then
-                         fractn = max(0.0, min(1.0,raper(k) - r + 0.5))
-                      else
-                         block
-                           real :: a,b,xt,yt
-                           a = raper(k)
-                           b = a*sqrte
-                           xt = a*cos(phi)
-                           yt = b*sin(phi)
-                           fractn = circfrac(a,b,phi,xt-x,yt-y,raper(k)*q>r)
-                           ! fractn = sqcover(x,y,raper(k))
-                           ! if( k == 3 .and. n == 1 ) &
-                           !  write(*,*) x,y,raper(k)-r,fractn, &
-                           !  max(0.0, min(1.0,raper(k) - r + 0.5)), &
-                           !  sqcover(x,y,raper(k))
-                         end block
-                      end if
+                      fractn = pixfrac(raper(k),e,sqrte,x,y,r,phi,q)
 
 !
 ! fractn is the fraction of the pixel that falls inside the
@@ -420,7 +393,101 @@ contains
 
   end subroutine daophotsb
 
-  real function circfrac(a,b,phi,dx,dy,outer)
+  subroutine daoapee(n,psf,i0,j0,xc,yc,raper,ecc,incl,ee)
+
+    ! The enclosed energy: the fraction of the flux of a model star
+    ! that the apertures of daophotsb contain. The pixelised model
+    ! psf(-n:n,-n:n) (the whole flux is 1) has its element (0,0) at
+    ! the pixel (i0,j0) of the frame, the star centre is xc,yc.
+    ! The pixels are weighted exactly as in daophotsb (the same partial
+    ! pixels, the same limits), so an aperture sum divided by ee is
+    ! the total flux of the star.
+
+    integer, intent(in) :: n, i0, j0
+    real(dbl), dimension(-n:n,-n:n), intent(in) :: psf
+    real, intent(in) :: xc, yc, ecc, incl
+    real, dimension(:), intent(in) :: raper
+    real(dbl), dimension(:), intent(out) :: ee
+
+    real, parameter :: rad = 57.295779513082322865
+    real :: apmxsq, rsq, dysq, x, y, r, phi, q, c, s, sqrte, fractn
+    integer :: i, j, k
+
+    apmxsq = -1.0
+    do k = 1, size(raper)
+       apmxsq = max(apmxsq, (raper(k)+0.5)**2)
+    end do
+
+    c = cos(incl/rad)
+    s = sin(incl/rad)
+    sqrte = sqrt(1 - ecc**2)
+
+    ee = 0
+    do j = j0 - n, j0 + n
+       dysq = (j - yc)**2
+       do i = i0 - n, i0 + n
+          rsq = dysq + (i - xc)**2
+          if( rsq <= apmxsq ) then
+             call pixgeom(i,j,xc,yc,ecc,c,s,sqrte,x,y,r,phi,q)
+             do k = 1, size(raper)
+                if( r <= raper(k)+1 ) then
+                   fractn = pixfrac(raper(k),ecc,sqrte,x,y,r,phi,q)
+                   ee(k) = ee(k) + fractn*psf(i-i0,j-j0)
+                end if
+             end do
+          end if
+       end do
+    end do
+
+  end subroutine daoapee
+
+  pure subroutine pixgeom(i,j,xc,yc,e,c,s,sqrte,x,y,r,phi,q)
+
+    ! the pixel (i,j) in the frame of the (elliptic) aperture
+    ! centred at xc,yc: the rotated offsets, the radius, the angle
+    ! and the radius factor of the ellipse
+
+    integer, intent(in) :: i,j
+    real, intent(in) :: xc,yc,e,c,s,sqrte
+    real, intent(out) :: x,y,r,phi,q
+    real :: u,v
+
+    u = i - xc
+    v = j - yc
+    x = c*u + s*v
+    y =-s*u + c*v
+    if( abs(x) > 0 .or. abs(y) > 0 ) then
+       r = sqrt(x**2 + y**2)
+       phi = atan2(y,x*sqrte)
+    else
+       r = 0
+       phi = 0
+    end if
+    q = sqrt(1 - e**2*sin(phi)**2)
+
+  end subroutine pixgeom
+
+  pure real function pixfrac(a,e,sqrte,x,y,r,phi,q)
+
+    ! the fraction of the pixel (by pixgeom) inside the aperture
+    ! of the radius (major semiaxis) a
+
+    real, intent(in) :: a,e,sqrte,x,y,r,phi,q
+    real :: b,xt,yt
+
+    if( abs(e) < epsilon(e) ) then
+       pixfrac = max(0.0, min(1.0,a - r + 0.5))
+    else
+       b = a*sqrte
+       xt = a*cos(phi)
+       yt = b*sin(phi)
+       pixfrac = circfrac(a,b,phi,xt-x,yt-y,a*q>r)
+       ! pixfrac = sqcover(x,y,a)
+    end if
+
+  end function pixfrac
+
+  pure real function circfrac(a,b,phi,dx,dy,outer)
 
     ! Estimates relative fraction of pixel intesrected with aperture circle edge
     ! The pixel is approximated by circle, the edge by a line.
