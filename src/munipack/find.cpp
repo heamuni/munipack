@@ -40,6 +40,9 @@ MuniFind::MuniFind(wxEvtHandler *h, const MuniCmdLineParser& cmd):
   if( cmd.Found("false-rate",&x) )
     Write("FALSE_RATE = %lf",x);
 
+  if( cmd.Found("shape-sigma",&x) )
+    Write("SHAPE_SIGMA = %lf",x);
+
   if( cmd.Found("read-noise",&x) )
     Write("READNOISE = %lf",x);
 

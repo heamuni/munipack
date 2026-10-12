@@ -184,6 +184,12 @@ contains
        call fits_update_key(fits,'FALSERAT',real(stats%nfalse),-4, &
             'expected noise peaks per frame (upper estimate)',status)
     end if
+    call fits_update_key(fits,'SHAPESIG',real(stats%shapesig),-3, &
+         '[sigma] shape tests by the noise (0: fixed windows)',status)
+    call fits_update_key(fits,'SHARPREF',real(stats%sharpref),-4, &
+         'expected sharpness (bright stars or model)',status)
+    call fits_update_key(fits,'ROUNDREF',real(stats%roundref),-4, &
+         'expected roundness (bright stars or model)',status)
     call fits_update_key(fits,FITS_KEY_LOWBAD,lobad,-3, &
          '[cts] low good datum',status)
     call fits_update_key(fits,FITS_KEY_HIGHBAD,hibad,-3, &

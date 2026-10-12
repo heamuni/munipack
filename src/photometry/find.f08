@@ -41,8 +41,11 @@ program find
   real :: shrplo = 0.2, shrphi = 1.0
   real :: rndlo = -1.0, rndhi = 1.0
   ! the expected number of noise peaks per frame setting the threshold
-  ! (<= 0: by the threshold)
+  ! (<= 0: by the threshold), the shape tests by the noise [sigma]
+  ! (<= 0: the fixed windows only), the windows given by the user
   real :: falserate = -1
+  real :: shapesig = 3
+  logical :: fixsharp = .false., fixround = .false.
   logical :: verbose = .false., plog = .false.
   logical :: ex, exitus = .true.
   integer :: eq, stat
@@ -94,6 +97,10 @@ program find
         read(val,*) falserate
         if( .not. (falserate > 0) ) stop 'Error in find: --false-rate > 0 expected.'
 
+     else if( key == 'SHAPE_SIGMA' ) then
+
+        read(val,*) shapesig
+
      else if( key == 'LOWER_THRESHOLD' ) then
 
         read(val,*) lothresh
@@ -101,18 +108,22 @@ program find
      else if( key == 'ROUND_LOWER' ) then
 
         read(val,*) rndlo
+        fixround = .true.
 
      else if( key == 'ROUND_HIGHER' ) then
 
         read(val,*) rndhi
+        fixround = .true.
 
      else if( key == 'SHARP_LOWER' ) then
 
         read(val,*) shrplo
+        fixsharp = .true.
 
      else if( key == 'SHARP_HIGHER' ) then
 
         read(val,*) shrphi
+        fixsharp = .true.
 
      else if( key == 'FITS_KEY_SATURATE' ) then
 
@@ -189,7 +200,7 @@ contains
     open(3,status='scratch',form='unformatted')
 
     call daofind(data,debug,plog,hibad,skymod,skysig,fwhm,lothresh,threshold,&
-         shrplo,shrphi,rndlo,rndhi,readns,falserate, &
+         shrplo,shrphi,rndlo,rndhi,readns,falserate,shapesig,fixsharp,fixround, &
          nstar,lobad,hmin,stats,gain,bias)
 
     rewind(3)
@@ -203,6 +214,11 @@ contains
             '  threshold ',stats%t,' (Normal deviate) = ',stats%x, &
             ' sigma of the filtered sky (skewness ',stats%skew, &
             '); expected noise peaks per frame ',stats%nfalse,'.'
+       if( stats%sharpnoise .or. stats%roundnoise ) &
+            write(error_unit,'(a,f0.1,a,f0.3,a,f0.3,a,i0,a)') &
+            '  shape tests within ',stats%shapesig,' sigma of sharp ', &
+            stats%sharpref,', round ',stats%roundref,' (',stats%nref, &
+            ' bright stars; 0: the model).'
     end if
     close(3)
 

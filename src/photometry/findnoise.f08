@@ -76,6 +76,30 @@
 !  FWHM 10, where A Q is 1.3 times high; 17 per 1024**2 for FWHM 15
 !  against 26 by the Euler characteristic (32 by A Q). The expected
 !  count is an upper estimate (the shape tests reject some peaks).
+!
+!  The shape of a point source (BUGS P32)
+!
+!  The sharpness of DAOFIND, sharp = (d_0 - mean of d_k, k /= 0)/h
+!  (over the circle of the kernel, sky subtracted), and the roundness,
+!  round = 2 (hx - hy)/(hx + hy) (the heights of the marginal fits), are
+!  linear functions of the pixels divided by a height; to the first order
+!
+!     var(sharp) = sum_k (a_k - s w_k)**2 v_k / h**2,
+!     var(round) = sum_k (cx_k - cy_k)**2 v_k / (h hm)**2,
+!
+!  a_k the coefficients of the numerator of sharp (1 in the centre,
+!  -1/(n-1) else), cx, cy the coefficients of the marginal heights,
+!  v_k = sigma**2 + h P_k / g the noise of the pixel by the sky and the
+!  photon noise of the star of the height h, P the profile of the star
+!  (unit height of the filter), hm = sum cx P, s the expected sharpness.
+!  P is a Gaussian of the FWHM of the filter integrated over the pixels,
+!  averaged over the sub-pixel position of the star (its sharpness is
+!  0.396 for FWHM 4.93 and 0.526 for 2.7, the pixel phase changes them
+!  by 0.001 and 0.005). On QUVIK-like frames (gain 0.101) the photon
+!  noise of the star dominates: the scatter of the sharpness of real
+!  stars at 4-5, 8-11, 25-50, 50-100 sigma_h is 0.45, 0.31, 0.16, 0.11
+!  (MAD; 0.50, 0.33, 0.17, 0.12 by the model), so 39, 28, 13 and 4%
+!  of them fell outside the fixed window 0.2 - 1.0.
 
 module findnoise
 
@@ -88,7 +112,7 @@ module findnoise
   real(dbl), parameter :: pi = 3.14159265358979324_dbl
 
   public :: normal_tail, normal_deviate, height_threshold, noise_peaks, &
-       rate_deviate, field_lambda2
+       rate_deviate, field_lambda2, shape_model, shape_noise
 
   ! the statistics of a detection (reported in FIND)
   type, public :: findstats
@@ -96,6 +120,12 @@ module findnoise
      ! skewness and the excess kurtosis of the filtered sky, the expected
      ! number of noise peaks above the threshold in the frame
      real(dbl) :: t = 0, x = 0, skew = 0, kurt = 0, nfalse = 0
+     ! the shape tests: k [sigma] (0: the fixed windows), the reference
+     ! sharpness and roundness (by the bright candidates or the model),
+     ! the number of the bright candidates (0: by the model)
+     real(dbl) :: shapesig = 0, sharpref = 0, roundref = 0
+     integer :: nref = 0
+     logical :: sharpnoise = .false., roundnoise = .false.
   end type findstats
 
 contains
@@ -270,5 +300,104 @@ contains
     rate_deviate = (a + b) / 2
 
   end function rate_deviate
+
+  subroutine shape_model(fwhm,mask,w,cx,cy,prof,sharp0,hm)
+
+    ! The profile of a point source of the FWHM of the filter integrated
+    ! over the pixels and averaged over its sub-pixel position, of the
+    ! unit height of the filter (prof), its sharpness and the mean height
+    ! of its marginal fits (hm); mask is the circle of the kernel w,
+    ! cx, cy the coefficients of the heights of the marginal fits
+
+    real(dbl), intent(in) :: fwhm
+    logical, dimension(:,:), intent(in) :: mask
+    real(dbl), dimension(:,:), intent(in) :: w, cx, cy
+    real(dbl), dimension(:,:), intent(out) :: prof
+    real(dbl), intent(out) :: sharp0, hm
+
+    integer, parameter :: nph = 8
+    real(dbl), dimension(size(w,1)) :: ex
+    real(dbl), dimension(size(w,2)) :: ey
+    real(dbl), dimension(size(w,1),size(w,2)) :: p
+    real(dbl) :: s, dx, dy, h
+    integer :: i, j, k, l, mx, my
+
+    mx = size(w,1) / 2 + 1
+    my = size(w,2) / 2 + 1
+    s = sqrt(2.0_dbl) * fwhm / (2*sqrt(2*log(2.0_dbl)))
+    prof = 0
+    do k = 1, nph
+       dx = (k - 0.5_dbl) / nph - 0.5_dbl
+       do i = 1, size(w,1)
+          ex(i) = pixel(i - mx - dx)
+       end do
+       do l = 1, nph
+          dy = (l - 0.5_dbl) / nph - 0.5_dbl
+          do j = 1, size(w,2)
+             ey(j) = pixel(j - my - dy)
+          end do
+          do j = 1, size(w,2)
+             p(:,j) = ex*ey(j)
+          end do
+          h = sum(w*p)
+          if( h > 0 ) prof = prof + p / h
+       end do
+    end do
+    prof = prof / nph**2
+    ! the centre minus the mean of the others in the circle
+    sharp0 = prof(mx,my) - &
+         (sum(prof,mask) - prof(mx,my)) / max(count(mask) - 1,1)
+    hm = (sum(cx*prof) + sum(cy*prof)) / 2
+
+  contains
+
+    real(dbl) function pixel(z)
+
+      ! the Gaussian integrated over a pixel centred at z
+
+      real(dbl), intent(in) :: z
+
+      pixel = (erf((z + 0.5_dbl)/s) - erf((z - 0.5_dbl)/s)) / 2
+
+    end function pixel
+
+  end subroutine shape_model
+
+  subroutine shape_noise(h,sig2,gain,sref,mask,w,cx,cy,prof,hm,ssharp,sround)
+
+    ! The noise (the standard deviations) of sharp and round of a point
+    ! source of the height h [ADU] of the filter: sig2 the variance of
+    ! a sky pixel [ADU**2], gain [e-/ADU] (<= 0: the sky noise only),
+    ! sref the expected sharpness, the profile by shape_model
+
+    real(dbl), intent(in) :: h, sig2, gain, sref, hm
+    logical, dimension(:,:), intent(in) :: mask
+    real(dbl), dimension(:,:), intent(in) :: w, cx, cy, prof
+    real(dbl), intent(out) :: ssharp, sround
+
+    real(dbl), dimension(size(w,1),size(w,2)) :: v, a
+    integer :: mx, my, n
+
+    if( .not. (h > 0) ) then
+       ssharp = huge(ssharp)
+       sround = huge(sround)
+       return
+    end if
+
+    mx = size(w,1) / 2 + 1
+    my = size(w,2) / 2 + 1
+    n = count(mask)
+    v = sig2
+    if( gain > 0 ) v = v + h*max(prof,0.0_dbl) / gain
+    where( mask )
+       a = -1.0_dbl / max(n - 1,1)
+    elsewhere
+       a = 0
+    end where
+    a(mx,my) = 1
+    ssharp = sqrt(sum((a - sref*w)**2*v)) / h
+    sround = sqrt(sum((cx - cy)**2*v)) / (h*max(hm,epsilon(hm)))
+
+  end subroutine shape_noise
 
 end module findnoise
