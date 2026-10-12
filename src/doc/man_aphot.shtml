@@ -272,10 +272,11 @@ stars were 2.5–3 times smaller than their scatter.
     with their excess scatter, clipped at 3σ) is consistent with
     zero within 2σ, so the light of the PSF wing is not left out of
     <i>T</i>. The search ends at twice the radius enclosing 99% of the
-    stacked growth curve (the median of the curves normalised by the
-    aperture of 2 FWHM, relative to its level: the median of the three
-    apertures from 4 FWHM, or its maximum; for a Gaussian PSF 6.1σ, 2.6
-    FWHM); when no window passes up to there, the plateau starts at the
+    stacked growth curve (the sum of the counts of the stars in an
+    aperture over their sum in the aperture of 2 FWHM, relative to its
+    level: the median of the three apertures from 4 FWHM, or its maximum;
+    for a Gaussian PSF 6.1σ, 2.6 FWHM); when no window passes up to there,
+    the plateau starts at the
     last aperture within the cap (EEPLAT = CAP). The cap keeps the total
     flux off the large apertures, which hold the light of the fainter
     neighbours, more on dense fields: before, the first aperture within

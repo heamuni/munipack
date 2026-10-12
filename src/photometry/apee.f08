@@ -55,9 +55,9 @@
 !       3 sigma), is consistent with zero (2 sigma), so the light of the
 !       PSF wing, a slope relative to T, is not left out of T. The search
 !       ends at twice the radius enclosing 99% of the stacked growth curve
-!       (the median of C_k / C_kn over the stars relative to its level,
-!       the median of the first three apertures from 4 FWHM, or its
-!       maximum);
+!       (the sum of C_k over the stars / the sum of C_kn, kn the aperture
+!       nearest to 2 FWHM, relative to its level, the median of the first
+!       three apertures from 4 FWHM, or its maximum);
 !       when no window passes up to there, the plateau starts at the last
 !       aperture within this cap. Before, the first aperture within 0.5%
 !       of the level of the stacked curve was taken: the level and the
@@ -329,10 +329,14 @@ contains
             ' bright isolated stars (3 at least).'
        return
     end if
+    ! the stacked growth curve: the sum of the counts of the stars over
+    ! their sum in the aperture nearest to 2 FWHM (the median of the
+    ! ratios, dominated by the fainter stars, scattered by 1-2% at the
+    ! large apertures and moved the radius of 99% to 20 pix on a frame)
     allocate(g(klim),area(nap))
     area = 4*atan(1.0_dbl)*real(raper,dbl)**2*sqrt(1 - real(ecc,dbl)**2)
     do k = 1, klim
-       g(k) = median(pack(cts(:,k) / cts(:,kn),sel))
+       g(k) = sum(cts(:,k),sel) / sum(cts(:,kn),sel)
     end do
     ! the level of the curve: the median of the three apertures from
     ! 4 FWHM (flat; the larger ones hold more light of the neighbours),
