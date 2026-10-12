@@ -136,9 +136,10 @@ peaks than Normal noise (505 instead of 110 per 2048² frame at
 
 <p class="indent">
 The height is computed from the noise model of the frame: Poisson
-photons of the mean λ = (<i>B</i> − BIASLEV)·GAIN electrons per pixel
-(at most GAIN²σ², the whole variance) and Normal noise of the rest of
-the variance (the read noise). The cumulant generating function of the
+photons of the mean λ = (<i>B</i> − BIASLEV)·GAIN electrons per pixel,
+at most GAIN²(σ² − RN²) (the variance less the read noise of READNS or
+RDNOISE, the whole variance without them), and Normal noise of the rest
+of the variance. The cumulant generating function of the
 convolution in the units of σ<sub>h</sub>, <i>K</i>(<i>u</i>) =
 λ Σ(e<sup><i>u y<sub>k</sub></i></sup> − 1 − <i>u y<sub>k</sub></i>) +
 ρ<i>u</i>²/2 with <i>y<sub>k</sub></i> = <i>w<sub>k</sub></i>/(GAIN
@@ -157,7 +158,8 @@ and 0.13 e⁻ of the dark current) the height is 4.59σ<sub>h</sub> for
 ground-based frames (hundreds of electrons) it is within
 0.03σ<sub>h</sub> of <i>t</i>. Without GAIN the noise is taken Normal
 (<i>t</i>σ<sub>h</sub>, as before); BIASLEV is the pedestal of the
-frame (0 when missing; λ is then bounded by the variance). A stack with
+frame (0 when missing; λ is then set by the variance), and a noiseless
+frame (its variance below the read noise) is Normal too. A stack with
 the GAIN of a single frame in its header gets a too high threshold.
 </p>
 

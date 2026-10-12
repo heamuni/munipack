@@ -45,7 +45,7 @@ contains
   subroutine daofind (d, verbose, plog, hibad, skymod, skysig,  &
        fwhm, lothresh, threshold, shrplo, shrphi, rndlo, rndhi, readns, &
        falserate, shapesig, fixsharp, fixround, &
-       nstar, lobad, hmin, stats, gain, bias )
+       nstar, lobad, hmin, stats, gain, bias, rn2 )
 
   use iso_fortran_env, only: REAL64
   use findnoise
@@ -65,9 +65,10 @@ contains
   integer, intent(out) :: nstar
   real, intent(out) :: lobad, hmin
   type(findstats), intent(out) :: stats
-  ! the gain [e-/ADU] and the bias [ADU] of the frame, optional (the
-  ! noise model of the sky and of the light of stars)
-  real(REAL64), intent(in), optional :: gain, bias
+  ! the gain [e-/ADU], the bias [ADU] and the read noise squared [ADU**2]
+  ! of the frame, optional (the noise model of the sky and of the light
+  ! of stars)
+  real(REAL64), intent(in), optional :: gain, bias, rn2
 
   ! Gain: DAOPHOT scales data on-the-fly by the parameter,
   ! while Munipack assumes that the data has already gain correction done.
@@ -177,7 +178,7 @@ contains
   real(REAL64), dimension(:,:), allocatable :: wf, cxf, cyf, prof
   real(REAL64), dimension(:), allocatable :: wk
   logical, dimension(:,:), allocatable :: disc
-  real(REAL64) :: g64, b64, lam, rhog, sigh, sharp0, hm
+  real(REAL64) :: g64, b64, r64, lam, rhog, sigh, sharp0, hm
   integer :: flag
 !
 ! Variables
@@ -450,8 +451,11 @@ contains
   ! convolution exceeded with that probability by the noise of the sky:
   ! Poisson photons and Normal read noise by the gain (GAIN), the sky
   ! level above the bias (BIASLEV) and the kernel. The Poisson mean
-  ! lam [e-] of a pixel is at most its variance (an unknown bias).
-  ! Without the gain, the noise is Normal: hmin = t sigma_h.
+  ! lam [e-] of a pixel is at most its variance less the read noise
+  ! (READNS, RDNOISE; the whole variance when unknown): a frame without
+  ! BIASLEV has the pedestal in its level, a noiseless frame has no
+  ! Poisson noise. Without the gain, the noise is Normal: hmin = t
+  ! sigma_h.
   allocate(wf(nbox,nbox),disc(nbox,nbox),cxf(nbox,nbox),cyf(nbox,nbox), &
        prof(nbox,nbox))
   disc = .not. skip
@@ -465,12 +469,14 @@ contains
 
   g64 = -1
   b64 = 0
+  r64 = 0
   if( present(gain) ) g64 = gain
   if( present(bias) ) b64 = bias
+  if( present(rn2) ) r64 = max(rn2,0.0_REAL64)
   lam = 0
   rhog = 1
   if( g64 > 0 ) then
-     lam = min(max((skymod - b64)*g64,0.0_REAL64),(g64*ssig)**2)
+     lam = max(min((skymod - b64)*g64,g64**2*(ssig**2 - r64)),0.0_REAL64)
      rhog = max(1 - lam/(g64*ssig)**2,0.0_REAL64)
   end if
 

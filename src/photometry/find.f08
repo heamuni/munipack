@@ -201,7 +201,7 @@ contains
 
     call daofind(data,debug,plog,hibad,skymod,skysig,fwhm,lothresh,threshold,&
          shrplo,shrphi,rndlo,rndhi,readns,falserate,shapesig,fixsharp,fixround, &
-         nstar,lobad,hmin,stats,gain,bias)
+         nstar,lobad,hmin,stats,gain,bias,rn2)
 
     rewind(3)
     call fits_find_save(filename,output,fkeys,nstar,fwhm,real(stats%t),&
