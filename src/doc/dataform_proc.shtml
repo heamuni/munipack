@@ -73,13 +73,20 @@ The table contains detected objects.
 <tr><th>Keyword</th><th>Description</th><th>Units</th></tr>
 <tr><td>EXTNAME</td><td>FIND as the identifier of this table</td><td></td></tr>
 <tr><td>FWHM</td><td>typical full width at half of maximum for a detected object</td><td>pixels</td></tr>
-<tr><td>THRESH</td><td>threshold for detection of peak of stars in sigmas of sky above sky mean level in a region</td><td></td></tr>
+<tr><td>THRESH</td><td>threshold for detection of peak of stars in sigmas of sky above sky mean level in a region: the Normal deviate of the false-alarm probability (see <a href="man_find.html#threshold">find</a>)</td><td></td></tr>
+<tr><td>HTHRESH</td><td>the height threshold of the convolved sky by its noise model (skewed Poisson noise)</td><td>sigmas</td></tr>
+<tr><td>SKEWFILT</td><td>skewness of the convolved sky by the noise model</td><td></td></tr>
+<tr><td>KURTFILT</td><td>excess kurtosis of the convolved sky by the noise model</td><td></td></tr>
+<tr><td>FALSERAT</td><td>expected number of noise peaks above the threshold per frame (the one requested by --false-rate)</td><td></td></tr>
 <tr><td>LOBAD</td><td>Lower good datum</td><td>ADU</td></tr>
 <tr><td>HIBAD</td><td>Higher good datum</td><td>ADU</td></tr>
 <tr><td>RNDLO</td><td>Round low</td><td></td></tr>
 <tr><td>RNDHI</td><td>Round high</td><td></td></tr>
 <tr><td>SHRPLO</td><td>Sharp low</td><td></td></tr>
 <tr><td>SHRPHI</td><td>Sharp high</td><td></td></tr>
+<tr><td>SHAPESIG</td><td>sharp and round accepted within this number of their standard deviations (0: the fixed limits only; see <a href="man_find.html#shape">find</a>)</td><td>sigmas</td></tr>
+<tr><td>SHARPREF</td><td>the expected sharpness of a star (bright stars or the model)</td><td></td></tr>
+<tr><td>ROUNDREF</td><td>the expected roundness of a star (bright stars or the model)</td><td></td></tr>
 </table>
 </div>
 
