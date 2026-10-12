@@ -38,10 +38,25 @@ For every detected star, the sum inside of the specified apertures
 as well as in sky determining ring is computed.
 </li>
 <li>
-The mean background in the ring is computed.
+The mean background in the ring is computed: the clipped mean of the
+pixels of the ring outside the masks of the other detected stars
+(<a href="#sky">see below</a>).
 </li>
 <li>
 The counts for all apertures are computed by subtracting of mean background.
+</li>
+<li>
+The apertures contaminated by a brighter neighbour are invalidated (-1):
+the light of the neighbour in the aperture, estimated by its growth curve
+(its apertures, linear in the area between them: the light in the annulus
+<i>d</i> − <i>a</i> … <i>d</i> + <i>a</i> times the fraction of the
+annulus the aperture of the radius <i>a</i> covers at the distance
+<i>d</i>), exceeds three times the error of the aperture and three times
+its own error. A neighbour without valid apertures (saturated) contaminates
+the apertures reaching its mask. So a faint star a few pixels from a bright
+one, or a second detection of the same star, is not measured with the
+light of the bright one (a u = 17 star 6 pixels from a u = 11.4 star came
+out 4.4 mag too bright).
 </li>
 </ul>
 
@@ -87,6 +102,47 @@ or a star is saturated.
 The results of aperture photometry are stored to next PHOTOMETRY extension.
 In the extension, the results in a selected aperture (by <samp>-s</samp>)
 are selected. Just stars with valid (non-negative) values are presented here.
+</p>
+
+<h2 id="sky">The sky</h2>
+
+<p>
+The aperture sums the sky pixels, so the sky subtracted from it must be
+the <b>mean</b> level of the sky; the mode, the median or a robust mean
+bias the counts by the difference times the area of the aperture. A sky
+of a few photo-electrons per pixel (a space telescope in the ultraviolet,
+short exposures) has a skewed, discrete (Poisson) distribution whose
+robust means lie well below its mean (by 13% at 0.4 e-/pixel and the read
+noise 0.37 e-, by 30% at 0.1 e-/pixel). The sky of a star is therefore:
+</p>
+
+<ul>
+<li>The pixels of the ring, except those inside the masks of the other
+  stars of FIND. The mask of a star follows its light outwards (the mean
+  of 1-pixel annuli above the sky of the frame by two standard errors),
+  so faint stars get small masks, bright, saturated or haloed stars large
+  ones (at most half of the outer ring radius). When the masks leave
+  less than a quarter of the ring (crowded fields), the whole ring is
+  used.</li>
+<li>Their mean clipped at <i>t</i> − 5σ … <i>t</i> + <i>q</i> +
+  √(<i>q</i>² + (5σ)²), iterated from the median, where <i>t</i> is the
+  mean, σ is the larger of the scatter of the pixels and the noise model
+  √((<i>t</i> − BIASLEV)/GAIN + READNS²) [ADU] (the read noise READNS
+  [ADU] or RDNOISE [e-]; without GAIN, the scatter alone), and
+  <i>q</i> = 25/6 photo-electrons (25/(6 GAIN) ADU). The upper limit is
+  the Bernstein bound of the Poisson tail at the probability of 5σ, so no
+  photon of the sky is clipped even when σ is less than one electron,
+  while stars, cosmics and hot pixels are.</li>
+<li>SKYERR is the scatter of the used pixels divided by the square
+  root of their number.</li>
+</ul>
+
+<p>
+On simulated QUVIK-like frames (0.1–2000 e-/pixel, gain 0.1 and 1.5 e-/ADU)
+the median SKY agrees with the true background within 0.002 e-/pixel
+(0.5% at 0.1 e-/pixel), the flux of faint stars is unbiased and SKYERR
+matches the scatter of the sky between noise realisations. The light of
+undetected stars is part of the mean sky (it is in the apertures as well).
 </p>
 
 <h2>Data assumption</h2>
@@ -179,14 +235,14 @@ are selected. Just stars with valid (non-negative) values are presented here.
     neighbour (brighter than 1%) within 5.5 FWHM give EE relative to
     their total flux: the median of three apertures of the plateau of
     the stacked growth curve (from the first aperture larger than 1.3 FWHM
-    within 0.5% of the level of the curve). A sky of a few photons per
-    pixel has a skewed distribution whose robust mean, the sky of aphot,
-    is lower than its mean; the growth curve then rises linearly with
-    the area past the star. This sky bias is measured by the apertures
-    larger than 4 FWHM (at least three are needed: use apertures out to
-    the sky ring, for example <samp>--apertures ...,20,25,30,35,40
-    --ring 45,60</samp>) and removed before EE is measured (EESKYBIA;
-    it is not removed from APCOUNT). EE of every aperture is fitted by
+    within 0.5% of the level of the curve; the level is the median of
+    the apertures larger than 4 FWHM when there are three at least: use
+    apertures out to the sky ring, for example <samp>--apertures
+    ...,20,25,30,35,40 --ring 45,60</samp>). The median slope of the
+    counts by the area over these apertures is recorded as a diagnostic
+    of the sky (EESKYBIA, ADU/pixel; zero within its noise for the mean
+    sky, it includes the light of extended PSF wings and of neighbours);
+    it is not removed. EE of every aperture is fitted by
     a polynomial over the field of the order <samp>--apcorr-var</samp>
     0, 1, 2 (default 2) in x,y, or in the distance from the field centre
     with <samp>--apcorr-radial</samp> (for optics whose PSF changes with
@@ -283,7 +339,9 @@ The routine is on base of original code of DAOPHOT II by P.B.Stetson
 enhancements has been done:
 </p>
 <ul>
-<li>Robust estimators replaces the original estimators of averadge.</li>
+<li>Robust estimators replaces the original estimators of averadge.
+  The sky is the clipped mean by the noise model, the detected stars masked
+  (a robust mean of the ring before 2026).</li>
 <li>All processing is done in memory (no disc buffering is used).</li>
 <!--<li>Real numbers in double precision are implemented</li>-->
 <li>The magnitude output has been abandoned.</li>
