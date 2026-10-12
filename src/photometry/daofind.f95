@@ -1190,6 +1190,7 @@ contains
 ! 20 at least, the median within the fixed window), else the model (a
 ! Gaussian of the FWHM integrated over the pixels). The sharpness stays
 ! within -1 .. 2 (a single hot pixel has 1.4 for FWHM 2.7, 2.7 for 4.9).
+! In the wings of brighter stars the fixed windows hold (SECTION 3b).
 ! A window given by the user is fixed (the old test).
 !
   allocate(accept(ncand))
@@ -1207,8 +1208,8 @@ contains
 ! core) produces local maxima of the brightness enhancement in its wings:
 ! the wings carry the noise of their light, far above the noise of the
 ! sky that sets the threshold, and their curvature adds a positive
-! enhancement. A candidate within the reach of a brighter one (twice at
-! least, or of a saturated area) is kept only when its enhancement
+! enhancement. A candidate within the reach of a brighter one (or of a
+! saturated area) is kept only when its enhancement
 ! exceeds the enhancement of the brighter star's wing at the same
 ! distance (the median over the annulus around the brighter star, its
 ! radial trend removed) by the threshold times the noise of the wing:
@@ -1218,7 +1219,13 @@ contains
 ! the height of the same false-alarm probability as on the sky, by the
 ! Poisson noise of the sky and of the wing light (findnoise). The
 ! annulus follows the actual profile of the star, with no PSF model; on
-! the sky alone the test is the usual threshold.
+! the sky alone the test is the usual threshold. Any brighter candidate
+! is a primary (twice brighter at least before: the twin detections of
+! a star by a filter narrower than the star, noise peaks of its profile
+! 2 px from the centre with 0.6-0.9 of its height, passed: 133 per
+! QUVIK-like frame of 2401 stars with FWHM 2.7 for 4.93, 78 now). A
+! candidate outside the fixed shape windows, accepted by the noise
+! (SECTION 3a), is not accepted in the light of a wing.
 !
   wgain = -1
   if( present(gain) ) wgain = real(gain)
@@ -1314,7 +1321,7 @@ contains
       ! areas reach farther by their radius times
       real, parameter :: reach = 8, reachmin = 20, reachsat = 3
       ! the primary brighter by the factor, the smallest annulus [pix]
-      real, parameter :: bright = 2
+      real, parameter :: bright = 1
       integer, parameter :: minpix = 8
       real, dimension(:,:), allocatable :: prim
       real, dimension(:), allocatable :: a, dr, b
@@ -1349,8 +1356,9 @@ contains
                yp = prim(2,k)
                rmax = max(reach*fwhm,reachmin) + reachsat*prim(3,k)
             else
-               ! the candidates brighter twice at least (a comparable
-               ! neighbour cannot be explained by the wing)
+               ! the brighter candidates (a twin detection of a star by
+               ! a narrow filter, a noise peak of its profile, has 0.6-0.9
+               ! of its height)
                if( k - nsat == n ) cycle
                if( .not. (cand(3,k-nsat) > bright*hc) ) cycle
                xp = cand(1,k-nsat)
@@ -1391,13 +1399,21 @@ contains
             med = qselect(a(1:m),(m + 1)/2)
             a(1:m) = abs(a(1:m) - med)
             sig = 1.4826*qselect(a(1:m),(m + 1)/2)
+            ! a candidate passing the shape tests only by the noise (as a
+            ! star on the sky, SECTION 3a) is not accepted in the light of
+            ! a wing (the noise of a sky pixel at least): the structure and
+            ! the curvature of the wing distort its shape
+            wing = qselect(b(1:m),(m + 1)/2) - skymod
+            if( iand(nint(cand(8,n)),4) /= 0 .and. wing > ssig ) then
+               accept(n) = .false.
+               exit
+            end if
             ! the scatter: the noise predicted by the light of the wing
             ! (the structure of the wing over the annulus, as the pixel
             ! phase of a sharp core, is not noise) or, without the gain,
             ! the scatter over the annulus
             xl = xsky
             if( gain > 0 ) then
-               wing = qselect(b(1:m),(m + 1)/2) - skymod
                sig = hsig*sqrt(1 + max(wing,0.0)/(gain*ssig**2))
                call height_threshold(wk/(gain*real(sig,REAL64)), &
                     lam + gain*max(wing,0.0),rhog*(hsig/sig)**2,t,xl,sk,ku)
