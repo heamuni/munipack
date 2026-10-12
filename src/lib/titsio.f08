@@ -88,6 +88,9 @@ module titsio
   character(len=*), parameter :: FITS_KEY_PHOTBW = 'PHOTBW'
   character(len=*), parameter :: FITS_KEY_CTPH = 'CTPH'
   character(len=*), parameter :: FITS_KEY_CTPHERR = 'CTPHERR'
+  character(len=*), parameter :: FITS_KEY_PHSYSERR = 'PHSYSERR'
+  character(len=*), parameter :: FITS_KEY_APCORTYP = 'APCORTYP'
+  character(len=*), parameter :: FITS_KEY_APCORR = 'APCORR'
   character(len=*), parameter :: FITS_KEY_CSPACE = 'CSPACE'
   character(len=*), parameter :: FITS_KEY_REFRAME = 'REFRAME'
   character(len=*), parameter :: FITS_KEY_SATURATE = 'SATURATE'
@@ -163,6 +166,8 @@ module titsio
   ! definitions of column labels, aperture photometry
   character(len=*), parameter :: FITS_COL_APCOUNT =    'APCOUNT'
   character(len=*), parameter :: FITS_COL_APCOUNTERR = 'APCOUNTERR'
+  character(len=*), parameter :: FITS_COL_APEE =       'APEE'
+  character(len=*), parameter :: FITS_COL_APEEERR =    'APEEERR'
 
   ! definitions of column labels, growth-curve photometry
   character(len=*), parameter :: FITS_COL_GCOUNT =    'GCOUNT'

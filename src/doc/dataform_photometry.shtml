@@ -119,6 +119,16 @@ further processing.
 <tr><td>ANNULUS2</td><td>outer sky annulus radius<td>deg</td></tr>
 <tr><td>CTPH</td><td>counts per photons<td></td></tr>
 <tr><td>CTPHERR</td><td>Statistical Error of CTPH<td></td></tr>
+<tr><td>PHSYSERR</td><td>systematic error of the calibration, added
+    in quadrature to the errors of all objects (0 when none,
+    see <a href="man_phcal.html">phcal --syserr</a>)<td>mag</td></tr>
+<tr><td>APCORTYP</td><td>aperture correction: EE (the counts divided by
+    the enclosed energy APEE<i>i</i> of the aperture, the total flux),
+    CONST (the constant APCORR), NONE (the aperture flux)<td></td></tr>
+<tr><td>APCORR</td><td>the constant aperture correction (total / aperture
+    flux, APCORTYP = CONST)<td></td></tr>
+<tr><td>EESOURCE</td><td>APEE by: PSF (a PSF file or an analytic PSF),
+    AUTO (growth curves of the frame's stars)<td></td></tr>
 <!--<tr><td>FWHM</td><td>standard FWHM of objects<td>pix</td></tr>-->
 </table>
 </div>

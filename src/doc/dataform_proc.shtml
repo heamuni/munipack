@@ -141,6 +141,32 @@ every star is estimated.
 </table>
 </div>
 
+<p>
+With the enclosed energy (<a href="man_aphot.html#ee">aphot --psf-file,
+--psf, --apcorr</a>), the header describes its source:
+</p>
+
+<div class="table">
+<table>
+<caption>Keywords of the enclosed energy</caption>
+<tr><th>Keyword</th><th>Units</th><th>Description</th></tr>
+<tr><td>EESOURCE</td><td></td><td>PSF (a known PSF) or AUTO (growth curves of the frame's stars)</td></tr>
+<tr><td>EEPSF</td><td></td><td>PSF: FILE, GAUSS or MOFFAT</td></tr>
+<tr><td>EEPSFFIL</td><td></td><td>PSF file (the last 64 characters of a longer name)</td></tr>
+<tr><td>EEPSFCX, EEPSFCY</td><td>pix</td><td>field centre of the PSF file</td></tr>
+<tr><td>EEPSFSCL</td><td>pix/deg</td><td>scale of RADCOO of the PSF file</td></tr>
+<tr><td>EEFWHM, EEBETA</td><td>pix</td><td>FWHM (and the Moffat β) of an analytic PSF</td></tr>
+<tr><td>EEVARREQ</td><td></td><td>AUTO: requested order of the spatial variation</td></tr>
+<tr><td>EEVAR</td><td></td><td>AUTO: the order allowed by the count of stars</td></tr>
+<tr><td>EEVARCOO</td><td></td><td>AUTO: the variation by XY or RADIAL (the distance from EEFCX, EEFCY)</td></tr>
+<tr><td>EENSTAR</td><td></td><td>AUTO: bright isolated stars used</td></tr>
+<tr><td>EERTOT1, EERTOT2</td><td>pix</td><td>AUTO: the apertures of the total flux (the plateau of the growth curve)</td></tr>
+<tr><td>EESKYBIA</td><td>ADU/pix</td><td>AUTO: the sky bias removed (counts − bias × area) before EE is measured</td></tr>
+<tr><td>EEORD<i>i</i></td><td></td><td>AUTO: the order of the variation of APEE<i>i</i> (lowered when not significant)</td></tr>
+<tr><td>EESIG<i>i</i></td><td></td><td>AUTO: the scatter of EE of the stars over the model (included in APEEERR<i>i</i>)</td></tr>
+</table>
+</div>
+
 <!--
 <p>Keyword CALIBR denotes calibration level. One can be potentially
 expanded. For example onto more fine calibration, multinight-calibration, etc.
@@ -171,6 +197,8 @@ The aperture photometry table.
 <tr><td>SKYERR</td><td>counts</td><td>Sky level error</td></tr>
 <tr><td>APCOUNT<i>i</i></td><td>counts</td><td>Sum of counts in <i>i</i>-th aperture<sup><a href="#neg">[*]</a></sup></td></tr>
 <tr><td>APCOUNTERR<i>i</i></td><td>counts</td><td>Statistical error of APCOUNT<i>i</i></td></tr>
+<tr><td>APEE<i>i</i><sup><a href="#ee">[†]</a></sup></td><td></td><td>Enclosed energy: the fraction of the total flux of the star in the <i>i</i>-th aperture</td></tr>
+<tr><td>APEEERR<i>i</i><sup><a href="#ee">[†]</a></sup></td><td></td><td>Error of APEE<i>i</i></td></tr>
 </table>
 </div>
 
@@ -178,6 +206,12 @@ The aperture photometry table.
 <p id="prim">
 <sup><a href="#prim">[§]</a></sup>
 This column is a direct copy of one from FIND extension.
+</p>
+<p id="ee">
+<sup><a href="#ee">[†]</a></sup>
+Optional: present only with <a href="man_aphot.html#ee">aphot --psf-file,
+--psf or --apcorr</a>, after the other columns. APCOUNT<i>i</i> / APEE<i>i</i>
+is the total flux of the star, used by <a href="man_phcal.html">phcal</a>.
 </p>
 <p id="neg">
 <sup><a href="#neg">[*]</a></sup>

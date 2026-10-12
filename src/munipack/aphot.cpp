@@ -63,10 +63,10 @@ MuniAphot::MuniAphot(wxEvtHandler *h, const MuniCmdLineParser& cmd):
     Write("ELLIPTICITY = T");
 
   if( cmd.Found("eccentricity",&x) )
-    Write("ECCENTRICITY = %lf",x);
+    Write("ECCENTRICITY = %.17g",x);
 
   if( cmd.Found("inclination",&x) )
-    Write("INCLINATION = %lf",x);
+    Write("INCLINATION = %.17g",x);
 
   if( cmd.Found("coo",&a) ) {
 
@@ -100,6 +100,81 @@ MuniAphot::MuniAphot(wxEvtHandler *h, const MuniCmdLineParser& cmd):
     for(size_t i = 0; i < x.size(); i++)
       Write("STAR = %.15f %.15f",x[i],y[i]);
   }
+
+  // the enclosed energy of apertures
+  wxString psf;
+  if( cmd.Found("psf",&a) ) {
+    psf = a.Upper();
+    if( ! (psf == "GAUSS" || psf == "MOFFAT" || psf == "FILE") )
+      wxLogFatalError("Unknown PSF `%s' (GAUSS, MOFFAT, FILE).",a);
+  }
+
+  if( cmd.Found("psf-file",&a) ) {
+    if( ! (psf == "" || psf == "FILE") )
+      wxLogFatalError("--psf-file requires --psf=FILE.");
+    psf = "FILE";
+    Write("PSFFILE = '" + a + "'");
+  }
+  else if( psf == "FILE" )
+    wxLogFatalError("--psf=FILE requires --psf-file.");
+
+  if( psf != "" )
+    Write("PSF = '" + psf + "'");
+
+  if( cmd.Found("fwhm",&x) ) {
+    if( ! (x > 0) )
+      wxLogFatalError("--fwhm must be positive.");
+    Write("FWHM = %.17g",x);
+  }
+
+  if( cmd.Found("beta",&x) ) {
+    if( ! (x > 1) )
+      wxLogFatalError("--beta must be greater than 1.");
+    Write("BETA = %.17g",x);
+  }
+
+  if( cmd.Found("scale",&x) )
+    Write("SCALE = %.17g",x);
+
+  if( cmd.Found("psf-centre",&a) ) {
+    wxStringTokenizer t(a,sep);
+    double c[2];
+    int i = 0;
+    while( t.HasMoreTokens() && i < 2 ) {
+      wxString token(t.GetNextToken());
+      if( ! token.ToDouble(&c[i]) )
+	wxLogFatalError("Failed to interpret `%s' as a coordinate.",token);
+      i++;
+    }
+    if( i != 2 )
+      wxLogFatalError("--psf-centre requires x,y.");
+    Write("PSFCENTRE = %.17g %.17g",c[0],c[1]);
+  }
+
+  if( cmd.Found("apcorr",&a) ) {
+    if( a.Upper() != "AUTO" )
+      wxLogFatalError("Unknown --apcorr `%s' (auto).",a);
+    if( psf != "" )
+      wxLogFatalError("--apcorr=auto and --psf, --psf-file are exclusive.");
+    Write("APCORR = 'AUTO'");
+  }
+
+  if( cmd.Found("apcorr-var",&n) ) {
+    if( n < 0 || n > 2 )
+      wxLogFatalError("--apcorr-var is 0, 1 or 2.");
+    if( ! cmd.Found("apcorr") )
+      wxLogFatalError("--apcorr-var requires --apcorr=auto.");
+    Write("APCORRVAR = %ld",n);
+  }
+
+  if( cmd.Found("apcorr-radial") ) {
+    if( ! cmd.Found("apcorr") )
+      wxLogFatalError("--apcorr-radial requires --apcorr=auto.");
+    Write("APCORRRADIAL = T");
+  }
+
+  if( cmd.Found("coo") && (psf != "" || cmd.Found("apcorr")) )
+    wxLogFatalError("--coo does not support the enclosed energy (--psf, --apcorr).");
 
   WriteFilesMultiple(cmd.GetFiles());
 }

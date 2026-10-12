@@ -33,6 +33,10 @@ module mfits
   ! (GROW when its extension is present, otherwise APER)
   character(len=FLEN_VALUE) :: phmethod = ''
 
+  ! the aperture photometry is divided by the enclosed energy of
+  ! the aperture (APEEi of APERPHOT, when present): the total flux
+  logical :: apee_use = .true.
+
 
 contains
 
@@ -169,7 +173,7 @@ contains
     real(dbl) :: nullval
     real :: hwhm
     logical :: anyf
-    logical :: undef_airmass, have_grow, have_ap, have_psf
+    logical :: undef_airmass, have_grow, have_ap, have_psf, aperture
 !    type(AstroTrafoProj) :: tproj
     type(fitsfiles) :: fits
     type(AstroWCS) :: wcs
@@ -365,6 +369,7 @@ contains
 
     keycts = ''
     keyerr = ''
+    aperture = .false.
 
     if( have_psf ) then
        keycts = FITS_COL_PSFCOUNT
@@ -403,6 +408,7 @@ contains
 
        write(keycts,'(a,i0)') FITS_COL_APCOUNT,maper
        write(keyerr,'(a,i0)') FITS_COL_APCOUNTERR,maper
+       aperture = .true.
 
     end if
 
@@ -430,6 +436,12 @@ contains
        call fits_read_col(fits,colnum(5),frow,nullval,dct(i:l),anyf,status)
        if( status /= 0 ) goto 666
     end do
+
+    ! the total flux by the enclosed energy of the aperture
+    if( aperture .and. apee_use ) then
+       call apee_apply(fits,maper,ct,dct,status)
+       if( status /= 0 ) goto 666
+    end if
 
     ! PSF photometry: stars with a saturated core or a failed fit
     ! (FLAG 1, 16) are not used
@@ -480,6 +492,74 @@ contains
     call fits_report_error(error_unit,status)
 
   end subroutine readframe
+
+  subroutine apee_apply(fits,maper,ct,dct,status,found,source)
+
+    ! The counts in the aperture maper (of the current APERPHOT HDU)
+    ! are divided by its enclosed energy APEE (when the column is present):
+    ! the total flux; the relative error of APEE (APEEERR) is added
+    ! in quadrature. Stars without a valid APEE are not used.
+
+    type(fitsfiles), intent(in out) :: fits
+    integer, intent(in) :: maper
+    real(dbl), dimension(:), intent(in out) :: ct, dct
+    integer, intent(in out) :: status
+    logical, intent(out), optional :: found
+    character(len=*), intent(out), optional :: source
+
+    real(dbl), dimension(:), allocatable :: ee, eeerr
+    character(len=FLEN_CARD) :: key
+    integer :: c1, c2, srows, frow, i, l, nrows
+    real(dbl) :: nullval
+    logical :: anyf
+
+    if( present(found) ) found = .false.
+    if( present(source) ) source = ''
+    if( status /= 0 ) return
+
+    write(key,'(a,i0)') FITS_COL_APEE,maper
+    call fits_write_errmark
+    call fits_get_colnum(fits,.true.,key,c1,status)
+    if( status == FITS_COLUMN_NOT_FOUND ) then
+       call fits_clear_errmark
+       status = 0
+       return
+    end if
+    if( present(source) ) then
+       call fits_read_key(fits,'EESOURCE',source,status)
+       if( status == FITS_KEYWORD_NOT_FOUND ) then
+          call fits_clear_errmark
+          status = 0
+          source = ''
+       end if
+    end if
+    write(key,'(a,i0)') FITS_COL_APEEERR,maper
+    call fits_get_colnum(fits,.true.,key,c2,status)
+    if( status /= 0 ) return
+
+    nrows = size(ct)
+    allocate(ee(nrows),eeerr(nrows))
+    nullval = -1
+    call fits_get_rowsize(fits,srows,status)
+    do i = 1, nrows, srows
+       frow = i
+       l = min(i+srows,nrows)
+       call fits_read_col(fits,c1,frow,nullval,ee(i:l),anyf,status)
+       call fits_read_col(fits,c2,frow,nullval,eeerr(i:l),anyf,status)
+    end do
+    if( status /= 0 ) return
+
+    where( ct > 0 .and. dct > 0 .and. ee > 0 .and. eeerr >= 0 )
+       dct = sqrt((dct / ee)**2 + (ct * eeerr / ee**2)**2)
+       ct = ct / ee
+    elsewhere
+       ct = -1
+       dct = -1
+    end where
+    if( present(found) ) found = .true.
+
+  end subroutine apee_apply
+
 
   subroutine checkframe(filename,keys,filter,nrows,status)
 
