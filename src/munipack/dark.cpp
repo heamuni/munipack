@@ -35,5 +35,15 @@ MuniDark::MuniDark(wxEvtHandler *h, const MuniCmdLineParser& cmd):
   if( cmd.Found("bias",&a) )
     Write("BIAS = '"+a+"'");
 
+  if( cmd.Found("arith") && cmd.Found("hampel") )
+    wxLogFatalError("--arith and --hampel are exclusive.");
+
+  // the default is the mean clipped by the noise model of the frames
+  if( cmd.Found("arith") )
+    Write("MEAN = 'ARITH'");
+
+  if( cmd.Found("hampel") )
+    Write("MEAN = 'HAMPEL'");
+
   WriteFilesSingle(cmd.GetFiles());
 }

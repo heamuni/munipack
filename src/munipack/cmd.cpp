@@ -161,6 +161,8 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddUsageText("Usage: munipack "+action+" [options] file(s)");
     AddUsageText("* Averaged dark frame.");
     AddOption("bias","","bias frame");
+    AddSwitch("","arith","average by the arithmetical mean");
+    AddSwitch("","hampel","robust mean by the Hampel M-estimator (old default)");
     COMMON_OPTIONS_PHCORR
     COMMON_OPTIONS_SINGLE
     COMMON_OPTIONS_BITPIX

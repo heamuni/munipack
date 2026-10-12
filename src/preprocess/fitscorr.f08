@@ -37,9 +37,10 @@ module fitscorr
      real :: gain = 1
      real :: readns = 0              ! readout noise [ADU]
      real :: rdnoise = 0             ! readout noise [e-] (RDNOISE)
+     real :: biaslev = 0             ! the pedestal [ADU] (BIASLEV)
      ! the master bias subtracted from a master dark (DARKBIAS)
      character(len=FLEN_VALUE) :: darkbias = ''
-     logical :: readns_set = .false., rdnoise_set = .false.
+     logical :: readns_set = .false., rdnoise_set = .false., biaslev_set = .false.
      logical :: saturate_set = .false.
      logical :: gain_set = .false.
      logical :: exptime_set = .false.
@@ -162,6 +163,17 @@ contains
           call fits_clear_errmark
           status = 0
           fits%rdnoise = 0
+       end if
+
+       ! the pedestal (artificial)
+       call fits_write_errmark
+       call fits_read_key(fitsfile,'BIASLEV',fits%biaslev,status)
+       if( status == 0 ) then
+          fits%biaslev_set = .true.
+       else if( status == FITS_KEYWORD_NOT_FOUND ) then
+          call fits_clear_errmark
+          status = 0
+          fits%biaslev = 0
        end if
 
        ! the master bias subtracted from a master dark

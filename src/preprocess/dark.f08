@@ -61,6 +61,11 @@ program dark
   real :: threshold = 1
   logical :: threshold_set = .false.
 
+  ! the mean of a pixel: CLIP (the mean clipped by the noise model of the
+  ! frames, lib/clipmean.f08, default), ARITH (arithmetic), HAMPEL (the
+  ! robust M-estimator of OakLeaf, biased low on a few electrons)
+  character(len=FLEN_VALUE) :: meanmode = 'CLIP'
+
   ! dark image and its statistical error
   real, dimension(:,:), allocatable :: image, imgerr
   real :: exptime_mean = 0,  exptime_err = 0  ! exposure time
@@ -107,6 +112,12 @@ program dark
         read(val,*) threshold
         if( .not. (threshold > 0) ) stop 'Threshold > 0 is required.'
         threshold_set = .true.
+     endif
+
+     if( key == 'MEAN' ) then
+        read(val,*) meanmode
+        if( .not. (meanmode == 'CLIP' .or. meanmode == 'ARITH' .or. &
+             meanmode == 'HAMPEL') ) stop 'The mean is CLIP, ARITH or HAMPEL.'
      endif
 
      if( key == 'FITS_KEY_DATEOBS' ) then
@@ -256,16 +267,21 @@ program dark
   block
 
     use oakleaf
+    use clipmean
 
     real, dimension(:,:), allocatable :: bias
     logical, dimension(:,:), allocatable :: mask, bitmask
     real, dimension(:), allocatable :: x
-    integer :: i,j,n,m
+    real(REAL64), dimension(:), allocatable :: xd, g, r2, b, gp, r2p, bp
+    real(REAL64) :: cmean, cerr, csig
+    integer :: i,j,n,m,nu
     real :: f
+    logical :: common
 
     allocate(bitmask(naxes(1),naxes(2)),mask(naxes(1),naxes(2)),x(ndark), &
          image(naxes(1),naxes(2)),imgerr(naxes(1),naxes(2)), &
-         bias(naxes(1),naxes(2)),stat=stat,errmsg=msg)
+         bias(naxes(1),naxes(2)),xd(ndark),g(ndark),r2(ndark),b(ndark), &
+         gp(ndark),r2p(ndark),bp(ndark),stat=stat,errmsg=msg)
     if( stat /= 0 ) then
        write(error_unit,*) trim(msg)
        error stop 'Insufficient memory.'
@@ -288,6 +304,42 @@ program dark
        bitmask = .true.
     end if
 
+    ! The noise model of the frames for the clipped mean: the gain [e-/ADU]
+    ! (GAIN; without it, the clipping by the observed scatter alone), the
+    ! read noise [ADU] (READNS, or RDNOISE [e-] / GAIN) and the level of no
+    ! photons of the values [ADU]: zero with the master bias subtracted,
+    ! the pedestal BIASLEV of the frame, zero when unknown (the noise of
+    ! a raw frame with a pedestal is overestimated then, the clipping
+    ! looser; the mean is not biased).
+    do m = 1, ndark
+       if( darks(m)%gain_set .and. darks(m)%gain > 0 ) then
+          g(m) = darks(m)%gain
+       else
+          g(m) = -1
+       end if
+       if( darks(m)%readns_set ) then
+          r2(m) = real(darks(m)%readns,REAL64)**2
+       else if( darks(m)%rdnoise_set .and. g(m) > 0 ) then
+          r2(m) = (darks(m)%rdnoise / g(m))**2
+       else
+          r2(m) = 0
+       end if
+       if( biasname /= '' ) then
+          b(m) = 0
+       else
+          b(m) = darks(m)%biaslev
+       end if
+    end do
+    ! one model for all the frames (usually)
+    common = all(g == g(1)) .and. all(r2 == r2(1)) .and. all(b == b(1))
+    if( verbose .and. meanmode == 'CLIP' ) then
+       write(error_unit,'(a,1pg0.4,a,1pg0.4,a,1pg0.4,a)',advance="no") &
+            ' Noise model (first frame): gain = ',g(1),' e-/ADU, read noise = ', &
+            sqrt(r2(1)),' ADU, level of no photons = ',b(1),' ADU'
+       if( .not. common ) write(error_unit,'(a)',advance="no") ' (frames differ)'
+       write(error_unit,*)
+    end if
+
     if( ndark > 1 ) then
 
        do j = 1, naxes(2)
@@ -301,11 +353,33 @@ program dark
                    if( threshold < f .and. f < darks(m)%saturate ) then
                       n = n + 1
                       x(n) = f - bias(i,j)
+                      xd(n) = real(f,REAL64) - bias(i,j)
+                      gp(n) = g(m)
+                      r2p(n) = r2(m)
+                      bp(n) = b(m)
                    end if
                 end do
 
                 if( n > 1 ) then
-                   call rmean(x(1:n),image(i,j),imgerr(i,j))
+                   if( meanmode == 'HAMPEL' ) then
+                      call rmean(x(1:n),image(i,j),imgerr(i,j))
+                   else if( meanmode == 'ARITH' ) then
+                      ! the mean and its error by the scatter (n - 1)
+                      cmean = sum(xd(1:n)) / n
+                      image(i,j) = real(cmean)
+                      imgerr(i,j) = real(sqrt(sum((xd(1:n) - cmean)**2) / &
+                           (n - 1) / n))
+                   else
+                      if( common ) then
+                         call clipped_mean(xd(1:n),g(1:1),r2(1:1),b(1:1), &
+                              cmean,cerr,csig,nu)
+                      else
+                         call clipped_mean(xd(1:n),gp(1:n),r2p(1:n),bp(1:n), &
+                              cmean,cerr,csig,nu)
+                      end if
+                      image(i,j) = real(cmean)
+                      imgerr(i,j) = real(cerr)
+                   end if
                 else
                    bitmask(i,j) = .false.
                 end if
@@ -345,17 +419,19 @@ program dark
 
        ! mean dark value
        mask = imgerr > 0
-       call rmean(pack(image,mask),dark_mean,dark_err)
+       call level(pack(image,mask),dark_mean,dark_err)
 
     else if( ndark == 1 ) then
 
-       image = darks(1)%image
+       ! (the bias is subtracted as from more frames: DARKBIAS says so)
+       mask = threshold < darks(1)%image .and. &
+            darks(1)%image < darks(1)%saturate .and. bitmask
+       image = darks(1)%image - bias
        temper_mean = darks(1)%temper
        temper_err = 0.0
        exptime_mean = darks(1)%exptime
        exptime_err = 0.0
-       mask = threshold < image .and. image < darks(1)%saturate .and. bitmask
-       call rmean(pack(image,mask),dark_mean,dark_err)
+       call level(pack(image,mask),dark_mean,dark_err)
 
     end if
 
@@ -365,7 +441,7 @@ program dark
        imgerr = dark_err
     end where
 
-    deallocate(bias,mask,bitmask,x)
+    deallocate(bias,mask,bitmask,x,xd,g,r2,b,gp,r2p,bp)
   end block
 
   ! checks
@@ -434,6 +510,8 @@ program dark
     write(buf,'(a,1pg0.5,a,1pg0.1)') ' Average level = ',dark_mean,' +- ',&
          dark_err
     call fits_write_comment(fits,buf(2:),status)
+    call fits_write_key(fits,'DARKMEAN',meanmode, &
+         'mean of pixels: CLIP (noise model), ARITH, HAMPEL',status)
 
     if( allocated(biasfits) ) &
          call fits_write_comment(fits,'BIAS: '//trim(biasfits%filename),status)
@@ -513,5 +591,36 @@ program dark
   else
      stop 'An error occurred during some dark or bias frames determination.'
   end if
+
+contains
+
+  subroutine level(a,mean,err)
+
+    ! The mean level of the pixels a of the averaged frame (the fill of
+    ! the undefined pixels) and its error: the robust mean with HAMPEL,
+    ! the clipped mean by the scatter alone otherwise (the averaged frame
+    ! has no simple noise model; hot pixels are clipped).
+
+    use oakleaf, only: rmean
+    use clipmean, only: clipped_mean
+
+    real, dimension(:), intent(in) :: a
+    real, intent(out) :: mean, err
+    real(REAL64) :: t, e, s
+    integer :: nu
+
+    mean = 0
+    err = 0
+    if( size(a) == 0 ) return
+    if( meanmode == 'HAMPEL' ) then
+       call rmean(a,mean,err)
+    else
+       call clipped_mean(real(a,REAL64),[-1.0_REAL64],[0.0_REAL64], &
+            [0.0_REAL64],t,e,s,nu)
+       mean = real(t)
+       err = real(e)
+    end if
+
+  end subroutine level
 
 end program dark

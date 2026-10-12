@@ -31,5 +31,9 @@ MuniBias::MuniBias(wxEvtHandler *h, const MuniCmdLineParser& cmd):
   CommonOptionsPhCorr(cmd);
   EnvironmentPhCorr();
 
+  // bias frames are Gaussian read noise: the robust mean is unbiased
+  // (the default of dark is the mean clipped by the noise model)
+  Write("MEAN = 'HAMPEL'");
+
   WriteFilesSingle(cmd.GetFiles());
 }
