@@ -40,6 +40,9 @@ program find
   real :: saturation = -1
   real :: shrplo = 0.2, shrphi = 1.0
   real :: rndlo = -1.0, rndhi = 1.0
+  ! the expected number of noise peaks per frame setting the threshold
+  ! (<= 0: by the threshold)
+  real :: falserate = -1
   logical :: verbose = .false., plog = .false.
   logical :: ex, exitus = .true.
   integer :: eq, stat
@@ -85,6 +88,11 @@ program find
      else if( key == 'THRESHOLD' ) then
 
         read(val,*) threshold
+
+     else if( key == 'FALSE_RATE' ) then
+
+        read(val,*) falserate
+        if( .not. (falserate > 0) ) stop 'Error in find: --false-rate > 0 expected.'
 
      else if( key == 'LOWER_THRESHOLD' ) then
 
@@ -141,6 +149,7 @@ contains
     use mdaosky
     use mdaofind
     use fitsfind
+    use findnoise, only: findstats
     use skymean, only: sky_noise_model
 
     logical, intent(out) :: exitus
@@ -148,6 +157,7 @@ contains
     real, dimension(:,:), allocatable :: data
     real :: lobad, hibad, hmin, readns,skymod, skyerr, skysig, satur
     real(REAL64) :: gain, rn2, bias
+    type(findstats) :: stats
     integer :: nstep,nstar,status
 
     if( fwhm <= 0.0 ) stop 'Error in find: Assumption FWHM > 0 unsatisfied.'
@@ -179,14 +189,21 @@ contains
     open(3,status='scratch',form='unformatted')
 
     call daofind(data,debug,plog,hibad,skymod,skysig,fwhm,lothresh,threshold,&
-         shrplo,shrphi,rndlo,rndhi,readns,nstar,lobad, hmin, gain)
+         shrplo,shrphi,rndlo,rndhi,readns,falserate, &
+         nstar,lobad,hmin,stats,gain,bias)
 
     rewind(3)
-    call fits_find_save(filename,output,fkeys,nstar,fwhm,threshold,&
+    call fits_find_save(filename,output,fkeys,nstar,fwhm,real(stats%t),&
          shrplo,shrphi,rndlo,rndhi,readns,lothresh, lobad, hibad, hmin, &
-         skymod, skyerr, skysig, maxsky,status)
+         skymod, skyerr, skysig, maxsky, stats, falserate, status)
 
-    if( verbose ) write(error_unit,*) skymod, nstar
+    if( verbose ) then
+       write(error_unit,*) skymod, nstar
+       write(error_unit,'(a,f0.3,a,f0.3,a,f0.4,a,g0.4,a)') &
+            '  threshold ',stats%t,' (Normal deviate) = ',stats%x, &
+            ' sigma of the filtered sky (skewness ',stats%skew, &
+            '); expected noise peaks per frame ',stats%nfalse,'.'
+    end if
     close(3)
 
 666 continue

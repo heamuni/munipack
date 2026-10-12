@@ -44,9 +44,11 @@ contains
 
   subroutine daofind (d, verbose, plog, hibad, skymod, skysig,  &
        fwhm, lothresh, threshold, shrplo, shrphi, rndlo, rndhi, readns, &
-       nstar, lobad, hmin, gain )
+       falserate, &
+       nstar, lobad, hmin, stats, gain, bias )
 
   use iso_fortran_env, only: REAL64
+  use findnoise
 
   implicit none
 
@@ -54,11 +56,15 @@ contains
   logical, intent(in) :: verbose, plog
   real, intent(in) :: hibad, fwhm, shrplo, shrphi, rndlo, rndhi, &
        readns, lothresh, threshold, skymod, skysig
+  ! the expected number of noise peaks per frame which sets the
+  ! threshold (<= 0: by the threshold)
+  real, intent(in) :: falserate
   integer, intent(out) :: nstar
   real, intent(out) :: lobad, hmin
-  ! the gain [e-/ADU] of the frame, optional (for the photon noise
-  ! of the light of stars)
-  real(REAL64), intent(in), optional :: gain
+  type(findstats), intent(out) :: stats
+  ! the gain [e-/ADU] and the bias [ADU] of the frame, optional (the
+  ! noise model of the sky and of the light of stars)
+  real(REAL64), intent(in), optional :: gain, bias
 
   ! Gain: DAOPHOT scales data on-the-fly by the parameter,
   ! while Munipack assumes that the data has already gain correction done.
@@ -161,6 +167,11 @@ contains
   logical, dimension(:), allocatable :: accept
   integer :: ncand
   real :: wgain
+  ! the noise model: the kernel (findnoise)
+  real(REAL64), dimension(:,:), allocatable :: wf
+  real(REAL64), dimension(:), allocatable :: wk
+  logical, dimension(:,:), allocatable :: disc
+  real(REAL64) :: g64, b64, lam, rhog, sigh
 !
 ! Variables
 !
@@ -424,8 +435,51 @@ contains
 !  write(*,*) 0.1*nint(10.*(skymod - lothresh*hmin)),max(0.0,skymod - lothresh*hmin)
 !  hmin = 0.01*nint(100.*threshold*relerr*hmin)
 !  write(*,*) skymod,lobad,hmin
-  hmin = threshold*relerr*ssig
 !  write(*,*) lobad,hmin,relerr,ssig
+
+  ! The threshold (findnoise, BUGS P33): t is the Normal deviate of the
+  ! false-alarm probability of a pixel (the user's threshold, or by the
+  ! expected number of noise peaks in the frame), hmin the height of the
+  ! convolution exceeded with that probability by the noise of the sky:
+  ! Poisson photons and Normal read noise by the gain (GAIN), the sky
+  ! level above the bias (BIASLEV) and the kernel. The Poisson mean
+  ! lam [e-] of a pixel is at most its variance (an unknown bias).
+  ! Without the gain, the noise is Normal: hmin = t sigma_h.
+  allocate(wf(nbox,nbox),disc(nbox,nbox))
+  disc = .not. skip
+  where( disc )
+     wf = (real(g,REAL64) - sgop) / denom
+  elsewhere
+     wf = 0
+  end where
+  wk = pack(wf,disc)
+  sigh = relerr*ssig
+
+  g64 = -1
+  b64 = 0
+  if( present(gain) ) g64 = gain
+  if( present(bias) ) b64 = bias
+  lam = 0
+  rhog = 1
+  if( g64 > 0 ) then
+     lam = min(max((skymod - b64)*g64,0.0_REAL64),(g64*ssig)**2)
+     rhog = max(1 - lam/(g64*ssig)**2,0.0_REAL64)
+  end if
+
+  if( falserate > 0 ) then
+     stats%t = rate_deviate(real(falserate,REAL64),real(ncol,REAL64)*nrow, &
+          field_lambda2(wf))
+  else
+     stats%t = threshold
+  end if
+  if( g64 > 0 ) then
+     call height_threshold(wk/(g64*sigh),lam,rhog,stats%t,stats%x, &
+          stats%skew,stats%kurt)
+  else
+     stats%x = stats%t
+  end if
+  stats%nfalse = noise_peaks(stats%t,real(ncol,REAL64)*nrow,field_lambda2(wf))
+  hmin = real(stats%x*sigh)
 
   ! simplified code:
 !  hmin = sqrt(readns**2 + skysig**2) ! replacing skymod->skysig**2 is realiable
@@ -1093,15 +1147,17 @@ contains
 ! radial trend removed) by the threshold times the noise of the wing:
 ! the noise of the sky raised by the photon noise of the light of the
 ! wing (with the gain), or the scatter of the enhancement over the
-! annulus (without it); the noise of the sky at least. The annulus
-! follows the actual profile of the star, with no PSF model; on the
-! sky alone the test is the usual threshold.
+! annulus (without it); the noise of the sky at least. The threshold is
+! the height of the same false-alarm probability as on the sky, by the
+! Poisson noise of the sky and of the wing light (findnoise). The
+! annulus follows the actual profile of the star, with no PSF model; on
+! the sky alone the test is the usual threshold.
 !
   wgain = -1
   if( present(gain) ) wgain = real(gain)
   allocate(accept(ncand))
   call wingtest(d,h,hibad,skymod,ssig,wgain,cand(:,1:ncand),fwhm, &
-       threshold,relerr*ssig,nhalf,accept)
+       stats%t,stats%x,wk,lam,rhog,relerr*ssig,nhalf,accept)
 
   do n = 1, ncand
      if( .not. accept(n) ) cycle
@@ -1155,13 +1211,13 @@ contains
 ! Normal return.
 !
 
-      deallocate(h,g,skip,cand,accept)
+      deallocate(h,g,skip,cand,accept,wf,disc)
 
     end subroutine daofind
 
 
-    subroutine wingtest(d,h,hibad,skymod,ssig,gain,cand,fwhm,threshold, &
-         hsig,nhalf,accept)
+    subroutine wingtest(d,h,hibad,skymod,ssig,gain,cand,fwhm,t,xsky, &
+         wk,lam,rhog,hsig,nhalf,accept)
 
       ! The candidates (cand(:,n): x, y, height, ..) explained by the wing
       ! of a brighter candidate or of a saturated area are not accepted
@@ -1171,10 +1227,19 @@ contains
       ! gain (gain > 0), the noise of the enhancement in the wing is
       ! predicted by the light of the wing (the median of the annulus):
       ! hsig*sqrt(1 + wing/(gain*ssig**2)); without it, by the scatter
-      ! of the enhancement over the annulus.
+      ! of the enhancement over the annulus. The threshold is the height
+      ! [noise] of the false-alarm probability Q(t) by the Poisson noise
+      ! of the sky and the wing (wk the kernel, lam [e-] the Poisson mean
+      ! and rhog the Normal fraction of the variance of a sky pixel), or
+      ! the one of the sky (xsky) without the gain.
+
+      use findnoise, only: height_threshold
+      use iso_fortran_env, only: REAL64
 
       real, dimension(:,:), intent(in) :: d, h, cand
-      real, intent(in) :: hibad, skymod, ssig, gain, fwhm, threshold, hsig
+      real, intent(in) :: hibad, skymod, ssig, gain, fwhm, hsig
+      real(REAL64), intent(in) :: t, xsky, lam, rhog
+      real(REAL64), dimension(:), intent(in) :: wk
       integer, intent(in) :: nhalf
       logical, dimension(:), intent(out) :: accept
 
@@ -1189,6 +1254,7 @@ contains
       integer :: ncand, nsat, n, k, i, j, m, ncol, nrow, ir
       real :: xc, yc, xp, yp, dist, r, rexcl, rmax, rlim, med, sig, hc, sr, &
            slope, wing
+      real(REAL64) :: xl, sk, ku
 
       ncand = size(cand,2)
       ncol = size(h,1)
@@ -1262,11 +1328,14 @@ contains
             ! (the structure of the wing over the annulus, as the pixel
             ! phase of a sharp core, is not noise) or, without the gain,
             ! the scatter over the annulus
+            xl = xsky
             if( gain > 0 ) then
                wing = qselect(b(1:m),(m + 1)/2) - skymod
                sig = hsig*sqrt(1 + max(wing,0.0)/(gain*ssig**2))
+               call height_threshold(wk/(gain*real(sig,REAL64)), &
+                    lam + gain*max(wing,0.0),rhog*(hsig/sig)**2,t,xl,sk,ku)
             end if
-            if( hc - med < threshold*max(sig,hsig) ) then
+            if( hc - med < xl*max(sig,hsig) ) then
                accept(n) = .false.
                exit
             end if

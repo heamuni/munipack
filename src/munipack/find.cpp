@@ -37,6 +37,9 @@ MuniFind::MuniFind(wxEvtHandler *h, const MuniCmdLineParser& cmd):
   if( cmd.Found("th",&x) || cmd.Found("threshold",&x) )
     Write("THRESHOLD = %lf",x);
 
+  if( cmd.Found("false-rate",&x) )
+    Write("FALSE_RATE = %lf",x);
+
   if( cmd.Found("read-noise",&x) )
     Write("READNOISE = %lf",x);
 

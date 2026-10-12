@@ -26,7 +26,7 @@ noinst_PROGRAMS = aphottester
 
 .NOTPARALLEL:
 
-find_SOURCES = skymean.f08 daosky.f95 daofind.f95 fitsfind.f08 find.f08
+find_SOURCES = skymean.f08 daosky.f95 findnoise.f08 daofind.f95 fitsfind.f08 find.f08
 find_LDADD   = $(ldir)/libsort.a $(LIBOAKLEAF) $(LIBMINPACK) $(FITSADD)
 
 aphot_SOURCES = skymean.f08 daosky.f95 daofotometr.f08 fitsaphot.f08 exscatter.f08 \

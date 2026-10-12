@@ -358,8 +358,11 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddUsageText("* Search for stars on frames.");
 
     AddOption("f","fwhm","FWHM in pixels",wxCMD_LINE_VAL_DOUBLE);
-    AddOption("th","threshold","threshold in sigmas above background",
+    AddOption("th","threshold","threshold in sigmas above background "
+	      "(the false-alarm rate of Normal noise, default 7)",
 	      wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","false-rate","threshold by the expected number of noise "
+	      "detections per frame",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","saturate","saturation in ADU",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","lothresh","lower for threshold in sigmas",
 	      wxCMD_LINE_VAL_DOUBLE);
