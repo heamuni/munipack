@@ -81,6 +81,7 @@ module fitspsfphot
      ! grouping (the link distance in FWHM, 0 off), the residual detection
      real(REAL64) :: group = 0
      integer :: ngroups = 0, maxgroup = 0, resdetect = 0, nresid = 0
+     real(REAL64) :: resthresh = -1
   end type PsfHeader
 
 contains
@@ -439,6 +440,9 @@ contains
          'passes of the detection in residuals',status)
     call fits_write_key(fits,'NRESID',hdr%nresid, &
          'stars found in residuals (FLAG 128)',status)
+    if( hdr%resdetect > 0 ) &
+         call fits_write_key(fits,'RESTHRES',hdr%resthresh,-4, &
+         '[sigma] threshold of the detection in residuals',status)
     call fits_write_key(fits,FITS_KEY_GAIN,hdr%gain,-6, &
          '[e-/ADU] gain used for weights',status)
     call fits_write_key(fits,FITS_KEY_READNS,hdr%readns,-6, &

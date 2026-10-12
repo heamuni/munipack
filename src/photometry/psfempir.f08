@@ -39,7 +39,8 @@
 !  the star. Every star samples the grid at its own phase; the solution
 !  combines all of them without a sub-pixel bias (nor the smoothing of
 !  an interpolation). The weights are the inverse variances of the
-!  model, outliers (cosmic rays, neighbours not subtracted) are clipped
+!  model (the Poisson term at least one electron, see below), outliers
+!  (cosmic rays, neighbours not subtracted) are clipped
 !  at 5 sigma. A sky offset of every star is fitted too, on a ring of
 !  pixels just outside of the tables (inside, a sky error would be a
 !  pedestal of the tables). A light regularisation by the squared Laplacian keeps the
@@ -182,7 +183,14 @@ contains
                s = frame%data(i0,j0) - frame%mstar(i0,j0) - st%sky
                if( abs(i) <= n .and. abs(j) <= n ) s = s + st%flux*pold(i,j)
                e%t(i,j) = s - st%flux*pbase(i,j)
-               e%w(i,j) = 1 / frame%variance(frame%mstar(i0,j0) + st%sky)
+               ! the weights with the Poisson term of one electron at
+               ! least (the variance of the fits has no floor): the
+               ! regularisation is relative to them, with the exact
+               ! variance of a sky of 0.4 e-/pixel the outer zone gained
+               ! weight and the empirical PSF of Gaussian stars came out
+               ! 0.2% low in flux (BUGS P35)
+               e%w(i,j) = 1 / (max(frame%mstar(i0,j0) + st%sky - frame%bias, &
+                    1 / frame%gain) / frame%gain + frame%rn2 + frame%qnoise)
             end do
          end do
          deallocate(pold,pbase)

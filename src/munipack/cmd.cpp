@@ -467,6 +467,9 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
 	      "simultaneously (default: 1.5, 0 off)",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","residual-detect","passes of the detection of stars "
 	      "in residuals (default: 0)",wxCMD_LINE_VAL_NUMBER);
+    AddOption("","residual-threshold","threshold of the detection in "
+	      "residuals [sigma] (default: by the false alarms, 5 for 2048x2048)",
+	      wxCMD_LINE_VAL_DOUBLE);
     AddOption("","residual","save the residual frame (single file only)");
     COMMON_OPTIONS_MULTIPLE
     AddParam("file(s)",wxCMD_LINE_VAL_STRING,

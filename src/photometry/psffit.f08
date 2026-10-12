@@ -24,7 +24,12 @@
 !  The weights are the inverse of variances predicted by the model
 !  (sky + all stars), not by data, so faint stars are not biased:
 !
-!     var = (model - bias) / gain + readnoise**2   [ADU**2]
+!     var = max(model - bias, 0) / gain + readnoise**2   [ADU**2]
+!
+!  (plus the quantisation noise of integer frames, 1/12 ADU**2). The
+!  Poisson term is not floored: a sky of a fraction of an electron per
+!  pixel has the variance of that fraction (a floor of one electron made
+!  the errors of faint stars 1.2-1.3 times too large on a sky of 0.4 e-).
 !
 !  The fitted neighbours are subtracted: the sum of models of all
 !  stars is kept in an image (mstar), the model of the star being
@@ -232,8 +237,11 @@ contains
     class(FrameType), intent(in) :: this
     real(REAL64), intent(in) :: m
 
-    ! at least one electron, so the weight is finite
-    variance = max(m - this%bias,1/this%gain) / this%gain + this%rn2 + this%qnoise
+    ! the Poisson noise of the mean (not of one electron at least) and
+    ! the read and the quantisation noise; a guard of (0.01 e-)**2 keeps
+    ! the weight finite for a noiseless model (no sky, no read noise)
+    variance = max(m - this%bias,0.0_REAL64) / this%gain + this%rn2 + this%qnoise
+    variance = max(variance,1e-4_REAL64 / this%gain**2)
 
   end function variance
 
