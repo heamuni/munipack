@@ -68,13 +68,17 @@ munipack psfphot [.. parameters ..] file(s)
   (Levenberg-Marquardt) in the circle of the fitting radius. The weights
   are inverse variances predicted by the model, not by the data,
   <p>
-  <i>σ<sup>2</sup> = (m - b)/g + r<sup>2</sup></i> [ADU<sup>2</sup>],
+  <i>σ<sup>2</sup> = </i>max<i>(m - b, </i>0<i>)/g + r<sup>2</sup></i> [ADU<sup>2</sup>],
   </p>
   where <i>m</i> is the model of the pixel (the sky plus all stars),
   <i>b</i> the bias, <i>g</i> the gain and <i>r</i> the read noise in ADU
-  (1/12 ADU<sup>2</sup> of the quantisation is added for integer frames).
+  (1/12 ADU<sup>2</sup> of the quantisation is added for integer frames;
+  σ is at least 0.01 e-, so the weights stay finite for a noiseless model).
   The weights are iterated with the model, so faint stars are not biased
   (the estimate is the Poisson maximum likelihood without read noise).
+  Versions before 0.6.2+hg1653 (patched) took the Poisson term as one
+  electron at least: on a sky of 0.4 e-/pixel the errors of faint stars
+  were 1.2–1.3 times their scatter and χ² about 0.5.
 </li>
 <li>The fitted neighbours are subtracted: the stars are fitted from the
   brightest, the models of the already fitted stars are subtracted
@@ -101,7 +105,13 @@ munipack psfphot [.. parameters ..] file(s)
   added (FLAG 128), and all stars are refitted (two passes); repeated
   n times. The detection is that of find: the amplitude of the lowered
   Gaussian of the (median) FWHM must be significant above the threshold
-  of find (THRESH of the FIND extension), its sharpness within the limits
+  (<samp>--residual-threshold</samp>; by default the threshold of find,
+  THRESH of the FIND extension, at least the Normal deviate exceeded
+  by chance by one pixel of the frame, <i>P</i> = 1/<i>N</i><sub>pix</sub>:
+  4.75 for 1024², 5.0 for 2048², 5.3 for 4096² pixels; the residuals are
+  searched in every pixel, and the noise of a sky of a few photons per
+  pixel is skewed: at 4σ about 110 noise peaks pass on a 2048² frame with
+  0.4 e-/pixel, 3 at the default), its sharpness within the limits
   of find (SHRPLO, SHRPHI), on a local maximum, farther than 0.75 FWHM
   from all stars and not on saturated areas. The significance is
   computed against the noise predicted by the model, with the PSF
@@ -353,6 +363,11 @@ munipack psfphot [.. parameters ..] file(s)
   <dd>The passes of the detection of stars in the residuals, 0 by
     default (the output has the rows of FIND and of the saturated stars
     only, matching aphot and gphot; the detection costs two more passes).</dd>
+  <dt><samp>--residual-threshold t</samp></dt>
+  <dd>The threshold of the detection in the residuals [σ]; by default the
+    threshold of find, at least the deviate of the false-alarm probability
+    1/<i>N</i><sub>pix</sub> (5.0 for 2048² pixels, see above).
+    RESTHRES of PSFPHOT records it.</dd>
   <dt><samp>--residual file</samp></dt>
   <dd>Save the frame with all fitted stars subtracted (the sky is kept);
     for a single input file.</dd>
@@ -398,7 +413,8 @@ munipack psfphot [.. parameters ..] file(s)
   PSFALPHA and PSFBETA, PSFAXRAT, PSFPA [deg], PSFNSTAR (stars of the
   shape fit), PSFCEN1, PSFCEN2, PSFSCALE (the PSF file geometry),
   PSFZOOM, FITRAD, SKYMODE, NPASS, GROUPDST (the link distance [FWHM]),
-  NGROUPS, MAXGROUP, RESDETEC, NRESID (stars found in the residuals) and
+  NGROUPS, MAXGROUP, RESDETEC, NRESID (stars found in the residuals),
+  RESTHRES (the threshold of the detection in the residuals [σ]) and
   the detector parameters used for the weights: GAIN, READNS, BIASLEV,
   SATURATE. The empirical PSF adds PSFCORE (GAUSS, MOFFAT, FILE), PSFVAR,
   PSFNSTAR (the PSF stars), PSFNSHAP (stars of the core fit), PSFRAD

@@ -124,6 +124,12 @@ MuniPsfphot::MuniPsfphot(wxEvtHandler *h, const MuniCmdLineParser& cmd):
     Write("RESDETECT = %ld",n);
   }
 
+  if( cmd.Found("residual-threshold",&x) ) {
+    if( ! (x > 0) )
+      wxLogFatalError("--residual-threshold must be positive.");
+    Write("RESTHRESH = %.17g",x);
+  }
+
   if( cmd.Found("fwhm",&x) )
     Write("FWHM = %.17g",x);
 

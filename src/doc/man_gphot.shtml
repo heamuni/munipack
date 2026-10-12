@@ -38,6 +38,17 @@ munipack gphot [.. parameters ..] file(s)[,result(s)]
 <h2>Apperture correction determination</h2>
 
 <p>
+  The counts of the apertures of a star are fitted by the growth curve
+  and a residual background <i>b</i> per pixel: <i>C<sub>k</sub></i> =
+  GCOUNT · <i>G<sub>k</sub></i> + <i>b</i> · <i>A<sub>k</sub></i>.
+  The corrected sky is SKY + <i>b</i>. The errors are propagated from the
+  covariance of the nested apertures (they share pixels): the noise of
+  the pixels of the smaller aperture. The error of the mean sky of the
+  ring (SKYERR of APERPHOT) is common to all apertures of a star and is
+  absorbed by <i>b</i> entirely, so it cancels in SKY + <i>b</i>: the
+  error SKYERR of GROWPHOT is that of <i>b</i> by the noise of the
+  pixels (versions before 0.6.2+hg1653 (patched) added the error of the
+  ring once more, 24–41% too large).
 </p>
 
 

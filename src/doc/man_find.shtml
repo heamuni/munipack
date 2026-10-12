@@ -51,7 +51,15 @@ Stars detection algorithm:
 <li>As the preparation step, the background level with the noise <i>B,σ</i>
     of image is determined on a grid covering full frame: the mean clipped
     by the noise model of the frame (GAIN, READNS or RDNOISE, BIASLEV),
-    as the sky of <a href="man_aphot.html#sky">aphot</a>.</li>
+    as the sky of <a href="man_aphot.html#sky">aphot</a>; σ is the observed
+    scatter of the sky pixels, which includes the read noise (the read
+    noise was added to it once more before 0.6.2+hg1653 (patched): with
+    READNS in the header, the threshold was too high, 14 instead of 113
+    noise detections on a Gaussian 2048² frame at <samp>-th 4</samp>).
+    Note that even Normal noise gives about 110 noise peaks per 2048²
+    pixels above 4σ (the convolution is searched in every pixel), and
+    a sky of a few photo-electrons per pixel, whose noise is skewed,
+    several times more.</li>
 <li>As the first step, the image is convoluted with Gaussian hat with
     FWHM provided by user. The convolution has effect of a digital filter
     which emphasizes star-like objects and suppress point defects or
@@ -177,7 +185,9 @@ to all input images.
 <dl>
 <dt><samp>--read-noise</samp></dt><dd>Read noise in ADU. A value from
     frame header is used by default. Use this option when the value is missing or
-    needs correction. Read noise is important for determining of photometry errors.</dd>
+    needs correction. Read noise is important for determining of photometry errors;
+    in find, it enters the noise model of the sky clipping only (the threshold
+    is by the observed scatter).</dd>
 </dl>
 
 <p>See <a href="man_com.html">Common options</a> for input/output filenames.</p>

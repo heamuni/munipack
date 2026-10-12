@@ -264,7 +264,8 @@ contains
     type(fitsfiles) :: fits, cfits
     character(len=80) :: msg
     integer :: stat,status,hdutype,hdunum,chdu
-    real :: t, xerr, xmask, saturate, gain, gain2, maxout
+    real :: t, xerr, xmask, saturate, gain, gain2, maxout, rnadu, qnoise, tb
+    logical :: rnset, electrons
     integer :: n, m
 
     corrector = .false.
@@ -402,14 +403,44 @@ contains
     ! the corrections, we are sure that FLAT > 0
     OUT = gain*(scifits%image - (t*DARK + BIAS)) / FLAT
 
-    ! Variance of electrons before flat-fielding: Poisson noise of the
-    ! signal (at least one electron, non-positive pixels are not given
-    ! an infinite weight), the readout noise of the frame (READNS [ADU]
-    ! when available) and the errors of the dark and bias frames.
-    ! The flat-field divides the noise and adds its own relative error.
-    VAR = max(gain*(scifits%image - (t*DARK + BIAS)), 1.0) + &
-         gain2*((t*DDARK)**2 + DBIAS**2 + scifits%readns**2)
-    DOUT = sqrt(VAR / FLAT**2 + (OUT*DFLAT/FLAT)**2)
+    ! The read noise of the frame [ADU]: READNS [ADU], or RDNOISE [e-]
+    ! (artificial) divided by the gain
+    rnset = scifits%readns_set .or. scifits%rdnoise_set
+    if( scifits%readns_set ) then
+       rnadu = scifits%readns
+    else if( scifits%rdnoise_set ) then
+       rnadu = scifits%rdnoise / gain
+    else
+       rnadu = 0
+    end if
+    ! the quantisation noise of integer frames [ADU**2]
+    if( scifits%bitpix > 0 ) then
+       qnoise = 1.0 / 12
+    else
+       qnoise = 0
+    end if
+    ! The error of the bias enters by (1 - t) when the dark was
+    ! bias-subtracted by the same master bias (its STDERR has the scatter
+    ! of the darks only): OUT = g*(S - t*D_raw - (1 - t)*B).
+    tb = 1
+    if( allocated(darkfits) .and. allocated(biasfits) ) then
+       if( darkfits%darkbias /= '' .and. &
+            basename(darkfits%darkbias) == basename(biasname) ) tb = 1 - t
+    end if
+
+    ! The variance of electrons before flat-fielding (first order, Merline
+    ! & Howell 1995, Newberry 1991): the Poisson noise of all detected
+    ! electrons (the sky, the stars and the dark current, S - B) by a model
+    ! of the pixel, the mean of its eight neighbours (not of the pixel
+    ! itself, so the weights 1/DOUT**2 do not depend on its noise and an
+    ! inverse-variance weighted mean is not biased; not floored at one
+    ! electron), the read noise, the quantisation noise of integer frames,
+    ! the errors of the bias and the dark frames. The flat-field divides
+    ! the noise and adds its own relative error. DOUT > 0 for every pixel.
+    call neighbour_mean(scifits%image - BIAS,VAR)
+    VAR = gain*max(VAR,0.0) + gain2*(rnadu**2 + qnoise + (tb*DBIAS)**2 + &
+         (t*DDARK)**2)
+    DOUT = sqrt(max(VAR / FLAT**2 + (OUT*DFLAT/FLAT)**2,1e-4*gain2))
     ! YES, this small piece of code is the full correction!!!
     ! All other staff is just a practise in reading and writing of FITS files.
 
@@ -497,7 +528,7 @@ contains
             if( bitpix > 0 ) then
                maxout = 2.0**bitpix - 1
                OUT = max(0.0,min(OUT,maxout))
-               DOUT = max(0.0,min(DOUT,maxout))
+               DOUT = max(1.0,min(DOUT,maxout))
             else
                call fits_write_errmark
                call fits_delete_key(cfits,'BSCALE',status)
@@ -514,17 +545,51 @@ contains
                     '[counts] saturation level',status)
             end if
 
-            ! set units of images
-            if( gain_set .or. scifits%gain_set ) then
+            ! set units of images; the noise model of the output (GAIN,
+            ! READNS, RDNOISE, BIASLEV) in its units, so find, aphot and
+            ! psfphot read a correct one: the values in electrons have the
+            ! gain 1, the read noise in electrons, no bias pedestal
+            electrons = gain_set .or. scifits%gain_set
+            if( electrons ) then
                call fits_update_key(cfits,FITS_KEY_BUNIT,'COUNTS', &
                     'captured electrons',status)
-               call fits_update_key(cfits,keys(6),gain,5, &
-                    '[e-/ADU] amplifier gain used for conversion',status)
+               call fits_update_key(cfits,keys(6),1.0,5, &
+                    '[e-/ADU] the values are electrons (by PHCGAIN)',status)
+               call fits_update_key(cfits,'PHCGAIN',gain,-7, &
+                    '[e-/ADU] gain of the conversion to electrons',status)
                write(buf,'(g0.3)') gain
                call fits_write_history(cfits,phid//" gain: "//trim(buf),status)
             else
                call fits_update_key(cfits,FITS_KEY_BUNIT,'ADU', &
                     'values directly provided by camera',status)
+            end if
+            if( rnset ) then
+               if( electrons ) then
+                  call fits_update_key(cfits,FITS_KEY_READNS,gain*rnadu,-7, &
+                       '[e-] read noise (the values are electrons)',status)
+                  call fits_update_key(cfits,'RDNOISE',gain*rnadu,-7, &
+                       '[e-] read-out noise',status)
+               else
+                  call fits_update_key(cfits,FITS_KEY_READNS,rnadu,-7, &
+                       '[ADU] read noise',status)
+               end if
+            end if
+            ! the pedestal is subtracted with the bias (or with a dark
+            ! including it), else it is in the units of the output
+            call fits_write_errmark
+            if( biasname /= '' .or. darkname /= '' ) then
+               call fits_delete_key(cfits,'BIASLEV',status)
+            else
+               block
+                 real :: biaslev
+                 call fits_read_key(cfits,'BIASLEV',biaslev,status)
+                 if( status == 0 ) call fits_update_key(cfits,'BIASLEV', &
+                      gain*biaslev,-7,'bias level (pedestal) in the units',status)
+               end block
+            end if
+            if( status == FITS_KEYWORD_NOT_FOUND ) then
+               call fits_clear_errmark
+               status = 0
             end if
 
             if( flatname /= '' ) then
@@ -592,5 +657,53 @@ contains
     corrector = status == 0
 
   end function corrector
+
+  subroutine neighbour_mean(x,m)
+
+    ! the mean of the eight neighbours of every pixel (fewer on the edges)
+
+    real, dimension(:,:), intent(in) :: x
+    real, dimension(:,:), intent(out) :: m
+    real, dimension(:,:), allocatable :: s, c
+    integer :: nx, ny, i, j
+
+    nx = size(x,1)
+    ny = size(x,2)
+    allocate(s(0:nx+1,0:ny+1),c(0:nx+1,0:ny+1))
+    s = 0
+    c = 0
+    s(1:nx,1:ny) = x
+    c(1:nx,1:ny) = 1
+    m = 0
+    do j = -1, 1
+       do i = -1, 1
+          if( i == 0 .and. j == 0 ) cycle
+          m = m + s(1+i:nx+i,1+j:ny+j)
+       end do
+    end do
+    s = c
+    c = 0
+    do j = -1, 1
+       do i = -1, 1
+          if( i == 0 .and. j == 0 ) cycle
+          c(1:nx,1:ny) = c(1:nx,1:ny) + s(1+i:nx+i,1+j:ny+j)
+       end do
+    end do
+    m = m / max(c(1:nx,1:ny),1.0)
+
+  end subroutine neighbour_mean
+
+  function basename(path) result(b)
+
+    ! the file name without the directory
+
+    character(len=*), intent(in) :: path
+    character(len=len(path)) :: b
+    integer :: l
+
+    l = index(path,'/',back=.true.)
+    b = path(l+1:)
+
+  end function basename
 
 end program phcorr

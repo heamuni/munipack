@@ -90,8 +90,6 @@ contains
     real, parameter :: pi = 3.141592653589793115997963
     real, parameter :: rad = 57.295779513082322865
 
-    ! It's expected that all data are already properly scaled by the gain.
-    real, parameter :: phpadu = 1.0
 !
 ! Parameters:
 !
@@ -106,13 +104,13 @@ contains
 !
 ! MAXAP  the maximum number of star apertures allowed.
 !
-    real(dbl), dimension(size(raper)) :: area, apsum
+    real(dbl), dimension(size(raper)) :: area, area2, apsum
     real(dbl), dimension(:), allocatable :: sky, skyall
     integer(int16), dimension(:,:), allocatable :: cover
     real, dimension(3) :: error
     real :: skymod, skysig, sigsq, skyvar, skyerr, datum, r, rsq, fractn, &
          edge, apmxsq, rout, dysq, xc, yc, e,c,s,sqrte,x,y,phi,q,rin
-    real(dbl) :: g, rn, b, smean, serr, ssig
+    real(dbl) :: g, rn, b, smean, serr, ssig, phpadu
     integer :: i, j, k, n, naper, nstar, lx, ly, nx, ny, mx, my, &
          nsky, nall, ncol, nrow, iflag, nused, ncover
     logical :: masking
@@ -158,6 +156,16 @@ contains
     if( present(gain) ) g = gain
     if( present(rn2) ) rn = rn2
     if( present(bias) ) b = bias
+
+    ! The photons (electrons) per ADU for the Poisson noise of the star:
+    ! the gain of the frame (1 for frames in electrons, BUNIT = COUNTS),
+    ! 1 when unknown (the caller warns). The data are in ADU, so the
+    ! variance of the counts of a star is counts/gain [ADU**2].
+    if( g > 0 ) then
+       phpadu = g
+    else
+       phpadu = 1
+    end if
 
     ! the masks: the number of stars covering a pixel
     masking = present(rmask)
@@ -234,6 +242,7 @@ contains
 !
           if (edge < raper(i)) apsum(i) = -huge(apsum)  ! Null magnitude
           area(i) = real(0.0,dbl)
+          area2(i) = real(0.0,dbl)
        enddo
 !
 ! Now read through the submatrix, picking out the data we want.
@@ -315,6 +324,7 @@ contains
                       if (datum < lobad .or. datum >= hibad ) apsum(k)=-huge(1.0)
                       apsum(k) = apsum(k) + fractn*datum
                       area(k) = area(k) + fractn
+                      area2(k) = area2(k) + fractn**2
                    endif
                 enddo
              endif
@@ -376,15 +386,17 @@ contains
 ! extends beyond the limits of the picture, or if there is a bad pixel
 ! in the star aperture, set the magnitude to 99.999.
 !
-             error(1) = real(area(i)*skyvar)
+             ! the noise of the sky pixels in the aperture: the sum of
+             ! the squares of their weights (a partial pixel of the
+             ! fraction f adds f**2 of its variance)
+             error(1) = real(area2(i)*skyvar)
              error(2) = real(apsum(i)/phpadu)
              error(3) = real(sigsq*area(i)**2)
 
-! For Munipack, we needs counts. Sum in aperture is multiplied
-! by phpadu, gain (=1 allways), to get detected counts instead
-! of digitalized data.
+! For Munipack, the counts are in ADU (the units of the frame); the
+! Poisson variance of the star is counts/gain [ADU**2].
 
-             apcts(n,i) = real(apsum(i)*phpadu)
+             apcts(n,i) = real(apsum(i))
              apcts_err(n,i) = real(sqrt(sum(error)))
 !             if( i == 6 ) write(*,*) area(i),apsum(i),sqrt(error)
           else
@@ -399,9 +411,9 @@ contains
 ! readout noise and the degree of contamination by other stars in the
 ! neighborhood, as estimated by the scatter in the sky values (this
 ! standard error increases as the square root of the area of the
-! aperture); (2) the Poisson statistics of the observed star brightness;
-! (3) the uncertainty of the mean sky brightness (this standard error
-! increases directly with the area of the aperture).
+! aperture); (2) the Poisson statistics of the observed star brightness
+! (counts/gain); (3) the uncertainty of the mean sky brightness (this
+! standard error increases directly with the area of the aperture).
 !
        enddo
 !
@@ -418,8 +430,8 @@ contains
 
        if( plog ) write(*,'(a,2(f0.3,1x),es15.5)') '=APHOT> ',xc,yc,apcts(n,1)
 
-       skystar(n) = skymod*phpadu
-       skystar_err(n) = skyerr*phpadu
+       skystar(n) = skymod
+       skystar_err(n) = skyerr
 
 3333 continue
     enddo ! over stars

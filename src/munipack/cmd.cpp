@@ -467,6 +467,9 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
 	      "simultaneously (default: 1.5, 0 off)",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","residual-detect","passes of the detection of stars "
 	      "in residuals (default: 0)",wxCMD_LINE_VAL_NUMBER);
+    AddOption("","residual-threshold","threshold of the detection in "
+	      "residuals [sigma] (default: by the false alarms, 5 for 2048x2048)",
+	      wxCMD_LINE_VAL_DOUBLE);
     AddOption("","residual","save the residual frame (single file only)");
     COMMON_OPTIONS_MULTIPLE
     AddParam("file(s)",wxCMD_LINE_VAL_STRING,
@@ -627,6 +630,7 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddSwitch("","disable-back","does not subtract background");
     AddSwitch("","flux-conserve","scale by pixel areas (conserve total flux)");
     AddSwitch("","arith","compute average by arithmetical mean");
+    AddSwitch("","hampel","robust mean by the Hampel M-estimator (old default)");
     COMMON_OPTIONS_SINGLE
     COMMON_OPTIONS_BITPIX
     AddParam("file(s)",wxCMD_LINE_VAL_STRING,

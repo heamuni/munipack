@@ -57,7 +57,8 @@ program psfphot
   character(len=80) :: msg
   real(REAL64) :: fwhm_par = -1, beta_par = -1, fitrad_par = -1, &
        saturate_par = -1, gain_par = -1, readns_par = -1, scale_par = -1, &
-       psfrad_par = -1, group_par = 1.5_REAL64, psfsmooth = 0.01_REAL64
+       psfrad_par = -1, group_par = 1.5_REAL64, psfsmooth = 0.01_REAL64, &
+       resthresh_par = -1, resthresh = -1
   real(REAL64), dimension(2) :: psfcen_par = 0
   logical :: psfcen_set = .false., elliptic = .false., verbose = .false.
   logical :: plog = .false., exitus = .true., ex
@@ -194,6 +195,12 @@ program psfphot
 
         read(val,*) resdetect
         if( resdetect < 0 ) stop 'Error: residual detection >= 0 unsatisfied.'
+
+     else if( key == 'RESTHRESH' ) then
+
+        read(val,*) resthresh_par
+        if( .not. (resthresh_par > 0) ) &
+             stop 'Error: residual detection threshold > 0 unsatisfied.'
 
      else if( key == 'FWHM' ) then
 
@@ -700,6 +707,7 @@ contains
     if( nstars == 0 ) hdr%maxgroup = 0
     hdr%resdetect = resdetect
     hdr%nresid = nres
+    hdr%resthresh = resthresh
     if( empirical ) then
        if( psf%ptype == PSF_FILE ) then
           hdr%core = 'FILE'
@@ -1798,11 +1806,19 @@ contains
 
       ! Stars in the residuals (the frame with all fitted stars
       ! subtracted): the amplitude h of the lowered Gaussian (as find)
-      ! of the median FWHM, significant above the threshold of find
+      ! of the median FWHM, significant above the threshold
       ! against the noise of the model, which includes the PSF mismatch
       ! perr*model (perr measured on the bright stars), local maxima
       ! of normal sharpness (the limits of find), farther than 0.75 FWHM
       ! from all stars and not on saturated stars.
+      !
+      ! The threshold (resthresh_par, by default) is the one of find, at
+      ! least the Normal deviate exceeded by one pixel of the frame by
+      ! chance (P = 1/npix: 5.0 for 2048**2 pixels, 4.75 for 1024**2,
+      ! 5.3 for 4096**2): the residuals are searched in every pixel,
+      ! and the skewed noise of a sky of a few photons per pixel gives
+      ! more noise peaks than the Normal tail (about 110 per 2048**2
+      ! frame at 4 sigma, 4 at 5 sigma on a sky of 0.4 e-/pixel).
 
       integer, intent(out) :: nnew
 
@@ -1818,6 +1834,11 @@ contains
       nnew = 0
       nx = frame%naxes(1)
       ny = frame%naxes(2)
+      if( resthresh_par > 0 ) then
+         resthresh = resthresh_par
+      else
+         resthresh = max(frame%threshold,normal_deviate(1 / real(nx*ny,REAL64)))
+      end if
       if( nstars == 0 ) return
       fw = median(fwhms(1:nstars))
       sig = fw*fwhm2sig
@@ -1924,7 +1945,7 @@ contains
       allocate(xs(0),ys(0),ss(0))
       do j = 1 + nk, ny - nk
          do i = 1 + nk, nx - nk
-            if( sg(i,j) < frame%threshold .or. .not. (h(i,j) > 0) ) cycle
+            if( sg(i,j) < resthresh .or. .not. (h(i,j) > 0) ) cycle
             ok = .true.
             do l = -nk, nk
                do k = -nk, nk
@@ -1976,7 +1997,7 @@ contains
                  s4 = median(pred(1:nn))
                  if( s4 > 0 ) q = max(s3 / s4,1.0_REAL64)
               end if
-              if( sg(i,j) < frame%threshold*q ) cycle
+              if( sg(i,j) < resthresh*q ) cycle
             end block
             ! the sub-pixel position
             c = h(i-1,j) - 2*h(i,j) + h(i+1,j)
@@ -2016,6 +2037,29 @@ contains
       end block
 
     end subroutine residual_detect
+
+    real(REAL64) function normal_deviate(p)
+
+      ! the deviate t of the Normal distribution exceeded with the
+      ! probability p: erfc(t/sqrt(2))/2 = p (bisection)
+
+      real(REAL64), intent(in) :: p
+      real(REAL64) :: a, b, t
+      integer :: i
+
+      a = 0
+      b = 38
+      do i = 1, 100
+         t = (a + b) / 2
+         if( erfc(t / sqrt(2.0_REAL64)) / 2 > p ) then
+            a = t
+         else
+            b = t
+         end if
+      end do
+      normal_deviate = (a + b) / 2
+
+    end function normal_deviate
 
     logical function near_star(x,y,d)
 

@@ -63,7 +63,12 @@ FITS_KEY_TEMPERATURE is valuable.
 
 <p>
 On output, a single file representing of mean dark frame is created.
-  The file has STDERR extension with standard errors.
+  The file has STDERR extension with standard errors: the error of the
+  mean by the scatter of the dark frames (the error of the subtracted bias
+  frame, common to all of them, is not in it). With <samp>-bias</samp>,
+  the keyword DARKBIAS records the bias frame; <a href="man_phcorr.html">phcorr</a>
+  with the same bias frame then propagates the error of the bias by
+  (1 − <i>t</i>), <i>t</i> the dark time factor.
   Masked values (if parameter <samp>-bitmask</samp> is presented) are
   set to the frame mean.
 </p>

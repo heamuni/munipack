@@ -404,7 +404,12 @@ contains
   if( .not. threshold > 0 ) &
        stop 'Error in FIND: threshold > 0 assumption failed.'
 
-  ssig = (phpadu*readns)**2 + skysig**2
+  ! The noise of a pixel: the observed scatter of the sky (skymean),
+  ! which includes the read noise already; adding the read noise
+  ! (READNS) again raised the threshold (by 1.4 times for READNS 3.7 ADU
+  ! on a Gaussian frame of the scatter 3.7 ADU). The read noise is used
+  ! only without the scatter (noiseless test data).
+  ssig = skysig**2
   if( ssig > 0 ) then
      ssig = sqrt(ssig)
   else if( skymod > 0 ) then

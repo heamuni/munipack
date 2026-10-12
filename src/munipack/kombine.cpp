@@ -68,8 +68,14 @@ MuniKombine::MuniKombine(wxEvtHandler *han, const MuniCmdLineParser& cmd):
   if( cmd.Found("i",&a) || cmd.Found("interpol",&a) )
     Write("INTERPOL = '" + a.Upper() + "'");
 
+  if( cmd.Found("arith") && cmd.Found("hampel") )
+    wxLogFatalError("--arith and --hampel are exclusive.");
+
   if( cmd.Found("arith") )
     Write("ROBUST = F");
+
+  if( cmd.Found("hampel") )
+    Write("MEAN = 'HAMPEL'");
 
   if( cmd.Found("disable-back") )
     Write("BACKGROUND = F");

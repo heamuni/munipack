@@ -331,7 +331,11 @@ These profiles known as point spread functions (PSF) are available:
   The result, including the bias, is clipped
   by the saturation (<samp>--saturate</samp>; the converter saturates on
   the total value), and also at zero for integer
-  (<samp>-B 8, 16, 32</samp>) frames. The clipping at zero biases the mean
+  (<samp>-B 8, 16, 32</samp>) frames, and the values of integer frames
+  are rounded to integers (the quantisation noise is 1/12 ADU²; before
+  0.6.2+hg1653 (patched) <samp>-B 8</samp> truncated, −0.5 ADU on
+  average, and <samp>-B 32</samp> lost the integer precision above
+  2<sup>24</sup> ADU). The clipping at zero biases the mean
   of low backgrounds with the read-out noise; a bias level of several
   <i>σ<sub>R</sub>/G</i> is recommended for integer frames
   with <samp>--readnoise</samp>.
@@ -557,7 +561,10 @@ can be recommended in that case.
   <dt><samp>--sky-mag skymag</samp></dt><dd>
     Set sky brightness in magnitudes per square arcsecond.
     Default value is 21 meaning good observing conditions.
-    Set <samp>--sky-mag 99</samp> to effectivelly switch it off.
+    Set <samp>--sky-mag 99</samp> (or fainter) to switch it off (the sky
+    is zero; before 0.6.2+hg1653 (patched) the magnitude conversion gave
+    −1 photon there, squared into a sky of about 1 e-/s/pixel on
+    QUVIK-like frames, which a sky gradient inverted).
   </dd>
   <dt><samp>--sky-grad-x xmag, --sky-grad-y ymag</samp></dt><dd>
     Gradient of the sky brightness in magnitudes per square arcsecond

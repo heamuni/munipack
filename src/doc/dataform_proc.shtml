@@ -138,6 +138,7 @@ every star is estimated.
 <tr><td>APER<i>i</i></td><td>pix</td><td>Radius of <i>i</i>-th aperture, <i>i</i> = 1..NAPER</td></tr>
 <tr><td>ANNULUS1</td><td>pix</td><td>inner sky annulus radius in pixels</td></tr>
 <tr><td>ANNULUS2</td><td>pix</td><td>outer sky annulus radius in pixels</td></tr>
+<tr><td>APERRGN</td><td>e-/ADU</td><td>gain applied to the star term of APCOUNTERR (the Poisson noise of the counts, APCOUNT/APERRGN; GAIN of the frame, 1 when unknown); absent in files of older versions, whose errors assumed 1 e-/ADU</td></tr>
 </table>
 </div>
 
@@ -196,7 +197,7 @@ The aperture photometry table.
 <tr><td>SKY</td><td>counts</td><td>Sky level</td></tr>
 <tr><td>SKYERR</td><td>counts</td><td>Sky level error</td></tr>
 <tr><td>APCOUNT<i>i</i></td><td>counts</td><td>Sum of counts in <i>i</i>-th aperture<sup><a href="#neg">[*]</a></sup></td></tr>
-<tr><td>APCOUNTERR<i>i</i></td><td>counts</td><td>Statistical error of APCOUNT<i>i</i></td></tr>
+<tr><td>APCOUNTERR<i>i</i></td><td>counts</td><td>Statistical error of APCOUNT<i>i</i>: the Poisson noise of the star (by APERRGN), the noise of the sky pixels in the aperture and the error of the mean sky (<a href="man_aphot.html#errors">aphot</a>)</td></tr>
 <tr><td>APEE<i>i</i><sup><a href="#ee">[†]</a></sup></td><td></td><td>Enclosed energy: the fraction of the total flux of the star in the <i>i</i>-th aperture</td></tr>
 <tr><td>APEEERR<i>i</i><sup><a href="#ee">[†]</a></sup></td><td></td><td>Error of APEE<i>i</i></td></tr>
 </table>
@@ -252,7 +253,7 @@ or saturation (for very bright stars).
 <tr><td>X</td><td>Horizontal coordinate</td><td>pix</td></tr>
 <tr><td>Y</td><td>Vertical coordinate</td><td>pix</td></tr>
 <tr><td>SKY</td><td>Sky level<sup><a href="#sky">[^]</a></sup></td><td>count</td></tr>
-<tr><td>SKYERR</td><td>Statistical error of sky level</td><td>count</td></tr>
+<tr><td>SKYERR</td><td>Statistical error of sky level (of the sky corrected by the growth-curve fit; the error of the mean sky of the ring cancels in it, see <a href="man_gphot.html">gphot</a>)</td><td>count</td></tr>
 <tr><td>GCOUNT</td><td>Growth curve estimated total sum of counts for an infinite
     aperture<sup><a href="#neg">[*]</a></sup></td><td>count</td></tr>
 <tr><td>GCOUNTERR</td><td>Statistical error of APCOUNT</td><td>count</td></tr>

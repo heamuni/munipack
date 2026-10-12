@@ -264,16 +264,18 @@ contains
   end subroutine fits_aphot_info
 
   subroutine fits_aphot_save(filename, output, hwhm, ecc, incl, raper, ring,  &
-       xcens, ycens, apcts,apcts_err,sky,sky_err, status, ee, eeerr)
+       xcens, ycens, apcts,apcts_err,sky,sky_err, errgain, status, ee, eeerr)
 
     ! The optional ee, eeerr (the enclosed energy of apertures and its
     ! error) are saved as the columns APEEi, APEEERRi following
-    ! the original ones.
+    ! the original ones. errgain is the gain [e-/ADU] of the Poisson
+    ! noise of the stars in APCOUNTERR (the keyword APERRGN).
 
     character(len=*), intent(in) :: filename, output
     real, intent(in) :: hwhm, ecc, incl
     real, dimension(:), intent(in) :: raper, ring, xcens, ycens, sky,sky_err
     real, dimension(:,:), intent(in) :: apcts,apcts_err
+    real(REAL64), intent(in) :: errgain
     integer, intent(in out) :: status
     real(REAL64), dimension(:,:), intent(in), optional :: ee, eeerr
 
@@ -363,6 +365,22 @@ contains
          '[pix] inner sky annulus radius',status)
     call fits_write_key(fits,trim(FITS_KEY_ANNULUS)//'2',ring(2),-5, &
          '[pix] outer sky annulus radius',status)
+    ! (a free-format value, so the whole comment fits the card)
+    block
+      character(len=FLEN_VALUE) :: val
+      integer :: ie, iz
+      write(val,'(g0.12)') errgain
+      ie = scan(val,'Ee')
+      if( ie == 0 ) ie = len_trim(val) + 1
+      iz = ie - 1
+      do while( iz > 1 .and. val(iz:iz) == '0' )
+         iz = iz - 1
+      end do
+      if( val(iz:iz) == '.' ) iz = iz + 1
+      val = val(1:iz)//val(ie:)
+      call fits_update_card(fits,'APERRGN','APERRGN = '//trim(val)// &
+           ' / [e-/ADU] gain applied to the star term of APCOUNTERR',status)
+    end block
 
     call fits_get_rowsize(fits,srows,status)
     do i = 1, nrows, srows

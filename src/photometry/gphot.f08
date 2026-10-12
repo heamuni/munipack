@@ -130,12 +130,13 @@ contains
     ! update sky: the growth-curve fit models the aperture counts
     ! as f*curve + b*area, so b (skycorr) is the residual background
     ! per pixel left after subtraction of the sky; it is added back.
-    ! The uncertainty of the sky estimate and of b are combined.
+    ! The error of the mean sky of the ring cancels in sky + b (b absorbs
+    ! it), so the error of the corrected sky is the error of b by the
+    ! noise of the pixels of the apertures (growfit); it was combined with
+    ! the error of the ring in quadrature (24-41% too large).
     sky = sky + skycorr
     where( skyerr > 0 .and. skyerrcorr > 0 )
-       skyerr = sqrt(skyerr**2 + skyerrcorr**2)
-!    elsewhere
-!       skyerr = 0
+       skyerr = skyerrcorr
     end where
 
     call fits_find_save(filename,output,ghwhm,rflux90, &

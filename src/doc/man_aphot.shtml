@@ -73,7 +73,7 @@ with the initial radius <i>r<sub>0</sub>=2</i> and pitch angle 8.9073°
 
 <p>
 For a correct determination of photometry errors, the camera-specific
-parameters must by provided.
+parameters must by provided (<a href="#errors">see below</a>).
 </p>
 
 <p>
@@ -145,11 +145,34 @@ matches the scatter of the sky between noise realisations. The light of
 undetected stars is part of the mean sky (it is in the apertures as well).
 </p>
 
+<h2 id="errors">The errors</h2>
+
+<p>
+APCOUNTERR [ADU] of an aperture of the area <i>A</i> = Σ<i>f</i>
+(<i>f</i> the fractions of the pixels inside the aperture) is
+</p>
+<pre>
+  APCOUNTERR² = APCOUNT/GAIN + Σ<i>f</i>² σ² + <i>A</i>² SKYERR²
+</pre>
+<p>
+the Poisson noise of the star (the counts in ADU divided by the gain
+[e-/ADU] of the frame), the noise of the sky pixels in the aperture
+(σ the scatter of the sky pixels of the ring, which includes the read
+noise; a partial pixel adds <i>f</i>² of its variance) and the error
+of the mean sky. The gain is GAIN of the frame (1 for frames in electrons,
+BUNIT = COUNTS of <a href="man_phcorr.html">phcorr</a>); without GAIN,
+1 e-/ADU is assumed with a warning. The gain used is the keyword APERRGN
+of APERPHOT. Versions before 0.6.2+hg1653 (patched) assumed 1 e-/ADU for
+every frame: on a frame with the gain 0.101 e-/ADU the errors of bright
+stars were 2.5–3 times smaller than their scatter.
+</p>
+
 <h2>Data assumption</h2>
 
 <p>
   Aphot does <b>assumtion</b>, that data represents actually detected
-  <b>counts</b>.
+  <b>counts</b>, or that the gain of the frame (GAIN) converts them to
+  electrons for the errors.
 </p>
 
 <p>
@@ -172,9 +195,10 @@ undetected stars is part of the mean sky (it is in the apertures as well).
 </p>
 
 <p>
-  Aphot does not check the assumption.
+  Aphot applies GAIN of the frame to the Poisson noise of stars (see the
+  errors above), so the errors are right for raw frames with GAIN as well.
   Carefully handled parameters of <a href="man_phcorr.html">phcorr</a>
-  will prepare such correct data. The gain value can be checked
+  will prepare data in electrons. The gain value can be checked
   by <a href="man_flat.html">flat-field</a>.
 </p>
 
@@ -233,7 +257,7 @@ undetected stars is part of the mean sky (it is in the apertures as well).
     (S/N > 30 in the aperture of 2 FWHM, at least 30 stars), unsaturated
     stars with all the apertures valid and without a comparable
     neighbour (brighter than 1%) within 5.5 FWHM give EE relative to
-    their total flux: the median of three apertures of the plateau of
+    their total flux <i>T</i>: the mean of three apertures of the plateau of
     the stacked growth curve (from the first aperture larger than 1.3 FWHM
     within 0.5% of the level of the curve; the level is the median of
     the apertures larger than 4 FWHM when there are three at least: use
@@ -246,14 +270,28 @@ undetected stars is part of the mean sky (it is in the apertures as well).
     a polynomial over the field of the order <samp>--apcorr-var</samp>
     0, 1, 2 (default 2) in x,y, or in the distance from the field centre
     with <samp>--apcorr-radial</samp> (for optics whose PSF changes with
-    the field radius); the fit is weighted, robust (3σ clipping), with the
-    excess scatter of stars over their errors added. The order is lowered
-    when there are fewer than three stars per parameter (with a warning)
-    and when the higher terms are not significant (99.9%), so a constant
-    PSF gives a constant EE; the model is not extrapolated beyond the
-    stars. APEEERR is the error of the polynomial at the star and the
-    excess scatter. The header records the stars, the orders, the plateau,
-    the sky bias and the scatter.</dd>
+    the field radius); the fit is weighted, robust (3σ clipping, starting
+    from the median), with the excess scatter of stars over their errors
+    added. The error of EE<sub><i>k</i></sub> = <i>C<sub>k</sub></i>/<i>T</i>
+    of a star takes the nesting of the apertures into account (they share
+    the pixels and the sky):
+    Var = [V(<i>C<sub>k</sub></i>) − 2 EE<sub><i>k</i></sub>
+    Cov(<i>C<sub>k</sub></i>,<i>T</i>) + EE<sub><i>k</i></sub>² V(<i>T</i>)]/<i>T</i>²,
+    Cov(<i>C<sub>i</sub></i>,<i>C<sub>j</sub></i>) =
+    V<sub>p</sub>(<i>C</i><sub>min(<i>i</i>,<i>j</i>)</sub>) +
+    <i>A<sub>i</sub>A<sub>j</sub></i> SKYERR², where
+    V<sub>p</sub> = APCOUNTERR² − <i>A</i>² SKYERR² is the noise of the
+    pixels of the smaller aperture and <i>A</i> the areas (taken as
+    independent, the errors were 4–15 times too large and no variation
+    could be significant). The order is the constant, raised while the
+    higher terms decrease χ² by the weights of the lower order (with its
+    excess scatter) at the 99.9% level, at most <samp>--apcorr-var</samp>
+    and three stars per parameter (with a warning for fewer stars), so a
+    constant PSF gives a constant EE and the scatter of EE of single stars
+    (neighbours, sub-pixel positions) is not taken for a variation; the
+    model is not extrapolated beyond the stars. APEEERR is the error of
+    the polynomial at the star and the excess scatter. The header records
+    the stars, the orders, the plateau, the sky bias and the scatter.</dd>
 </dl>
 
 <p>

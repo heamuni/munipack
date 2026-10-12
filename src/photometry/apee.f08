@@ -43,7 +43,7 @@
 !       counts by area over the apertures larger than 4 FWHM (of stars
 !       isolated by the largest aperture); zero within its noise for
 !       the mean sky of daophotsb (BUGS P23).
-!     - The total flux: the median of three apertures of the plateau of
+!     - The total flux T: the mean of three apertures of the plateau of
 !       the stacked growth curve, from the first aperture larger than
 !       1.3 FWHM within 0.5% of the level of the curve (the median of
 !       the apertures larger than 4 FWHM, or its maximum).
@@ -54,6 +54,17 @@
 !       clipped at 3 sigma. The order is lowered for too few stars
 !       (3 per parameter) and while the higher terms are not significant
 !       (chi2 at 99.9%); the model is not extrapolated beyond the stars.
+!     - The error of EE = C_k / T of a star: the apertures are nested,
+!       C_k and T share pixels and the sky, so (first order)
+!
+!         Var(EE_k) = [V(C_k) - 2 EE_k Cov(C_k,T) + EE_k**2 V(T)] / T**2,
+!         Cov(C_i,C_j) = Vp(C_min(i,j)) + A_i A_j SKYERR**2,
+!
+!       Vp(C) = APCOUNTERR**2 - A**2 SKYERR**2 the noise of the pixels
+!       of the aperture (Poisson and read noise; the smaller aperture's
+!       pixels are common), A_i the areas, SKYERR**2 the variance of the
+!       mean sky (common to all apertures). Treated as independent, the
+!       errors were 8-10 times too large and no variation was significant.
 !     - The error of EE of a star is the error of the polynomial at its
 !       position (the covariance) and the excess scatter.
 !
@@ -156,32 +167,33 @@ contains
   end subroutine apee_psf
 
 
-  subroutine apee_auto(desc,xcens,ycens,apcts,apcts_err,raper,ring,fwhm, &
-       gain,naxes,verbose,ee,eeerr,ok)
+  subroutine apee_auto(desc,xcens,ycens,apcts,apcts_err,sky_err,raper,ring, &
+       ecc,fwhm,naxes,verbose,ee,eeerr,ok)
 
     ! EE of all stars by the growth curves of the bright isolated ones,
-    ! the requested order of the spatial variation is desc%ordreq
+    ! the requested order of the spatial variation is desc%ordreq;
+    ! sky_err is the error of the mean sky of the stars, ecc the
+    ! eccentricity of the apertures (their areas)
 
     use exscatter
 
     type(EEDescr), intent(in out) :: desc
-    real, dimension(:), intent(in) :: xcens, ycens, raper, ring
+    real, dimension(:), intent(in) :: xcens, ycens, sky_err, raper, ring
     real, dimension(:,:), intent(in) :: apcts, apcts_err
-    real, intent(in) :: fwhm
-    real(dbl), intent(in) :: gain
+    real, intent(in) :: ecc, fwhm
     integer, dimension(:), intent(in) :: naxes
     logical, intent(in) :: verbose
     real(dbl), dimension(:,:), intent(out) :: ee, eeerr
     logical, intent(out) :: ok
 
     real(dbl), dimension(:,:), allocatable :: cts, var
-    real(dbl), dimension(:), allocatable :: dnn, snr, g, tot, vtot, f, s, &
-         res, w, xs, ys, cfit, xa, ya
-    real(dbl), dimension(:,:), allocatable :: cov
+    real(dbl), dimension(:), allocatable :: dnn, snr, g, tot, f, s, &
+         res, w, xs, ys, cfit, xa, ya, area
+    real(dbl), dimension(:,:), allocatable :: cov, vee
     integer, dimension(:), allocatable :: idx, plat
     logical, dimension(:), allocatable :: cand, sel, keep, prev
-    real(dbl) :: xc, yc, hx, hy, sig, gmax, chi2
-    integer :: nst, nap, klim, kn, ks, k, l, m, nsel, order, npar, kmax, it, &
+    real(dbl) :: xc, yc, hx, hy, sig, psig, gmax, chi2
+    integer :: nst, nap, klim, kn, ks, k, l, m, nsel, order, npar, kmax, &
          ko, mo, ml, nl
     logical :: fitok, biased
 
@@ -200,14 +212,12 @@ contains
        return
     end if
 
-    ! counts and their variances: aphot's star term is the Poisson noise
-    ! of the counts for a gain of 1 e-/ADU, replaced by counts/gain
+    ! counts and their variances (aphot's star term is counts/gain)
     allocate(cts(nst,nap),var(nst,nap))
     cts = apcts
     var = -1
     where( apcts_err > 0 )
-       var = max(real(apcts_err,dbl)**2 + max(cts,0.0_dbl)*(1/gain - 1), &
-            real(apcts_err,dbl)**2 / 100)
+       var = real(apcts_err,dbl)**2
     end where
 
     ! the apertures inside of the sky ring, the normalising aperture
@@ -327,12 +337,14 @@ contains
     desc%nstars = nsel
     idx = pack([(l, l = 1, nst)],sel)
 
-    ! the total flux: the median of the plateau apertures
-    allocate(tot(nsel),vtot(nsel),xs(nsel),ys(nsel))
+    ! the total flux: the mean of the plateau apertures, the variances
+    ! of EE of the stars in all apertures (the nested apertures)
+    allocate(tot(nsel),xs(nsel),ys(nsel),vee(nsel,nap),area(nap))
+    area = 4*atan(1.0_dbl)*real(raper,dbl)**2*sqrt(1 - real(ecc,dbl)**2)
     do m = 1, nsel
        l = idx(m)
-       tot(m) = median(cts(l,plat))
-       vtot(m) = median(var(l,plat))
+       tot(m) = sum(cts(l,plat)) / size(plat)
+       call ee_variance(l,tot(m),vee(m,:))
     end do
 
     ! the normalised field coordinates: x,y in -1 .. 1, or the distance
@@ -375,72 +387,58 @@ contains
          cov(npar,npar),prev(nsel))
     do k = 1, nap
        f = cts(idx,k) / tot
-       s = sqrt(max(var(idx,k),0.0_dbl) / tot**2 + f**2*vtot / tot**2)
+       s = sqrt(vee(:,k))
        where( .not. (cts(idx,k) > 0 .and. var(idx,k) > 0) ) s = -1
        keep = s > 0
        if( count(keep) < npar + 1 ) cycle
 
-       sig = 0
-       do it = 1, 10
-          where( keep )
-             w = 1 / (s**2 + sig**2)
-          elsewhere
-             w = 0
-          end where
-          call polyfit(order,xs,ys,f,w,cfit,cov,fitok)
+       ! the initial excess scatter and outliers by the median: the errors
+       ! of the brightest stars are small, the first fit must not follow
+       ! a few of them (the scatter of the others would hide an outlier)
+       res = f - median(pack(f,keep))
+       call excess_scatter(res,s,sig,keep,clip)
+       if( count(keep) < npar + 1 ) cycle
+
+       ! The constant model, then the higher orders while significant:
+       ! a higher order is accepted when it decreases chi2 by the weights
+       ! of the lower one (its excess scatter included) at the 99.9%
+       ! level, so the scatter of EE of the stars (neighbours, sub-pixel
+       ! positions) is not taken for a variation over the field, while
+       ! a true variation, which is the excess scatter of the lower
+       ! model, is significant. The noise of a higher model is not
+       ! added when EE does not vary.
+       ko = 0
+       mo = model(0)
+       nl = nterms(mo)
+       call fit_model(mo,cfit(1:nl),cov(1:nl,1:nl),fitok)
+       if( .not. fitok ) cycle
+       do while( ko < desc%order )
+          ml = model(ko+1)
+          call weights
+          res = f - polyval(mo,xs,ys,cfit(1:nl))
+          chi2 = sum(w*res**2)
+          call polyfit(ml,xs,ys,f,w,cfit(1:nterms(ml)), &
+               cov(1:nterms(ml),1:nterms(ml)),fitok)
           if( .not. fitok ) exit
-          res = f - polyval(order,xs,ys,cfit)
+          res = f - polyval(ml,xs,ys,cfit(1:nterms(ml)))
+          if( chi2 - sum(w*res**2) <= chi2crit(nterms(ml) - nl) ) exit
           prev = keep
-          call excess_scatter(res,s,sig,keep,clip)
-          if( count(keep) < npar + 1 ) then
-             fitok = .false.
+          psig = sig
+          call fit_model(ml,cfit(1:nterms(ml)),cov(1:nterms(ml),1:nterms(ml)),fitok)
+          if( .not. fitok ) then
+             ! the lower order (its fit restored)
+             keep = prev
+             sig = psig
              exit
           end if
-          if( all(keep .eqv. prev) ) exit
-       end do
-       if( .not. fitok ) cycle
-       where( keep )
-          w = 1 / (s**2 + sig**2)
-       elsewhere
-          w = 0
-       end where
-       call polyfit(order,xs,ys,f,w,cfit,cov,fitok)
-       if( .not. fitok ) cycle
-       res = f - polyval(order,xs,ys,cfit)
-       chi2 = sum(w*res**2)
-
-       ! The variation must be significant: the order is lowered while
-       ! the higher terms do not decrease chi2 at the 99.9% level, so
-       ! the noise of the model is not added when EE does not vary.
-       ko = desc%order
-       mo = order
-       do while( ko > 0 )
-          ml = model(ko-1)
-          nl = nterms(ml)
-          call polyfit(ml,xs,ys,f,w,cfit(1:nl),cov(1:nl,1:nl),fitok)
-          if( .not. fitok ) exit
-          res = f - polyval(ml,xs,ys,cfit(1:nl))
-          if( sum(w*res**2) - chi2 > chi2crit(nterms(mo) - nl) ) exit
-          ko = ko - 1
+          ko = ko + 1
           mo = ml
-          chi2 = sum(w*res**2)
+          nl = nterms(mo)
        end do
-       ! the final fit of the chosen order, its excess scatter
-       nl = nterms(mo)
+       call weights
        call polyfit(mo,xs,ys,f,w,cfit(1:nl),cov(1:nl,1:nl),fitok)
        if( .not. fitok ) cycle
        res = f - polyval(mo,xs,ys,cfit(1:nl))
-       if( mo /= order ) then
-          call excess_scatter(res,s,sig,prev,clip)
-          where( keep )
-             w = 1 / (s**2 + sig**2)
-          elsewhere
-             w = 0
-          end where
-          call polyfit(mo,xs,ys,f,w,cfit(1:nl),cov(1:nl,1:nl),fitok)
-          if( .not. fitok ) cycle
-          res = f - polyval(mo,xs,ys,cfit(1:nl))
-       end if
        chi2 = sum(w*res**2)
        if( count(keep) > nl ) &
             cov(1:nl,1:nl) = cov(1:nl,1:nl) * max(1.0_dbl,chi2/(count(keep)-nl))
@@ -466,6 +464,90 @@ contains
          ' pix, sky bias ',desc%skybias,' ADU/pix.'
 
   contains
+
+    subroutine weights
+
+      ! the weights of the fit: the errors and the excess scatter
+
+      where( keep )
+         w = 1 / (s**2 + sig**2)
+      elsewhere
+         w = 0
+      end where
+
+    end subroutine weights
+
+    subroutine fit_model(mo,c,cv,ok)
+
+      ! The fit of the model mo with the excess scatter and the clipping
+      ! iterated (from the current sig and keep) until the set of the
+      ! stars does not change.
+
+      integer, intent(in) :: mo
+      real(dbl), dimension(:), intent(out) :: c
+      real(dbl), dimension(:,:), intent(out) :: cv
+      logical, intent(out) :: ok
+      logical, dimension(size(keep)) :: kprev
+      integer :: it
+
+      ok = .false.
+      do it = 1, 10
+         call weights
+         call polyfit(mo,xs,ys,f,w,c,cv,ok)
+         if( .not. ok ) return
+         res = f - polyval(mo,xs,ys,c)
+         kprev = keep
+         call excess_scatter(res,s,sig,keep,clip)
+         if( count(keep) < size(c) + 1 ) then
+            ok = .false.
+            return
+         end if
+         if( all(keep .eqv. kprev) ) exit
+      end do
+      call weights
+      call polyfit(mo,xs,ys,f,w,c,cv,ok)
+
+    end subroutine fit_model
+
+    subroutine ee_variance(l,t,v)
+
+      ! The variances of EE = C_k / t of the star l in all apertures,
+      ! t the mean of the plateau apertures (first order, see the head):
+      ! Cov(C_i,C_j) = Vp(C_min(i,j)) + A_i A_j SKYERR**2
+
+      integer, intent(in) :: l
+      real(dbl), intent(in) :: t
+      real(dbl), dimension(:), intent(out) :: v
+
+      real(dbl), dimension(nap) :: vp
+      real(dbl) :: s2, at, vt, ct, e
+      integer :: i, j, k, np
+
+      np = size(plat)
+      s2 = max(real(sky_err(l),dbl),0.0_dbl)**2
+      do k = 1, nap
+         vp(k) = max(var(l,k) - area(k)**2*s2,0.0_dbl)
+      end do
+      at = sum(area(plat)) / np
+      vt = 0
+      do i = 1, np
+         do j = 1, np
+            vt = vt + vp(min(plat(i),plat(j)))
+         end do
+      end do
+      vt = vt / np**2 + at**2*s2
+      do k = 1, nap
+         ct = 0
+         do j = 1, np
+            ct = ct + vp(min(k,plat(j)))
+         end do
+         ct = ct / np + area(k)*at*s2
+         e = cts(l,k) / t
+         ! (a floor: the plateau apertures of a single-aperture plateau)
+         v(k) = max((var(l,k) - 2*e*ct + e**2*vt) / t**2,1e-12_dbl)
+      end do
+
+    end subroutine ee_variance
 
     integer function model(order)
       ! the polynomial model of the order (see nterms)
