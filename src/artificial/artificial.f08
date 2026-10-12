@@ -877,7 +877,8 @@ contains
     ! The merged level is split back into the sky part (skyback), which
     ! follows the sky gradient and the airmass, and the gnoise part (gback),
     ! which is uniform over the frame and independent of the airmass.
-    skyint = magiconv(phsys,filter, [skymag])
+    ! (no sky for --sky-mag 99 and fainter: the conversion gives -1 there)
+    skyint = max(magiconv(phsys,filter, [skymag]),0.0_REAL64)
     back = sqrt(skyint**2 + gnoise**2)
     back = back * exptime * area * qefficiency * (3600/scale)**2
     skyback = skyint * exptime * area * qefficiency * (3600/scale)**2
@@ -1023,6 +1024,9 @@ contains
     ! the converter saturates on the total value, including bias
     if( bitpix > 0 ) sky = max(sky,0.0_REAL64)
     sky = min(sky,saturate)
+    ! the integer values are rounded (CFITSIO rounds the conversion only
+    ! with BZERO, so -B 8 truncated: -0.5 ADU on average)
+    if( bitpix > 0 ) sky = anint(sky)
 
     ! save the generated artificial sky to FITS file
     status = 0
@@ -1170,7 +1174,8 @@ contains
        call fits_write_comment(fits,com,status)
     end if
     call fits_write_comment(fits,MUNIPACK_VERSION,status)
-    call fits_write_image(fits,0,real(sky),status)
+    ! in double precision: the integers above 2**24 ADU (-B 32) are exact
+    call fits_write_image(fits,0,sky,status)
 
     ! PSF extension
     if( psffile == '' ) then
