@@ -257,7 +257,7 @@ stars were 2.5–3 times smaller than their scatter.
     (S/N > 30 in the aperture of 2 FWHM, at least 30 stars), unsaturated
     stars with all the apertures valid and without a comparable
     neighbour (brighter than 1%) within 5.5 FWHM give EE relative to
-    their total flux: the median of three apertures of the plateau of
+    their total flux <i>T</i>: the mean of three apertures of the plateau of
     the stacked growth curve (from the first aperture larger than 1.3 FWHM
     within 0.5% of the level of the curve; the level is the median of
     the apertures larger than 4 FWHM when there are three at least: use
@@ -270,14 +270,28 @@ stars were 2.5–3 times smaller than their scatter.
     a polynomial over the field of the order <samp>--apcorr-var</samp>
     0, 1, 2 (default 2) in x,y, or in the distance from the field centre
     with <samp>--apcorr-radial</samp> (for optics whose PSF changes with
-    the field radius); the fit is weighted, robust (3σ clipping), with the
-    excess scatter of stars over their errors added. The order is lowered
-    when there are fewer than three stars per parameter (with a warning)
-    and when the higher terms are not significant (99.9%), so a constant
-    PSF gives a constant EE; the model is not extrapolated beyond the
-    stars. APEEERR is the error of the polynomial at the star and the
-    excess scatter. The header records the stars, the orders, the plateau,
-    the sky bias and the scatter.</dd>
+    the field radius); the fit is weighted, robust (3σ clipping, starting
+    from the median), with the excess scatter of stars over their errors
+    added. The error of EE<sub><i>k</i></sub> = <i>C<sub>k</sub></i>/<i>T</i>
+    of a star takes the nesting of the apertures into account (they share
+    the pixels and the sky):
+    Var = [V(<i>C<sub>k</sub></i>) − 2 EE<sub><i>k</i></sub>
+    Cov(<i>C<sub>k</sub></i>,<i>T</i>) + EE<sub><i>k</i></sub>² V(<i>T</i>)]/<i>T</i>²,
+    Cov(<i>C<sub>i</sub></i>,<i>C<sub>j</sub></i>) =
+    V<sub>p</sub>(<i>C</i><sub>min(<i>i</i>,<i>j</i>)</sub>) +
+    <i>A<sub>i</sub>A<sub>j</sub></i> SKYERR², where
+    V<sub>p</sub> = APCOUNTERR² − <i>A</i>² SKYERR² is the noise of the
+    pixels of the smaller aperture and <i>A</i> the areas (taken as
+    independent, the errors were 4–15 times too large and no variation
+    could be significant). The order is the constant, raised while the
+    higher terms decrease χ² by the weights of the lower order (with its
+    excess scatter) at the 99.9% level, at most <samp>--apcorr-var</samp>
+    and three stars per parameter (with a warning for fewer stars), so a
+    constant PSF gives a constant EE and the scatter of EE of single stars
+    (neighbours, sub-pixel positions) is not taken for a variation; the
+    model is not extrapolated beyond the stars. APEEERR is the error of
+    the polynomial at the star and the excess scatter. The header records
+    the stars, the orders, the plateau, the sky bias and the scatter.</dd>
 </dl>
 
 <p>

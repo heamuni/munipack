@@ -349,8 +349,8 @@ contains
           else
              fwhm_ee = 2*hwhm
           end if
-          call apee_auto(desc,xcens,ycens,apcts,apcts_err,raper,ring,fwhm_ee, &
-               gain,naxes,verbose,ee,eeerr,eeok)
+          call apee_auto(desc,xcens,ycens,apcts,apcts_err,sky_err,raper,ring, &
+               ecc,fwhm_ee,naxes,verbose,ee,eeerr,eeok)
           if( .not. eeok ) write(error_unit,*) 'Warning: ',trim(filename), &
                ': the aperture correction failed, APEE not saved.'
        end if
