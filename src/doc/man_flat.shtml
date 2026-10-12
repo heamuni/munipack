@@ -69,6 +69,12 @@ the dome flats or by another technique.
   (sixteen input frames increases accuracy by factor 4×).
   Implemented robust methods works well when amount of
   input frames is over thirteen frames <i>N &gt; 13</i>.
+  The robust (Hampel) mean of the pixels is not biased at the counts of
+  flats: the Poisson distribution of thousands of electrons is symmetric
+  (ten frames of 10⁴ e-: +0.025 ± 0.036 e-, as the arithmetic mean),
+  unlike dark frames of a few electrons per pixel
+  (<a href="man_dark.html">dark</a> averages them by the mean clipped
+  by the noise model).
 </p>
 
 <p class="indent">

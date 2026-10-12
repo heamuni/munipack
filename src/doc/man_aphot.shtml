@@ -132,7 +132,9 @@ noise 0.37 e-, by 30% at 0.1 e-/pixel). The sky of a star is therefore:
   <i>q</i> = 25/6 photo-electrons (25/(6 GAIN) ADU). The upper limit is
   the Bernstein bound of the Poisson tail at the probability of 5σ, so no
   photon of the sky is clipped even when σ is less than one electron,
-  while stars, cosmics and hot pixels are.</li>
+  while stars, cosmics and hot pixels are. (One routine with the sky of
+  find and psfphot, the stack of <a href="man_kombine.html">kombine</a>
+  and the master of <a href="man_dark.html">dark</a>.)</li>
 <li>SKYERR is the scatter of the used pixels divided by the square
   root of their number.</li>
 </ul>
@@ -258,15 +260,37 @@ stars were 2.5–3 times smaller than their scatter.
     stars with all the apertures valid and without a comparable
     neighbour (brighter than 1%) within 5.5 FWHM give EE relative to
     their total flux <i>T</i>: the mean of three apertures of the plateau of
-    the stacked growth curve (from the first aperture larger than 1.3 FWHM
-    within 0.5% of the level of the curve; the level is the median of
-    the apertures larger than 4 FWHM when there are three at least: use
-    apertures out to the sky ring, for example <samp>--apertures
-    ...,20,25,30,35,40 --ring 45,60</samp>). The median slope of the
-    counts by the area over these apertures is recorded as a diagnostic
-    of the sky (EESKYBIA, ADU/pixel; zero within its noise for the mean
-    sky, it includes the light of extended PSF wings and of neighbours);
-    it is not removed. EE of every aperture is fitted by
+    the growth curves. A growth curve is
+    <i>C</i>(<i>r</i>) = <i>T</i> EE(<i>r</i>) + <i>b A</i>(<i>r</i>),
+    <i>A</i> the area and <i>b</i> a residual sky per pixel (the error of
+    the sky of the star, the light of fainter neighbours inside the
+    apertures, which the sky ring masks); on the plateau EE = 1 and
+    <i>C</i> = <i>T</i> + <i>b A</i>. The plateau is the first window of
+    three consecutive apertures, from the first one larger than 1.3 FWHM,
+    whose slope relative to <i>T</i> (fitted for every star, the errors
+    by the covariance of the nested apertures, averaged over the stars
+    with their excess scatter, clipped at 3σ) is consistent with
+    zero within 2σ, so the light of the PSF wing is not left out of
+    <i>T</i>. The search ends at twice the radius enclosing 99% of the
+    stacked growth curve (the median of the curves normalised by the
+    aperture of 2 FWHM, relative to its level: the median of the three
+    apertures from 4 FWHM, or its maximum; for a Gaussian PSF 6.1σ, 2.6
+    FWHM); when no window passes up to there, the plateau starts at the
+    last aperture within the cap (EEPLAT = CAP). The cap keeps the total
+    flux off the large apertures, which hold the light of the fainter
+    neighbours, more on dense fields: before, the first aperture within
+    0.5% of the level of the stacked curve was taken, and on dense
+    frames the plateau went out to 20–40 pixels and <i>T</i> was
+    0.1–0.4% too large. The fitted <i>b</i> of the plateau (EEPLATB,
+    ADU/pixel, its error EEPLATBE), consistent with zero, is recorded
+    and not removed (that would add its error times the area to
+    <i>T</i>). Use apertures out to the sky ring, for example
+    <samp>--apertures ...,20,25,30,35,40 --ring 45,60</samp>; the median
+    slope of the counts by the area over the apertures larger than
+    4 FWHM (three at least) is recorded as a diagnostic of the sky
+    (EESKYBIA, ADU/pixel; zero within its noise for the mean sky, it
+    includes the light of extended PSF wings and of neighbours); it is
+    not removed. EE of every aperture is fitted by
     a polynomial over the field of the order <samp>--apcorr-var</samp>
     0, 1, 2 (default 2) in x,y, or in the distance from the field centre
     with <samp>--apcorr-radial</samp> (for optics whose PSF changes with
@@ -291,7 +315,8 @@ stars were 2.5–3 times smaller than their scatter.
     (neighbours, sub-pixel positions) is not taken for a variation; the
     model is not extrapolated beyond the stars. APEEERR is the error of
     the polynomial at the star and the excess scatter. The header records
-    the stars, the orders, the plateau, the sky bias and the scatter.</dd>
+    the stars, the orders, the plateau (EERTOT1, EERTOT2, EEPLAT, EEPLATZ,
+    EEPLATB, EER99, EERCAP), the sky bias and the scatter.</dd>
 </dl>
 
 <p>

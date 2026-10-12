@@ -180,8 +180,9 @@ munipack kombine [..] files
     the scatter of the values and the noise of a value by the noise model
     of its frame, √((<i>t</i> + background − BIASLEV)/GAIN + READNS²) [ADU]
     (READNS [ADU] or RDNOISE [e-]; without GAIN, the scatter alone), and
-    <i>q</i> = 25/6 photo-electrons (as the sky of
-    <a href="man_aphot.html#sky">aphot</a>): no photon of a sky of a
+    <i>q</i> = 25/6 photo-electrons (one routine with the sky of
+    <a href="man_aphot.html#sky">aphot</a> and the mean of
+    <a href="man_dark.html">dark</a>): no photon of a sky of a
     fraction of an electron per pixel is clipped, so the mean is not
     biased. Eight QUVIK-like frames (0.39 e-/pixel, gain 0.1 e-/ADU): sky
     +0.9% (as <samp>--arith</samp>; the robust mean of Hampel, the default
