@@ -364,7 +364,7 @@ contains
     do while( order > 0 .and. nsel < 3*nterms(model(order)) + 2 )
        order = order - 1
     end do
-    if( order < desc%ordreq ) write(error_unit,'(a,i0,a,i0,a,i0,a)') &
+    if( order < desc%ordreq ) write(error_unit,'(a,i0,2a,i0,a,i0,a)') &
          ' Warning: aperture correction: ',nsel,' stars, the order of ', &
          'the variation lowered from ',desc%ordreq,' to ',order,'.'
     desc%order = order
