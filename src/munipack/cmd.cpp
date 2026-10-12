@@ -358,15 +358,20 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddUsageText("* Search for stars on frames.");
 
     AddOption("f","fwhm","FWHM in pixels",wxCMD_LINE_VAL_DOUBLE);
-    AddOption("th","threshold","threshold in sigmas above background",
+    AddOption("th","threshold","threshold in sigmas above background "
+	      "(the false-alarm rate of Normal noise, default 7)",
 	      wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","false-rate","threshold by the expected number of noise "
+	      "detections per frame",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","saturate","saturation in ADU",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","lothresh","lower for threshold in sigmas",
 	      wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","rndlo","lower for round",wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","rndhi","higher for round",wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","shrplo","lower for sharp",wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","shrphi","higher for sharp",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","shape-sigma","sharp and round within the noise in sigmas "
+	      "(default 3, 0: the fixed limits only)",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","rndlo","lower for round (fixed limit)",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","rndhi","higher for round (fixed limit)",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","shrplo","lower for sharp (fixed limit)",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","shrphi","higher for sharp (fixed limit)",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","read-noise","read noise in ADU (default: frame header)",
 	      wxCMD_LINE_VAL_DOUBLE);
     COMMON_OPTIONS_MULTIPLE

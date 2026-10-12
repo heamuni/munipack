@@ -55,42 +55,47 @@ Stars detection algorithm:
     scatter of the sky pixels, which includes the read noise (the read
     noise was added to it once more before 0.6.2+hg1653 (patched): with
     READNS in the header, the threshold was too high, 14 instead of 113
-    noise detections on a Gaussian 2048² frame at <samp>-th 4</samp>).
-    Note that even Normal noise gives about 110 noise peaks per 2048²
-    pixels above 4σ (the convolution is searched in every pixel), and
-    a sky of a few photo-electrons per pixel, whose noise is skewed,
-    several times more.</li>
+    noise detections on a Gaussian 2048² frame at <samp>-th 4</samp>).</li>
 <li>As the first step, the image is convoluted with Gaussian hat with
     FWHM provided by user. The convolution has effect of a digital filter
     which emphasizes star-like objects and suppress point defects or
     large-scale gradients.</li>
 <li>The convoluted image is searched for local peaks. For every peak,
-    a maximum value is determined. A star candidate has the value
-    above threshold level <i>B+tσ</i> (parameter <i>t</i>
-    corresponds to <samp>--th</samp> switch) and below saturation <i>S</i>
-    limit (given by <samp>--saturate</samp>)</li>
+    a maximum value is determined. A star candidate has the value above
+    the threshold (see <a href="#threshold">Threshold</a>: the height
+    which the noise of the sky exceeds with the probability of a Normal
+    deviate above <i>t</i>; parameter <i>t</i> corresponds to
+    <samp>-th</samp> switch, or it is set by <samp>--false-rate</samp>)
+    and below saturation <i>S</i> limit (given by <samp>--saturate</samp>)</li>
 <li>The parameters <samp>round</samp> and <samp>sharp</samp> are determined
-    for every candidate.
-    When both parameters lies inside acceptable intervals (tune it via
-    <samp>--rndlo,--rndhi,--shrplo,--shrphi</samp> options), the candidate
-    is stored and classified as a star.
+    for every candidate. The candidate is stored and classified as a star
+    when both parameters lie inside acceptable intervals (tune it via
+    <samp>--rndlo,--rndhi,--shrplo,--shrphi</samp> options), or within
+    their noise of the values of a star (see <a href="#shape">Shape
+    tests</a>).
     </li>
 <li>The wings of bright stars (a halo, a broad PSF, a saturated core) carry
     the noise of their light, far above the noise of the sky, and their
     curvature adds to the convolution: noise peaks in the wings would pass
     the threshold of the sky. A candidate within 8 FWHM (20 pixels at
-    least) of a candidate brighter twice at least, or of a saturated area
-    (farther by three times its radius), is a star only when its
-    convolution exceeds the convolution of the brighter star's wing at
+    least) of a brighter candidate, or of a saturated area (farther by
+    three times its radius), is a star only when its convolution exceeds
+    the convolution of the brighter star's wing at
     the same distance (the median over the annulus ±1 pixel around the
     brighter star, its radial trend removed, the candidate left out) by
-    <i>t</i> times the noise of the wing: the noise of the sky raised by
-    the photon noise of the wing light (the median of the annulus, with
+    the threshold times the noise of the wing: the noise of the sky raised
+    by the photon noise of the wing light (the median of the annulus, with
     GAIN), or the scatter of the convolution over the annulus (without
-    GAIN). On the sky alone this is the usual threshold. On simulated
-    frames with a PSF of a 1.5 pixel core and an extended halo the
-    secondary detections around bright stars dropped from 9.3 to 1.9 per
-    frame, with the same completeness of companions at 1–3 FWHM.</li>
+    GAIN); the threshold is the height of the same false-alarm probability
+    for the Poisson noise of the sky and the wing. On the sky alone this
+    is the usual threshold. On simulated frames with a PSF of a 1.5 pixel
+    core and an extended halo the secondary detections around bright stars
+    dropped from 9.3 to 1.9 per frame, with the same completeness of
+    companions at 1–3 FWHM. Any brighter candidate counts (twice brighter
+    at least before 2026-10): a filter narrower than the stars (FWHM 2.7
+    for a PSF of 4.9 pixels) finds noise peaks of a star's own profile
+    about 2 pixels from its centre with 0.6–0.9 of its height; these twin
+    detections dropped from 133 to 78 per frame of 2401 stars.</li>
 <li>Rectangular coordinates and peak ratio are determined for every star.</li>
 </ul>
 
@@ -102,7 +107,149 @@ to <samp>--lothresh</samp>) are not used during the detection process.
 <p class="indent">
 This routine adds a FIND extensions to original frames
 as a table, its is described in <a href="dataform_proc.html">Find Format</a>.
+The threshold and the shape tests are reported by its keywords THRESH
+(<i>t</i>), HTHRESH (the height threshold in σ<sub>h</sub>), SKEWFILT and
+KURTFILT (the skewness and the excess kurtosis of the convolved sky by
+the noise model), FALSERAT (the expected number of noise peaks above the
+threshold per frame), SHAPESIG, SHARPREF and ROUNDREF; <samp>--verbose</samp>
+prints them.
 </p>
+
+
+<h2 id="threshold">Threshold</h2>
+
+<p>
+The convolution <i>h</i> = Σ <i>w<sub>k</sub> d<sub>k</sub></i> (the
+lowered Gaussian, Σ<i>w<sub>k</sub></i> = 0) of the sky has the scatter
+σ<sub>h</sub> = σ √(Σ<i>w<sub>k</sub></i>²). The threshold <i>t</i>
+(<samp>-th</samp>) is a false-alarm probability: a pixel of the convolved
+sky exceeds the threshold height with the probability
+<i>Q</i>(<i>t</i>) = erfc(<i>t</i>/√2)/2 of a Normal deviate above
+<i>t</i>. For Normal noise the height is <i>t</i>σ<sub>h</sub>. A sky of
+a few photo-electrons per pixel is Poisson, its convolution is skewed
+(the skewness is 0.11 for FWHM 2.7 and 0.05 for 4.9 on a sky of 0.4 e⁻
+with the read noise 0.37 e⁻) and has heavier tails: the height
+<i>t</i>σ<sub>h</sub> used before 2026-10 passed 4–5 times more noise
+peaks than Normal noise (505 instead of 110 per 2048² frame at
+<samp>-th 4</samp> with FWHM 2.7).
+</p>
+
+<p class="indent">
+The height is computed from the noise model of the frame: Poisson
+photons of the mean λ = (<i>B</i> − BIASLEV)·GAIN electrons per pixel,
+at most GAIN²(σ² − RN²) (the variance less the read noise of READNS or
+RDNOISE, the whole variance without them), and Normal noise of the rest
+of the variance. The cumulant generating function of the
+convolution in the units of σ<sub>h</sub>, <i>K</i>(<i>u</i>) =
+λ Σ(e<sup><i>u y<sub>k</sub></i></sup> − 1 − <i>u y<sub>k</sub></i>) +
+ρ<i>u</i>²/2 with <i>y<sub>k</sub></i> = <i>w<sub>k</sub></i>/(GAIN
+σ<sub>h</sub>) and ρ the Normal fraction of the variance, is inverted
+by the saddle-point approximation of Barndorff-Nielsen: <i>P</i>(<i>h</i>
+&gt; <i>x</i>) = <i>Q</i>(<i>r</i>*), <i>r</i>* = <i>r</i> +
+ln(<i>q</i>/<i>r</i>)/<i>r</i>, <i>r</i> = √(2(<i>ux</i> − <i>K</i>)),
+<i>q</i> = <i>u</i>√<i>K</i>″(<i>u</i>), <i>K</i>′(<i>u</i>) = <i>x</i>;
+the threshold height <i>x</i> has <i>r</i>* = <i>t</i>. By an
+exponentially tilted Monte Carlo the tail is within 1.3% of
+<i>Q</i>(<i>t</i>) at <i>t</i> = 4 and 5 for skies of 0.13–200 e⁻ per
+pixel (the Cornish–Fisher expansion by the skewness and the kurtosis
+overcorrects up to five times below 1 e⁻). On a sky of 0.53 e⁻ (0.4 e⁻
+and 0.13 e⁻ of the dark current) the height is 4.59σ<sub>h</sub> for
+<samp>-th 4</samp> and FWHM 2.7, 4.27σ<sub>h</sub> for FWHM 4.9; on
+ground-based frames (hundreds of electrons) it is within
+0.03σ<sub>h</sub> of <i>t</i>. Without GAIN the noise is taken Normal
+(<i>t</i>σ<sub>h</sub>, as before); BIASLEV is the pedestal of the
+frame (0 when missing; λ is then set by the variance), and a noiseless
+frame (its variance below the read noise) is Normal too. A stack with
+the GAIN of a single frame in its header gets a too high threshold.
+</p>
+
+<p class="indent">
+Noise detections per 2048² frame (4 seeds, without stars; QUVIK-like:
+GAIN 0.101, read noise 0.37 e⁻, dark current 0.13 e⁻; ground-like:
+GAIN 2, read noise 5 e⁻), before 2026-10 → now:
+</p>
+
+<table>
+<tr><th>sky [e⁻/pixel]</th><th>0.1</th><th>0.4</th><th>2</th><th>20</th><th>200</th></tr>
+<tr><td>QUVIK-like, FWHM 2.7, <samp>-th 4</samp></td><td>608 → 123</td><td>505 → 132</td><td>315 → 139</td><td>159 → 125</td><td>128 → 118</td></tr>
+<tr><td>QUVIK-like, FWHM 4.9, <samp>-th 4</samp></td><td>236 → 123</td><td>203 → 124</td><td>152 → 126</td><td>126 → 134</td><td>98 → 120</td></tr>
+<tr><td>QUVIK-like, FWHM 2.7, <samp>-th 5</samp></td><td>35 → 1.0</td><td>21 → 0.8</td><td>11 → 1.8</td><td>2.0 → 1.0</td><td>0.5 → 0.5</td></tr>
+<tr><td>QUVIK-like, FWHM 4.9, <samp>-th 5</samp></td><td>8.0 → 1.8</td><td>6.2 → 1.0</td><td>2.0 → 0.8</td><td>1.8 → 1.5</td><td>1.0 → 1.5</td></tr>
+<tr><td>ground-like, FWHM 2.7, <samp>-th 4</samp></td><td>116 → 117</td><td>110 → 111</td><td>115 → 114</td><td>129 → 120</td><td>128 → 120</td></tr>
+<tr><td>ground-like, FWHM 4.9, <samp>-th 4</samp></td><td>101 → 124</td><td>110 → 131</td><td>101 → 125</td><td>108 → 123</td><td>109 → 132</td></tr>
+</table>
+
+<p class="indent">
+Even Normal noise gives about 130 noise peaks per 2048² pixels above
+<i>t</i> = 4 (the convolution is searched in every pixel: 4.2·10⁶ times
+<i>Q</i>(4) = 3.2·10⁻⁵), about one above <i>t</i> = 5 and 5·10⁻⁶ above
+the default <i>t</i> = 7. The expected number of the noise peaks above
+the threshold, FALSERAT, is the lower of the number of pixels above
+<i>t</i> (Bonferroni) and the expected Euler characteristic of the
+excursion set of a Gaussian random field,
+<i>A</i>λ<sub>2</sub><i>t</i>e<sup>−<i>t</i>²/2</sup>/(2π)<sup>3/2</sup>
+in the area <i>A</i> (Adler 1981; Worsley et al. 1996, Hum. Brain Mapp.
+4, 58), λ<sub>2</sub> = 2(1 − ρ<sub>1</sub>) the variance of the
+derivative of the normalized convolution by the kernel, ρ<sub>1</sub>
+the correlation of neighbouring pixels. The convolution by the small
+kernel of find is rough, and the number of pixels is the better
+estimate up to FWHM 10 (120–135 peaks against 132 at <i>t</i> = 4 on
+2048² Normal noise; the number is an upper estimate). <samp>--false-rate
+N</samp> sets <i>t</i> by the expected number <i>N</i> of noise
+detections per frame: <samp>--false-rate 1</samp> is <i>t</i> = 5.04 on
+2048² frames (0.2–1.8 noise detections per frame for the skies above),
+<samp>--false-rate 10</samp> is 4.58 (7–13).
+</p>
+
+
+<h2 id="shape">Shape tests</h2>
+
+<p>
+The sharpness, (<i>d</i><sub>0</sub> − the mean of the other pixels of
+the circle of the kernel)/<i>h</i>, and the roundness,
+2(<i>h<sub>x</sub></i> − <i>h<sub>y</sub></i>)/(<i>h<sub>x</sub></i> +
+<i>h<sub>y</sub></i>) of the heights of the marginal fits, tell stars
+from hot pixels and bad columns; the fixed windows 0.2…1.0 and −1…1 are
+DAOPHOT's. A faint star scatters out of them by the noise of its pixels:
+on QUVIK-like frames (GAIN 0.101) the photon noise of the star dominates,
+and 39% of the stars at 4–5σ<sub>h</sub>, 28% at 8–11σ<sub>h</sub> and
+13% at 25–50σ<sub>h</sub> were outside 0.2…1.0. Both statistics are
+linear in the pixels over a height; their variances are, to the first
+order, sums of the squared coefficients times the noise of each pixel:
+the sky and the photon noise of a point source of the measured height
+(by GAIN; a Gaussian of the FWHM integrated over the pixels and averaged
+over its sub-pixel position). The predicted scatter matches the observed
+one within 7% above 8σ<sub>h</sub>.
+</p>
+
+<p class="indent">
+A candidate passes when the statistic is within the fixed window, or
+within <samp>--shape-sigma</samp> <i>k</i> (default 3) times its
+standard deviation of the value expected for a star: the median over the
+bright candidates (above 10σ<sub>h</sub>, at least 20, the median within
+the fixed window), else the model (0.40 for FWHM 4.9, 0.53 for 2.7). The
+sharpness stays within −1…2 (a single hot pixel has 1.4 for FWHM 2.7 and
+2.7 for 4.9). In the light of a brighter star's wing (above the noise of
+a sky pixel) the fixed windows hold. Windows given by
+<samp>--shrplo,--shrphi</samp> or <samp>--rndlo,--rndhi</samp> are fixed
+(the old tests); <samp>--shape-sigma 0</samp> keeps the fixed windows
+only. Noise peaks are not told from faint stars by their shape: the
+false detections are set by the threshold.
+</p>
+
+<p class="indent">
+Completeness of isolated stars (2048² QUVIK-like frames of 2401 stars on
+a 40 pixel grid, 8 seeds; u-band magnitudes of 20 s exposures; the true
+FWHM is 4.93, <samp>-th 4</samp>), before 2026-10 → now, and the noise
+detections per frame of the sky of 0.4 e⁻ (above):
+</p>
+
+<table>
+<tr><th>u</th><th>13–15</th><th>15–16</th><th>16–17</th><th>17–18</th><th>18–19</th><th>noise</th></tr>
+<tr><td>Gaussian PSF, <samp>-f 4.93</samp></td><td>96 → 100%</td><td>84 → 100%</td><td>76 → 100%</td><td>48 → 74%</td><td>6 → 8%</td><td>203 → 124</td></tr>
+<tr><td>Gaussian PSF, <samp>-f 2.7</samp></td><td>97 → 99%</td><td>92 → 97%</td><td>79 → 89%</td><td>36 → 37%</td><td>5 → 3%</td><td>505 → 132</td></tr>
+<tr><td>halo PSF (1.5 px core), <samp>-f 4.93</samp></td><td>100 → 100%</td><td>100 → 100%</td><td>98 → 100%</td><td>90 → 100%</td><td>73 → 95%</td><td>203 → 124</td></tr>
+</table>
 
 
 <h2>Relation to DAOPHOT II</h2>
@@ -117,6 +264,9 @@ enhancements has been done:
   the sky of the frame is the clipped mean by the noise model (2026).</li>
 <li>The candidates in the wings of brighter stars are tested against the
   wing (2026).</li>
+<li>The threshold is the false-alarm probability of the skewed (Poisson)
+  noise of the sky; <samp>--false-rate</samp> (2026).</li>
+<li>The shape tests accept the noise of faint stars (2026).</li>
 <li>All processing is done in memory (no disc buffering is used).</li>
 <!--<li>Real numbers in double precision are implemented</li>-->
 <!--<li>The output of magnitudes has been abandoned.</li>-->
@@ -153,13 +303,18 @@ to all input images.
 <dt><samp>-f</samp></dt><dd>Set FWHM in pixels. The value is set by default to 3 pixels
     which will satisfactory for small telescopes. Hubble space telescope requires
     values below 1 pixel and a well sampled image has FWHM between 5 - 10 pixels.</dd>
-<dt><samp>-th</samp></dt><dd>Threshold in sigmas above background.
+<dt><samp>-th</samp></dt><dd>Threshold in sigmas above background
+    (default 7): the false-alarm probability of a Normal deviate above
+    the threshold, for the skewed noise of a faint sky too (see
+    <a href="#threshold">Threshold</a>).
     One affects how much and how faint stars will be detected.
-    Common values are about 5-10.
-    Brigh stars detection only requires the threshold above 10 and the
-    dim stars (and many defect) is under 1. Checking values below sky noise is not
-    recommended.
+    About 5 (or <samp>--false-rate 1</samp>) gives one false detection
+    per 4·10⁶ pixels, 4 about 130.
+    Brigh stars detection only requires the threshold above 10.
+    Checking values below sky noise is not recommended.
 </dd>
+<dt><samp>--false-rate</samp></dt><dd>The threshold by the expected
+    number of noise detections per frame (instead of <samp>-th</samp>).</dd>
 <dt><samp>--saturate</samp></dt><dd>Saturation in ADU. The value is determined
     from FITS header using <a href="man_env.html">SATURATE</a> key,
     when the keyword is not found
@@ -175,10 +330,14 @@ to all input images.
 <h3>Searching Limits:</h3>
 <dl>
 <dt><samp>--lothresh</samp></dt><dd> lower for threshold in sigmas</dd>
-<dt><samp>--rndlo</samp></dt><dd> lower for round</dd>
-<dt><samp>--rndhi</samp></dt><dd> higher for round</dd>
-<dt><samp>--shrplo</samp></dt><dd> lower for sharp</dd>
-<dt><samp>--shrphi</samp></dt><dd> higher for sharp</dd>
+<dt><samp>--shape-sigma</samp></dt><dd> sharp and round within their
+  noise in sigmas (default 3; 0: the fixed limits only)</dd>
+<dt><samp>--rndlo</samp></dt><dd> lower for round (default −1; when
+  given, the limits of round are fixed)</dd>
+<dt><samp>--rndhi</samp></dt><dd> higher for round (default 1)</dd>
+<dt><samp>--shrplo</samp></dt><dd> lower for sharp (default 0.2; when
+  given, the limits of sharp are fixed)</dd>
+<dt><samp>--shrphi</samp></dt><dd> higher for sharp (default 1)</dd>
 </dl>
 
 <h3>Additional:</h3>
@@ -205,6 +364,14 @@ Detect stars on image:
 </p>
 <pre>
 $ munipack find -f 2 -th 10 pleiades.fits
+</pre>
+
+<p>
+Detect stars with one noise detection per frame expected, and print the
+threshold:
+</p>
+<pre>
+$ munipack find -f 4.9 --false-rate 1 --verbose frame.fits
 </pre>
 
 <h2>See Also</h2>

@@ -38,15 +38,17 @@ module mdaofind
 
   logical, parameter, private :: debug = .false.
 
-  private :: centres, moments, wingtest, saturated, qselect
+  private :: centres, moments, wingtest, shapetest, saturated, qselect
 
 contains
 
   subroutine daofind (d, verbose, plog, hibad, skymod, skysig,  &
        fwhm, lothresh, threshold, shrplo, shrphi, rndlo, rndhi, readns, &
-       nstar, lobad, hmin, gain )
+       falserate, shapesig, fixsharp, fixround, &
+       nstar, lobad, hmin, stats, gain, bias, rn2 )
 
   use iso_fortran_env, only: REAL64
+  use findnoise
 
   implicit none
 
@@ -54,11 +56,19 @@ contains
   logical, intent(in) :: verbose, plog
   real, intent(in) :: hibad, fwhm, shrplo, shrphi, rndlo, rndhi, &
        readns, lothresh, threshold, skymod, skysig
+  ! the expected number of noise peaks per frame which sets the
+  ! threshold (<= 0: by the threshold), the limit of the shape tests
+  ! [sigma] (<= 0: the fixed windows), the fixed window of sharp, round
+  ! given by the user
+  real, intent(in) :: falserate, shapesig
+  logical, intent(in) :: fixsharp, fixround
   integer, intent(out) :: nstar
   real, intent(out) :: lobad, hmin
-  ! the gain [e-/ADU] of the frame, optional (for the photon noise
-  ! of the light of stars)
-  real(REAL64), intent(in), optional :: gain
+  type(findstats), intent(out) :: stats
+  ! the gain [e-/ADU], the bias [ADU] and the read noise squared [ADU**2]
+  ! of the frame, optional (the noise model of the sky and of the light
+  ! of stars)
+  real(REAL64), intent(in), optional :: gain, bias, rn2
 
   ! Gain: DAOPHOT scales data on-the-fly by the parameter,
   ! while Munipack assumes that the data has already gain correction done.
@@ -156,11 +166,20 @@ contains
 ! data(2), opt(nopt)
 !  real, dimension(:,:), allocatable :: g
   logical, dimension(:,:), allocatable :: skip
-  ! the candidates: x, y, height, sharp, round, ecc, incl
+  ! the candidates: x, y, height, sharp, round, ecc, incl, flag
+  ! (1: the central pixel valid, 2: near the edge, without round,
+  ! 4: outside the fixed shape windows, accepted by the noise)
   real, dimension(:,:), allocatable :: cand, ctmp
   logical, dimension(:), allocatable :: accept
   integer :: ncand
   real :: wgain
+  ! the noise model: the kernel, the coefficients of the marginal fits,
+  ! the profile of a point source (findnoise)
+  real(REAL64), dimension(:,:), allocatable :: wf, cxf, cyf, prof
+  real(REAL64), dimension(:), allocatable :: wk
+  logical, dimension(:,:), allocatable :: disc
+  real(REAL64) :: g64, b64, r64, lam, rhog, sigh, sharp0, hm
+  integer :: flag
 !
 ! Variables
 !
@@ -424,8 +443,83 @@ contains
 !  write(*,*) 0.1*nint(10.*(skymod - lothresh*hmin)),max(0.0,skymod - lothresh*hmin)
 !  hmin = 0.01*nint(100.*threshold*relerr*hmin)
 !  write(*,*) skymod,lobad,hmin
-  hmin = threshold*relerr*ssig
 !  write(*,*) lobad,hmin,relerr,ssig
+
+  ! The threshold (findnoise, BUGS P33): t is the Normal deviate of the
+  ! false-alarm probability of a pixel (the user's threshold, or by the
+  ! expected number of noise peaks in the frame), hmin the height of the
+  ! convolution exceeded with that probability by the noise of the sky:
+  ! Poisson photons and Normal read noise by the gain (GAIN), the sky
+  ! level above the bias (BIASLEV) and the kernel. The Poisson mean
+  ! lam [e-] of a pixel is at most its variance less the read noise
+  ! (READNS, RDNOISE; the whole variance when unknown): a frame without
+  ! BIASLEV has the pedestal in its level, a noiseless frame has no
+  ! Poisson noise. Without the gain, the noise is Normal: hmin = t
+  ! sigma_h.
+  allocate(wf(nbox,nbox),disc(nbox,nbox),cxf(nbox,nbox),cyf(nbox,nbox), &
+       prof(nbox,nbox))
+  disc = .not. skip
+  where( disc )
+     wf = (real(g,REAL64) - sgop) / denom
+  elsewhere
+     wf = 0
+  end where
+  wk = pack(wf,disc)
+  sigh = relerr*ssig
+
+  g64 = -1
+  b64 = 0
+  r64 = 0
+  if( present(gain) ) g64 = gain
+  if( present(bias) ) b64 = bias
+  if( present(rn2) ) r64 = max(rn2,0.0_REAL64)
+  lam = 0
+  rhog = 1
+  if( g64 > 0 ) then
+     lam = max(min((skymod - b64)*g64,g64**2*(ssig**2 - r64)),0.0_REAL64)
+     rhog = max(1 - lam/(g64*ssig)**2,0.0_REAL64)
+  end if
+
+  if( falserate > 0 ) then
+     stats%t = rate_deviate(real(falserate,REAL64),real(ncol,REAL64)*nrow, &
+          field_lambda2(wf))
+  else
+     stats%t = threshold
+  end if
+  if( g64 > 0 ) then
+     call height_threshold(wk/(g64*sigh),lam,rhog,stats%t,stats%x, &
+          stats%skew,stats%kurt)
+  else
+     stats%x = stats%t
+  end if
+  stats%nfalse = noise_peaks(stats%t,real(ncol,REAL64)*nrow,field_lambda2(wf))
+  hmin = real(stats%x*sigh)
+
+  ! The shape of a point source (findnoise, BUGS P32): the marginal fits
+  ! (section 3) are linear in the pixels with the coefficients cxf, cyf
+  ! (the triangular weights wt and the Gaussian g summed over the other
+  ! axis).
+  block
+    real(REAL64), dimension(nbox) :: wt, sgm
+    real(REAL64) :: sg1, sgg, pw, dd
+    integer :: k
+    wt = [(middle - abs(k - middle), k = 1, nbox)]
+    sgm = matmul(real(g,REAL64),wt)
+    pw = sum(wt)
+    sg1 = sum(wt*sgm)
+    sgg = sum(wt*sgm**2)
+    dd = sgg - sg1**2/pw
+    do j = 1, nbox
+       do i = 1, nbox
+          cxf(i,j) = wt(i)*(sgm(i) - sg1/pw)*wt(j) / dd
+       end do
+    end do
+    cyf = transpose(cxf)
+  end block
+  call shape_model(real(fwhm,REAL64),disc,wf,cxf,cyf,prof,sharp0,hm)
+  stats%shapesig = max(shapesig,0.0)
+  stats%sharpnoise = shapesig > 0 .and. .not. fixsharp
+  stats%roundnoise = shapesig > 0 .and. .not. fixround
 
   ! simplified code:
 !  hmin = sqrt(readns**2 + skysig**2) ! replacing skymod->skysig**2 is realiable
@@ -721,7 +815,7 @@ contains
 !
   nstar = 0
   ncand = 0
-  allocate(cand(7,1000))
+  allocate(cand(8,1000))
 
   do jy = 1, nrow
 
@@ -790,6 +884,7 @@ contains
 !        allocate(sh(nbox*nbox))
 !        n = 0
         sharp = 0.0
+        flag = 0
         datum = d(jx,jy)
         if( lobad <= datum .and. datum < hibad ) then
            p = 0.0
@@ -819,6 +914,7 @@ contains
            ! the original estimator
            if( height > 0 .and. p > 0 ) then
               sharp = (d(jx,jy) - skymod - sharp/p)/height
+              flag = 1
            else
               sharp = 0
            end if
@@ -831,7 +927,11 @@ contains
 
         endif
 !        deallocate(sh)
-        if ( sharp < shrplo .or. sharp > shrphi ) go to 3200
+        ! the sharpness by the noise is tested later (with the reference
+        ! of the bright candidates); without the central pixel, the
+        ! fixed window
+        if( (.not. stats%sharpnoise .or. flag == 0) .and. &
+             (sharp < shrplo .or. sharp > shrphi) ) go to 3200
 !           write(*,*) sharp,skysig,datum
 
 !
@@ -912,6 +1012,7 @@ contains
            round = 0
            ecc = 0
            incl = 0
+           flag = flag + 2
 
            go to 3190
 !           goto 3200
@@ -1038,7 +1139,8 @@ contains
         if ((ycen < 0.5) .or. (ycen > nrow-0.5)) go to 3200
 
         round = 2.0*(hx - hy)/(hx + hy)
-        if( round < rndlo .or. round > rndhi ) go to 3200
+        if( .not. stats%roundnoise .and. (round < rndlo .or. round > rndhi) ) &
+             go to 3200
 
         ! estimate of stars centroids
         call centres(d,jx,jy,nbox,middle,skymod,lobad,hibad,xcen,ycen)
@@ -1056,7 +1158,7 @@ contains
            ctmp(:,1:size(cand,2)) = cand
            call move_alloc(ctmp,cand)
         end if
-        cand(:,ncand) = [xcen, ycen, height, sharp, round, ecc, incl]
+        cand(:,ncand) = [xcen, ycen, height, sharp, round, ecc, incl, real(flag)]
 
 3200    continue
 !
@@ -1080,28 +1182,62 @@ contains
 !
 !-----------------------------------------------------------------------
 !
+! SECTION 3a
+!
+! The shape tests by the noise (BUGS P32). The sharpness and the
+! roundness of a faint star scatter by the noise of its pixels, the
+! photon noise of the star and of the sky (far beyond the fixed windows
+! at a low gain: 39% of the stars at 4-5 sigma of the convolution, 13% at
+! 25-50 sigma were outside 0.2 - 1.0 on QUVIK-like frames). A candidate
+! passes when the statistic is within the fixed window (SHRPLO..SHRPHI,
+! RNDLO..RNDHI) as before, or within shapesig times its standard
+! deviation of the value expected for a star of its height (findnoise):
+! the median over the bright candidates (10 sigma of the convolution,
+! 20 at least, the median within the fixed window), else the model (a
+! Gaussian of the FWHM integrated over the pixels). The sharpness stays
+! within -1 .. 2 (a single hot pixel has 1.4 for FWHM 2.7, 2.7 for 4.9).
+! In the wings of brighter stars the fixed windows hold (SECTION 3b).
+! A window given by the user is fixed (the old test).
+!
+  allocate(accept(ncand))
+  call shapetest(cand(:,1:ncand),sigh,real(ssig,REAL64)**2,g64,shrplo, &
+       shrphi,rndlo,rndhi,disc,wf,cxf,cyf,prof,sharp0,hm,stats,accept)
+  cand = cand(:,pack([(n, n = 1, ncand)],accept))
+  ncand = size(cand,2)
+  deallocate(accept)
+
+!-----------------------------------------------------------------------
+!
 ! SECTION 3b
 !
 ! A bright star with extended wings (a halo, a broad PSF, a saturated
 ! core) produces local maxima of the brightness enhancement in its wings:
 ! the wings carry the noise of their light, far above the noise of the
 ! sky that sets the threshold, and their curvature adds a positive
-! enhancement. A candidate within the reach of a brighter one (twice at
-! least, or of a saturated area) is kept only when its enhancement
+! enhancement. A candidate within the reach of a brighter one (or of a
+! saturated area) is kept only when its enhancement
 ! exceeds the enhancement of the brighter star's wing at the same
 ! distance (the median over the annulus around the brighter star, its
 ! radial trend removed) by the threshold times the noise of the wing:
 ! the noise of the sky raised by the photon noise of the light of the
 ! wing (with the gain), or the scatter of the enhancement over the
-! annulus (without it); the noise of the sky at least. The annulus
-! follows the actual profile of the star, with no PSF model; on the
-! sky alone the test is the usual threshold.
+! annulus (without it); the noise of the sky at least. The threshold is
+! the height of the same false-alarm probability as on the sky, by the
+! Poisson noise of the sky and of the wing light (findnoise). The
+! annulus follows the actual profile of the star, with no PSF model; on
+! the sky alone the test is the usual threshold. Any brighter candidate
+! is a primary (twice brighter at least before: the twin detections of
+! a star by a filter narrower than the star, noise peaks of its profile
+! 2 px from the centre with 0.6-0.9 of its height, passed: 133 per
+! QUVIK-like frame of 2401 stars with FWHM 2.7 for 4.93, 78 now). A
+! candidate outside the fixed shape windows, accepted by the noise
+! (SECTION 3a), is not accepted in the light of a wing.
 !
   wgain = -1
   if( present(gain) ) wgain = real(gain)
   allocate(accept(ncand))
   call wingtest(d,h,hibad,skymod,ssig,wgain,cand(:,1:ncand),fwhm, &
-       threshold,relerr*ssig,nhalf,accept)
+       stats%t,stats%x,wk,lam,rhog,relerr*ssig,nhalf,accept)
 
   do n = 1, ncand
      if( .not. accept(n) ) cycle
@@ -1155,13 +1291,13 @@ contains
 ! Normal return.
 !
 
-      deallocate(h,g,skip,cand,accept)
+      deallocate(h,g,skip,cand,accept,wf,disc,cxf,cyf,prof)
 
     end subroutine daofind
 
 
-    subroutine wingtest(d,h,hibad,skymod,ssig,gain,cand,fwhm,threshold, &
-         hsig,nhalf,accept)
+    subroutine wingtest(d,h,hibad,skymod,ssig,gain,cand,fwhm,t,xsky, &
+         wk,lam,rhog,hsig,nhalf,accept)
 
       ! The candidates (cand(:,n): x, y, height, ..) explained by the wing
       ! of a brighter candidate or of a saturated area are not accepted
@@ -1171,10 +1307,19 @@ contains
       ! gain (gain > 0), the noise of the enhancement in the wing is
       ! predicted by the light of the wing (the median of the annulus):
       ! hsig*sqrt(1 + wing/(gain*ssig**2)); without it, by the scatter
-      ! of the enhancement over the annulus.
+      ! of the enhancement over the annulus. The threshold is the height
+      ! [noise] of the false-alarm probability Q(t) by the Poisson noise
+      ! of the sky and the wing (wk the kernel, lam [e-] the Poisson mean
+      ! and rhog the Normal fraction of the variance of a sky pixel), or
+      ! the one of the sky (xsky) without the gain.
+
+      use findnoise, only: height_threshold
+      use iso_fortran_env, only: REAL64
 
       real, dimension(:,:), intent(in) :: d, h, cand
-      real, intent(in) :: hibad, skymod, ssig, gain, fwhm, threshold, hsig
+      real, intent(in) :: hibad, skymod, ssig, gain, fwhm, hsig
+      real(REAL64), intent(in) :: t, xsky, lam, rhog
+      real(REAL64), dimension(:), intent(in) :: wk
       integer, intent(in) :: nhalf
       logical, dimension(:), intent(out) :: accept
 
@@ -1182,13 +1327,14 @@ contains
       ! areas reach farther by their radius times
       real, parameter :: reach = 8, reachmin = 20, reachsat = 3
       ! the primary brighter by the factor, the smallest annulus [pix]
-      real, parameter :: bright = 2
+      real, parameter :: bright = 1
       integer, parameter :: minpix = 8
       real, dimension(:,:), allocatable :: prim
       real, dimension(:), allocatable :: a, dr, b
       integer :: ncand, nsat, n, k, i, j, m, ncol, nrow, ir
       real :: xc, yc, xp, yp, dist, r, rexcl, rmax, rlim, med, sig, hc, sr, &
            slope, wing
+      real(REAL64) :: xl, sk, ku
 
       ncand = size(cand,2)
       ncol = size(h,1)
@@ -1216,8 +1362,9 @@ contains
                yp = prim(2,k)
                rmax = max(reach*fwhm,reachmin) + reachsat*prim(3,k)
             else
-               ! the candidates brighter twice at least (a comparable
-               ! neighbour cannot be explained by the wing)
+               ! the brighter candidates (a twin detection of a star by
+               ! a narrow filter, a noise peak of its profile, has 0.6-0.9
+               ! of its height)
                if( k - nsat == n ) cycle
                if( .not. (cand(3,k-nsat) > bright*hc) ) cycle
                xp = cand(1,k-nsat)
@@ -1258,15 +1405,26 @@ contains
             med = qselect(a(1:m),(m + 1)/2)
             a(1:m) = abs(a(1:m) - med)
             sig = 1.4826*qselect(a(1:m),(m + 1)/2)
+            ! a candidate passing the shape tests only by the noise (as a
+            ! star on the sky, SECTION 3a) is not accepted in the light of
+            ! a wing (the noise of a sky pixel at least): the structure and
+            ! the curvature of the wing distort its shape
+            wing = qselect(b(1:m),(m + 1)/2) - skymod
+            if( iand(nint(cand(8,n)),4) /= 0 .and. wing > ssig ) then
+               accept(n) = .false.
+               exit
+            end if
             ! the scatter: the noise predicted by the light of the wing
             ! (the structure of the wing over the annulus, as the pixel
             ! phase of a sharp core, is not noise) or, without the gain,
             ! the scatter over the annulus
+            xl = xsky
             if( gain > 0 ) then
-               wing = qselect(b(1:m),(m + 1)/2) - skymod
                sig = hsig*sqrt(1 + max(wing,0.0)/(gain*ssig**2))
+               call height_threshold(wk/(gain*real(sig,REAL64)), &
+                    lam + gain*max(wing,0.0),rhog*(hsig/sig)**2,t,xl,sk,ku)
             end if
-            if( hc - med < threshold*max(sig,hsig) ) then
+            if( hc - med < xl*max(sig,hsig) ) then
                accept(n) = .false.
                exit
             end if
@@ -1274,6 +1432,75 @@ contains
       end do
 
     end subroutine wingtest
+
+    subroutine shapetest(cand,sigh,sig2,gain,shrplo,shrphi,rndlo,rndhi, &
+         disc,wf,cxf,cyf,prof,sharp0,hm,stats,accept)
+
+      ! The shape tests of the candidates (cand(:,n): x, y, height, sharp,
+      ! round, ecc, incl, flag) by the noise (see SECTION 3a of daofind;
+      ! 4 is added to the flag of a candidate outside the fixed windows):
+      ! sigh the noise of the convolution, sig2 the variance of a sky
+      ! pixel, gain [e-/ADU] (<= 0: unknown), the fixed windows, the kernel
+      ! (disc, wf), the marginal fits (cxf, cyf) and the point source
+      ! (prof, sharp0, hm) of findnoise.
+
+      use findnoise
+      use iso_fortran_env, only: REAL64
+
+      real, dimension(:,:), intent(in out) :: cand
+      real(REAL64), intent(in) :: sigh, sig2, gain, sharp0, hm
+      real, intent(in) :: shrplo, shrphi, rndlo, rndhi
+      logical, dimension(:,:), intent(in) :: disc
+      real(REAL64), dimension(:,:), intent(in) :: wf, cxf, cyf, prof
+      type(findstats), intent(in out) :: stats
+      logical, dimension(:), intent(out) :: accept
+
+      ! the bright candidates [sigh] and their least number for the
+      ! reference; the sanity limits of the sharpness
+      real, parameter :: hbright = 10, sharpmin = -1, sharpmax = 2
+      integer, parameter :: nbright = 20
+      real, dimension(:), allocatable :: a
+      logical, dimension(:), allocatable :: bri
+      integer, dimension(:), allocatable :: flag
+      real(REAL64) :: ss, sr
+      real :: sharp, round, med
+      integer :: n
+      logical :: okshr, okrnd
+
+      flag = nint(cand(8,:))
+      stats%sharpref = sharp0
+      stats%roundref = 0
+      stats%nref = 0
+      bri = cand(3,:) >= hbright*sigh .and. iand(flag,1) == 1 .and. &
+           iand(flag,2) == 0
+      if( count(bri) >= nbright ) then
+         stats%nref = count(bri)
+         a = pack(cand(4,:),bri)
+         med = qselect(a,(size(a) + 1)/2)
+         if( shrplo <= med .and. med <= shrphi ) stats%sharpref = med
+         a = pack(cand(5,:),bri)
+         med = qselect(a,(size(a) + 1)/2)
+         if( rndlo <= med .and. med <= rndhi ) stats%roundref = med
+      end if
+
+      do n = 1, size(cand,2)
+         sharp = cand(4,n)
+         round = cand(5,n)
+         call shape_noise(real(cand(3,n),REAL64),sig2,gain,stats%sharpref, &
+              disc,wf,cxf,cyf,prof,hm,ss,sr)
+         okshr = shrplo <= sharp .and. sharp <= shrphi
+         if( stats%sharpnoise .and. iand(flag(n),1) == 1 .and. .not. okshr ) &
+              okshr = abs(sharp - stats%sharpref) <= stats%shapesig*ss .and. &
+              sharpmin <= sharp .and. sharp <= sharpmax
+         okrnd = rndlo <= round .and. round <= rndhi
+         if( stats%roundnoise .and. iand(flag(n),2) == 0 .and. .not. okrnd ) &
+              okrnd = abs(round - stats%roundref) <= stats%shapesig*sr
+         accept(n) = okshr .and. okrnd
+         if( accept(n) .and. .not. (shrplo <= sharp .and. sharp <= shrphi .and. &
+              rndlo <= round .and. round <= rndhi) ) cand(8,n) = flag(n) + 4
+      end do
+
+    end subroutine shapetest
 
     subroutine saturated(d,hibad,prim,nsat)
 

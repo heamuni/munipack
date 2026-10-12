@@ -102,9 +102,11 @@ contains
 
   subroutine fits_find_save(filename,output,fkeys,nstar, &
        fwhm,threshold,shrplo,shrphi,rndlo,rndhi, readns, &
-       lothresh,  lobad, hibad, hmin, skymod, skyerr, skysig, maxsky, status)
+       lothresh,  lobad, hibad, hmin, skymod, skyerr, skysig, maxsky, &
+       stats, falserate, status)
 
     use oakleaf
+    use findnoise, only: findstats
 
     ! results fills new FITS extension
 
@@ -113,7 +115,8 @@ contains
 
     real, intent(in) :: fwhm, threshold, &
          shrplo,shrphi,rndlo,rndhi, lothresh, readns, lobad, hibad, hmin, &
-         skymod, skyerr, skysig
+         skymod, skyerr, skysig, falserate
+    type(findstats), intent(in) :: stats
     integer, intent(in) :: maxsky, nstar
     integer, intent(in out) :: status
 
@@ -166,8 +169,27 @@ contains
     call fits_update_key(fits,fkeys(2),readns,-7,'[ADU] read noise',status)
     call fits_update_key(fits,FITS_KEY_FWHM,fwhm,-2, &
          '[pix] standard FWHM of objects',status)
-    call fits_update_key(fits,FITS_KEY_THRESHOLD,threshold,-2, &
-         'threshold in sigmas above background',status)
+    call fits_update_key(fits,FITS_KEY_THRESHOLD,threshold,-4, &
+         'threshold: Normal deviate of the false-alarm rate',status)
+    call fits_update_key(fits,'HTHRESH',real(stats%x),-4, &
+         '[sigma] the height threshold of the filtered sky',status)
+    call fits_update_key(fits,'SKEWFILT',real(stats%skew),-4, &
+         'skewness of the filtered sky (noise model)',status)
+    call fits_update_key(fits,'KURTFILT',real(stats%kurt),-4, &
+         'excess kurtosis of the filtered sky',status)
+    if( falserate > 0 ) then
+       call fits_update_key(fits,'FALSERAT',falserate,-4, &
+            'expected noise peaks per frame (requested)',status)
+    else
+       call fits_update_key(fits,'FALSERAT',real(stats%nfalse),-4, &
+            'expected noise peaks per frame (upper estimate)',status)
+    end if
+    call fits_update_key(fits,'SHAPESIG',real(stats%shapesig),-3, &
+         '[sigma] shape tests by the noise (0: fixed windows)',status)
+    call fits_update_key(fits,'SHARPREF',real(stats%sharpref),-4, &
+         'expected sharpness (bright stars or model)',status)
+    call fits_update_key(fits,'ROUNDREF',real(stats%roundref),-4, &
+         'expected roundness (bright stars or model)',status)
     call fits_update_key(fits,FITS_KEY_LOWBAD,lobad,-3, &
          '[cts] low good datum',status)
     call fits_update_key(fits,FITS_KEY_HIGHBAD,hibad,-3, &
