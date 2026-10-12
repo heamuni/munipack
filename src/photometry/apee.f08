@@ -39,11 +39,10 @@
 !       splits stars with extended wings; a brighter one excludes the
 !       star), S/N > 30 in the aperture of 2 FWHM (at least the 30
 !       brightest ones).
-!     - The sky bias: the robust mean of a sky of a few photons per pixel
-!       (a skewed distribution) is lower than its mean, the counts grow
-!       by bias*area; the bias is the median slope of counts by area over
-!       the apertures larger than 4 FWHM (of stars isolated by the largest
-!       aperture), and it is removed from the counts for EE.
+!     - The sky bias (a diagnostic, not removed): the median slope of
+!       counts by area over the apertures larger than 4 FWHM (of stars
+!       isolated by the largest aperture); zero within its noise for
+!       the mean sky of daophotsb (BUGS P23).
 !     - The total flux: the median of three apertures of the plateau of
 !       the stacked growth curve, from the first aperture larger than
 !       1.3 FWHM within 0.5% of the level of the curve (the median of
@@ -254,13 +253,16 @@ contains
        snr = -1
     end where
 
-    ! The sky bias: the robust mean of the sky in the ring differs from
-    ! the mean when the sky is not Normal (a few photons per pixel), so
-    ! the counts are biased by bias*area. The bias is the median, over
-    ! the stars isolated by the largest aperture, of the slope of counts
-    ! by area over the apertures larger than 4 FWHM (where the growth
-    ! curve is flat); it is removed from the counts for EE. At least three
-    ! such apertures are needed, the bias is zero otherwise.
+    ! The sky bias (a diagnostic): the median, over the stars isolated by
+    ! the largest aperture, of the slope of counts by area over the
+    ! apertures larger than 4 FWHM (where the growth curve is flat). The
+    ! sky of daophotsb is the mean of the ring, so the slope is zero
+    ! within its noise (the robust mean used before was biased on a sky
+    ! of a few photons per pixel, BUGS P23, and the bias was removed
+    ! here). It is not removed: the slope includes the light of extended
+    ! PSF wings too. At least three such apertures are needed (and the
+    ! level of the growth curve is their median), the bias is zero
+    ! otherwise.
     desc%skybias = 0
     biased = .false.
     block
@@ -279,15 +281,6 @@ contains
          if( size(slopes) >= 5 ) then
             biased = .true.
             desc%skybias = median(slopes)
-            do k = 1, nap
-               where( var(:,k) > 0 ) &
-                    cts(:,k) = cts(:,k) - desc%skybias*area(k)
-            end do
-            ! the validity of counts after the correction
-            do l = 1, nst
-               cand(l) = cand(l) .and. all(cts(l,1:klim) > 0)
-            end do
-            where( .not. cand ) snr = -1
          end if
       end if
     end block
@@ -304,7 +297,7 @@ contains
        g(k) = median(pack(cts(:,k) / cts(:,kn),sel))
     end do
     ! the level of the curve: the median of the apertures larger than
-    ! 4 FWHM (flat after the removal of the sky bias), or its maximum;
+    ! 4 FWHM (flat), or its maximum;
     ! the plateau: three apertures from the first one within 0.5%
     ! of the level
     if( biased ) then
@@ -801,7 +794,7 @@ contains
        call fits_update_key(fits,'EERTOT2',desc%rref2,-5, &
             '[pix] total flux: the largest plateau aperture',status)
        call fits_update_key(fits,'EESKYBIA',desc%skybias,-4, &
-            '[ADU/pix] sky bias removed for EE (counts - bias*area)',status)
+            '[ADU/pix] residual sky bias (diagnostic, not removed)',status)
        do k = 1, size(desc%sigma)
           call fits_make_keyn('EEORD',k,key,status)
           call fits_update_key(fits,key,desc%korder(k), &
