@@ -253,7 +253,7 @@ or saturation (for very bright stars).
 <tr><td>X</td><td>Horizontal coordinate</td><td>pix</td></tr>
 <tr><td>Y</td><td>Vertical coordinate</td><td>pix</td></tr>
 <tr><td>SKY</td><td>Sky level<sup><a href="#sky">[^]</a></sup></td><td>count</td></tr>
-<tr><td>SKYERR</td><td>Statistical error of sky level</td><td>count</td></tr>
+<tr><td>SKYERR</td><td>Statistical error of sky level (of the sky corrected by the growth-curve fit; the error of the mean sky of the ring cancels in it, see <a href="man_gphot.html">gphot</a>)</td><td>count</td></tr>
 <tr><td>GCOUNT</td><td>Growth curve estimated total sum of counts for an infinite
     aperture<sup><a href="#neg">[*]</a></sup></td><td>count</td></tr>
 <tr><td>GCOUNTERR</td><td>Statistical error of APCOUNT</td><td>count</td></tr>

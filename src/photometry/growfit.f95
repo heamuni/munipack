@@ -46,13 +46,20 @@ module grow_fit
 
   real(dbl), dimension(:), allocatable, private :: aper,cts,dcts,curve,curve_err,acts,ects
   real(dbl), private :: rsig, fmin, ctsref
+  ! the variance of the mean sky of the star (the sky subtracted from the
+  ! apertures), negative when unknown
+  real(dbl), private :: skyvar
 
   private :: growfun, growdif, growder, difjac, res, varpar, &
        snoise, snoise_graph
 
 contains
 
-  subroutine growfit(raper,xcts,xdcts,xcurve,xcurve_err,bmax,f,df,b,db,sig,info)
+  subroutine growfit(raper,xcts,xdcts,xcurve,xcurve_err,skyerr,f,df,b,db,sig,info)
+
+    ! skyerr is the error of the mean sky subtracted from the apertures
+    ! (SKYERR; <= 0 when unknown); db is then the error of the corrected
+    ! sky, sky + b (see varpar)
 
     use NelderMead
     use minpacks
@@ -60,7 +67,7 @@ contains
 
     real, dimension(:), intent(in) :: raper
     real(dbl), dimension(:), intent(in) :: xcts,xdcts,xcurve,xcurve_err
-    real, intent(in) :: bmax
+    real, intent(in) :: skyerr
     real(dbl), intent(in out) :: f,df,b,db
     real(dbl), intent(out) :: sig
     integer, intent(out) :: info
@@ -81,6 +88,11 @@ contains
     curve = xcurve
     curve_err = xcurve_err
     ctsref = f
+    if( skyerr > 0 ) then
+       skyvar = real(skyerr,dbl)**2
+    else
+       skyvar = -1
+    end if
     acts = cts / ctsref
     ects = dcts / ctsref
 
@@ -97,7 +109,7 @@ contains
     p(1) = f
     p(2) = 0
     dp(1) = 1e-4*df + f*curve_err(6)
-    dp(2) = 1!0.01*bmax
+    dp(2) = 1
 
     p(1) = 1
     p(2) = 0
@@ -367,7 +379,7 @@ contains
     real(dbl),dimension(:), allocatable :: f,df,r,ds,w
     real(dbl),dimension(:,:), allocatable :: x,g,c
     real(dbl) :: sum2,sum3
-    integer :: i,j,n
+    integer :: i,j,k,n
 
     n = size(aper)
     allocate(r(n),f(n),df(n),ds(n),w(n),x(n,2),g(2,n),c(n,n))
@@ -398,13 +410,25 @@ contains
        ! the pixels (and their noise) of smaller ones, so the measurements
        ! are strongly correlated. The covariance of the counts in apertures
        ! (sorted by radius) is approximated by cov(i,j) = dcts(min(i,j))**2
-       ! (photon noise of the star and the sky, the sky estimate error;
-       ! the last one, common for all apertures, is absorbed by b).
+       ! (photon noise of the star and the sky, the sky estimate error).
        ! The covariance of the parameters is given by the sandwich formula
        !   cov(p) = H X' W C W X H,  H = (X' W X)**(-1).
+       ! With the error of the mean sky known (skyvar), its part of dcts**2,
+       ! area**2*skyvar, is replaced by the exact one, area(i)*area(j)*skyvar,
+       ! common to all apertures: X' W X H = I, so it is absorbed by b
+       ! entirely (b = -(sky error) + the pixel noise) and does not enter f;
+       ! the covariance of the pixels alone gives the error of f and the
+       ! error of the corrected sky, sky + b, in which the error of the
+       ! mean of the ring cancels (it was added to it once more: SKYERR
+       ! of gphot was 24-41% too large).
        do i = 1,n
           do j = 1,n
-             c(i,j) = dcts(min(i,j))**2
+             k = min(i,j)
+             if( skyvar >= 0 ) then
+                c(i,j) = max(dcts(k)**2 - aper(k)**2*skyvar,0.0_dbl)
+             else
+                c(i,j) = dcts(k)**2
+             end if
           end do
           c(i,i) = c(i,i) + (p(1)*curve_err(i))**2
        end do
