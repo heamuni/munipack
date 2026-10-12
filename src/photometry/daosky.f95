@@ -39,9 +39,16 @@ module mdaosky
 
 contains
 
-subroutine  daosky (d, nstep, verbose, hibad, sky, skyerr, skysig)
+subroutine  daosky (d, nstep, verbose, hibad, sky, skyerr, skysig, gain, rn2, bias)
 
-  use oakleaf
+  ! The mean sky level of the frame by every nstep-th pixel (in both
+  ! directions) below hibad: the clipped mean of skymean (the robust mean
+  ! used before is biased on a sky of a few photons per pixel, BUGS P23).
+  ! The noise model (gain [e-/ADU], read noise squared [ADU**2], bias
+  ! [ADU]) is optional.
+
+  use iso_fortran_env
+  use skymean
 
   implicit none
 
@@ -50,46 +57,34 @@ subroutine  daosky (d, nstep, verbose, hibad, sky, skyerr, skysig)
   real, intent(in) :: hibad
   real, intent(in), dimension(:,:) :: d
   real, intent(out) :: sky, skyerr, skysig
+  real(REAL64), intent(in), optional :: gain, rn2, bias
 
-!
-! NMAX    is the maximum number of sky pixels we can deal with,
-!         given the limited amount of working space.
-!
-
+  real(REAL64), dimension(:), allocatable :: s
+  real(REAL64) :: g, rn, b, mean, err, sig
   integer :: ncol, nrow, n
-  real, dimension(:), allocatable :: s
 
   ncol = size(d,1)
   nrow = size(d,2)
-!
-!-----------------------------------------------------------------------
-!
-! The spacing between pixels that will be included in the sample is
-! estimated by the ratio of the total number of pixels in the picture to
-! the maximum number of pixels that can be accomodated in the vector S.
-!
-!  istep = max((ncol*nrow)/nmax, 1)
-!
-! Go through the disk file reading a row at a time and extracting every
-! ISTEP-th pixel.  If ISTEP is not equal to 1, make sure that the
-! starting pixel for each row is staggered.
-!
 
-  allocate(s(size(d)))
-  s = pack(d(1:ncol:nstep,1:nrow:nstep), d < hibad)
-  n = count(d(1:ncol:nstep,1:nrow:nstep) < hibad)
+  g = -1
+  rn = 0
+  b = 0
+  if( present(gain) ) g = gain
+  if( present(rn2) ) rn = rn2
+  if( present(bias) ) b = bias
 
-!
-! Sort these values, then estimate the mode.
-!
+  ! the mask of the same (sub-sampled) shape as the pixels
+  s = pack(real(d(1:ncol:nstep,1:nrow:nstep),REAL64), &
+       d(1:ncol:nstep,1:nrow:nstep) < hibad)
 
-  call rmean(s(1:n),sky,skyerr,skysig)
+  call sky_mean(s,g,rn,b,mean,err,sig,n)
+  sky = real(mean)
+  skyerr = real(err)
+  skysig = real(sig)
 
   if( verbose ) &
        write (*,"(A,F9.1,A,F10.2)") &
        ' Approximate sky value for this frame =', sky,' +- ',skyerr
-
-  deallocate(s)
 
 end subroutine daosky
 

@@ -26,14 +26,14 @@ noinst_PROGRAMS = aphottester
 
 .NOTPARALLEL:
 
-find_SOURCES = daosky.f95 daofind.f95 fitsfind.f08 find.f08
+find_SOURCES = skymean.f08 daosky.f95 daofind.f95 fitsfind.f08 find.f08
 find_LDADD   = $(ldir)/libsort.a $(LIBOAKLEAF) $(LIBMINPACK) $(FITSADD)
 
-aphot_SOURCES = daosky.f95 daofotometr.f08 fitsaphot.f08 exscatter.f08 \
+aphot_SOURCES = skymean.f08 daosky.f95 daofotometr.f08 fitsaphot.f08 exscatter.f08 \
                 apee.f08 aphot.f08
 aphot_LDADD   = $(ldir)/libpsfmodel.a $(LIBOAKLEAF) $(LIBMINPACK) $(FITSADD)
 
-aphottester_SOURCES = daofotometr.f08 fitsaphot.f08 aphottester.f08
+aphottester_SOURCES = skymean.f08 daofotometr.f08 fitsaphot.f08 aphottester.f08
 aphottester_LDADD   = $(LIBOAKLEAF) $(LIBMINPACK) $(FITSADD)
 
 gphot_SOURCES = growinit.f95 growmodel.f95 growfit.f95\
@@ -56,7 +56,7 @@ phfotran_LDADD   = $(ldir)/libastrotrafo.a $(ldir)/libphotometry.a \
                    $(LIBOAKLEAF) $(LIBMINPACK) $(FITSADD)
 # $(ldir)/libphio.a
 
-psfphot_SOURCES = fitspsfphot.f08 psffit.f08 psfempir.f08 psfphot.f08
+psfphot_SOURCES = skymean.f08 fitspsfphot.f08 psffit.f08 psfempir.f08 psfphot.f08
 psfphot_LDADD   = $(ldir)/libpsfmodel.a $(FITSADD)
 # the module dependencies (for parallel builds)
 psffit.$(OBJEXT): fitspsfphot.$(OBJEXT)

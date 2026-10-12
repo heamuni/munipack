@@ -141,11 +141,13 @@ contains
     use mdaosky
     use mdaofind
     use fitsfind
+    use skymean, only: sky_noise_model
 
     logical, intent(out) :: exitus
 
     real, dimension(:,:), allocatable :: data
     real :: lobad, hibad, hmin, readns,skymod, skyerr, skysig, satur
+    real(REAL64) :: gain, rn2, bias
     integer :: nstep,nstar,status
 
     if( fwhm <= 0.0 ) stop 'Error in find: Assumption FWHM > 0 unsatisfied.'
@@ -164,9 +166,12 @@ contains
     end if
     if( readns_init > 0.0 ) readns = readns_init
 
-    ! Sky estimate
+    ! Sky estimate: the mean, clipped by the noise model of the frame
+    call sky_noise_model(filename,gain,rn2,bias,status)
+    if( status /= 0 ) goto 666
+    if( readns_init > 0.0 ) rn2 = real(readns_init,REAL64)**2
     nstep = max(int(log(float(size(data))/maxsky) / log(2.0)),1)
-    call daosky(data,nstep,verbose,hibad,skymod,skyerr,skysig)
+    call daosky(data,nstep,verbose,hibad,skymod,skyerr,skysig,gain,rn2,bias)
     if( debug ) write(*,*) 'Sky:',skymod,'+-',skyerr,' sig=',skysig
 
     ! Detected stars are temporary stored in a scratch file under unit 3.
