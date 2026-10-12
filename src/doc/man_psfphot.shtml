@@ -329,10 +329,13 @@ munipack psfphot [.. parameters ..] file(s)
   <dd><samp>fixed</samp> (default): the sky in the annulus of aphot
     (ANNULUS1, ANNULUS2 of APERPHOT; without APERPHOT, the annulus from
     the fitting radius + 2 pixels, at least 5 pixels wide). The first pass
-    uses the sky of aphot (or a median in the annulus); before the next
-    passes, the sky is re-estimated in the annulus of the frame with all
-    fitted stars subtracted (the mean clipped at 3σ), so the light of
-    neighbours (and of the star itself) does not bias it.
+    uses the sky of aphot (or the clipped mean in the annulus); before the
+    next passes, the sky is re-estimated in the annulus of the frame with
+    all fitted stars subtracted, so the light of neighbours (and of the
+    star itself) does not bias it. Both are the mean clipped by the noise
+    model, as the sky of <a href="man_aphot.html#sky">aphot</a> (a median
+    or a mean clipped at 3σ by the median absolute deviation is biased on
+    a sky of a few photons per pixel).
     <samp>local</samp>: a constant sky is fitted for every star.</dd>
   <dt><samp>--maxiter n</samp></dt>
   <dd>The maximum of iterations of a fit, 50 by default.</dd>

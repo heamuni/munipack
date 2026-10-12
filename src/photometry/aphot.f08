@@ -28,6 +28,7 @@ program aphot
   use fitsaphot
   use daofotometr
   use aperture_ee
+  use skymean, only: sky_noise_model
   use psfmodel, only: psf_file_load
 
   implicit none
@@ -241,7 +242,9 @@ contains
     real :: lobad,hibad,fwhm,hwhm,ecc,incl,fwhm_ee
     integer :: nrows, status
     real(REAL64), dimension(:,:), allocatable :: ee, eeerr
-    real(REAL64) :: scale, gain
+    real(REAL64) :: scale, gain, ngain, nrn2, nbias
+    real, dimension(:), allocatable :: rmask
+    integer :: ncont
     integer, dimension(2) :: naxes
     type(EEDescr) :: desc
     logical :: eeok
@@ -261,10 +264,21 @@ contains
 
     nrows = size(xcens)
     allocate(apcts(nrows,naper),apcts_err(nrows,naper), &
-         sky(nrows),sky_err(nrows))
+         sky(nrows),sky_err(nrows),rmask(nrows))
 
+    ! the sky: the clipped mean by the noise model, the detected stars
+    ! masked
+    call sky_noise_model(filename,ngain,nrn2,nbias,status)
+    if( status /= 0 ) goto 666
+    call daomaskrad(data,xcens,ycens,lobad,hibad,ngain,nrn2,nbias,ring(2)/2, &
+         rmask)
     call daophotsb(data,stderr,xcens,ycens,raper,ring,ecc,incl,lobad,hibad, &
-         verbose,plog,apcts,apcts_err,sky,sky_err)
+         verbose,plog,apcts,apcts_err,sky,sky_err,ngain,nrn2,nbias,rmask)
+
+    ! the apertures contaminated by brighter neighbours are invalid
+    call daocontam(xcens,ycens,raper,rmask,apcts,apcts_err,ncont)
+    if( verbose ) write(*,'(a,i0,a)') ' Apertures contaminated by neighbours: ',&
+         ncont,' (invalidated).'
 
     ! estimate of width parameter for Gaussian
     call estim_hwhm(data,xcens,ycens,sky,fwhm,lobad,hibad,hwhm)
@@ -359,6 +373,7 @@ contains
 
     if( allocated(data) ) deallocate(data,stderr)
     if( allocated(apcts) ) deallocate(xcens,ycens,apcts,apcts_err,sky,sky_err)
+    if( allocated(rmask) ) deallocate(rmask)
 
   end subroutine the_aphot
 
@@ -371,16 +386,19 @@ contains
     real, dimension(:,:), allocatable :: data, stderr
     real, dimension(:), allocatable :: sky, sky_err
     real, dimension(:,:), allocatable :: apcts,apcts_err
+    real, dimension(:), allocatable :: rmask
     real :: lobad, hibad, saturate, skyavg,skyerr,skysig
-    integer :: i, nrow, nstep, status
+    real(REAL64) :: ngain, nrn2, nbias
+    integer :: i, nrow, nstep, status, ncont
 
     status = 0
     call fits_aphot_image(filename,fkeys,data,stderr,saturate,status)
+    call sky_noise_model(filename,ngain,nrn2,nbias,status)
     if( status /= 0 ) goto 666
 
     hibad = saturate
     nstep = max(int(log(float(size(data))/4e4) / log(2.0)),1)
-    call daosky(data,nstep,verbose,hibad,skyavg,skyerr,skysig)
+    call daosky(data,nstep,verbose,hibad,skyavg,skyerr,skysig,ngain,nrn2,nbias)
     ! the same low-bad threshold as in find (lothresh = 5 sigma), not clamped
     ! to zero (it would cut half of the sky on sky-subtracted frames)
     lobad = skyavg - 5*skysig
@@ -422,8 +440,13 @@ contains
        end block
     end if
 
+    allocate(rmask(nrow))
+    call daomaskrad(data,xstar,ystar,lobad,hibad,ngain,nrn2,nbias,ring(2)/2, &
+         rmask)
     call daophotsb(data,stderr,xstar,ystar,raper,ring,ecc_par,incl_par, &
-         lobad,hibad,verbose,plog,apcts,apcts_err,sky,sky_err)
+         lobad,hibad,verbose,plog,apcts,apcts_err,sky,sky_err, &
+         ngain,nrn2,nbias,rmask)
+    call daocontam(xstar,ystar,raper,rmask,apcts,apcts_err,ncont)
 
     do i = 1, nrow
        write(*,*) '=BYHAND> ',i,xstar(i),ystar(i),sky(i),sky_err(i), &

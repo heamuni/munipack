@@ -38,6 +38,7 @@ program psfphot
   use psffit
   use psfempir
   use fitspsfphot
+  use skymean, only: sky_mean
   use iso_fortran_env
 
   implicit none
@@ -918,9 +919,8 @@ contains
       type(StarFit), intent(in out) :: star
 
       real(REAL64), dimension(:), allocatable :: s
-      logical, dimension(:), allocatable :: keep
-      real(REAL64) :: r1, r2, r, mean, sig
-      integer :: i, j, n, m, iter
+      real(REAL64) :: r1, r2, r, mean, sig, sdev
+      integer :: i, j, n, m
 
       if( frame%ring(1) > 0 .and. frame%ring(2) > frame%ring(1) ) then
          r1 = frame%ring(1)
@@ -946,21 +946,12 @@ contains
       end do
       if( n < 10 ) return
 
-      ! the mean clipped at 3 sigma (the residual sky is nearly symmetric,
-      ! the mean is not biased like the median of Poisson counts)
-      mean = median(s(1:n))
-      sig = 1.4826_REAL64*median(abs(s(1:n) - mean))
-      allocate(keep(n))
-      keep = .true.
-      do iter = 1, 5
-         if( .not. (sig > 0) ) exit
-         keep = abs(s(1:n) - mean) < 3*sig
-         if( count(keep) < 10 ) exit
-         mean = sum(s(1:n),keep) / count(keep)
-         sig = sqrt(sum((s(1:n) - mean)**2,keep) / (count(keep) - 1))
-      end do
+      ! the mean clipped by the noise model (skymean): a symmetric clip
+      ! by the scatter (at 3 sigma by the median absolute deviation, as
+      ! before) rejects the photons of a sky of a few photons per pixel
+      call sky_mean(s(1:n),fr%gain,fr%rn2,fr%bias,mean,sig,sdev,m)
       star%sky = mean
-      star%skyerr = sig / sqrt(real(count(keep),REAL64))
+      star%skyerr = sig
 
     end subroutine annulus_sky
 
@@ -971,8 +962,8 @@ contains
       type(StarFit), intent(in out) :: star
 
       real(REAL64), dimension(:), allocatable :: s
-      real(REAL64) :: r1, r2, r, med, mad
-      integer :: i, j, n, m
+      real(REAL64) :: r1, r2, r, med, mad, sdev
+      integer :: i, j, n, m, nu
 
       r1 = star%fitrad + 2
       r2 = r1 + max(5.0_REAL64,star%fitrad)
@@ -992,13 +983,11 @@ contains
          end do
       end do
       if( n > 5 ) then
-         med = median(s(1:n))
-         mad = median(abs(s(1:n) - med))
-         ! clip stars in the annulus
-         med = median(pack(s(1:n),abs(s(1:n) - med) < 3*1.4826_REAL64*mad &
-              .or. mad == 0))
+         ! the mean clipped by the noise model (the median of a sky of
+         ! a few photons per pixel is biased, BUGS P23)
+         call sky_mean(s(1:n),fr%gain,fr%rn2,fr%bias,med,mad,sdev,nu)
          star%sky = med
-         star%skyerr = 1.2533_REAL64*1.4826_REAL64*max(mad,1e-10_REAL64)/sqrt(real(n))
+         star%skyerr = max(mad,1e-10_REAL64)
       else
          star%sky = fr%bias
          star%skyerr = -1
@@ -1823,7 +1812,7 @@ contains
       real(REAL64), dimension(:), allocatable :: e2, xs, ys, ss, buf
       integer, dimension(:), allocatable :: idx, tmp
       real(REAL64) :: fw, sig, rk, sk2, perr, s1, s2, v, dmin, a, c, dx, dy, sharp
-      integer :: nx, ny, nk, i, j, k, l, i0, j0, ib, jb, nbx, nby, nc, m
+      integer :: nx, ny, nk, i, j, k, l, i0, j0, ib, jb, nbx, nby, nc, m, nsb
       logical :: ok
 
       nnew = 0
@@ -1852,7 +1841,7 @@ contains
       end where
       sk2 = sum(ker**2)
 
-      ! the residuals, the sky by medians in blocks
+      ! the residuals, the sky by clipped means in blocks
       allocate(res(nx,ny),sky(nx,ny))
       res = fr%data - fr%mstar
       nbx = (nx - 1) / blk + 1
@@ -1871,7 +1860,8 @@ contains
                end do
             end do
             if( m > blk**2 / 4 ) then
-               a = median(buf(1:m))
+               ! the mean (for the noise model), clipped
+               call sky_mean(buf(1:m),fr%gain,fr%rn2,fr%bias,a,s2,v,nsb)
             else
                a = s1
             end if

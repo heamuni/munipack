@@ -150,6 +150,10 @@ munipack kombine [..] files
     Kombine computes the average by arithmetic mean per every single pixel.
     By default, the average is computed by robust mean, giving the brilliant
     look of results, yet both significantly slower and memory consuming.
+    The robust mean of a few values of a sky of a few photons per pixel is
+    biased low (eight QUVIK-like frames, 0.39 e-/pixel, gain 0.1 e-/ADU:
+    −0.033 e-/pixel, −8.5%) and differently for stars and sky; use
+    <samp>--arith</samp> for photometry of such frames.
   </dd>
 </dl>
 

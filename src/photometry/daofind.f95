@@ -38,13 +38,15 @@ module mdaofind
 
   logical, parameter, private :: debug = .false.
 
-  private :: centres, moments
+  private :: centres, moments, wingtest, saturated, qselect
 
 contains
 
   subroutine daofind (d, verbose, plog, hibad, skymod, skysig,  &
        fwhm, lothresh, threshold, shrplo, shrphi, rndlo, rndhi, readns, &
-       nstar, lobad, hmin )
+       nstar, lobad, hmin, gain )
+
+  use iso_fortran_env, only: REAL64
 
   implicit none
 
@@ -54,6 +56,9 @@ contains
        readns, lothresh, threshold, skymod, skysig
   integer, intent(out) :: nstar
   real, intent(out) :: lobad, hmin
+  ! the gain [e-/ADU] of the frame, optional (for the photon noise
+  ! of the light of stars)
+  real(REAL64), intent(in), optional :: gain
 
   ! Gain: DAOPHOT scales data on-the-fly by the parameter,
   ! while Munipack assumes that the data has already gain correction done.
@@ -151,6 +156,11 @@ contains
 ! data(2), opt(nopt)
 !  real, dimension(:,:), allocatable :: g
   logical, dimension(:,:), allocatable :: skip
+  ! the candidates: x, y, height, sharp, round, ecc, incl
+  real, dimension(:,:), allocatable :: cand, ctmp
+  logical, dimension(:), allocatable :: accept
+  integer :: ncand
+  real :: wgain
 !
 ! Variables
 !
@@ -705,6 +715,8 @@ contains
 ! counter.
 !
   nstar = 0
+  ncand = 0
+  allocate(cand(7,1000))
 
   do jy = 1, nrow
 
@@ -1030,28 +1042,16 @@ contains
         call moments(d,jx,jy,nbox,middle,skymod,lobad,hibad,xcen,ycen,shape,ecc,incl)
 
 !
-! the fully verified and located star may now be dignified with its own
-! ID number.
+! the fully verified and located star is a candidate; the candidates
+! explained by the light of a brighter star are rejected below.
 !
-3190    nstar = nstar + 1
-
-!        height = -2.5*log10(height/hmin)
-        height = height / max(hmin,1.0)
-
-!!!!!!        if (watch > 0.5) then
-        if( verbose ) then
-           write (*,"(12X, I5, 2F7.1, 2x,1pg9.3, 0p2F9.2)") &
-                nstar, xcen, ycen, height, sharp, round
-        endif
-!!!!!!
-!        write (3,"(I6, 14F9.3)") nstar, xcen, ycen, height, sharp, round
-!!!!!!
-
-        ! the data are saved to the scratch file and re-read later
-        write(3) xcen, ycen, height, sharp, round, ecc, incl
-
-        if( plog ) write(*,'(a,i0,1x,2(f0.3,1x))') '=FIND> ',nstar,xcen,ycen
-!        if( verbose ) write(*,*) nstar,xcen,ycen
+3190    ncand = ncand + 1
+        if( ncand > size(cand,2) ) then
+           allocate(ctmp(size(cand,1),2*size(cand,2)))
+           ctmp(:,1:size(cand,2)) = cand
+           call move_alloc(ctmp,cand)
+        end if
+        cand(:,ncand) = [xcen, ycen, height, sharp, round, ecc, incl]
 
 3200    continue
 !
@@ -1075,6 +1075,63 @@ contains
 !
 !-----------------------------------------------------------------------
 !
+! SECTION 3b
+!
+! A bright star with extended wings (a halo, a broad PSF, a saturated
+! core) produces local maxima of the brightness enhancement in its wings:
+! the wings carry the noise of their light, far above the noise of the
+! sky that sets the threshold, and their curvature adds a positive
+! enhancement. A candidate within the reach of a brighter one (twice at
+! least, or of a saturated area) is kept only when its enhancement
+! exceeds the enhancement of the brighter star's wing at the same
+! distance (the median over the annulus around the brighter star, its
+! radial trend removed) by the threshold times the noise of the wing:
+! the noise of the sky raised by the photon noise of the light of the
+! wing (with the gain), or the scatter of the enhancement over the
+! annulus (without it); the noise of the sky at least. The annulus
+! follows the actual profile of the star, with no PSF model; on the
+! sky alone the test is the usual threshold.
+!
+  wgain = -1
+  if( present(gain) ) wgain = real(gain)
+  allocate(accept(ncand))
+  call wingtest(d,h,hibad,skymod,ssig,wgain,cand(:,1:ncand),fwhm, &
+       threshold,relerr*ssig,nhalf,accept)
+
+  do n = 1, ncand
+     if( .not. accept(n) ) cycle
+     xcen = cand(1,n)
+     ycen = cand(2,n)
+     sharp = cand(4,n)
+     round = cand(5,n)
+     ecc = cand(6,n)
+     incl = cand(7,n)
+
+!
+! the fully verified and located star may now be dignified with its own
+! ID number.
+!
+     nstar = nstar + 1
+
+!        height = -2.5*log10(height/hmin)
+     height = cand(3,n) / max(hmin,1.0)
+
+!!!!!!        if (watch > 0.5) then
+     if( verbose ) then
+        write (*,"(12X, I5, 2F7.1, 2x,1pg9.3, 0p2F9.2)") &
+             nstar, xcen, ycen, height, sharp, round
+     endif
+
+     ! the data are saved to the scratch file and re-read later
+     write(3) xcen, ycen, height, sharp, round, ecc, incl
+
+     if( plog ) write(*,'(a,i0,1x,2(f0.3,1x))') '=FIND> ',nstar,xcen,ycen
+  end do
+  if( debug ) write(*,*) 'Candidates:',ncand,' rejected in wings:',ncand - nstar
+
+!
+!-----------------------------------------------------------------------
+!
 ! SECTION 4
 !
 ! Find out whether the user is happy.  If so, delete the scratch picture
@@ -1093,10 +1150,220 @@ contains
 ! Normal return.
 !
 
-      deallocate(h,g,skip)
+      deallocate(h,g,skip,cand,accept)
 
     end subroutine daofind
 
+
+    subroutine wingtest(d,h,hibad,skymod,ssig,gain,cand,fwhm,threshold, &
+         hsig,nhalf,accept)
+
+      ! The candidates (cand(:,n): x, y, height, ..) explained by the wing
+      ! of a brighter candidate or of a saturated area are not accepted
+      ! (see SECTION 3b of daofind). h is the brightness enhancement,
+      ! hsig its noise on the sky (ssig the noise of a sky pixel, skymod
+      ! the sky), nhalf the half-size of the convolution box. With the
+      ! gain (gain > 0), the noise of the enhancement in the wing is
+      ! predicted by the light of the wing (the median of the annulus):
+      ! hsig*sqrt(1 + wing/(gain*ssig**2)); without it, by the scatter
+      ! of the enhancement over the annulus.
+
+      real, dimension(:,:), intent(in) :: d, h, cand
+      real, intent(in) :: hibad, skymod, ssig, gain, fwhm, threshold, hsig
+      integer, intent(in) :: nhalf
+      logical, dimension(:), intent(out) :: accept
+
+      ! the reach of the wings [FWHM], at least [pix]; the saturated
+      ! areas reach farther by their radius times
+      real, parameter :: reach = 8, reachmin = 20, reachsat = 3
+      ! the primary brighter by the factor, the smallest annulus [pix]
+      real, parameter :: bright = 2
+      integer, parameter :: minpix = 8
+      real, dimension(:,:), allocatable :: prim
+      real, dimension(:), allocatable :: a, dr, b
+      integer :: ncand, nsat, n, k, i, j, m, ncol, nrow, ir
+      real :: xc, yc, xp, yp, dist, r, rexcl, rmax, rlim, med, sig, hc, sr, &
+           slope, wing
+
+      ncand = size(cand,2)
+      ncol = size(h,1)
+      nrow = size(h,2)
+      accept = .true.
+      if( ncand == 0 ) return
+
+      ! the saturated areas (their pixels are not detected)
+      call saturated(d,hibad,prim,nsat)
+
+      ! the candidate's own enhancement is excluded from the annulus
+      rexcl = nhalf + 1.5
+      rlim = max(reach*fwhm,reachmin)
+      if( nsat > 0 ) rlim = rlim + reachsat*maxval(prim(3,1:nsat))
+      allocate(a(nint(16*(rlim + 3))),dr(nint(16*(rlim + 3))), &
+           b(nint(16*(rlim + 3))))
+
+      do n = 1, ncand
+         xc = cand(1,n)
+         yc = cand(2,n)
+         hc = cand(3,n)
+         do k = 1, nsat + ncand
+            if( k <= nsat ) then
+               xp = prim(1,k)
+               yp = prim(2,k)
+               rmax = max(reach*fwhm,reachmin) + reachsat*prim(3,k)
+            else
+               ! the candidates brighter twice at least (a comparable
+               ! neighbour cannot be explained by the wing)
+               if( k - nsat == n ) cycle
+               if( .not. (cand(3,k-nsat) > bright*hc) ) cycle
+               xp = cand(1,k-nsat)
+               yp = cand(2,k-nsat)
+               rmax = max(reach*fwhm,reachmin)
+            end if
+            dist = hypot(xc - xp,yc - yp)
+            if( dist > rmax .or. dist < 1 ) cycle
+
+            ! the enhancement over the annulus dist +- 1 around the
+            ! primary, except near the candidate; its radial trend
+            ! (a line in r - dist) is removed, so the steep inner wings
+            ! do not add to the scatter
+            m = 0
+            ir = ceiling(dist + 2)
+            do j = max(1,nint(yp) - ir), min(nrow,nint(yp) + ir)
+               do i = max(1,nint(xp) - ir), min(ncol,nint(xp) + ir)
+                  r = hypot(i - xp,j - yp)
+                  if( abs(r - dist) > 1 ) cycle
+                  if( hypot(i - xc,j - yc) < rexcl ) cycle
+                  if( d(i,j) >= hibad ) cycle
+                  if( m == size(a) ) cycle
+                  m = m + 1
+                  a(m) = h(i,j)
+                  b(m) = d(i,j)
+                  dr(m) = r - dist
+               end do
+            end do
+            if( m < minpix ) cycle
+            ! the line by least squares, then the median and the scatter
+            ! (MAD) of the residuals
+            sr = sum(dr(1:m)) / m
+            slope = sum((dr(1:m) - sr)**2)
+            if( slope > 0 ) then
+               slope = sum((dr(1:m) - sr)*a(1:m)) / slope
+            end if
+            a(1:m) = a(1:m) - slope*dr(1:m)
+            med = qselect(a(1:m),(m + 1)/2)
+            a(1:m) = abs(a(1:m) - med)
+            sig = 1.4826*qselect(a(1:m),(m + 1)/2)
+            ! the scatter: the noise predicted by the light of the wing
+            ! (the structure of the wing over the annulus, as the pixel
+            ! phase of a sharp core, is not noise) or, without the gain,
+            ! the scatter over the annulus
+            if( gain > 0 ) then
+               wing = qselect(b(1:m),(m + 1)/2) - skymod
+               sig = hsig*sqrt(1 + max(wing,0.0)/(gain*ssig**2))
+            end if
+            if( hc - med < threshold*max(sig,hsig) ) then
+               accept(n) = .false.
+               exit
+            end if
+         end do
+      end do
+
+    end subroutine wingtest
+
+    subroutine saturated(d,hibad,prim,nsat)
+
+      ! the saturated areas (8-connected pixels >= hibad): their centres
+      ! and radii (of the circle of the same area) in prim(1:3,:)
+
+      real, dimension(:,:), intent(in) :: d
+      real, intent(in) :: hibad
+      real, dimension(:,:), allocatable, intent(out) :: prim
+      integer, intent(out) :: nsat
+
+      logical, dimension(:,:), allocatable :: seen
+      integer, dimension(:,:), allocatable :: stack
+      integer :: i, j, k, l, ii, jj, ns, npix, ncol, nrow, nbad
+      real :: sx, sy
+
+      ncol = size(d,1)
+      nrow = size(d,2)
+      nsat = 0
+      nbad = count(d >= hibad)
+      allocate(prim(3,nbad))
+      if( nbad == 0 ) return
+      allocate(seen(ncol,nrow),stack(2,nbad))
+      seen = .false.
+      do j = 1, nrow
+         do i = 1, ncol
+            if( seen(i,j) .or. d(i,j) < hibad ) cycle
+            ! flood fill
+            ns = 1
+            stack(:,1) = [i,j]
+            seen(i,j) = .true.
+            npix = 0
+            sx = 0
+            sy = 0
+            do while( ns > 0 )
+               ii = stack(1,ns)
+               jj = stack(2,ns)
+               ns = ns - 1
+               npix = npix + 1
+               sx = sx + ii
+               sy = sy + jj
+               do l = max(1,jj-1), min(nrow,jj+1)
+                  do k = max(1,ii-1), min(ncol,ii+1)
+                     if( .not. seen(k,l) .and. d(k,l) >= hibad ) then
+                        seen(k,l) = .true.
+                        ns = ns + 1
+                        stack(:,ns) = [k,l]
+                     end if
+                  end do
+               end do
+            end do
+            nsat = nsat + 1
+            prim(:,nsat) = [sx/npix, sy/npix, sqrt(npix/3.14159265)]
+         end do
+      end do
+
+    end subroutine saturated
+
+    real function qselect(a,k) result(x)
+
+      ! the k-th smallest element of a (Hoare's selection; a is reordered)
+
+      real, dimension(:), intent(in out) :: a
+      integer, intent(in) :: k
+      real :: p, tmp
+      integer :: l, r, i, j
+
+      l = 1
+      r = size(a)
+      do while( l < r )
+         p = a((l + r) / 2)
+         i = l
+         j = r
+         do
+            do while( a(i) < p )
+               i = i + 1
+            end do
+            do while( p < a(j) )
+               j = j - 1
+            end do
+            if( i <= j ) then
+               tmp = a(i)
+               a(i) = a(j)
+               a(j) = tmp
+               i = i + 1
+               j = j - 1
+            end if
+            if( i > j ) exit
+         end do
+         if( j < k ) l = i
+         if( k < i ) r = j
+      end do
+      x = a(k)
+
+    end function qselect
 
     subroutine centres(d,jx,jy,nbox,middle,skymod,lobad,hibad,xcen,ycen)
 

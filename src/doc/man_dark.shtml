@@ -38,6 +38,10 @@ input images <i>(I<sub>k</sub>)<sub>ij</sub></i>:
 </p>
 <p>
   where <i>i,j</i> is an index of a pixel and <i>k</i> is an index of an image.
+  The average is the robust mean: on dark frames of a few electrons per
+  pixel (a skewed, discrete distribution) it is biased low (ten QUVIK-like
+  frames, 0.13 e- of dark per pixel, gain 0.1 e-/ADU: −0.024 e-/pixel,
+  about −15% of the dark signal).
   The bias frame <i>B<sub>ij</sub></i> is optional.
 When one is available, one is subtracted from dark exposures before averaging.
 </p>

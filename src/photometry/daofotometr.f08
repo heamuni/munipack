@@ -47,10 +47,10 @@ module daofotometr
 contains
 
   subroutine  daophotsb (d,derr,xstar,ystar,raper,ring,ecc,incl,lobad,hibad,&
-       verbose,plog,apcts,apcts_err,skystar,skystar_err)
+       verbose,plog,apcts,apcts_err,skystar,skystar_err,gain,rn2,bias,rmask)
 
     use iso_fortran_env
-    use oakleaf
+    use skymean
 
     implicit none
 
@@ -60,6 +60,13 @@ contains
     real, dimension(:), intent(out) :: skystar,skystar_err
     real, intent(in) :: lobad, hibad, ecc, incl
     logical, intent(in) :: verbose, plog
+    ! the noise model of the frame for the sky (gain [e-/ADU], read noise
+    ! squared [ADU**2], bias [ADU]); without it, the sky is clipped
+    ! by the scatter of the data only
+    real(dbl), intent(in), optional :: gain, rn2, bias
+    ! the radii of the masks of the stars [pix]: the sky ring of a star
+    ! leaves out the pixels inside the masks of the other stars
+    real, dimension(:), intent(in), optional :: rmask
 
 !
 !=======================================================================
@@ -100,12 +107,15 @@ contains
 ! MAXAP  the maximum number of star apertures allowed.
 !
     real(dbl), dimension(size(raper)) :: area, apsum
-    real, dimension(:), allocatable :: sky, dsky
+    real(dbl), dimension(:), allocatable :: sky, skyall
+    integer(int16), dimension(:,:), allocatable :: cover
     real, dimension(3) :: error
     real :: skymod, skysig, sigsq, skyvar, skyerr, datum, r, rsq, fractn, &
          edge, apmxsq, rout, dysq, xc, yc, e,c,s,sqrte,x,y,phi,q,rin
+    real(dbl) :: g, rn, b, smean, serr, ssig
     integer :: i, j, k, n, naper, nstar, lx, ly, nx, ny, mx, my, &
-         nsky, ncol, nrow, iflag
+         nsky, nall, ncol, nrow, iflag, nused, ncover
+    logical :: masking
 
     skystar = -1
     skystar_err = -1
@@ -139,7 +149,19 @@ contains
 ! sky buffers allocation
 !
     nsky = int(max(pi*((ring(2)+1)**2 - ring(1)**2),1.5))
-    allocate(sky(nsky),dsky(nsky))
+    allocate(sky(nsky),skyall(nsky))
+
+    ! the noise model
+    g = -1
+    rn = 0
+    b = 0
+    if( present(gain) ) g = gain
+    if( present(rn2) ) rn = rn2
+    if( present(bias) ) b = bias
+
+    ! the masks: the number of stars covering a pixel
+    masking = present(rmask)
+    if( masking ) call starmask(xstar,ystar,rmask,ncol,nrow,cover)
 
 !
 ! NAPER   is the number of apertures, whose radii are stored in
@@ -217,6 +239,7 @@ contains
 ! Now read through the submatrix, picking out the data we want.
 !
        nsky = 0
+       nall = 0
        do  j = ly, my
           dysq = (j - yc)**2
           do i = lx,mx
@@ -232,9 +255,20 @@ contains
 !           write(*,*) r,rin,rout,datum,lobad,hibad
              if( rin <= r .and. r <= rout .and. &
                   lobad <= datum .and. datum < hibad ) then
-                nsky = nsky + 1
-                sky(nsky) = datum
-                dsky(nsky) = derr(i,j)
+                nall = nall + 1
+                skyall(nall) = datum
+                ncover = 0
+                if( masking ) then
+                   ! covered by another star? (the star's own mask is
+                   ! subtracted by the same test as in starmask)
+                   ncover = cover(i,j)
+                   if( (i - xc)**2 + (j - yc)**2 < rmask(n)**2 ) &
+                        ncover = ncover - 1
+                end if
+                if( ncover == 0 ) then
+                   nsky = nsky + 1
+                   sky(nsky) = datum
+                end if
              endif
 !
 ! The inclusion of partial pixels inside the aperture is done as
@@ -292,6 +326,12 @@ contains
 ! limits have already been eliminated.  Now sort SKY to place the
 ! pixels in order of increasing brightness.
 !
+       ! too much of the ring masked (a crowded field): all the ring
+       if( masking .and. nsky < max(minsky,nall/4) ) then
+          nsky = nall
+          sky(1:nsky) = skyall(1:nall)
+       end if
+
        if (nsky < minsky)  then
           write(error_unit,*) "There aren't enough pixels in the sky annulus."
           write(error_unit,*) 'Object at coordinates:',xc,yc
@@ -301,12 +341,15 @@ contains
           goto 3333
        end if
 !
-! Obtain the mode, standard deviation, and skewness of the peak in the
-! sky histogram.
-       !
-
-       call rmean(sky(1:nsky),skymod,skyerr,skysig,flag=iflag)
-!       write(*,*) '*',n,nsky,skymod,skyerr,skysig,iflag
+! The mean of the sky (not the mode: the aperture sums the sky pixels),
+! clipped against stars, cosmics and bad pixels (see skymean).
+!
+       call sky_mean(sky(1:nsky),g,rn,b,smean,serr,ssig,nused)
+       skymod = real(smean)
+       skyerr = real(serr)
+       skysig = real(ssig)
+       iflag = 0
+       if( nused < minsky ) iflag = 5
 
        skyvar = skysig**2
        sigsq = skyerr**2    ! equivalent of: sigsq = skyvar/nsky
@@ -389,9 +432,255 @@ contains
 !
 
     if( verbose ) write(*,"(a,i0,a)") " Found ",nstar," star(s)."
-    deallocate(sky,dsky)
+    deallocate(sky,skyall)
 
   end subroutine daophotsb
+
+  subroutine daocontam(xstar,ystar,raper,rmask,apcts,apcts_err,ncont)
+
+    ! The apertures contaminated by the light of a brighter neighbour
+    ! (by more than three times their error) are invalidated (-1): a
+    ! faint star a few pixels from a bright one keeps its light in the
+    ! aperture. The light of the neighbour m in the aperture of the
+    ! radius a of the star n at the distance d is estimated by the growth
+    ! curve of m (its apertures, linear in the area between them): the
+    ! light of m in the annulus d-a .. d+a times the fraction of the
+    ! annulus the aperture covers, at least the light of m inside a-d
+    ! (the aperture over the centre of m). The estimate must be
+    ! significant too (three times its error by the errors of m's
+    ! apertures): the growth curves of faint detections are noise.
+    ! A neighbour without valid apertures (saturated, at the border)
+    ! contaminates the apertures reaching its mask. ncont is the number
+    ! of invalidated apertures.
+
+    real, dimension(:), intent(in) :: xstar, ystar, raper, rmask
+    real, dimension(:,:), intent(in out) :: apcts, apcts_err
+    integer, intent(out) :: ncont
+
+    real, parameter :: pi = 3.14159265358979
+    real, parameter :: kappa = 3
+    real, dimension(:,:), allocatable :: g, ge
+    real, dimension(:), allocatable :: bright, rcurve
+    integer, dimension(:), allocatable :: nval
+    integer :: n, m, k, nstar, naper, kref
+    real :: d, a, rlo, rhi, c, e, f, reach
+
+    nstar = size(xstar)
+    naper = size(raper)
+    ncont = 0
+    if( nstar < 2 .or. naper < 1 ) return
+
+    ! the growth curves (a copy: the flags do not change them), valid
+    ! from the first aperture to the last valid one in a row
+    allocate(g(nstar,naper),nval(nstar),bright(nstar),rcurve(nstar))
+    g = apcts
+    ge = apcts_err
+    do n = 1, nstar
+       nval(n) = 0
+       do k = 1, naper
+          if( .not. (g(n,k) > 0 .and. apcts_err(n,k) > 0) ) exit
+          nval(n) = k
+       end do
+    end do
+
+    ! the brightness: the counts in the aperture nearest to 2 pix
+    kref = minloc(abs(raper - 2),1)
+    do n = 1, nstar
+       if( nval(n) >= kref ) then
+          bright(n) = g(n,kref)
+       else if( nval(n) > 0 ) then
+          bright(n) = g(n,nval(n))
+       else
+          ! no valid aperture: saturated (or at the border)
+          bright(n) = huge(1.0)
+       end if
+       if( nval(n) > 0 ) then
+          rcurve(n) = raper(nval(n))
+       else
+          rcurve(n) = rmask(n)
+       end if
+    end do
+    reach = raper(naper) + max(maxval(rcurve),maxval(rmask))
+
+    do n = 1, nstar
+       if( nval(n) == 0 ) cycle
+       do m = 1, nstar
+          if( m == n .or. .not. (bright(m) > bright(n)) ) cycle
+          if( abs(xstar(m) - xstar(n)) > reach .or. &
+               abs(ystar(m) - ystar(n)) > reach ) cycle
+          d = hypot(xstar(m) - xstar(n),ystar(m) - ystar(n))
+          do k = 1, naper
+             if( .not. (apcts(n,k) > 0 .and. apcts_err(n,k) > 0) ) cycle
+             a = raper(k)
+             if( nval(m) == 0 ) then
+                ! a saturated neighbour: its mask
+                if( d - a < rmask(m) ) then
+                   apcts(n,k) = -1
+                   apcts_err(n,k) = -1
+                   ncont = ncont + 1
+                end if
+                cycle
+             end if
+             rlo = max(d - a,0.0)
+             rhi = d + a
+             if( rlo >= rcurve(m) ) cycle
+             f = min(a**2 / (rhi**2 - rlo**2),1.0)
+             c = (curve(m,rhi) - curve(m,rlo)) * f
+             e = curverr(m,rhi) * f
+             if( a > d ) then
+                c = max(c,curve(m,a - d))
+                e = max(e,curverr(m,a - d))
+             end if
+             if( c > kappa*apcts_err(n,k) .and. c > kappa*e ) then
+                apcts(n,k) = -1
+                apcts_err(n,k) = -1
+                ncont = ncont + 1
+             end if
+          end do
+       end do
+    end do
+
+  contains
+
+    real function curve(m,r)
+
+      ! the growth curve of the star m at the radius r: linear in r**2
+      ! between the apertures, from zero at the centre, constant beyond
+      ! the last valid aperture
+
+      integer, intent(in) :: m
+      real, intent(in) :: r
+      integer :: k
+      real :: r1, g1
+
+      curve = g(m,nval(m))
+      r1 = 0
+      g1 = 0
+      do k = 1, nval(m)
+         if( r <= raper(k) ) then
+            curve = g1 + (g(m,k) - g1)*(r**2 - r1**2) / (raper(k)**2 - r1**2)
+            return
+         end if
+         r1 = raper(k)
+         g1 = g(m,k)
+      end do
+
+    end function curve
+
+    real function curverr(m,r)
+
+      ! the error of the growth curve of the star m at the radius r:
+      ! the error of the aperture enclosing r (the last valid one beyond)
+
+      integer, intent(in) :: m
+      real, intent(in) :: r
+      integer :: k
+
+      curverr = ge(m,nval(m))
+      do k = 1, nval(m)
+         if( r <= raper(k) ) then
+            curverr = ge(m,k)
+            return
+         end if
+      end do
+
+    end function curverr
+
+  end subroutine daocontam
+
+  subroutine starmask(xstar,ystar,rmask,ncol,nrow,cover)
+
+    ! the number of the stars whose masks (discs of the radius rmask
+    ! centred at the stars) cover a pixel
+
+    use iso_fortran_env, only: int16
+
+    real, dimension(:), intent(in) :: xstar, ystar, rmask
+    integer, intent(in) :: ncol, nrow
+    integer(int16), dimension(:,:), allocatable, intent(out) :: cover
+    integer :: i, j, n
+
+    allocate(cover(ncol,nrow))
+    cover = 0
+    do n = 1, size(xstar)
+       do j = max(1,int(ystar(n) - rmask(n)) - 1), &
+            min(nrow,int(ystar(n) + rmask(n)) + 1)
+          do i = max(1,int(xstar(n) - rmask(n)) - 1), &
+               min(ncol,int(xstar(n) + rmask(n)) + 1)
+             if( (i - xstar(n))**2 + (j - ystar(n))**2 < rmask(n)**2 ) &
+                  cover(i,j) = min(cover(i,j) + 1_int16,huge(cover))
+          end do
+       end do
+    end do
+
+  end subroutine starmask
+
+  subroutine daomaskrad(d,xstar,ystar,lobad,hibad,gain,rn2,bias,rmax,rmask)
+
+    ! The radii of the masks of stars: the light of a star is followed
+    ! outwards by the mean of annuli 1 pixel wide while it is above the sky
+    ! by 2 standard errors of the mean (by the scatter of the sky); the
+    ! mask is one pixel larger. The sky and its scatter are of the whole
+    ! frame. Saturated pixels count as bright. So the radius follows the
+    ! actual profile and brightness (faint stars get small masks, bright,
+    ! saturated stars and extended halos large ones), at most rmax.
+
+    use skymean
+
+    real, dimension(:,:), intent(in) :: d
+    real, dimension(:), intent(in) :: xstar, ystar
+    real, intent(in) :: lobad, hibad, rmax
+    real(dbl), intent(in) :: gain, rn2, bias
+    real, dimension(:), intent(out) :: rmask
+
+    integer, parameter :: nsamp = 250000
+    real(dbl), dimension(:), allocatable :: s
+    real(dbl), dimension(:), allocatable :: asum
+    integer, dimension(:), allocatable :: acnt
+    real(dbl) :: sky, skyerr, skysig, rr
+    integer :: ncol, nrow, nstep, n, i, j, k, nused, kmax
+
+    ncol = size(d,1)
+    nrow = size(d,2)
+
+    ! the sky of the frame by a sample of pixels
+    nstep = max(int(sqrt(real(ncol)*real(nrow)/nsamp)),1)
+    s = pack(real(d(1:ncol:nstep,1:nrow:nstep),dbl), &
+         lobad <= d(1:ncol:nstep,1:nrow:nstep) .and. &
+         d(1:ncol:nstep,1:nrow:nstep) < hibad)
+    call sky_mean(s,gain,rn2,bias,sky,skyerr,skysig,nused)
+
+    kmax = max(int(rmax),1)
+    allocate(asum(0:kmax+1),acnt(0:kmax+1))
+    do n = 1, size(xstar)
+       asum = 0
+       acnt = 0
+       do j = max(1,int(ystar(n)) - kmax - 1), min(nrow,int(ystar(n)) + kmax + 1)
+          do i = max(1,int(xstar(n)) - kmax - 1), min(ncol,int(xstar(n)) + kmax + 1)
+             rr = hypot(real(i - xstar(n),dbl),real(j - ystar(n),dbl))
+             k = nint(rr)
+             if( k > kmax ) cycle
+             if( d(i,j) >= hibad ) then
+                asum(k) = asum(k) + huge(1.0)
+                acnt(k) = acnt(k) + 1
+             else if( d(i,j) >= lobad ) then
+                asum(k) = asum(k) + (d(i,j) - sky)
+                acnt(k) = acnt(k) + 1
+             end if
+          end do
+       end do
+       rmask(n) = rmax
+       do k = 1, kmax
+          if( acnt(k) > 0 ) then
+             if( asum(k) / acnt(k) < 2*skysig/sqrt(real(acnt(k),dbl)) ) then
+                rmask(n) = min(k + 1.0,rmax)
+                exit
+             end if
+          end if
+       end do
+    end do
+
+  end subroutine daomaskrad
 
   subroutine daoapee(n,psf,i0,j0,xc,yc,raper,ecc,incl,ee)
 
