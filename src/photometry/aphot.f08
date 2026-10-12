@@ -244,6 +244,7 @@ contains
     real(REAL64), dimension(:,:), allocatable :: ee, eeerr
     real(REAL64) :: scale, gain, ngain, nrn2, nbias
     real, dimension(:), allocatable :: rmask
+    integer :: ncont
     integer, dimension(2) :: naxes
     type(EEDescr) :: desc
     logical :: eeok
@@ -273,6 +274,11 @@ contains
          rmask)
     call daophotsb(data,stderr,xcens,ycens,raper,ring,ecc,incl,lobad,hibad, &
          verbose,plog,apcts,apcts_err,sky,sky_err,ngain,nrn2,nbias,rmask)
+
+    ! the apertures contaminated by brighter neighbours are invalid
+    call daocontam(xcens,ycens,raper,rmask,apcts,apcts_err,ncont)
+    if( verbose ) write(*,'(a,i0,a)') ' Apertures contaminated by neighbours: ',&
+         ncont,' (invalidated).'
 
     ! estimate of width parameter for Gaussian
     call estim_hwhm(data,xcens,ycens,sky,fwhm,lobad,hibad,hwhm)
@@ -383,7 +389,7 @@ contains
     real, dimension(:), allocatable :: rmask
     real :: lobad, hibad, saturate, skyavg,skyerr,skysig
     real(REAL64) :: ngain, nrn2, nbias
-    integer :: i, nrow, nstep, status
+    integer :: i, nrow, nstep, status, ncont
 
     status = 0
     call fits_aphot_image(filename,fkeys,data,stderr,saturate,status)
@@ -440,6 +446,7 @@ contains
     call daophotsb(data,stderr,xstar,ystar,raper,ring,ecc_par,incl_par, &
          lobad,hibad,verbose,plog,apcts,apcts_err,sky,sky_err, &
          ngain,nrn2,nbias,rmask)
+    call daocontam(xstar,ystar,raper,rmask,apcts,apcts_err,ncont)
 
     do i = 1, nrow
        write(*,*) '=BYHAND> ',i,xstar(i),ystar(i),sky(i),sky_err(i), &

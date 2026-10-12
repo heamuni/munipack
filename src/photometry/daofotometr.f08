@@ -436,6 +436,158 @@ contains
 
   end subroutine daophotsb
 
+  subroutine daocontam(xstar,ystar,raper,rmask,apcts,apcts_err,ncont)
+
+    ! The apertures contaminated by the light of a brighter neighbour
+    ! (by more than three times their error) are invalidated (-1): a
+    ! faint star a few pixels from a bright one keeps its light in the
+    ! aperture. The light of the neighbour m in the aperture of the
+    ! radius a of the star n at the distance d is estimated by the growth
+    ! curve of m (its apertures, linear in the area between them): the
+    ! light of m in the annulus d-a .. d+a times the fraction of the
+    ! annulus the aperture covers, at least the light of m inside a-d
+    ! (the aperture over the centre of m). The estimate must be
+    ! significant too (three times its error by the errors of m's
+    ! apertures): the growth curves of faint detections are noise.
+    ! A neighbour without valid apertures (saturated, at the border)
+    ! contaminates the apertures reaching its mask. ncont is the number
+    ! of invalidated apertures.
+
+    real, dimension(:), intent(in) :: xstar, ystar, raper, rmask
+    real, dimension(:,:), intent(in out) :: apcts, apcts_err
+    integer, intent(out) :: ncont
+
+    real, parameter :: pi = 3.14159265358979
+    real, parameter :: kappa = 3
+    real, dimension(:,:), allocatable :: g, ge
+    real, dimension(:), allocatable :: bright, rcurve
+    integer, dimension(:), allocatable :: nval
+    integer :: n, m, k, nstar, naper, kref
+    real :: d, a, rlo, rhi, c, e, f, reach
+
+    nstar = size(xstar)
+    naper = size(raper)
+    ncont = 0
+    if( nstar < 2 .or. naper < 1 ) return
+
+    ! the growth curves (a copy: the flags do not change them), valid
+    ! from the first aperture to the last valid one in a row
+    allocate(g(nstar,naper),nval(nstar),bright(nstar),rcurve(nstar))
+    g = apcts
+    ge = apcts_err
+    do n = 1, nstar
+       nval(n) = 0
+       do k = 1, naper
+          if( .not. (g(n,k) > 0 .and. apcts_err(n,k) > 0) ) exit
+          nval(n) = k
+       end do
+    end do
+
+    ! the brightness: the counts in the aperture nearest to 2 pix
+    kref = minloc(abs(raper - 2),1)
+    do n = 1, nstar
+       if( nval(n) >= kref ) then
+          bright(n) = g(n,kref)
+       else if( nval(n) > 0 ) then
+          bright(n) = g(n,nval(n))
+       else
+          ! no valid aperture: saturated (or at the border)
+          bright(n) = huge(1.0)
+       end if
+       if( nval(n) > 0 ) then
+          rcurve(n) = raper(nval(n))
+       else
+          rcurve(n) = rmask(n)
+       end if
+    end do
+    reach = raper(naper) + max(maxval(rcurve),maxval(rmask))
+
+    do n = 1, nstar
+       if( nval(n) == 0 ) cycle
+       do m = 1, nstar
+          if( m == n .or. .not. (bright(m) > bright(n)) ) cycle
+          if( abs(xstar(m) - xstar(n)) > reach .or. &
+               abs(ystar(m) - ystar(n)) > reach ) cycle
+          d = hypot(xstar(m) - xstar(n),ystar(m) - ystar(n))
+          do k = 1, naper
+             if( .not. (apcts(n,k) > 0 .and. apcts_err(n,k) > 0) ) cycle
+             a = raper(k)
+             if( nval(m) == 0 ) then
+                ! a saturated neighbour: its mask
+                if( d - a < rmask(m) ) then
+                   apcts(n,k) = -1
+                   apcts_err(n,k) = -1
+                   ncont = ncont + 1
+                end if
+                cycle
+             end if
+             rlo = max(d - a,0.0)
+             rhi = d + a
+             if( rlo >= rcurve(m) ) cycle
+             f = min(a**2 / (rhi**2 - rlo**2),1.0)
+             c = (curve(m,rhi) - curve(m,rlo)) * f
+             e = curverr(m,rhi) * f
+             if( a > d ) then
+                c = max(c,curve(m,a - d))
+                e = max(e,curverr(m,a - d))
+             end if
+             if( c > kappa*apcts_err(n,k) .and. c > kappa*e ) then
+                apcts(n,k) = -1
+                apcts_err(n,k) = -1
+                ncont = ncont + 1
+             end if
+          end do
+       end do
+    end do
+
+  contains
+
+    real function curve(m,r)
+
+      ! the growth curve of the star m at the radius r: linear in r**2
+      ! between the apertures, from zero at the centre, constant beyond
+      ! the last valid aperture
+
+      integer, intent(in) :: m
+      real, intent(in) :: r
+      integer :: k
+      real :: r1, g1
+
+      curve = g(m,nval(m))
+      r1 = 0
+      g1 = 0
+      do k = 1, nval(m)
+         if( r <= raper(k) ) then
+            curve = g1 + (g(m,k) - g1)*(r**2 - r1**2) / (raper(k)**2 - r1**2)
+            return
+         end if
+         r1 = raper(k)
+         g1 = g(m,k)
+      end do
+
+    end function curve
+
+    real function curverr(m,r)
+
+      ! the error of the growth curve of the star m at the radius r:
+      ! the error of the aperture enclosing r (the last valid one beyond)
+
+      integer, intent(in) :: m
+      real, intent(in) :: r
+      integer :: k
+
+      curverr = ge(m,nval(m))
+      do k = 1, nval(m)
+         if( r <= raper(k) ) then
+            curverr = ge(m,k)
+            return
+         end if
+      end do
+
+    end function curverr
+
+  end subroutine daocontam
+
   subroutine starmask(xstar,ystar,rmask,ncol,nrow,cover)
 
     ! the number of the stars whose masks (discs of the radius rmask
