@@ -600,7 +600,11 @@ contains
 
   subroutine readframes(filenames,keys,filters_ref,photosys,threshold, &
        maxerr,ra,dec,cts,dcts,utol,exptime,area,filter,tol,init_area, &
-       saper,aper,verbose,status)
+       saper,aper,verbose,status,forder)
+
+    ! The frames are arranged by the order of the filters in filters_ref
+    ! (the filters of the photometry system); forder (optional) gives
+    ! the index of the n-th frame in filenames.
 
     character(len=*), dimension(:), intent(in) :: filenames,keys,filters_ref
     character(len=*), intent(out) :: photosys
@@ -614,6 +618,7 @@ contains
     real(dbl), dimension(:), allocatable, intent(out) :: aper
     logical, intent(in) :: verbose
     integer, intent(out) :: status
+    integer, dimension(:), allocatable, intent(out), optional :: forder
 
     real(dbl) :: ftol
     integer :: n, nd, nfiles!, i, j
@@ -673,7 +678,7 @@ contains
             init_area,saper,aper(n),verbose,status)
 
        if( status /= 0 ) then
-          write(error_unit,*) "File: `",trim(filenames(n)),"'"
+          write(error_unit,*) "File: `",trim(filenames(order(n))),"'"
           stop 'Failed to read a frame.'
        end if
 
@@ -701,6 +706,9 @@ contains
        deallocate(qra,qdec,dn,ddn)
 
     end do
+    if( present(forder) ) then
+       allocate(forder,source=order)
+    end if
     deallocate(order)
 
   end subroutine readframes
@@ -894,11 +902,17 @@ contains
 
   end subroutine readref
 
-  subroutine file_order(filenames,keys,filters_ref,order,maxdat)
+  subroutine file_order(filenames,keys,filters_ref,order,maxdat,filters)
+
+    ! order(n) is the index in filenames of the n-th frame arranged
+    ! by the order of filters_ref; filters (optional) are the filters
+    ! of the arranged frames
 
     character(len=*), dimension(:), intent(in) :: filenames,keys,filters_ref
     integer, dimension(:), allocatable, intent(out) :: order
     integer, intent(out), optional :: maxdat
+    character(len=FLEN_VALUE), dimension(:), allocatable, intent(out), &
+         optional :: filters
     character(len=FLEN_VALUE), dimension(:), allocatable :: filter
     integer, dimension(:), allocatable :: ndat
     integer :: i,j,n,status,nfiles,nfilters
@@ -944,6 +958,11 @@ contains
     if( present(maxdat) ) then
        ! array allocation dimension
        maxdat = maxval(ndat)
+    end if
+
+    if( present(filters) ) then
+       allocate(filters(nfiles))
+       filters = filter(order)
     end if
 
     deallocate(filter,ndat)
