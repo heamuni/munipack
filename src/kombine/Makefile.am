@@ -26,6 +26,6 @@ pkglibexec_PROGRAMS = kombine
 
 kombine_SOURCES = interpol.f08 fitskombi.f08 kombine.f08
 kombine_LDADD   = $(ldir)/libastrotrafo.a $(ldir)/libastrosphere.a \
-                  $(ldir)/libtitsio.a \
+                  $(ldir)/libtitsio.a $(ldir)/libclipmean.a \
                   $(LIBOAKLEAF) $(WCSLIB_LIBS) $(LIBCFITSIO) $(LIBM)
 # $(ldir)/libphio.a

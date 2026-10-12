@@ -27,26 +27,19 @@
 !  0.4 e-/pixel and the read noise 0.37 e- give -13% of the sky with the
 !  Hampel estimator of rmean (BUGS P23), -30% at 0.1 e-/pixel.
 !
-!  The estimator is the mean of the pixels inside the interval
+!  The estimator is the mean of the pixels clipped by the noise model of
+!  the detector (GAIN, READNS or RDNOISE, BIASLEV; lib/clipmean.f08,
+!  shared with kombine and dark): the interval
 !
 !     t - k*sig  <=  x  <=  t + q + sqrt(q**2 + (k*sig)**2),
 !
 !  iterated from the median; t is the current mean, k = 5, and sig is
 !  the larger of the observed scatter of the pixels inside the interval
 !  and the expected one by the noise model of the detector (when the gain
-!  is given), sqrt((t - bias)/gain + readnoise**2) [ADU]. The upper limit
-!  is the Bernstein bound of the Poisson tail: the probability that a
-!  Poisson count exceeds its mean by more than q + sqrt(q**2 + (k*sig)**2),
-!  q = k**2/6 photo-electrons (= k**2/(6*gain) ADU), is below exp(-k**2/2),
-!  for any mean, even when sig is less than one electron (the median
-!  absolute deviation of such data is zero, the clipping by sig alone
-!  would reject every photon). So the sky photons are never clipped (the
-!  bias of the truncation is below 0.001 e- per pixel), while stars,
-!  cosmics and hot pixels, many sig above, are. The lower limit is k*sig
-!  (the lower tail of the Poisson distribution is shorter than Normal).
-!  The scatter by the data guards the clipping when the model is wrong
-!  (no gain, frames processed); the model guards it when the data have
-!  few distinct values.
+!  is given), sqrt((t - bias)/gain + readnoise**2) [ADU]; q = k**2/6
+!  photo-electrons (= k**2/(6*gain) ADU), the Bernstein bound of the
+!  Poisson tail, so the sky photons are never clipped, while stars,
+!  cosmics and hot pixels, many sig above, are.
 !
 !  Faint light within k*sig (the wings of neighbours) is not rejected:
 !  its pixels should be masked before (aphot masks the detected stars).
@@ -58,6 +51,7 @@ module skymean
 
   use iso_fortran_env
   use titsio
+  use clipmean, only: clip_kappa, clipped_mean
 
   implicit none
   private
@@ -65,9 +59,9 @@ module skymean
   integer, parameter :: dbl = REAL64
 
   ! the clipping [sigma]
-  real(dbl), parameter, public :: sky_kclip = 5
+  real(dbl), parameter, public :: sky_kclip = clip_kappa
 
-  public :: sky_mean, sky_select, sky_noise_model
+  public :: sky_mean, sky_noise_model
 
 contains
 
@@ -78,126 +72,24 @@ contains
     !      noise squared [ADU**2], bias [ADU] the pedestal of the frame
     ! mean, stderr, stdsig [ADU]: the mean, its standard error and
     !      the scatter of pixels; nused: the number of the pixels used
+    !      (stderr = stdsig = -1 without pixels)
 
     real(dbl), dimension(:), intent(in) :: s
     real(dbl), intent(in) :: gain, rn2, bias
     real(dbl), intent(out) :: mean, stderr, stdsig
     integer, intent(out) :: nused
 
-    integer, parameter :: maxit = 100
-    real(dbl), dimension(:), allocatable :: w
-    real(dbl) :: t, tnew, sig, var, q, lo, hi, k
-    integer :: n, m, mold, it
-
-    n = size(s)
-    k = sky_kclip
-    nused = n
-    if( n == 0 ) then
+    if( size(s) == 0 ) then
        mean = 0
        stderr = -1
        stdsig = -1
-       return
-    else if( n < 3 ) then
-       mean = sum(s) / n
-       stdsig = 0
-       if( n > 1 ) stdsig = sqrt(sum((s - mean)**2) / (n - 1))
-       stderr = stdsig / sqrt(real(n,dbl))
+       nused = 0
        return
     end if
 
-    ! the initial estimate: the median and the scatter by the median
-    ! absolute deviation (or by the model, when larger)
-    allocate(w(n))
-    w = s
-    t = sky_select(w,(n+1)/2)
-    w = abs(s - t)
-    sig = max(1.4826_dbl*sky_select(w,(n+1)/2),model(t))
-
-    ! one quantum: a photo-electron in ADU (1 ADU without the model)
-    if( gain > 0 ) then
-       q = k**2 / (6*gain)
-    else
-       q = k**2 / 6
-    end if
-
-    mold = -1
-    var = 0
-    do it = 1, maxit
-       lo = t - k*sig
-       hi = t + q + sqrt(q**2 + (k*sig)**2)
-       m = count(lo <= s .and. s <= hi)
-       if( m < 2 ) exit
-       tnew = sum(s, lo <= s .and. s <= hi) / m
-       var = sum((s - tnew)**2, lo <= s .and. s <= hi) / (m - 1)
-       sig = max(sqrt(var),model(tnew))
-       if( m == mold .and. abs(tnew - t) <= 1e-9_dbl*max(abs(t),sig) ) then
-          t = tnew
-          exit
-       end if
-       t = tnew
-       mold = m
-    end do
-
-    mean = t
-    nused = max(m,1)
-    stdsig = sqrt(var)
-    stderr = stdsig / sqrt(real(nused,dbl))
-
-  contains
-
-    real(dbl) function model(x)
-
-      ! the scatter of a pixel of the mean x by the noise model
-
-      real(dbl), intent(in) :: x
-
-      if( gain > 0 ) then
-         model = sqrt(max(x - bias,0.0_dbl)/gain + max(rn2,0.0_dbl))
-      else
-         model = 0
-      end if
-
-    end function model
+    call clipped_mean(s,[gain],[rn2],[bias],mean,stderr,stdsig,nused)
 
   end subroutine sky_mean
-
-  function sky_select(a,k) result(x)
-
-    ! the k-th smallest element of a (Hoare's selection; a is reordered)
-
-    real(dbl), dimension(:), intent(in out) :: a
-    integer, intent(in) :: k
-    real(dbl) :: x, p, tmp
-    integer :: l, r, i, j
-
-    l = 1
-    r = size(a)
-    do while( l < r )
-       p = a((l + r) / 2)
-       i = l
-       j = r
-       do
-          do while( a(i) < p )
-             i = i + 1
-          end do
-          do while( p < a(j) )
-             j = j - 1
-          end do
-          if( i <= j ) then
-             tmp = a(i)
-             a(i) = a(j)
-             a(j) = tmp
-             i = i + 1
-             j = j - 1
-          end if
-          if( i > j ) exit
-       end do
-       if( j < k ) l = i
-       if( k < i ) r = j
-    end do
-    x = a(k)
-
-  end function sky_select
 
   subroutine sky_noise_model(filename,gain,rn2,bias,status)
 

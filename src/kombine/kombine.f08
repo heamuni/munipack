@@ -23,6 +23,7 @@ program kombine
 
   use fitskombi
   use oakleaf
+  use clipmean
   use astrotrafo
   use titsio
   use iso_fortran_env
@@ -347,12 +348,15 @@ program kombine
     real(REAL64), dimension(:,:), allocatable :: alpha, delta
     real(REAL64), dimension(:), allocatable :: xgrid, ygrid
     real, dimension(:,:), allocatable :: img
-    real, dimension(:), allocatable :: fbuf, wexp, xgain, xrn2, xoff, wbuf
+    real, dimension(:), allocatable :: fbuf, wexp
+    real(REAL64), dimension(:), allocatable :: xgain, xrn2, xbias, vbuf, wbuf, &
+         gbuf, rbuf, bbuf
     real(REAL64), dimension(:,:), allocatable :: s0, s1, s2
+    real(REAL64) :: cmean, cerr, csig
     integer, dimension(:,:), allocatable :: ncov
     logical, dimension(:), allocatable :: isntnan
     real :: amean, stddev
-    integer :: i,j,n,m, idev
+    integer :: i,j,n,m, idev, nu
 
     allocate(alpha(naxes(1),naxes(2)),delta(naxes(1),naxes(2)),fbuf(nfiles), &
          img(naxes(1),naxes(2)),mask(naxes(1),naxes(2)),isntnan(nfiles), &
@@ -414,14 +418,17 @@ program kombine
           end if
        end do
 
-       ! the exposure weights and the noise model of the frames
-       allocate(wexp(nfiles),xgain(nfiles),xrn2(nfiles),xoff(nfiles),wbuf(nfiles))
+       ! the exposure weights and the noise model of the frames for the
+       ! clipped mean (lib/clipmean.f08)
+       allocate(wexp(nfiles),xgain(nfiles),xrn2(nfiles),xbias(nfiles), &
+            vbuf(nfiles),wbuf(nfiles),gbuf(nfiles),rbuf(nfiles),bbuf(nfiles))
        do n = 1, nfiles
           wexp(n) = files(n)%exptime / exptime
           xgain(n) = files(n)%gain
           xrn2(n) = files(n)%rn2
-          ! the raw level (before the background subtraction) above the bias
-          xoff(n) = files(n)%back - files(n)%bias
+          ! the level of no photons of the values: the bias less the
+          ! subtracted background (the raw level is value*w + background)
+          xbias(n) = -(files(n)%back - files(n)%bias)
        end do
 
        do i = 1, naxes(1)
@@ -434,10 +441,20 @@ program kombine
                    call rmean(fbuf(1:m),IMAGE(i,j),IMGERR(i,j),stddev)
                    if( m < 2 ) IMGERR(i,j) = IEEE_VALUE(IMGERR(i,j),IEEE_QUIET_NAN)
                 else
+                   vbuf(1:m) = fbuf(1:m)
                    wbuf(1:m) = pack(wexp,isntnan)
-                   call clipped_mean(fbuf(1:m),wbuf(1:m),pack(xgain,isntnan), &
-                        pack(xrn2,isntnan),pack(xoff,isntnan),IMAGE(i,j), &
-                        IMGERR(i,j),stddev)
+                   gbuf(1:m) = pack(xgain,isntnan)
+                   rbuf(1:m) = pack(xrn2,isntnan)
+                   bbuf(1:m) = pack(xbias,isntnan)
+                   call clipped_mean(vbuf(1:m),gbuf(1:m),rbuf(1:m),bbuf(1:m), &
+                        cmean,cerr,csig,nu,wbuf(1:m))
+                   IMAGE(i,j) = real(cmean)
+                   stddev = real(csig)
+                   if( nu > 1 ) then
+                      IMGERR(i,j) = real(cerr)
+                   else
+                      IMGERR(i,j) = IEEE_VALUE(IMGERR(i,j),IEEE_QUIET_NAN)
+                   end if
                 end if
                 fbuf(1:m) = fbuf(1:m) - IMAGE(i,j)
                 idev = maxloc(abs(fbuf(1:m)),1)
@@ -646,123 +663,5 @@ program kombine
   else
      stop 'Kombine failed.'
   end if
-
-contains
-
-  subroutine clipped_mean(v,w,gain,rn2,off,mean,err,sdev)
-
-    ! The mean of the values v of a pixel (exposure-normalised, weights
-    ! w the relative exposures) clipped by the noise model, as the sky
-    ! of aphot (skymean.f08): the interval
-    !
-    !    t - k*s  <=  v  <=  t + q + sqrt(q**2 + (k*s)**2),
-    !
-    ! iterated from the median, t the current mean, k = 5, s the larger
-    ! of the observed scatter of the used values and the one of a value
-    ! by the noise model, sqrt((t*w + off)/gain + rn2) / w [ADU] (off
-    ! the raw level of the frame above the bias: the subtracted background
-    ! less BIASLEV), q = k**2/(6*gain*w) one photo-electron times k**2/6
-    ! (the Bernstein bound of the Poisson tail: no photon of a sky of a
-    ! fraction of an electron is clipped, while the robust means of such
-    ! values are biased low). Cosmic rays, hot pixels and satellites, many
-    ! s above, are rejected. Without the gain, s is the scatter, q = k**2/6.
-    ! err is the standard error of the weighted mean (as the arithmetic
-    ! mean), sdev the scatter of the used values.
-
-    real, dimension(:), intent(in) :: v, w, gain, rn2, off
-    real, intent(out) :: mean, err, sdev
-
-    integer, parameter :: maxit = 50
-    real(REAL64), parameter :: k = 5
-    real(REAL64), dimension(size(v)) :: s, q, lo, hi, d
-    logical, dimension(size(v)) :: keep, prev
-    real(REAL64) :: t, sw, so, c
-    integer :: m, n, it
-
-    n = size(v)
-    if( n == 0 ) then
-       mean = 0
-       err = IEEE_VALUE(err,IEEE_QUIET_NAN)
-       sdev = 0
-       return
-    end if
-
-    keep = .true.
-    if( n >= 3 ) then
-       ! the median and the scatter by the median absolute deviation
-       t = vmedian(real(v,REAL64))
-       d = abs(v - t)
-       so = 1.4826_REAL64*vmedian(d)
-       where( gain > 0 )
-          q = k**2 / (6*gain*w)
-       elsewhere
-          q = k**2 / 6
-       end where
-       do it = 1, maxit
-          ! the scatter of a value by the noise model
-          where( gain > 0 )
-             s = sqrt(max(t*w + off,0.0_REAL64)/gain + rn2) / w
-          elsewhere
-             s = 0
-          end where
-          s = max(so,s)
-          lo = t - k*s
-          hi = t + q + sqrt(q**2 + (k*s)**2)
-          prev = keep
-          keep = lo <= v .and. v <= hi
-          m = count(keep)
-          if( m < 2 ) then
-             keep = prev
-             exit
-          end if
-          t = sum(w*v,keep) / sum(w,keep)
-          so = sqrt(sum(w*(v - t)**2,keep) / sum(w,keep) * m / (m - 1))
-          if( it > 1 .and. all(keep .eqv. prev) ) exit
-       end do
-    end if
-
-    m = count(keep)
-    sw = sum(w,keep)
-    t = sum(w*v,keep) / sw
-    mean = real(t)
-    if( m > 1 ) then
-       c = sum(w*(v - t)**2,keep) / (m - 1)
-       err = real(sqrt(c / sw))
-       sdev = real(sqrt(sum((v - t)**2,keep) / (m - 1)))
-    else
-       err = IEEE_VALUE(err,IEEE_QUIET_NAN)
-       sdev = 0
-    end if
-
-  end subroutine clipped_mean
-
-  real(REAL64) function vmedian(a)
-
-    ! the median of a small array (insertion sort of a copy)
-
-    real(REAL64), dimension(:), intent(in) :: a
-    real(REAL64), dimension(size(a)) :: b
-    real(REAL64) :: x
-    integer :: i, j, n
-
-    n = size(a)
-    b = a
-    do i = 2, n
-       x = b(i)
-       j = i - 1
-       do while( j >= 1 )
-          if( b(j) <= x ) exit
-          b(j+1) = b(j)
-          j = j - 1
-       end do
-       b(j+1) = x
-    end do
-    if( mod(n,2) == 1 ) then
-       vmedian = b(n/2+1)
-    else
-       vmedian = (b(n/2) + b(n/2+1)) / 2
-    end if
-
-  end function vmedian
 
 end program kombine
