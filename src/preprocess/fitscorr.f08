@@ -36,6 +36,10 @@ module fitscorr
      real :: temper = -666
      real :: gain = 1
      real :: readns = 0              ! readout noise [ADU]
+     real :: rdnoise = 0             ! readout noise [e-] (RDNOISE)
+     ! the master bias subtracted from a master dark (DARKBIAS)
+     character(len=FLEN_VALUE) :: darkbias = ''
+     logical :: readns_set = .false., rdnoise_set = .false.
      logical :: saturate_set = .false.
      logical :: gain_set = .false.
      logical :: exptime_set = .false.
@@ -140,13 +144,33 @@ contains
           fits%gain = 1
        end if
 
-       ! readout noise
+       ! readout noise: READNS [ADU], or RDNOISE [e-] (artificial)
        call fits_write_errmark
        call fits_read_key(fitsfile,FITS_KEY_READNS,fits%readns,status)
-       if( status == FITS_KEYWORD_NOT_FOUND ) then
+       if( status == 0 ) then
+          fits%readns_set = .true.
+       else if( status == FITS_KEYWORD_NOT_FOUND ) then
           call fits_clear_errmark
           status = 0
           fits%readns = 0
+       end if
+       call fits_write_errmark
+       call fits_read_key(fitsfile,'RDNOISE',fits%rdnoise,status)
+       if( status == 0 ) then
+          fits%rdnoise_set = .true.
+       else if( status == FITS_KEYWORD_NOT_FOUND ) then
+          call fits_clear_errmark
+          status = 0
+          fits%rdnoise = 0
+       end if
+
+       ! the master bias subtracted from a master dark
+       call fits_write_errmark
+       call fits_read_key(fitsfile,'DARKBIAS',fits%darkbias,status)
+       if( status == FITS_KEYWORD_NOT_FOUND ) then
+          call fits_clear_errmark
+          status = 0
+          fits%darkbias = ''
        end if
 
        ! imagetyp

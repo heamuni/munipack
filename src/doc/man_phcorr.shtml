@@ -158,15 +158,46 @@ is found, one is adequately modified.
 
 <p class="indent">
 Standard errors of the corrected values are stored in STDERR extension.
-They are computed as
-<i>σ</i><sup>2</sup> = [max(<i>e</i>,1) + <i>g</i><sup>2</sup>(<i>t</i><sup>2</sup><i>σ</i><sub>D</sub><sup>2</sup>
-+ <i>σ</i><sub>B</sub><sup>2</sup> + <i>r</i><sup>2</sup>)] / <i>F</i><sup>2</sup>
+They are computed (first order; Merline &amp; Howell 1995, Newberry 1991) as
+<i>σ</i><sup>2</sup> = [<i>g</i> max(<i>m</i>,0) + <i>g</i><sup>2</sup>(<i>r</i><sup>2</sup>
++ <i>q</i> + <i>τ</i><sup>2</sup><i>σ</i><sub>B</sub><sup>2</sup>
++ <i>t</i><sup>2</sup><i>σ</i><sub>D</sub><sup>2</sup>)] / <i>F</i><sup>2</sup>
 + (<i>c σ</i><sub>F</sub> / <i>F</i>)<sup>2</sup>,
-where <i>e</i> = <i>g</i>(<i>S</i> − <i>t D</i> − <i>B</i>) are electrons
-before flat-fielding, <i>c = e/F</i> is the corrected value, <i>g</i> gain,
-<i>σ</i><sub>D</sub>, <i>σ</i><sub>B</sub>, <i>σ</i><sub>F</sub> are standard
-errors of the dark, bias and flat frames and <i>r</i> is the readout noise
-in ADU given by READNS keyword of the frame (zero when it is missing).
+where <i>m</i> is the model of the detected signal <i>S</i> − <i>B</i> [ADU]
+(the sky, the stars and the dark current: all the electrons have the Poisson
+noise) by the mean of the eight neighbours of the pixel,
+<i>c</i> = <i>g</i>(<i>S</i> − <i>t D</i> − <i>B</i>)/<i>F</i> is the
+corrected value, <i>g</i> gain, <i>σ</i><sub>D</sub>, <i>σ</i><sub>B</sub>,
+<i>σ</i><sub>F</sub> are standard errors of the dark, bias and flat frames,
+<i>r</i> is the readout noise in ADU (READNS [ADU] of the frame, or RDNOISE
+[e-] divided by the gain; zero when both are missing), <i>q</i> = 1/12 the
+quantisation noise of integer frames, and <i>τ</i> = 1 − <i>t</i> when the
+dark was bias-subtracted by the same master bias (DARKBIAS of the dark by
+<a href="man_dark.html">dark</a> <samp>-bias</samp>: the bias then enters
+by <i>S</i> − <i>t</i>(<i>D</i><sub>raw</sub> − <i>B</i>) − <i>B</i>), else 1.
+The model of the pixel is not the pixel itself, so the weights 1/<i>σ</i><sup>2</sup>
+do not depend on its noise: an inverse-variance weighted mean is not biased.
+The error is never zero (at least 0.01 <i>g</i>).
+</p>
+
+<p class="indent">
+The output carries the noise model in its units, so <a href="man_find.html">find</a>,
+<a href="man_aphot.html">aphot</a> and <a href="man_psfphot.html">psfphot</a>
+use a correct one: for the values in electrons (BUNIT = COUNTS) GAIN = 1
+(PHCGAIN is the gain of the conversion), READNS and RDNOISE are the read
+noise in electrons, and BIASLEV (the pedestal of artificial frames) is
+removed when a bias or a dark frame is subtracted (else converted).
+</p>
+
+<p class="indent">
+Versions before 0.6.2+hg1653 (patched) floored the Poisson term at one
+electron and took it from the pixel's own value without the dark current
+(on a QUVIK-like frame, 0.39 e- of sky and 0.13 e- of dark per pixel,
+STDERR was 1.30 times the true error, 0.55 times on a dark-dominated frame,
+and the inverse-variance weighted mean of the sky was 29% low), and kept
+GAIN, READNS [ADU] and BIASLEV of the raw frame: find, aphot and psfphot
+applied them to the values in electrons (the threshold of find was 4.2
+times too high with READNS in the header).
 </p>
 
 

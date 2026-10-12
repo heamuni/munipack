@@ -451,6 +451,21 @@ program dark
 
     if( biasname /= '' ) then
        call fits_write_history(fits,"DARK bias: '"//trim(biasname)//"'",status)
+       ! the bias subtracted (phcorr: the error of the bias then enters
+       ! the corrected frame by (1 - t), t the dark time factor; the
+       ! STDERR of the dark has the scatter of the darks only)
+       block
+         character(len=FLEN_VALUE) :: val
+         integer :: l
+         l = len_trim(biasname)
+         if( l > 64 ) then
+            val = '...'//biasname(l-60:l)
+         else
+            val = biasname
+         end if
+         call fits_write_key(fits,'DARKBIAS',val, &
+              'master bias subtracted from the dark',status)
+       end block
     end if
 
     if( maskname /= '' ) &
