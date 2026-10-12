@@ -40,6 +40,10 @@ module fitskombi
      integer :: bitpix = -32
      integer :: naxis = 0
      real :: exptime = 1
+     ! the noise model of the frame: gain [e-/ADU] (<= 0 unknown; 1 for
+     ! BUNIT = COUNTS), read noise squared [ADU**2], bias [ADU], and the
+     ! background subtracted by reproject [ADU]
+     real :: gain = -1, rn2 = 0, bias = 0, back = 0
      logical :: background = .true.
      logical :: geo = .false.
      logical :: status = .false.
@@ -108,6 +112,56 @@ contains
        status = 0
        fits%exptime = 1
     end if
+
+    ! the noise model: GAIN (1 for BUNIT = COUNTS), READNS [ADU] or
+    ! RDNOISE [e-], BIASLEV
+    block
+      character(len=FLEN_VALUE) :: bunit
+      real :: x
+      call fits_write_errmark
+      call fits_read_key(fitsfile,FITS_KEY_GAIN,x,status)
+      if( status == 0 .and. x > 0 ) then
+         fits%gain = x
+      else
+         fits%gain = -1
+      end if
+      if( status /= 0 ) then
+         call fits_clear_errmark
+         status = 0
+      end if
+      call fits_write_errmark
+      call fits_read_key(fitsfile,FITS_KEY_BUNIT,bunit,status)
+      if( status == 0 ) then
+         if( bunit == 'COUNTS' ) fits%gain = 1
+      else
+         call fits_clear_errmark
+         status = 0
+      end if
+      call fits_write_errmark
+      call fits_read_key(fitsfile,FITS_KEY_READNS,x,status)
+      if( status == 0 ) then
+         fits%rn2 = x**2
+      else
+         call fits_clear_errmark
+         status = 0
+         call fits_write_errmark
+         call fits_read_key(fitsfile,'RDNOISE',x,status)
+         if( status == 0 .and. fits%gain > 0 ) then
+            fits%rn2 = (x / fits%gain)**2
+         else
+            call fits_clear_errmark
+            status = 0
+         end if
+      end if
+      call fits_write_errmark
+      call fits_read_key(fitsfile,'BIASLEV',x,status)
+      if( status == 0 ) then
+         fits%bias = x
+      else
+         call fits_clear_errmark
+         status = 0
+      end if
+    end block
 
     ! filter
     call fits_write_errmark
@@ -253,6 +307,7 @@ contains
     else
        back = 0.0
     end if
+    this%back = back
 
     if( method == 'BICUBIC' ) then
        allocate(fx(nx,ny),fy(nx,ny),fxy(nx,ny))

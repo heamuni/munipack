@@ -92,11 +92,34 @@ munipack kombine [..] files
 </p>
 
 <p>
-  On output, the mean of the input files is created.
-  The file has STDERR extension with standard errors.
+  On output, the mean of the input files is created (times their number,
+  see above).
+  The file has STDERR extension with standard errors of the output values
+  (on the scale of the output, the sum): the error of the mean of the
+  exposure-normalised values <i>v</i> of a pixel by their scatter,
+  <i>c</i> = Σ<i>w</i>(<i>v</i> − <i>v̄</i>)²/(<i>m</i> − 1),
+  STDERR = <i>N</i> √(<i>c</i>/Σ<i>w</i>), where <i>w</i> are the exposure
+  times relative to the mean one, <i>m</i> the number of the (used) values
+  of the pixel (the coverage in mosaics) and <i>N</i> the number of frames;
+  NaN where <i>m</i> &lt; 2. Versions before 0.6.2+hg1653 (patched) wrote
+  the error of the mean unscaled (<i>N</i> times too small) by the robust
+  mean, and the sum of squares of the values for <samp>--arith</samp>
+  where the scatter was not positive (always for a single frame).
   The MAXDEV extension contains maximal deviations of
   the robust mean (not included if <samp>--arith</samp>);
   it helps to detect anomalies.
+</p>
+
+<p>
+  The errors of the output pixels are correlated by the interpolation:
+  the bilinear and bicubic interpolations average neighbouring input
+  pixels, so the per-pixel variance of the resampled frames is lower
+  (0.52 times for bilinear, 0.70 for bicubic at random sub-pixel shifts;
+  STDERR follows it), while the noise of sums over many pixels (aperture
+  photometry) is nearly unchanged (0.87 and 0.94 times for 5×5 pixels):
+  the per-pixel errors underestimate the noise of apertures (Casertano et
+  al. 2000, AJ 120, 2747). The nearest-neighbour method keeps the pixels
+  independent.
 </p>
 
 
@@ -147,13 +170,29 @@ munipack kombine [..] files
     brightness is conserved (see above).
   </dd>
   <dt><samp>--arith</samp></dt><dd>
-    Kombine computes the average by arithmetic mean per every single pixel.
-    By default, the average is computed by robust mean, giving the brilliant
-    look of results, yet both significantly slower and memory consuming.
-    The robust mean of a few values of a sky of a few photons per pixel is
-    biased low (eight QUVIK-like frames, 0.39 e-/pixel, gain 0.1 e-/ADU:
-    −0.033 e-/pixel, −8.5%) and differently for stars and sky; use
-    <samp>--arith</samp> for photometry of such frames.
+    Kombine computes the average by arithmetic mean per every single pixel
+    (the mean of the rates, weighted by the exposure times).
+    By default, the average is the mean clipped by the noise model,
+    which rejects cosmic rays, hot pixels and satellites, yet slower and
+    memory consuming: the values of a pixel within
+    <i>t</i> − 5σ … <i>t</i> + <i>q</i> + √(<i>q</i>² + (5σ)²),
+    iterated from the median, where <i>t</i> is the mean, σ the larger of
+    the scatter of the values and the noise of a value by the noise model
+    of its frame, √((<i>t</i> + background − BIASLEV)/GAIN + READNS²) [ADU]
+    (READNS [ADU] or RDNOISE [e-]; without GAIN, the scatter alone), and
+    <i>q</i> = 25/6 photo-electrons (as the sky of
+    <a href="man_aphot.html#sky">aphot</a>): no photon of a sky of a
+    fraction of an electron per pixel is clipped, so the mean is not
+    biased. Eight QUVIK-like frames (0.39 e-/pixel, gain 0.1 e-/ADU): sky
+    +0.9% (as <samp>--arith</samp>; the robust mean of Hampel, the default
+    before 0.6.2+hg1653 (patched), −8%, and −13.4% at 0.39 e- without read
+    noise, −2.0% at 2 e-, −0.2% at 20 e-); 40 cosmic rays per frame:
+    no residual (<samp>--arith</samp>: the sky +86%).
+  </dd>
+  <dt><samp>--hampel</samp></dt><dd>
+    The robust mean of the previous versions (the Hampel M-estimator of
+    OakLeaf); it is biased low on a sky of a few photons per pixel, and
+    differently for stars and sky.
   </dd>
 </dl>
 

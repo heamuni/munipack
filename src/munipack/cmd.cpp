@@ -630,6 +630,7 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddSwitch("","disable-back","does not subtract background");
     AddSwitch("","flux-conserve","scale by pixel areas (conserve total flux)");
     AddSwitch("","arith","compute average by arithmetical mean");
+    AddSwitch("","hampel","robust mean by the Hampel M-estimator (old default)");
     COMMON_OPTIONS_SINGLE
     COMMON_OPTIONS_BITPIX
     AddParam("file(s)",wxCMD_LINE_VAL_STRING,
