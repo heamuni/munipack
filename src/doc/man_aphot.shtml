@@ -144,6 +144,67 @@ are selected. Just stars with valid (non-negative) values are presented here.
 </p>
 
 
+<h2 id="ee">Aperture Corrections: the Enclosed Energy</h2>
+
+<p>
+  An aperture contains only a fraction of the light of a star, its
+  enclosed energy EE (the fraction of the total flux). When the PSF
+  changes over the field, so does EE, and the aperture photometry of
+  stars at different positions are on different scales. Optionally,
+  aphot records EE of every star in every aperture: the columns
+  APEE<i>i</i> and APEEERR<i>i</i> (its error) of APERPHOT
+  (<a href="dataform_proc.html#aperphot">format</a>). APCOUNT<i>i</i>/APEE<i>i</i>
+  is the total flux of the star; <a href="man_phcal.html">phcal</a>
+  calibrates it when APEE is present. Two sources:
+</p>
+
+<dl>
+  <dt>A known PSF (<samp>--psf-file</samp>, or <samp>--psf GAUSS|MOFFAT</samp>)</dt>
+  <dd>The PSF file of <a href="man_artificial.html">artificial</a> and
+    <a href="man_psfphot.html">psfphot</a>
+    (<a href="dataform_artpsf.html">format</a>; the same field-position
+    convention as psfphot: pixel offsets from NAXIS/2 or <samp>--psf-centre</samp>,
+    divided by the WCS scale or <samp>--scale</samp>), or an analytic
+    Gauss or Moffat PSF of <samp>--fwhm</samp> (the FWHM of FIND by default)
+    and <samp>--beta</samp>. The PSF at the position of the star is
+    pixelised at its sub-pixel position and summed with exactly the
+    partial-pixel weights of the apertures, so APCOUNT/APEE is the total
+    flux of the model (on noiseless frames rendered with the PSF file,
+    APCOUNT/APEE equals the true flux to 1e-6 in every aperture).
+    APEEERR is zero.</dd>
+  <dt>The frame's stars (<samp>--apcorr auto</samp>)</dt>
+  <dd>The apertures of a star are its growth curve. The bright
+    (S/N > 30 in the aperture of 2 FWHM, at least 30 stars), unsaturated
+    stars with all the apertures valid and without a comparable
+    neighbour (brighter than 1%) within 5.5 FWHM give EE relative to
+    their total flux: the median of three apertures of the plateau of
+    the stacked growth curve (from the first aperture larger than 1.3 FWHM
+    within 0.5% of the level of the curve). A sky of a few photons per
+    pixel has a skewed distribution whose robust mean, the sky of aphot,
+    is lower than its mean; the growth curve then rises linearly with
+    the area past the star. This sky bias is measured by the apertures
+    larger than 4 FWHM (at least three are needed: use apertures out to
+    the sky ring, for example <samp>--apertures ...,20,25,30,35,40
+    --ring 45,60</samp>) and removed before EE is measured (EESKYBIA;
+    it is not removed from APCOUNT). EE of every aperture is fitted by
+    a polynomial over the field of the order <samp>--apcorr-var</samp>
+    0, 1, 2 (default 2) in x,y, or in the distance from the field centre
+    with <samp>--apcorr-radial</samp> (for optics whose PSF changes with
+    the field radius); the fit is weighted, robust (3σ clipping), with the
+    excess scatter of stars over their errors added. The order is lowered
+    when there are fewer than three stars per parameter (with a warning)
+    and when the higher terms are not significant (99.9%), so a constant
+    PSF gives a constant EE; the model is not extrapolated beyond the
+    stars. APEEERR is the error of the polynomial at the star and the
+    excess scatter. The header records the stars, the orders, the plateau,
+    the sky bias and the scatter.</dd>
+</dl>
+
+<p>
+  Without these options, aphot writes no APEE columns (as before).
+  <samp>--coo</samp> does not support them.
+</p>
+
 <h2>Input And Output</h2>
 
 <p>
@@ -185,6 +246,23 @@ represented by FITS extension, is added to all input images.
     in degrees. Positive values of the angle are in mathematics sense
     (counter-clockwise).
   </dd>
+  <dt><samp>--psf-file <i>file</i></samp></dt><dd>the enclosed energy
+    (APEE) by the PSF file (<a href="#ee">see above</a>)</dd>
+  <dt><samp>--psf GAUSS|MOFFAT|FILE</samp></dt><dd>the enclosed energy
+    by an analytic PSF (FILE requires <samp>--psf-file</samp>)</dd>
+  <dt><samp>--fwhm <i>pix</i></samp>, <samp>--beta <i>β</i></samp></dt>
+  <dd>FWHM and the Moffat exponent of the analytic PSF
+    (defaults: FWHM of FIND, 2.5)</dd>
+  <dt><samp>--scale <i>pix/deg</i></samp>, <samp>--psf-centre <i>x,y</i></samp></dt>
+  <dd>the scale (default: WCS of the frame) and the field centre
+    (default: NAXIS/2) of the PSF file, as in psfphot; the field centre
+    also for <samp>--apcorr-radial</samp></dd>
+  <dt><samp>--apcorr auto</samp></dt><dd>the enclosed energy by the growth
+    curves of the frame's stars</dd>
+  <dt><samp>--apcorr-var 0|1|2</samp></dt><dd>the order of its variation
+    over the field (default: 2)</dd>
+  <dt><samp>--apcorr-radial</samp></dt><dd>the variation by the distance
+    from the field centre (default: x,y)</dd>
   <dt><samp>--coo "x1,y1 x2,y2..."</samp></dt>
   <dd>
     List of pixel rectangular coordinates: they are centroids of stars
@@ -230,6 +308,17 @@ Select apertures and sky estimation by hand (as powers of 2):
 </p>
 <code>
 $ munipack aphot --apertures 1,2,4,8,16,32 --ring 16,32 pleiades.fits
+</code>
+
+<p>
+  The enclosed energy by the field-dependent PSF file, or by the frame's
+  stars with a radial variation (phcal then calibrates the total flux):
+</p>
+<code>
+$ munipack aphot --psf-file psf.fits frame.fits<br>
+$ munipack aphot --apertures 1,2,3,4,5,7,9,12,15,20,25,30,35,40 --ring 45,60 \<br>
+&nbsp;&nbsp;--apcorr auto --apcorr-radial frame.fits<br>
+$ munipack phcal --saper 5 -c cat.fits ... frame.fits
 </code>
 
 <p>

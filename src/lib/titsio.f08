@@ -163,6 +163,8 @@ module titsio
   ! definitions of column labels, aperture photometry
   character(len=*), parameter :: FITS_COL_APCOUNT =    'APCOUNT'
   character(len=*), parameter :: FITS_COL_APCOUNTERR = 'APCOUNTERR'
+  character(len=*), parameter :: FITS_COL_APEE =       'APEE'
+  character(len=*), parameter :: FITS_COL_APEEERR =    'APEEERR'
 
   ! definitions of column labels, growth-curve photometry
   character(len=*), parameter :: FITS_COL_GCOUNT =    'GCOUNT'

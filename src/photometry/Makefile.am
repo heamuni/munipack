@@ -29,8 +29,9 @@ noinst_PROGRAMS = aphottester
 find_SOURCES = daosky.f95 daofind.f95 fitsfind.f08 find.f08
 find_LDADD   = $(ldir)/libsort.a $(LIBOAKLEAF) $(LIBMINPACK) $(FITSADD)
 
-aphot_SOURCES = daosky.f95 daofotometr.f08 fitsaphot.f08 aphot.f08
-aphot_LDADD   = $(LIBOAKLEAF) $(LIBMINPACK) $(FITSADD)
+aphot_SOURCES = daosky.f95 daofotometr.f08 fitsaphot.f08 exscatter.f08 \
+                apee.f08 aphot.f08
+aphot_LDADD   = $(ldir)/libpsfmodel.a $(LIBOAKLEAF) $(LIBMINPACK) $(FITSADD)
 
 aphottester_SOURCES = daofotometr.f08 fitsaphot.f08 aphottester.f08
 aphottester_LDADD   = $(LIBOAKLEAF) $(LIBMINPACK) $(FITSADD)

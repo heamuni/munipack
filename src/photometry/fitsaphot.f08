@@ -205,20 +205,84 @@ contains
 
   end subroutine fits_aphot_read
 
+  subroutine fits_aphot_info(filename,naxes,scale,gain,status)
+
+    ! the frame size, the scale [pix/deg] by WCS (-1 when undefined)
+    ! and the gain [e-/ADU] (1 when undefined)
+
+    character(len=*),intent(in) :: filename
+    integer, dimension(:), intent(out) :: naxes
+    real(REAL64), intent(out) :: scale, gain
+    integer, intent(in out) :: status
+
+    type(fitsfiles) :: fits
+    real(REAL64), dimension(2,2) :: cd
+    real(REAL64), dimension(2) :: cdelt
+
+    if( status /= 0 ) return
+
+    call fits_open_image(fits,filename,FITS_READONLY,status)
+    if( status /= 0 ) return
+    call fits_get_img_size(fits,2,naxes,status)
+    if( status /= 0 ) goto 666
+
+    call fits_write_errmark
+    call fits_read_key(fits,'CD1_1',cd(1,1),status)
+    call fits_read_key(fits,'CD1_2',cd(1,2),status)
+    call fits_read_key(fits,'CD2_1',cd(2,1),status)
+    call fits_read_key(fits,'CD2_2',cd(2,2),status)
+    if( status == 0 ) then
+       scale = 1 / sqrt(abs(cd(1,1)*cd(2,2) - cd(1,2)*cd(2,1)))
+    else
+       call fits_clear_errmark
+       status = 0
+       call fits_write_errmark
+       call fits_read_key(fits,'CDELT1',cdelt(1),status)
+       call fits_read_key(fits,'CDELT2',cdelt(2),status)
+       if( status == 0 ) then
+          scale = 1 / sqrt(abs(cdelt(1)*cdelt(2)))
+       else
+          call fits_clear_errmark
+          status = 0
+          scale = -1
+       end if
+    end if
+
+    call fits_write_errmark
+    call fits_read_key(fits,FITS_KEY_GAIN,gain,status)
+    if( status /= 0 .or. .not. (gain > 0) ) then
+       call fits_clear_errmark
+       status = 0
+       gain = 1
+    end if
+
+666 continue
+
+    call fits_close_file(fits,status)
+    call fits_report_error(error_unit,status)
+
+  end subroutine fits_aphot_info
+
   subroutine fits_aphot_save(filename, output, hwhm, ecc, incl, raper, ring,  &
-       xcens, ycens, apcts,apcts_err,sky,sky_err, status)
+       xcens, ycens, apcts,apcts_err,sky,sky_err, status, ee, eeerr)
+
+    ! The optional ee, eeerr (the enclosed energy of apertures and its
+    ! error) are saved as the columns APEEi, APEEERRi following
+    ! the original ones.
 
     character(len=*), intent(in) :: filename, output
     real, intent(in) :: hwhm, ecc, incl
     real, dimension(:), intent(in) :: raper, ring, xcens, ycens, sky,sky_err
     real, dimension(:,:), intent(in) :: apcts,apcts_err
     integer, intent(in out) :: status
+    real(REAL64), dimension(:,:), intent(in), optional :: ee, eeerr
 
     type(fitsfiles) :: fits
     integer, parameter :: extver = 0, nbegin = 4
     character(len=FLEN_VALUE), dimension(:), allocatable :: ttype, tform, tunit
     character(len=FLEN_VALUE) :: key
-    integer :: hdutype,i,j,k,l,n,nrows,srows,frow
+    integer :: hdutype,i,j,k,l,n,nrows,srows,frow,nee
+    logical :: have_ee
 
 
     if( status /= 0 ) return
@@ -249,7 +313,13 @@ contains
     end if
     if( status /= 0 ) goto 666
 
-    n = nbegin + 2*size(raper)
+    have_ee = present(ee) .and. present(eeerr)
+    nee = nbegin + 2*size(raper)
+    if( have_ee ) then
+       n = nbegin + 4*size(raper)
+    else
+       n = nbegin + 2*size(raper)
+    end if
     allocate(ttype(n), tform(n), tunit(n))
 
     tform = '1D'
@@ -264,6 +334,13 @@ contains
        write(ttype(j),'(a,i0)') trim(FITS_COL_APCOUNT),i
        write(ttype(j+1),'(a,i0)') trim(FITS_COL_APCOUNTERR),i
     end do
+    if( have_ee ) then
+       do i = 1, size(raper)
+          j = nee - 1 + 2*i
+          write(ttype(j),'(a,i0)') trim(FITS_COL_APEE),i
+          write(ttype(j+1),'(a,i0)') trim(FITS_COL_APEEERR),i
+       end do
+    end if
 
     ! aperture photometry table
     nrows = size(xcens)
@@ -302,6 +379,13 @@ contains
           call fits_write_col(fits,j,frow,apcts(i:l,k),status)
           call fits_write_col(fits,j+1,frow,apcts_err(i:l,k),status)
        end do
+       if( have_ee ) then
+          do k = 1,size(ee,2)
+             j = nee-1+2*k
+             call fits_write_col(fits,j,frow,ee(i:l,k),status)
+             call fits_write_col(fits,j+1,frow,eeerr(i:l,k),status)
+          end do
+       end if
     end do
     deallocate(ttype,tform,tunit)
 

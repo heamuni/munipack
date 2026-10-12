@@ -387,6 +387,23 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption("","inclination","inclination of major semiaxis, degrees",
 	      wxCMD_LINE_VAL_DOUBLE);
     AddOption("","coo","coordinates of objects");
+    AddOption("","psf-file","enclosed energy of apertures (APEE) by "
+	      "the PSF file (field-dependent PSF, as artificial)");
+    AddOption("","psf","enclosed energy by the PSF: GAUSS, MOFFAT, FILE");
+    AddOption("","fwhm","FWHM [pix] of the GAUSS, MOFFAT PSF (default: FIND)",
+	      wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","beta","Moffat exponent (default: 2.5)",
+	      wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","scale","scale [pix/deg] for PSF file (default: header)",
+	      wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","psf-centre","x,y field centre of PSF file [pix] "
+	      "(default: NAXIS/2)");
+    AddOption("","apcorr","auto: enclosed energy of apertures by "
+	      "growth curves of the frame's stars");
+    AddOption("","apcorr-var","order of the spatial variation of the "
+	      "enclosed energy 0, 1, 2 (default: 2)",wxCMD_LINE_VAL_NUMBER);
+    AddSwitch("","apcorr-radial","the variation by the distance from "
+	      "the field centre (default: x,y)");
     COMMON_OPTIONS_MULTIPLE
     AddParam("file(s)",wxCMD_LINE_VAL_STRING,
 	     wxCMD_LINE_PARAM_OPTIONAL|wxCMD_LINE_PARAM_MULTIPLE);

@@ -27,6 +27,8 @@ program aphot
   use titsio
   use fitsaphot
   use daofotometr
+  use aperture_ee
+  use psfmodel, only: psf_file_load
 
   implicit none
 
@@ -47,6 +49,20 @@ program aphot
   logical :: ex, exitus = .true.
   integer :: i,eq,stat,naper,nstars
   real :: theta, pitch
+
+  ! the enclosed energy of apertures (aperture corrections): by a PSF
+  ! (eemode = 'PSF', the PSF file or an analytic one) or by the frame's
+  ! stars (eemode = 'AUTO')
+  character(len=FLEN_VALUE) :: eemode = '', psftype = ''
+  character(len=FLEN_FILENAME) :: psffile = ''
+  real(REAL64) :: fwhm_par = -1, beta_par = 2.5, scale_par = -1
+  real(REAL64), dimension(2) :: psfcen_par = -1
+  logical :: psfcen_set = .false.
+  integer :: eevar = 2
+  logical :: eeradial = .false.
+  real(REAL64), dimension(:,:,:), allocatable :: stamps
+  real(REAL64), dimension(:), allocatable :: rcoo, acoo
+  integer :: zoom = 1, nbox = 0
 
   ! Aperture radii are defined by the logarithmic spiral
   ! (https://en.wikipedia.org/wiki/Logarithmic_spiral); the angles
@@ -137,11 +153,62 @@ program aphot
 
         read(val,*) snap
 
+     else if( key == 'PSF' ) then
+
+        read(val,*) psftype
+        if( .not. (psftype == 'GAUSS' .or. psftype == 'MOFFAT' .or. &
+             psftype == 'FILE') ) stop 'Error: PSF is GAUSS, MOFFAT or FILE.'
+        eemode = 'PSF'
+
+     else if( key == 'PSFFILE' ) then
+
+        read(val,*) psffile
+        psftype = 'FILE'
+        eemode = 'PSF'
+
+     else if( key == 'FWHM' ) then
+
+        read(val,*) fwhm_par
+
+     else if( key == 'BETA' ) then
+
+        read(val,*) beta_par
+
+     else if( key == 'SCALE' ) then
+
+        read(val,*) scale_par
+
+     else if( key == 'PSFCENTRE' ) then
+
+        read(val,*) psfcen_par
+        psfcen_set = .true.
+
+     else if( key == 'APCORR' ) then
+
+        read(val,*) eemode
+        if( eemode /= 'AUTO' ) stop 'Error: APCORR is AUTO.'
+
+     else if( key == 'APCORRRADIAL' ) then
+
+        read(val,*) eeradial
+
+     else if( key == 'APCORRVAR' ) then
+
+        read(val,*) eevar
+        if( eevar < 0 .or. eevar > 2 ) stop 'Error: APCORRVAR is 0, 1 or 2.'
+
      else if( key == 'FILE' ) then
 
         read(val,*) filename, output
 
         if( verbose ) write(*,*) trim(filename)//": "
+
+        if( psftype == 'FILE' .and. .not. allocated(stamps) ) then
+           if( psffile == '' ) stop 'Error: PSF=FILE requires a PSF file.'
+           stat = 0
+           call psf_file_load(psffile,stamps,rcoo,acoo,zoom,nbox,verbose,stat)
+           if( stat /= 0 ) stop 'Error: failed to read the PSF file.'
+        end if
 
         if( nstars > 0 ) then
            call byhand(exitus)
@@ -171,8 +238,13 @@ contains
     real, dimension(:,:), allocatable :: data,stderr
     real, dimension(:), allocatable :: xcens,ycens,sky,sky_err
     real, dimension(:,:), allocatable :: apcts,apcts_err
-    real :: lobad,hibad,fwhm,hwhm,ecc,incl
+    real :: lobad,hibad,fwhm,hwhm,ecc,incl,fwhm_ee
     integer :: nrows, status
+    real(REAL64), dimension(:,:), allocatable :: ee, eeerr
+    real(REAL64) :: scale, gain
+    integer, dimension(2) :: naxes
+    type(EEDescr) :: desc
+    logical :: eeok
 
     status = 0
     call fits_aphot_read(filename,data,stderr,xcens,ycens, &
@@ -198,8 +270,88 @@ contains
     call estim_hwhm(data,xcens,ycens,sky,fwhm,lobad,hibad,hwhm)
     if( hwhm < 0 ) hwhm = fwhm / 2
 
-    call fits_aphot_save(filename, output, hwhm, ecc, incl, raper, ring, &
-         xcens, ycens, apcts,apcts_err,sky,sky_err, status)
+    ! the enclosed energy of the apertures
+    eeok = .false.
+    if( eemode /= '' ) then
+       allocate(ee(nrows,naper),eeerr(nrows,naper))
+       call fits_aphot_info(filename,naxes,scale,gain,status)
+       if( status /= 0 ) goto 666
+       if( eemode == 'PSF' ) then
+          desc%source = 'PSF'
+          desc%psftype = psftype
+          if( psftype == 'FILE' ) then
+             desc%psffile = psffile
+             if( psfcen_set ) then
+                desc%xcen = psfcen_par(1)
+                desc%ycen = psfcen_par(2)
+             else
+                ! the same reference pixel as artificial and psfphot
+                desc%xcen = naxes(1) / 2
+                desc%ycen = naxes(2) / 2
+             end if
+             if( scale_par > 0 ) then
+                desc%scale = scale_par
+             else
+                desc%scale = scale
+             end if
+             if( .not. (desc%scale > 0) .and. size(rcoo) > 1 ) then
+                write(error_unit,*) 'Error: the scale [pix/deg] is undefined ', &
+                     '(no WCS in the header): use --scale.'
+                status = 1
+                goto 666
+             end if
+          else
+             if( fwhm_par > 0 ) then
+                desc%fwhm = fwhm_par
+             else if( fwhm > 0 ) then
+                desc%fwhm = fwhm
+             else
+                desc%fwhm = 2*hwhm
+             end if
+             desc%beta = beta_par
+             if( psftype == 'MOFFAT' .and. .not. (beta_par > 1) ) &
+                  stop 'Error: Moffat beta > 1 required.'
+             allocate(stamps(0,0,0),rcoo(0),acoo(0))
+          end if
+          call apee_psf(desc,stamps,rcoo,acoo,zoom,nbox,xcens,ycens,raper, &
+               ecc,incl,ee,eeerr)
+          if( psftype /= 'FILE' ) deallocate(stamps,rcoo,acoo)
+          eeok = .true.
+       else
+          desc%source = 'AUTO'
+          desc%ordreq = eevar
+          desc%radial = eeradial
+          if( psfcen_set ) then
+             desc%xcen = psfcen_par(1)
+             desc%ycen = psfcen_par(2)
+          else
+             desc%xcen = naxes(1) / 2
+             desc%ycen = naxes(2) / 2
+          end if
+          if( fwhm > 0 ) then
+             fwhm_ee = fwhm
+          else
+             fwhm_ee = 2*hwhm
+          end if
+          call apee_auto(desc,xcens,ycens,apcts,apcts_err,raper,ring,fwhm_ee, &
+               gain,naxes,verbose,ee,eeerr,eeok)
+          if( .not. eeok ) write(error_unit,*) 'Warning: ',trim(filename), &
+               ': the aperture correction failed, APEE not saved.'
+       end if
+    end if
+
+    if( eeok ) then
+       call fits_aphot_save(filename, output, hwhm, ecc, incl, raper, ring, &
+            xcens, ycens, apcts,apcts_err,sky,sky_err, status, ee, eeerr)
+       if( output == '' ) then
+          call apee_header(filename,desc,status)
+       else
+          call apee_header(output,desc,status)
+       end if
+    else
+       call fits_aphot_save(filename, output, hwhm, ecc, incl, raper, ring, &
+            xcens, ycens, apcts,apcts_err,sky,sky_err, status)
+    end if
 
 666 continue
 
