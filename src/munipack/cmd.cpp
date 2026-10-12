@@ -644,7 +644,10 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption("f","filters","list of filters");
     AddOption("th","threshold","select stars with the threshold above sky",wxCMD_LINE_VAL_DOUBLE);
     AddOption("e","maxerr","select stars with the maximal relative error",wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","apcorr","aperture correction",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","apcorr","aperture correction: auto (APEE when present, "
+	      "default), none, or a constant factor");
+    AddOption("","syserr","systematic error [mag] added to errors: "
+	      "auto (by residuals, default), or a value (0 off)");
     AddOption(wxEmptyString,"col-ra","Right Ascension column");
     AddOption(wxEmptyString,"col-dec","Declination column");
     AddOption(wxEmptyString,"col-mag","magnitude column(s)");

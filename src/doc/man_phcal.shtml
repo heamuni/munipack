@@ -116,11 +116,30 @@ and by search in close neighbourhood.</li>
 <li>From known filter and photometry system, from catalogue magnitudes
 photon fluxes are computed. </li>
 <li>Observed counts are normalised to rates by knowing of telescope
-area and exposure time.</li>
+area and exposure time. The counts in an aperture are divided by its
+enclosed energy (APEE, when <a href="man_aphot.html#ee">aphot</a> provides
+it), so the total flux is calibrated (<samp>--apcorr</samp>).</li>
 <li>The calibration ratio between expected photons and observed counts
     is determined by a robust method.</li>
+<li>The systematic error: the scatter of the calibration stars in excess
+    of their errors (<samp>--syserr</samp>). When present, the ratio is
+    determined again with the errors increased by it, and it is added
+    in quadrature to the errors of all objects.</li>
 <li>All values in frames and tables are recomputed on photons.</li>
 </ul>
+
+<p>
+<b>Changed defaults.</b> The systematic error is estimated by default
+(<samp>--syserr auto</samp>): MAGERR (and the errors of other quantities,
+CTPHERR) of frames whose calibration stars scatter more than their errors
+say are larger than in older versions, and CTPH may change within its
+error (the weights of the stars change). On frames whose stars scatter
+as their errors say, the estimate is zero or a few mmag and the results
+do not change. <samp>--syserr 0</samp> gives the results of older versions.
+The enclosed energy is used by default when APERPHOT contains it
+(<samp>--apcorr none</samp> switches it off); frames processed without
+it give the same results as before.
+</p>
 
 <p>When photometry transformation table from instrumental to
 standard system is available <samp>--tratab</samp>, the counts

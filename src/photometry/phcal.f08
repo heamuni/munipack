@@ -60,6 +60,9 @@ program phcal
   real(dbl) :: threshold = 0.1
   real(dbl) :: maxerr = 0.1
   real(dbl) :: apcorr = 1.0_dbl
+  ! the systematic error [mag] added to the calibrated errors,
+  ! < 0: estimated by the residuals of the calibration stars
+  real(dbl) :: syserr = -1
   real(dbl), dimension(:), allocatable :: ctph_manual,dctph_manual
   integer :: eq,nfile,n,nmag,nmagerr,nfilters,nctph,saper
   character(len=FLEN_KEYWORD), dimension(8) :: keys
@@ -217,6 +220,15 @@ program phcal
 
         read(val,*) apcorr
 
+     else if( key == 'APEE' ) then
+
+        ! the enclosed energy of apertures (APEE of APERPHOT) applied
+        read(val,*) apee_use
+
+     else if( key == 'SYSERR' ) then
+
+        read(val,*) syserr
+
      else if( key == 'NQUANTITIES' ) then
 
         read(val,*) nqlabels
@@ -298,6 +310,9 @@ program phcal
 
 20 continue
 
+  ! a constant aperture correction replaces the enclosed energy
+  if( abs(apcorr - 1) > epsilon(apcorr) ) apee_use = .false.
+
   ! check of requested quantities before any output is created,
   ! PHRATE is an alias of PHOTRATE
   do n = 1, size(qlabels)
@@ -356,7 +371,7 @@ contains
     character(len=FLEN_VALUE) :: catid,photosys_instr,photsys1,photsys2
     character(len=FLEN_VALUE), dimension(:), allocatable :: filter_frames
     real(dbl), allocatable, dimension(:) :: refra, refdec, ctph,dctph, &
-         exptime, areas, tol, aper
+         exptime, areas, tol, aper, sys
     real(dbl), allocatable, dimension(:,:) :: tr,tr1,trerr,tr1err,refph,drefph,&
          cts,dcts,dn,ddn,ra,dec,mag,dmag
     real(dbl) :: q, d
@@ -520,7 +535,7 @@ contains
 !       end do
 !    end if
 
-    allocate(phres(nfiles),ctph(nfiles),dctph(nfiles))
+    allocate(phres(nfiles),ctph(nfiles),dctph(nfiles),sys(nfiles))
     do n = 1, nfiles
        call photores_init(phres(n),ncat)
        phres(n)%ra = refra(1:ncat)
@@ -529,10 +544,10 @@ contains
 
     if( nfiles == 1 ) then
        call calibr(refph,drefph,cts(1:ncat,:),dcts(1:ncat,:),ctph,dctph, &
-            phres,verbose)
+            phres,verbose,syserr,sys)
     else
        call caliber(pairs,filters,tr,tr1,refph,drefph, &
-            cts(1:ncat,:),dcts(1:ncat,:),ctph,dctph,phres,verbose)
+            cts(1:ncat,:),dcts(1:ncat,:),ctph,dctph,phres,verbose,syserr,sys)
     end if
 
     ! apperture correction
@@ -561,7 +576,8 @@ contains
 !    dctph = ctph * d
 
     call writecal(filename,output,keys,advanced,phsystable,filters, &
-         catid,photsys_ref,area,init_area,saper,tr1,ctph,dctph,qlabels,phres,verbose)
+         catid,photsys_ref,area,init_area,saper,tr1,ctph,dctph,qlabels,phres,verbose, &
+         sys,apcorr)
 
     do i = 1,size(phres)
        call photores_destroy(phres(i))
@@ -571,7 +587,7 @@ contains
     if( allocated(pairs) ) deallocate(pairs)
 
     deallocate(refra,refdec,refph,drefph,filter_frames,exptime,areas,aper, &
-         tol,tr,tr1,trerr,tr1err,cts,dcts,dn,ddn,ra,dec,mag,dmag,ctph,dctph)
+         tol,tr,tr1,trerr,tr1err,cts,dcts,dn,ddn,ra,dec,mag,dmag,ctph,dctph,sys)
 
   end subroutine calibrate
 
@@ -603,7 +619,7 @@ contains
     character(len=FLEN_VALUE), dimension(:), allocatable :: filter_ref, &
          filters_fram
     real(dbl), allocatable, dimension(:) :: refra, refdec, ctph,dctph, &
-         exptime, areas, tol, aper
+         exptime, areas, tol, aper, sys
     real(dbl), allocatable, dimension(:,:) :: refph,drefph, &
          cts,dcts,ra,dec
     real(dbl), dimension(1,1), parameter :: tratab = real(1.0,dbl)
@@ -721,7 +737,7 @@ contains
 !       dcts(1:ncat,n) = dcts(1:ncat,n) / sqrt(q)
 !    end do
 
-    allocate(phres(nfiles),ctph(nfiles),dctph(nfiles))
+    allocate(phres(nfiles),ctph(nfiles),dctph(nfiles),sys(nfiles))
     do n = 1, nfiles
        call photores_init(phres(n),ncat)
        phres(n)%ra = refra(1:ncat)
@@ -732,7 +748,7 @@ contains
 !    write(*,*) cts(1:ncat,:)
 
     call calibr(refph(1:ncat,:),drefph(1:ncat,:),cts(1:ncat,:),dcts(1:ncat,:),&
-         ctph,dctph,phres,verbose)
+         ctph,dctph,phres,verbose,syserr,sys)
 
     ! pull back of original rates
 !    q = reftime * refarea
@@ -764,10 +780,10 @@ contains
 
     call writecal(filename,output,keys,advanced,phsystable, &
          filters_fram,catid,photsys_ref,area,init_area,saper,tratab, &
-         ctph,dctph,qlabels,phres,verbose)
+         ctph,dctph,qlabels,phres,verbose,sys,apcorr)
 
     deallocate(refra,refdec,refph,drefph,filter_ref,filters_fram,exptime, &
-         areas,tol,cts,dcts,ra,dec,ctph,dctph)
+         areas,tol,cts,dcts,ra,dec,ctph,dctph,sys)
 
     do i = 1,size(phres)
        call photores_destroy(phres(i))
@@ -813,7 +829,8 @@ contains
 
     call writecal(filename,output,keys,advanced,phsystable,filters, &
          catid,photsys_ref,area,init_area,saper,tr1,apcorr*ctph_manual, &
-         apcorr*dctph_manual,qlabels,verbose=verbose)
+         apcorr*dctph_manual,qlabels,verbose=verbose, &
+         syserr=spread(max(syserr,0.0_dbl),1,size(ctph_manual)),apcorr=apcorr)
 
     deallocate(tr,tr1,trerr,tr1err)
 

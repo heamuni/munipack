@@ -39,6 +39,9 @@ module sfits
           radf90, airmass, jd, hjd, longitude, latitude
      real(dbl), dimension(2) :: annuls
      character(len=FLEN_VALUE) :: filter, phtype
+     ! the enclosed energy (APEE) of the aperture applied, its source
+     logical :: apee = .false.
+     character(len=FLEN_VALUE) :: eesource = ''
      logical :: geodefined = .false.
      logical :: status
   end type qFITS
@@ -51,7 +54,12 @@ contains
 
   subroutine writecal(filenames,outputs,keys,advanced,phsystable, &
        filters,catid,photsys,area,init_area,saper,tra,ctph,dctph,quantities,phres,&
-       verbose)
+       verbose,syserr,apcorr)
+
+    ! syserr (optional) are the systematic errors [mag] of the calibration
+    ! of the frames (by ctph), added in quadrature to the errors of all
+    ! objects; apcorr (optional) is the constant aperture correction
+    ! (for the header only, ctph includes it)
 
     use phsysfits
     use oakleaf
@@ -72,6 +80,8 @@ contains
     real(dbl), intent(in) :: area
     integer, intent(in) :: saper
     logical, intent(in) :: init_area, advanced, verbose
+    real(dbl), dimension(:), intent(in), optional :: syserr
+    real(dbl), intent(in), optional :: apcorr
 
     real(dbl), parameter :: nullval = 0
     integer, parameter :: dim2 = 2
@@ -84,7 +94,8 @@ contains
          phsky,dphsky,mag,dmag,phr,dphr
     real, dimension(:,:,:), allocatable :: cube,tcube
     real(dbl), dimension(size(ctph)) :: xctph,sqarcsec,airmass,aring,nsky, &
-         leff,lfwhm,rskies,rskydevs
+         leff,lfwhm,rskies,rskydevs,srel
+    real(dbl) :: apc
     real(dbl), dimension(1,size(ctph)) :: skymag,dskymag,skyrate,dskyrate
     integer, allocatable, dimension(:) :: order
     integer :: i,j,k,n,status,nrows_max, width, height, nq, ncat, nfiles, nrows, npht
@@ -93,6 +104,12 @@ contains
     nfiles = size(filenames)
     nq = size(quantities)
     npht = size(tra,1)
+
+    ! the relative systematic errors (2.5/ln 10 = 1.0857 mag)
+    srel = 0
+    if( present(syserr) ) srel = max(syserr,0.0_dbl) / 1.0857362047581294_dbl
+    apc = 1
+    if( present(apcorr) ) apc = apcorr
 
     status = 0
     allocate(fitses(nfiles))
@@ -262,7 +279,8 @@ contains
           where( ct(i,:) > 0 .and. dct(i,:) > 0 )
              ph(i,:) = ctph(1)*ct(i,:)
              dph(i,:) = sqrt(ctph(1)) * dct(i,:)  ! pure Poisson
-             dph(i,:) = sqrt(ctph(1)**2*dct(i,:)**2 + ct(i,:)**2*dctph(1)**2)
+             dph(i,:) = sqrt(ctph(1)**2*dct(i,:)**2 + ct(i,:)**2*dctph(1)**2 &
+                  + (srel(1)*ph(i,:))**2)
 
              ! "gain" update
 !             dph(i,:) = dph(i,:) / sqrt(ctph(1))
@@ -299,6 +317,7 @@ contains
           call fotra(tra,pairs,sky(i,:),dsky(i,:),phsky(i,:),dphsky(i,:))
           call correx(leff,lfwhm/2,airmass,k0,r,lref,phr(i,:))
           where( phr(i,:) > 0 )
+             dphr(i,:) = sqrt(dphr(i,:)**2 + (srel*phr(i,:))**2)
              ph(i,:) = phr(i,:) * xctph
              dph(i,:) = dphr(i,:) * xctph !! correct !!!
           elsewhere
@@ -368,11 +387,11 @@ contains
        if( present(phres) ) then
           call savefits(filenames(i),outputs(i),fitses(n),advanced, &
                photsys,phsyscal,area,init_area,catid,quantities, &
-               ctph(n),dctph(n),status,k0,r,lref,phres(n))
+               ctph(n),dctph(n),status,k0,r,lref,srel(n),apc,phres(n))
        else
           call savefits(filenames(i),outputs(i),fitses(n),advanced, &
                photsys,phsyscal,area,init_area,catid,quantities, &
-               ctph(n),dctph(n),status,k0,r,lref)
+               ctph(n),dctph(n),status,k0,r,lref,srel(n),apc)
        end if
        call qfits_deallocate(fitses(n))
     end do
@@ -386,7 +405,7 @@ contains
 
     ! this is candidate for merge with the analogical subroutine in mfits.f95
 
-    use mfits, only: phmethod
+    use mfits, only: phmethod, apee_use, apee_apply
     use astrotrafo
     use astrosphere
     use trajd
@@ -633,6 +652,13 @@ contains
        if( status /= 0 ) goto 666
     end do
 
+    ! the total flux by the enclosed energy of the aperture
+    if( fits%phtype == 'APHOT' .and. apee_use ) then
+       call apee_apply(fitsfile,maper,fits%cts,fits%dcts,status,fits%apee, &
+            fits%eesource)
+       if( status /= 0 ) goto 666
+    end if
+
     call fits_close_file(fitsfile,status)
 
     !  coordinates conversions
@@ -660,7 +686,8 @@ contains
 
 
   subroutine savefits(filename,output,fits,advanced,photsys,phsyscal,&
-       area,init_area,catid, qlabels,ctph, dctph, status, k0, r, lref, phres)
+       area,init_area,catid, qlabels,ctph, dctph, status, k0, r, lref, &
+       srel, apcorr, phres)
 
     use phsysfits
     use photoconv
@@ -670,7 +697,7 @@ contains
     character(len=*), dimension(:), intent(in) :: qlabels
     type(qFITS), intent(in) :: fits
     type(type_phsys), intent(in) :: phsyscal
-    real(dbl), intent(in) :: area, ctph, dctph, k0, r, lref
+    real(dbl), intent(in) :: area, ctph, dctph, k0, r, lref, srel, apcorr
     logical, intent(in) :: init_area, advanced
     type(photores), intent(in), optional :: phres
     integer, intent(in out) :: status
@@ -782,6 +809,23 @@ contains
     call fits_update_key(fitscal,FITS_KEY_PHOTOTYP,fits%phtype,'photometry method',status)
     call fits_update_key(fitscal,FITS_KEY_CTPH,ctph,13,'counts per photons, calibration',status)
     call fits_update_key(fitscal,FITS_KEY_CTPHERR,dctph,1,'std. error of CTPH ',status)
+    call fits_update_key(fitscal,FITS_KEY_PHSYSERR,1.0857362047581294_dbl*srel,-5, &
+         '[mag] systematic error added to errors',status)
+    if( fits%apee ) then
+       call fits_update_key(fitscal,FITS_KEY_APCORTYP,'EE', &
+            'aperture correction: APEE (enclosed energy)',status)
+       if( fits%eesource /= '' ) &
+            call fits_update_key(fitscal,'EESOURCE',fits%eesource, &
+            'APEE by: PSF or AUTO (frame stars)',status)
+    else if( abs(apcorr - 1) > epsilon(apcorr) ) then
+       call fits_update_key(fitscal,FITS_KEY_APCORTYP,'CONST', &
+            'aperture correction: the constant APCORR',status)
+       call fits_update_key(fitscal,FITS_KEY_APCORR,apcorr,-6, &
+            'aperture correction (total / aperture flux)',status)
+    else if( fits%phtype == 'APHOT' ) then
+       call fits_update_key(fitscal,FITS_KEY_APCORTYP,'NONE', &
+            'aperture correction: none (aperture flux)',status)
+    end if
 
     if( fits%aper > 0 ) &
          call fits_update_key(fitscal,FITS_KEY_APER,fits%aper,3, &
@@ -824,6 +868,13 @@ contains
     end if
     write(buf,'(a,g0.5,a,es8.1)') "Counts per photons = ",ctph," +- ",dctph
     call fits_write_comment(fitscal,buf,status)
+    write(buf,'(a,f7.5,a)') "Systematic error = ",1.0857362047581294_dbl*srel, &
+         " mag (added in quadrature)"
+    call fits_write_comment(fitscal,buf,status)
+    if( fits%apee ) then
+       call fits_write_comment(fitscal, &
+            "Counts divided by the enclosed energy of the aperture (APEE)",status)
+    end if
 
     if( present(phres) ) then
 

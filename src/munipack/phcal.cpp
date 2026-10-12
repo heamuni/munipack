@@ -102,10 +102,10 @@ MuniPhcal::MuniPhcal(wxEvtHandler *h, const MuniCmdLineParser& cmd):
       Write("PHOTSYS_REF = '"+a+"'");
 
     if( cmd.Found("tol",&x) )
-      Write("TOL = %e",x);
+      Write("TOL = %.17g",x);
 
     if( cmd.Found("area",&x) )
-      Write("AREA = %e",x);
+      Write("AREA = %.17g",x);
 
     if( cmd.Found("saper",&n) )
       Write("SAPER = %ld",n);
@@ -118,13 +118,35 @@ MuniPhcal::MuniPhcal(wxEvtHandler *h, const MuniCmdLineParser& cmd):
     }
 
     if( cmd.Found("th",&x) || cmd.Found("threshold",&x))
-      Write("THRESHOLD = %e",x);
+      Write("THRESHOLD = %.17g",x);
 
     if( cmd.Found("e",&x) || cmd.Found("maxerr",&x))
-      Write("MAXERR = %e",x);
+      Write("MAXERR = %.17g",x);
 
-    if( cmd.Found("apcorr",&x))
-      Write("APCORR = %e",x);
+    // aperture correction: the enclosed energy APEE (auto, by default),
+    // none, or a constant factor (total / aperture flux)
+    if( cmd.Found("apcorr",&a) ) {
+      if( a.Upper() == "AUTO" )
+	;
+      else if( a.Upper() == "NONE" )
+	Write("APEE = F");
+      else if( a.ToDouble(&x) && x > 0 ) {
+	Write("APEE = F");
+	Write("APCORR = %.17g",x);
+      }
+      else
+	wxLogFatalError("Unknown --apcorr `%s' (auto, none, or a positive factor).",a);
+    }
+
+    // systematic error: auto (by residuals, default) or a value [mag]
+    if( cmd.Found("syserr",&a) ) {
+      if( a.Upper() == "AUTO" )
+	Write("SYSERR = -1");
+      else if( a.ToDouble(&x) && x >= 0 )
+	Write("SYSERR = %.17g",x);
+      else
+	wxLogFatalError("Unknown --syserr `%s' (auto, or a non-negative value in mag).",a);
+    }
 
     if( cmd.Found("C",&a) || cmd.Found("cal",&a) ) {
       long n;

@@ -88,10 +88,35 @@ phfotran</a>.</dd>
     <a href="man_psfphot.html">psfphot</a>; stars with a saturated core
     or a failed fit are not used for the calibration).
     By default, GROWPHOT is used when present, APERPHOT otherwise.</dd>
-  <dt><samp>--apcorr</samp></dt><dd>sets the aperture correction.
-    This correction converts fluxes in an aperture to the total flux
-    (infinite aperture). The value of correction should be obtained
-    by <a href="man_gphot.html">gphot</a>.</dd>
+  <dt><samp>--apcorr auto|none|<i>value</i></samp></dt><dd>the aperture
+    correction: it converts the flux in an aperture to the total flux
+    (infinite aperture).
+    <samp>auto</samp> (default): the counts of the aperture are divided by
+    its enclosed energy APEE<i>i</i> when APERPHOT contains it
+    (<a href="man_aphot.html#ee">aphot --psf-file, --psf, --apcorr</a>);
+    the relative error of APEE<i>i</i> is added in quadrature; frames
+    without APEE are calibrated as before.
+    <samp>none</samp>: APEE is not used.
+    A <i>value</i> is a constant factor, total / aperture flux, applied
+    to the calibration (CTPH) as in older versions, instead of APEE
+    (it can be obtained by <a href="man_gphot.html">gphot</a>).
+    The header keyword APCORTYP of PHOTOMETRY records the correction
+    (EE, CONST, NONE).</dd>
+  <dt><samp>--syserr auto|<i>value</i></samp></dt><dd>the systematic
+    error of the calibration [mag], added in quadrature to the errors of
+    all calibrated objects (MAGERR and the errors of all quantities).
+    <samp>auto</samp> (default): estimated by the residuals of the
+    calibration stars: the excess of their scatter over their errors
+    (the catalogue and the frame), the maximum likelihood value of
+    an additional Gaussian scatter, with 3σ clipping. The calibration
+    (CTPH) is then fitted again with the errors of the stars increased
+    by it, so CTPHERR includes it too. The value is zero when the
+    residuals scatter as their errors say; for a frame with a field
+    dependent aperture loss (a PSF varying over the field, no aperture
+    correction) it is the size of the unmodelled variation.
+    A <i>value</i> ≥ 0 is applied as given, <samp>0</samp> switches it off
+    (the errors of older versions). The value is saved as PHSYSERR.
+  </dd>
 
 <dt><samp>--advanced</samp></dt><dd>Advanced format. Additional extensions
                     (results of star find, photometry and residuals) are included.

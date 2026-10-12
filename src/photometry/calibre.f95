@@ -59,7 +59,55 @@ contains
   end subroutine photores_destroy
 
 
-  subroutine caliber(pairs,filters,tr,tr1,pht,dpht,cts,dcts,ctph,dctph,phres,verbose)
+  subroutine syscal(ph,dph,ct,dct,mode,t,dt,sys,verbose)
+
+    ! The calibration t = ph / ct (fmean) with the systematic error:
+    ! mode < 0 (auto): the excess scatter of the relative residuals
+    ! (ph - t*ct) / (t*ct) over their errors (exscatter), mode >= 0:
+    ! the given value [mag]. When the systematic error is positive, it is
+    ! added in quadrature to the relative errors of ct and t is fitted
+    ! again; sys is the systematic error in magnitudes.
+
+    use oakleaf
+    use exscatter
+
+    real(dbl), dimension(:), intent(in) :: ph,dph,ct,dct
+    real(dbl), intent(in) :: mode
+    real(dbl), intent(out) :: t,dt,sys
+    logical, intent(in) :: verbose
+
+    real(dbl), parameter :: mag = 1.0857362047581294_dbl  ! 2.5 / ln(10)
+    real(dbl), dimension(:), allocatable :: r,e,dc
+    real(dbl) :: srel
+    integer :: iter
+
+    call fmean(ph,dph,ct,dct,t,dt,verbose=verbose)
+    sys = 0
+    if( size(ph) < 3 .or. mode == 0 ) return
+
+    allocate(r(size(ph)),e(size(ph)),dc(size(ph)))
+    dc = dct
+    do iter = 1, 3
+       if( mode < 0 ) then
+          r = (ph - t*ct) / (t*ct)
+          e = sqrt(dph**2 + t**2*dct**2) / (t*ct)
+          call excess_scatter(r,e,srel)
+       else
+          srel = mode / mag
+       end if
+       if( .not. (srel > 0) ) exit
+       dc = sqrt(dct**2 + (srel*ct)**2)
+       call fmean(ph,dph,ct,dc,t,dt,verbose=verbose)
+       if( mode >= 0 ) exit
+    end do
+    sys = srel * mag
+    if( verbose ) write(*,'(a,f0.5,a)') ' Systematic error: ',sys,' mag'
+
+  end subroutine syscal
+
+
+  subroutine caliber(pairs,filters,tr,tr1,pht,dpht,cts,dcts,ctph,dctph,phres,&
+       verbose,syserr,sys)
 
     use fotran
     use oakleaf
@@ -71,9 +119,12 @@ contains
     real(dbl), dimension(:), intent(in out) :: ctph,dctph
     type(photores), dimension(:), intent(in out) :: phres
     logical, intent(in) :: verbose
+    real(dbl), intent(in), optional :: syserr
+    real(dbl), dimension(:), intent(out), optional :: sys
 
     real(dbl),dimension(:,:),allocatable :: ct, dct
     real(dbl),dimension(:,:),allocatable :: relerr
+    real(dbl) :: mode, s
     integer :: i,n,ndat,npht
 
     ndat = size(pht,1)
@@ -84,10 +135,13 @@ contains
        call fotra(tr,pairs,pht(i,:),dpht(i,:),ct(i,:),dct(i,:))
     end do
 
+    mode = 0
+    if( present(syserr) ) mode = syserr
     do n = 1, npht
        if( verbose ) write(*,*) 'Filter: ',trim(filters(n))
-       call fmean(ct(:,n),dct(:,n),cts(:,n),dcts(:,n),ctph(n),dctph(n), &
-            verbose=verbose)
+       call syscal(ct(:,n),dct(:,n),cts(:,n),dcts(:,n),mode,ctph(n),dctph(n), &
+            s,verbose)
+       if( present(sys) ) sys(n) = s
     end do
 
     do i = 1, ndat
@@ -112,7 +166,11 @@ contains
   end subroutine caliber
 
 
-  subroutine calibr(pht,dpht,cts,dcts,ctph,dctph,phres,verbose)
+  subroutine calibr(pht,dpht,cts,dcts,ctph,dctph,phres,verbose,syserr,sys)
+
+    ! syserr (optional) is the systematic error [mag], < 0 for its
+    ! estimate by the residuals (see syscal), 0 by default;
+    ! sys are the systematic errors applied [mag]
 
     use oakleaf
 
@@ -120,9 +178,12 @@ contains
     real(dbl), dimension(:), intent(out) :: ctph,dctph
     type(photores), dimension(:), intent(in out) :: phres
     logical, intent(in) :: verbose
+    real(dbl), intent(in), optional :: syserr
+    real(dbl), dimension(:), intent(out), optional :: sys
 
     real(dbl),dimension(:),allocatable :: ct, dct,ph,dph
     real(dbl),dimension(:,:),allocatable :: relerr
+    real(dbl) :: mode, s
     integer :: i,n,ndat,ncol
 
     if( size(pht,1) /= size(cts,1) ) stop 'Non-conformal data.'
@@ -150,7 +211,10 @@ contains
 !       call phrate(ct,ph,ctph(n),dctph(n),verbose=verbose)
 !       call phrate(ph,ct,ctph(n),dctph(n),verbose=verbose)
 !       write(*,*) 'phrate result=',ctph(n),dctph(n)
-       call fmean(ph,dph,ct,dct,ctph(n),dctph(n),verbose=verbose)
+       mode = 0
+       if( present(syserr) ) mode = syserr
+       call syscal(ph,dph,ct,dct,mode,ctph(n),dctph(n),s,verbose)
+       if( present(sys) ) sys(n) = s
 !       call fmean(ct,dct,ph,dph,ctph(n),dctph(n),verbose=verbose)
        relerr(:,n) = (ph - ctph(n)*ct) / ((ph + ctph(n)*ct) / 2)
 !       relerr(:,n) = (ct - ctph(n)*ph) / ct !((ct + ctph(n)*ph) / 2)
