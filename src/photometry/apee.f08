@@ -200,14 +200,12 @@ contains
        return
     end if
 
-    ! counts and their variances: aphot's star term is the Poisson noise
-    ! of the counts for a gain of 1 e-/ADU, replaced by counts/gain
+    ! counts and their variances (aphot's star term is counts/gain)
     allocate(cts(nst,nap),var(nst,nap))
     cts = apcts
     var = -1
     where( apcts_err > 0 )
-       var = max(real(apcts_err,dbl)**2 + max(cts,0.0_dbl)*(1/gain - 1), &
-            real(apcts_err,dbl)**2 / 100)
+       var = real(apcts_err,dbl)**2
     end where
 
     ! the apertures inside of the sky ring, the normalising aperture

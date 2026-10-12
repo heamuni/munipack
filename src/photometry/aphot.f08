@@ -242,7 +242,7 @@ contains
     real :: lobad,hibad,fwhm,hwhm,ecc,incl,fwhm_ee
     integer :: nrows, status
     real(REAL64), dimension(:,:), allocatable :: ee, eeerr
-    real(REAL64) :: scale, gain, ngain, nrn2, nbias
+    real(REAL64) :: scale, gain, ngain, nrn2, nbias, errgain
     real, dimension(:), allocatable :: rmask
     integer :: ncont
     integer, dimension(2) :: naxes
@@ -270,6 +270,8 @@ contains
     ! masked
     call sky_noise_model(filename,ngain,nrn2,nbias,status)
     if( status /= 0 ) goto 666
+    ! the gain of the Poisson noise of stars in APCOUNTERR
+    errgain = error_gain(ngain)
     call daomaskrad(data,xcens,ycens,lobad,hibad,ngain,nrn2,nbias,ring(2)/2, &
          rmask)
     call daophotsb(data,stderr,xcens,ycens,raper,ring,ecc,incl,lobad,hibad, &
@@ -356,7 +358,7 @@ contains
 
     if( eeok ) then
        call fits_aphot_save(filename, output, hwhm, ecc, incl, raper, ring, &
-            xcens, ycens, apcts,apcts_err,sky,sky_err, status, ee, eeerr)
+            xcens, ycens, apcts,apcts_err,sky,sky_err, errgain, status, ee, eeerr)
        if( output == '' ) then
           call apee_header(filename,desc,status)
        else
@@ -364,7 +366,7 @@ contains
        end if
     else
        call fits_aphot_save(filename, output, hwhm, ecc, incl, raper, ring, &
-            xcens, ycens, apcts,apcts_err,sky,sky_err, status)
+            xcens, ycens, apcts,apcts_err,sky,sky_err, errgain, status)
     end if
 
 666 continue
@@ -388,13 +390,14 @@ contains
     real, dimension(:,:), allocatable :: apcts,apcts_err
     real, dimension(:), allocatable :: rmask
     real :: lobad, hibad, saturate, skyavg,skyerr,skysig
-    real(REAL64) :: ngain, nrn2, nbias
+    real(REAL64) :: ngain, nrn2, nbias, errgain
     integer :: i, nrow, nstep, status, ncont
 
     status = 0
     call fits_aphot_image(filename,fkeys,data,stderr,saturate,status)
     call sky_noise_model(filename,ngain,nrn2,nbias,status)
     if( status /= 0 ) goto 666
+    errgain = error_gain(ngain)
 
     hibad = saturate
     nstep = max(int(log(float(size(data))/4e4) / log(2.0)),1)
@@ -461,6 +464,24 @@ contains
     if( allocated(apcts) ) deallocate(apcts,apcts_err,sky,sky_err)
 
   end subroutine byhand
+
+  real(REAL64) function error_gain(ngain)
+
+    ! The gain [e-/ADU] for the Poisson noise of the stars in APCOUNTERR:
+    ! the gain of the noise model of the frame (GAIN, or 1 for frames
+    ! in electrons, BUNIT = COUNTS), 1 when unknown (with a warning).
+
+    real(REAL64), intent(in) :: ngain
+
+    if( ngain > 0 ) then
+       error_gain = ngain
+    else
+       error_gain = 1
+       write(error_unit,*) 'Warning: ',trim(filename),': the gain is unknown ', &
+            '(no GAIN keyword), 1 e-/ADU assumed for the errors of counts.'
+    end if
+
+  end function error_gain
 
 
 end program aphot

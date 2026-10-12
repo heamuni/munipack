@@ -73,7 +73,7 @@ with the initial radius <i>r<sub>0</sub>=2</i> and pitch angle 8.9073°
 
 <p>
 For a correct determination of photometry errors, the camera-specific
-parameters must by provided.
+parameters must by provided (<a href="#errors">see below</a>).
 </p>
 
 <p>
@@ -145,11 +145,34 @@ matches the scatter of the sky between noise realisations. The light of
 undetected stars is part of the mean sky (it is in the apertures as well).
 </p>
 
+<h2 id="errors">The errors</h2>
+
+<p>
+APCOUNTERR [ADU] of an aperture of the area <i>A</i> = Σ<i>f</i>
+(<i>f</i> the fractions of the pixels inside the aperture) is
+</p>
+<pre>
+  APCOUNTERR² = APCOUNT/GAIN + Σ<i>f</i>² σ² + <i>A</i>² SKYERR²
+</pre>
+<p>
+the Poisson noise of the star (the counts in ADU divided by the gain
+[e-/ADU] of the frame), the noise of the sky pixels in the aperture
+(σ the scatter of the sky pixels of the ring, which includes the read
+noise; a partial pixel adds <i>f</i>² of its variance) and the error
+of the mean sky. The gain is GAIN of the frame (1 for frames in electrons,
+BUNIT = COUNTS of <a href="man_phcorr.html">phcorr</a>); without GAIN,
+1 e-/ADU is assumed with a warning. The gain used is the keyword APERRGN
+of APERPHOT. Versions before 0.6.2+hg1653 (patched) assumed 1 e-/ADU for
+every frame: on a frame with the gain 0.101 e-/ADU the errors of bright
+stars were 2.5–3 times smaller than their scatter.
+</p>
+
 <h2>Data assumption</h2>
 
 <p>
   Aphot does <b>assumtion</b>, that data represents actually detected
-  <b>counts</b>.
+  <b>counts</b>, or that the gain of the frame (GAIN) converts them to
+  electrons for the errors.
 </p>
 
 <p>
@@ -172,9 +195,10 @@ undetected stars is part of the mean sky (it is in the apertures as well).
 </p>
 
 <p>
-  Aphot does not check the assumption.
+  Aphot applies GAIN of the frame to the Poisson noise of stars (see the
+  errors above), so the errors are right for raw frames with GAIN as well.
   Carefully handled parameters of <a href="man_phcorr.html">phcorr</a>
-  will prepare such correct data. The gain value can be checked
+  will prepare data in electrons. The gain value can be checked
   by <a href="man_flat.html">flat-field</a>.
 </p>
 
