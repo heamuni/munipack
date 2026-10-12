@@ -179,7 +179,7 @@ contains
     open(3,status='scratch',form='unformatted')
 
     call daofind(data,debug,plog,hibad,skymod,skysig,fwhm,lothresh,threshold,&
-         shrplo,shrphi,rndlo,rndhi,readns,nstar,lobad, hmin)
+         shrplo,shrphi,rndlo,rndhi,readns,nstar,lobad, hmin, gain)
 
     rewind(3)
     call fits_find_save(filename,output,fkeys,nstar,fwhm,threshold,&
