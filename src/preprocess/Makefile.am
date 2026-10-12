@@ -25,5 +25,6 @@ pkglibexec_PROGRAMS = dark flat phcorr
 .NOTPARALLEL:
 
 dark_SOURCES = fitscorr.f08 dark.f08
+dark_LDADD = ../lib/libclipmean.a $(LDADD)
 flat_SOURCES = fitscorr.f08 flat.f08
 phcorr_SOURCES = fitscorr.f08 phcorr.f08

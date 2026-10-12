@@ -17,7 +17,7 @@ Compute an average dark frame of a set of dark frames.
 <h2>Synopsis</h2>
 
 <code>
-munipack dark [-bias file] [..] file(s)
+munipack dark [-bias file] [--arith|--hampel] [..] file(s)
 </code>
 
 <h2>Description</h2>
@@ -38,12 +38,39 @@ input images <i>(I<sub>k</sub>)<sub>ij</sub></i>:
 </p>
 <p>
   where <i>i,j</i> is an index of a pixel and <i>k</i> is an index of an image.
-  The average is the robust mean: on dark frames of a few electrons per
-  pixel (a skewed, discrete distribution) it is biased low (ten QUVIK-like
-  frames, 0.13 e- of dark per pixel, gain 0.1 e-/ADU: −0.024 e-/pixel,
-  about −15% of the dark signal).
   The bias frame <i>B<sub>ij</sub></i> is optional.
 When one is available, one is subtracted from dark exposures before averaging.
+</p>
+<p>
+  The average 〈 〉 is the mean clipped by the noise model of the frames
+  (the same routine as the sky of <a href="man_aphot.html#sky">aphot</a>
+  and the mean of <a href="man_kombine.html">kombine</a>): the mean of
+  the values of a pixel within
+  <i>t</i> − 5σ … <i>t</i> + <i>q</i> + √(<i>q</i>² + (5σ)²),
+  iterated from the median, where <i>t</i> is the mean, σ the larger of
+  the scatter of the values and the noise of a value by the noise model of
+  its frame, √((<i>t</i> − <i>b</i>)/GAIN + RN²) [ADU], and
+  <i>q</i> = 25/6 photo-electrons (the Bernstein bound of the Poisson
+  tail: no electron of a dark of a fraction of an electron per pixel is
+  clipped, while cosmic rays and other outliers, many σ above, are).
+  The noise model: GAIN of the frame (without it, σ is the scatter alone
+  and <i>q</i> = 25/6 ADU), the read noise RN by READNS [ADU] or
+  RDNOISE [e-], and the level of no electrons <i>b</i>: zero with the
+  bias frame subtracted, the pedestal BIASLEV of the frame (artificial),
+  zero when unknown (the noise of a raw frame with a pedestal is then
+  overestimated and the clipping of outliers looser; the mean is not
+  biased: use <samp>-bias</samp>).
+  The robust mean used before (<samp>--hampel</samp>) is biased low on
+  dark frames of a few electrons per pixel, a skewed, discrete
+  (Poisson) distribution. Ten QUVIK-like frames (gain 0.101 e-/ADU, read
+  noise 0.37 e-, 12 masters of 256² pixels), the master − the true dark:
+  0.05 e-: −0.0114 (−23%) by the robust mean, +0.0001 ± 0.0002 e-/pixel
+  by the clipped mean; 0.13 e-: −0.023 (−18%), +0.0003 ± 0.0002;
+  2 e-: −0.048 (−2.4%), −0.0007 ± 0.0005; 20 e-: −0.051 (−0.25%),
+  −0.001 ± 0.003. With 20 cosmic rays per frame the clipped mean is
+  the same and no cosmic-ray pixel is left (<samp>--arith</samp>:
+  +0.68 e-/pixel). At high counts (10⁴ e-, as flats) and on bias frames
+  (read noise only) all the means agree.
 </p>
 
 <p class="indent">
@@ -64,19 +91,32 @@ FITS_KEY_TEMPERATURE is valuable.
 <p>
 On output, a single file representing of mean dark frame is created.
   The file has STDERR extension with standard errors: the error of the
-  mean by the scatter of the dark frames (the error of the subtracted bias
-  frame, common to all of them, is not in it). With <samp>-bias</samp>,
+  mean by the scatter of the used values of the pixel,
+  √(Σ(<i>x</i> − 〈<i>x</i>〉)²/(<i>n</i> − 1)/<i>n</i>), equal to the
+  scatter of masters over realisations within 0.1% (rms) on the frames
+  above (the error of the subtracted bias frame, common to all of them,
+  is not in it; the robust mean of <samp>--hampel</samp> has its own
+  error). With <samp>-bias</samp>,
   the keyword DARKBIAS records the bias frame; <a href="man_phcorr.html">phcorr</a>
   with the same bias frame then propagates the error of the bias by
-  (1 − <i>t</i>), <i>t</i> the dark time factor.
-  Masked values (if parameter <samp>-bitmask</samp> is presented) are
-  set to the frame mean.
+  (1 − <i>t</i>), <i>t</i> the dark time factor. A single dark frame is
+  bias-subtracted too (it was written as it is, while DARKBIAS said
+  otherwise). DARKMEAN records the mean (CLIP, ARITH, HAMPEL).
+  Masked values (if parameter <samp>-bitmask</samp> is presented), and
+  the pixels with less than two values within the threshold and the
+  saturation, are set to the frame mean (the clipped mean of the pixels
+  by their scatter; the robust mean with <samp>--hampel</samp>).
 </p>
 
 <h2>Parameters</h2>
 
 <dl>
   <dt><samp>-bias file</samp></dt><dd>use the specified bias frame</dd>
+  <dt><samp>--arith</samp></dt><dd>the arithmetic mean of the values of
+    a pixel (no rejection of outliers)</dd>
+  <dt><samp>--hampel</samp></dt><dd>the robust mean of the previous
+    versions (the Hampel M-estimator of OakLeaf), biased low on a dark of
+    a few electrons per pixel</dd>
   <!-- #include virtual="/man_phcorr_common.shtml" -->
   <dt><samp>-B bitpix</samp></dt><dd>set numerical type of output images,
     see <a href="man_com.html">Common options</a> (default -32)</dd>

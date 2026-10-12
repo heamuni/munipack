@@ -44,9 +44,28 @@
 !       isolated by the largest aperture); zero within its noise for
 !       the mean sky of daophotsb (BUGS P23).
 !     - The total flux T: the mean of three apertures of the plateau of
-!       the stacked growth curve, from the first aperture larger than
-!       1.3 FWHM within 0.5% of the level of the curve (the median of
-!       the apertures larger than 4 FWHM, or its maximum).
+!       the growth curves. Each growth curve is C(r) = T EE(r) + b A(r),
+!       b a residual sky (the sky error of the star, the light of the
+!       fainter neighbours inside the apertures, which the sky ring masks)
+!       and A the area. On the plateau EE = 1, so over three consecutive
+!       apertures C = T + b A: the plateau is the first such window from
+!       1.3 FWHM whose slope relative to T, fitted for every star (the
+!       errors by the covariance of the nested apertures) and averaged
+!       over the stars (weighted, the excess scatter added, clipped at
+!       3 sigma), is consistent with zero (2 sigma), so the light of the
+!       PSF wing, a slope relative to T, is not left out of T. The search
+!       ends at twice the radius enclosing 99% of the stacked growth curve
+!       (the sum of C_k over the stars / the sum of C_kn, kn the aperture
+!       nearest to 2 FWHM, relative to its level, the median of the first
+!       three apertures from 4 FWHM, or its maximum);
+!       when no window passes up to there, the plateau starts at the last
+!       aperture within this cap. Before, the first aperture within 0.5%
+!       of the level of the stacked curve was taken: the level and the
+!       large apertures include the light of the fainter neighbours, so
+!       the plateau wandered to 20-40 pix on dense frames, T was 0.1-0.4%
+!       too large (APEE too small). b of the plateau, in ADU/pix, is
+!       recorded (fitted with T; consistent with zero, it is not removed:
+!       its removal adds its error times the area to T).
 !     - EE = counts / total of every aperture is fitted by a polynomial
 !       of the order 0, 1 or 2 in x,y, or in the distance from the field
 !       centre (radial), weighted least squares, the excess scatter of
@@ -88,14 +107,22 @@ module aperture_ee
      ! the variation by the distance from the field centre xcen, ycen
      logical :: radial = .false.
      real(dbl) :: rref1 = -1, rref2 = -1, skybias = 0
+     ! the plateau: the radius enclosing 99% of the stacked growth curve,
+     ! the cap of the search, the significance of the relative slope of
+     ! the plateau, the residual sky b of the plateau and its error,
+     ! found by the slope (or the cap)
+     real(dbl) :: r99 = -1, rcap = -1, platz = 0, platb = 0, platbe = -1
+     logical :: platok = .false.
      real(dbl), dimension(:), allocatable :: sigma
      integer, dimension(:), allocatable :: korder
   end type EEDescr
 
   ! the isolation of stars for the growth curve [FWHM], their plateau
-  ! starts at [FWHM], the plateau tolerance, the clipping [sigma]
+  ! starts at [FWHM], ends at [the radius of 99% of the stacked curve],
+  ! the slope of the plateau consistent with zero [sigma], the clipping
+  ! [sigma]
   real(dbl), parameter, private :: iso_fwhm = 5.5_dbl, plat_fwhm = 1.3_dbl, &
-       plat_tol = 0.005_dbl, clip = 3
+       plat_cap = 2, plat_z = 2, clip = 3
   ! the sky bias is measured by apertures larger than [FWHM]
   real(dbl), parameter, private :: sky_fwhm = 4
   ! the bright stars: S/N above, at least
@@ -194,7 +221,7 @@ contains
     logical, dimension(:), allocatable :: cand, sel, keep, prev
     real(dbl) :: xc, yc, hx, hy, sig, psig, gmax, chi2
     integer :: nst, nap, klim, kn, ks, k, l, m, nsel, order, npar, kmax, &
-         ko, mo, ml, nl
+         ko, mo, ml, nl, k0
     logical :: fitok, biased
 
     ok = .false.
@@ -302,26 +329,78 @@ contains
             ' bright isolated stars (3 at least).'
        return
     end if
-    allocate(g(klim))
+    ! the stacked growth curve: the sum of the counts of the stars over
+    ! their sum in the aperture nearest to 2 FWHM (the median of the
+    ! ratios, dominated by the fainter stars, scattered by 1-2% at the
+    ! large apertures and moved the radius of 99% to 20 pix on a frame)
+    allocate(g(klim),area(nap))
+    area = 4*atan(1.0_dbl)*real(raper,dbl)**2*sqrt(1 - real(ecc,dbl)**2)
     do k = 1, klim
-       g(k) = median(pack(cts(:,k) / cts(:,kn),sel))
+       g(k) = sum(cts(:,k),sel) / sum(cts(:,kn),sel)
     end do
-    ! the level of the curve: the median of the apertures larger than
-    ! 4 FWHM (flat), or its maximum;
-    ! the plateau: three apertures from the first one within 0.5%
-    ! of the level
+    ! the level of the curve: the median of the three apertures from
+    ! 4 FWHM (flat; the larger ones hold more light of the neighbours),
+    ! or its maximum; the radius enclosing 99% of the curve (linear
+    ! between the apertures), twice it is the cap of the plateau (all
+    ! the apertures without a crossing)
     if( biased ) then
-       gmax = median(pack(g,raper(1:klim) >= sky_fwhm*fwhm))
+       block
+         integer, dimension(:), allocatable :: kl
+         kl = pack([(k, k = 1, klim)],raper(1:klim) >= sky_fwhm*fwhm)
+         gmax = median(g(kl(1:min(3,size(kl)))))
+       end block
     else
        gmax = maxval(g,mask=raper(1:klim) >= plat_fwhm*fwhm)
     end if
-    kmax = klim
+    desc%r99 = -1
+    do k = 2, klim
+       if( g(k) >= 0.99*gmax .and. g(k-1) < 0.99*gmax ) then
+          desc%r99 = raper(k-1) + (0.99*gmax - g(k-1)) / (g(k) - g(k-1)) * &
+               (raper(k) - raper(k-1))
+          exit
+       end if
+    end do
+    if( desc%r99 > 0 ) then
+       desc%rcap = plat_cap*desc%r99
+    else
+       desc%rcap = raper(klim)
+    end if
+
+    ! The plateau: the first window of three apertures (two at the last
+    ! one) from 1.3 FWHM to the cap whose slope relative to the total is
+    ! consistent with zero; when none, the window from the last aperture
+    ! within the cap (or the first one larger than 1.3 FWHM)
+    idx = pack([(l, l = 1, nst)],sel)
+    kmax = -1
+    k0 = -1
     do k = 1, klim
-       if( raper(k) >= plat_fwhm*fwhm .and. g(k) >= gmax*(1 - plat_tol) ) then
+       if( raper(k) < plat_fwhm*fwhm ) cycle
+       if( k0 < 0 ) k0 = k
+       if( raper(k) > desc%rcap .or. k == klim ) exit
+       k0 = k
+       call plateau_slope(k,min(k+2,klim),desc%platz,desc%platb,desc%platbe)
+       if( verbose ) write(error_unit,'(a,f0.2,a,es10.3,a,f0.2)') &
+            ' Aperture correction: plateau from ',raper(k),' pix: b = ', &
+            desc%platb,' ADU/pix, slope/T z = ',desc%platz
+       if( abs(desc%platz) <= plat_z ) then
           kmax = k
           exit
        end if
     end do
+    desc%platok = kmax > 0
+    if( .not. desc%platok ) then
+       kmax = max(k0,1)
+       if( kmax < klim ) then
+          call plateau_slope(kmax,min(kmax+2,klim),desc%platz,desc%platb,desc%platbe)
+       else
+          desc%platz = 0
+          desc%platb = 0
+          desc%platbe = -1
+       end if
+       if( verbose ) write(error_unit,'(a,f0.2,a)') &
+            ' Aperture correction: no flat plateau up to the cap, from ', &
+            raper(kmax),' pix.'
+    end if
     plat = [(k, k = kmax, min(kmax+2,klim))]
     desc%rref1 = raper(plat(1))
     desc%rref2 = raper(plat(size(plat)))
@@ -339,8 +418,7 @@ contains
 
     ! the total flux: the mean of the plateau apertures, the variances
     ! of EE of the stars in all apertures (the nested apertures)
-    allocate(tot(nsel),xs(nsel),ys(nsel),vee(nsel,nap),area(nap))
-    area = 4*atan(1.0_dbl)*real(raper,dbl)**2*sqrt(1 - real(ecc,dbl)**2)
+    allocate(tot(nsel),xs(nsel),ys(nsel),vee(nsel,nap))
     do m = 1, nsel
        l = idx(m)
        tot(m) = sum(cts(l,plat)) / size(plat)
@@ -458,12 +536,100 @@ contains
     end do
 
     ok = any(desc%sigma >= 0)
-    if( verbose ) write(error_unit,'(a,i0,a,i0,a,f0.2,a,f0.2,a,g0.4,a)') &
+    if( verbose ) write(error_unit,'(a,i0,a,i0,a,f0.2,a,f0.2,a,f0.2,a,g0.4,a,g0.3,a,g0.4,a)') &
          ' Aperture correction: ',nsel,' stars, order ',desc%order, &
          ', total flux by apertures ',desc%rref1,' .. ',desc%rref2, &
-         ' pix, sky bias ',desc%skybias,' ADU/pix.'
+         ' pix (cap ',desc%rcap,'), b of the plateau ',desc%platb,' +- ', &
+         desc%platbe,' ADU/pix, sky bias ',desc%skybias,' ADU/pix.'
 
   contains
+
+    subroutine plateau_slope(k1,k2,z,b,eb)
+
+      ! The slope of the growth curves C = T + b A over the apertures
+      ! k1..k2 of the stars idx (least squares in the area, the errors by
+      ! the covariance of the nested apertures): z the significance of
+      ! the mean slope relative to T (the PSF wing), b the mean slope
+      ! [ADU/pix] (the residual sky) and its error eb. The means are
+      ! weighted, with the excess scatter of the stars, clipped.
+
+      integer, intent(in) :: k1, k2
+      real(dbl), intent(out) :: z, b, eb
+
+      real(dbl), dimension(:), allocatable :: u, eu, sl, esl
+      real(dbl), dimension(k2-k1+1) :: a, vp
+      real(dbl) :: t, s2, v, um, eum
+      integer :: i, j, l, m, n
+
+      n = size(idx)
+      allocate(u(n),eu(n),sl(n),esl(n))
+      a = area(k1:k2) - sum(area(k1:k2)) / (k2 - k1 + 1)
+      do m = 1, n
+         l = idx(m)
+         t = sum(cts(l,k1:k2)) / (k2 - k1 + 1)
+         s2 = max(real(sky_err(l),dbl),0.0_dbl)**2
+         vp = max(var(l,k1:k2) - area(k1:k2)**2*s2,0.0_dbl)
+         ! a' Cov a, Cov(C_i,C_j) = Vp(C_min(i,j)) + A_i A_j SKYERR**2
+         v = 0
+         do i = 1, k2 - k1 + 1
+            do j = 1, k2 - k1 + 1
+               v = v + a(i)*a(j)*(vp(min(i,j)) + area(k1+i-1)*area(k1+j-1)*s2)
+            end do
+         end do
+         sl(m) = dot_product(a,cts(l,k1:k2)) / dot_product(a,a)
+         esl(m) = sqrt(max(v,0.0_dbl)) / dot_product(a,a)
+         if( t > 0 ) then
+            u(m) = sl(m) / t
+            eu(m) = esl(m) / t
+         else
+            u(m) = 0
+            eu(m) = -1
+         end if
+      end do
+      call wmean_excess(u,eu,um,eum)
+      if( eum > 0 ) then
+         z = um / eum
+      else
+         z = 0
+      end if
+      call wmean_excess(sl,esl,b,eb)
+
+    end subroutine plateau_slope
+
+    subroutine wmean_excess(x,e,xm,em)
+
+      ! the mean of x weighted by the errors e (> 0) with the excess
+      ! scatter added, clipped (from the median); em its error (-1 when
+      ! undefined)
+
+      real(dbl), dimension(:), intent(in) :: x, e
+      real(dbl), intent(out) :: xm, em
+
+      real(dbl), dimension(size(x)) :: w
+      logical, dimension(size(x)) :: kp, kprev
+      real(dbl) :: sg
+      integer :: it
+
+      xm = 0
+      em = -1
+      if( count(e > 0) < 2 ) return
+      xm = median(pack(x,e > 0))
+      kprev = e > 0
+      do it = 1, 20
+         call excess_scatter(x - xm,e,sg,kp,clip)
+         if( count(kp) < 2 ) exit
+         where( kp )
+            w = 1 / (e**2 + sg**2)
+         elsewhere
+            w = 0
+         end where
+         xm = sum(w*x) / sum(w)
+         em = 1 / sqrt(sum(w))
+         if( it > 1 .and. all(kp .eqv. kprev) ) exit
+         kprev = kp
+      end do
+
+    end subroutine wmean_excess
 
     subroutine weights
 
@@ -875,6 +1041,23 @@ contains
             '[pix] total flux: the smallest plateau aperture',status)
        call fits_update_key(fits,'EERTOT2',desc%rref2,-5, &
             '[pix] total flux: the largest plateau aperture',status)
+       if( desc%platok ) then
+          val = 'SLOPE'
+       else
+          val = 'CAP'
+       end if
+       call fits_update_key(fits,'EEPLAT',val, &
+            'plateau by its slope, or the last one within EERCAP',status)
+       call fits_update_key(fits,'EEPLATZ',desc%platz,-3, &
+            'slope/total of the plateau in its errors',status)
+       call fits_update_key(fits,'EEPLATB',desc%platb,-4, &
+            '[ADU/pix] residual sky b of the plateau (not removed)',status)
+       call fits_update_key(fits,'EEPLATBE',desc%platbe,-3, &
+            '[ADU/pix] error of EEPLATB',status)
+       call fits_update_key(fits,'EER99',desc%r99,-4, &
+            '[pix] radius of 99% of the stacked growth curve',status)
+       call fits_update_key(fits,'EERCAP',desc%rcap,-4, &
+            '[pix] the plateau starts within (2*EER99)',status)
        call fits_update_key(fits,'EESKYBIA',desc%skybias,-4, &
             '[ADU/pix] residual sky bias (diagnostic, not removed)',status)
        do k = 1, size(desc%sigma)

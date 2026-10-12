@@ -169,7 +169,12 @@ With the enclosed energy (<a href="man_aphot.html#ee">aphot --psf-file,
 <tr><td>EEVARCOO</td><td></td><td>AUTO: the variation by XY or RADIAL (the distance from EEFCX, EEFCY)</td></tr>
 <tr><td>EENSTAR</td><td></td><td>AUTO: bright isolated stars used</td></tr>
 <tr><td>EERTOT1, EERTOT2</td><td>pix</td><td>AUTO: the apertures of the total flux (the plateau of the growth curve)</td></tr>
-<tr><td>EESKYBIA</td><td>ADU/pix</td><td>AUTO: the sky bias removed (counts − bias × area) before EE is measured</td></tr>
+<tr><td>EEPLAT</td><td></td><td>AUTO: SLOPE (the plateau is the first window whose slope is consistent with zero) or CAP (none up to EERCAP: the last window within it)</td></tr>
+<tr><td>EEPLATZ</td><td></td><td>AUTO: the slope of the plateau relative to the total flux, in its errors</td></tr>
+<tr><td>EEPLATB, EEPLATBE</td><td>ADU/pix</td><td>AUTO: the residual sky <i>b</i> of the plateau, <i>C</i> = <i>T</i> + <i>b A</i>, and its error (not removed)</td></tr>
+<tr><td>EER99</td><td>pix</td><td>AUTO: the radius enclosing 99% of the stacked growth curve (−1: no crossing)</td></tr>
+<tr><td>EERCAP</td><td>pix</td><td>AUTO: the plateau starts within this radius (2 EER99; all the apertures without EER99)</td></tr>
+<tr><td>EESKYBIA</td><td>ADU/pix</td><td>AUTO: the median slope of counts by area over the apertures beyond 4 FWHM (a diagnostic of the sky, not removed)</td></tr>
 <tr><td>EEORD<i>i</i></td><td></td><td>AUTO: the order of the variation of APEE<i>i</i> (lowered when not significant)</td></tr>
 <tr><td>EESIG<i>i</i></td><td></td><td>AUTO: the scatter of EE of the stars over the model (included in APEEERR<i>i</i>)</td></tr>
 </table>

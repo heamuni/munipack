@@ -44,6 +44,13 @@ input images <i>(I<sub>k</sub>)<sub>ij</sub></i>:
 </p>
 <p>
 where <i>i,j</i> is an index of a pixel and <i>k</i> is an index of an image.
+  The average is the robust mean (the Hampel M-estimator): bias frames
+  are read noise, symmetric, so it is not biased (QUVIK-like frames,
+  read noise 0.37 e- at gain 0.101 e-/ADU, and ground-like ones, 5 e- at
+  2 e-/ADU, ten frames: −0.0001 ± 0.0002 and +0.0014 ± 0.0022 e-/pixel,
+  as the arithmetic mean). Dark frames of a few electrons per pixel are
+  not symmetric: <a href="man_dark.html">dark</a> averages them by the
+  mean clipped by the noise model.
 </p>
 
 <p class="indent">
