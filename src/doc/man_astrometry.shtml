@@ -281,6 +281,8 @@ On output, the WCS calibration in the header of primary FITS is created
         <ul>
 	  <li>none,</li>
 	  <li>gnomonic (default)</li>
+	  <li>TPV: gnomonic with the polynomial distortion of the third
+	    order (<a href="#tpv">below</a>)</li>
 	</ul>
   </dd>
 <dt><samp>--xcen xxx.y</samp></dt><dd>centre of projection on chip [pix] (default: width/2)</dd>
@@ -390,11 +392,40 @@ stored to FITS header.
   one is updated.
 </p>
 
+<h2 id="tpv">Distortions (TPV)</h2>
+
+<p>
+With <samp>-p TPV</samp> the gnomonic projection is completed by the
+TPV polynomials of the third order (PV1_0 … PV1_11, PV2_0 … PV2_11,
+including the radial terms), fitted robustly. The fit is staged:
+the gnomonic solution is found first and the stars are cross-matched
+by it within the limit <samp>--sig</samp> × 5 (or 5 × its scatter);
+a deformation of the second order is fitted on them, all stars are
+cross-matched again by that solution (within 5 × the larger of
+<samp>--sig</samp> and the scatter of the fit) and the fit is repeated
+until the cross-matched set does not change; then the third order is
+fitted and iterated in the same way. A large distortion moves the stars
+at the edges of the field beyond the limit of the gnomonic solution, and
+a polynomial fitted only on the inner stars is extrapolated there; the
+iterations recover them. The progress is printed with
+<samp>--verbose</samp> (TPV stage).
+</p>
+<p>
+Synthetic 2048² fields (1″/pixel, 0.05 pixel centroid noise, three random
+patterns of quadratic and cubic terms, rotation 0° and 30°, mirrored or
+not): with the distortion of 15 pixels after the best affine fit, the
+maximal error at the stars of the frame was 0.2–5.7 pixels with the
+default 250 stars and 0.1–60 pixels with <samp>--maxstars 1000</samp>
+(edge stars not matched, or matched to wrong stars) in versions before
+0.6.2+hg1653 (patched); now 0.06–0.11 and 0.03–0.07 pixels, the same as
+without distortion. Undistorted frames give the same solution as before.
+</p>
+
 <h2>Caveats</h2>
 
 <p>
-Any distortions, including atmospheric refraction,
-are not implemented yet.
+The atmospheric refraction is not modelled (the TPV polynomials
+absorb its differential part on small fields).
 </p>
 
 

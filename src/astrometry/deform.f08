@@ -39,6 +39,9 @@ module astrometry_deformfun
      real(REAL64), dimension(:), pointer :: x,y,u,v
      real(REAL64) :: sc,rot,refl
      real(REAL64), dimension(:), pointer :: u1,v1,rdist
+     ! the fitted parameters (the scale and the terms of PV1, PV2),
+     ! the others are kept at their initial values
+     logical, dimension(0:2*npar) :: free = .true.
    contains
      procedure :: val => pvalue
      procedure :: grad => pgradient
@@ -157,6 +160,7 @@ contains
 
     fgrad(1:)= -fgrad(1:) / (n*s)
     fgrad(0) = -fgrad(0)  / (n*s**2) + 1 / s
+    where( .not. this % free ) fgrad = 0
 
     if( debug ) then
        block
@@ -354,15 +358,70 @@ module deform
   integer, parameter, private :: dbl = selected_real_kind(15)
   real(dbl), parameter, private :: rad = 57.295779513082322865_dbl
 
-  public :: defmin
+  public :: defmin, defmatch, deforder
 
 contains
 
+  pure function deforder(order) result(free)
+
+    ! the terms of the polynomials PV1, PV2 of the order 1, 2 or 3
+    ! (3: all, the radial terms r and r**3 included), with the scale
+
+    integer, intent(in) :: order
+    logical, dimension(0:24) :: free
+    logical, dimension(0:11) :: t
+
+    t = .true.
+    if( order <= 2 ) t([3,7,8,9,10,11]) = .false.
+    if( order <= 1 ) t([4,5,6]) = .false.
+    free(0) = .true.
+    free(1:12) = t
+    free(13:24) = t
+
+  end function deforder
+
+
+  subroutine defmatch(type,alpha,delta,xpix,ypix,acen,dcen,xcen,ycen, &
+       sc,rot,refl,pvi,tol,i1,i2)
+
+    ! The cross-match of the reference (alpha,delta) and the frame stars
+    ! (xpix,ypix) by the solution with the deformation pvi (in the
+    ! internal convention of defmin, the u = -xi frame), within tol [deg]
+
+    use astrometry_deformfun
+    use astrotrafo
+    use nearmatch
+
+    character(len=*), intent(in) :: type
+    real(dbl), dimension(:), intent(in) :: alpha,delta,xpix,ypix
+    real(dbl), intent(in) :: acen,dcen,xcen,ycen,sc,rot,refl,tol
+    real(dbl), dimension(:,0:), intent(in) :: pvi
+    integer, dimension(:), allocatable, intent(out) :: i1,i2
+
+    real(dbl), dimension(size(alpha)) :: u,v
+    real(dbl), dimension(size(xpix)) :: x,y,u1,v1,r
+    type(AstrometryProjection) :: tp
+    type(AstrometryGeometry) :: tg
+
+    call tp % init(type,acen,dcen)
+    call tp % proj(alpha,delta,u,v)
+    call tg % init(sc,rot,refl)
+    call tg % pix2uv(xpix-xcen,ypix-ycen,x,y)
+    call dist_fun(pvi,x,y,u1,v1,r)
+    call pairmatch(u,v,u1,v1,tol,i1,i2)
+
+  end subroutine defmatch
+
+
 
   subroutine defmin(type,rec,dec,refl,xpix,ypix,s,acen,dcen, &
-       sc,rot,stdsig,pv,verbose,reliable)
+       sc,rot,stdsig,pv,verbose,reliable,order,pvi)
 
-    ! fitting of the transformation by the robust method
+    ! fitting of the transformation by the robust method;
+    ! order (optional, 3 by default) limits the terms of the polynomials
+    ! (deforder), pvi (optional) is the initial solution on input (unless
+    ! zero) and the solution on output, both in the internal convention
+    ! of the fit (u = -xi, the FITS convention is pv)
 
     use astrometry_deformfun
     use oakleaf
@@ -377,6 +436,8 @@ contains
     real(dbl), dimension(:,0:), intent(out) :: pv
     logical, intent(in) :: verbose
     logical, intent(out) :: reliable
+    integer, intent(in), optional :: order
+    real(dbl), dimension(:,0:), intent(in out), optional :: pvi
 
     real(dbl), parameter :: macheps = epsilon(1.0_dbl)
     integer, parameter :: npar = 12
@@ -415,6 +476,12 @@ contains
     p(0) = s
     p(2) = 1
     p(npar+2) = 1
+    if( present(pvi) ) then
+       if( any(pvi /= 0) ) then
+          p(1:npar) = pvi(1,:)
+          p(npar+1:) = pvi(2,:)
+       end if
+    end if
 
     call tp % init(type,acen,dcen)
     call tp % proj(rec,dec,uref,vref)
@@ -422,6 +489,11 @@ contains
     call tg % pix2uv(xpix,ypix,x,y)
 
     fun = deform_bfgs(x,y,uref,vref,sc,rot,refl,u1,v1,rdist)
+    if( present(order) ) then
+       fun % free = deforder(order)
+       ! the terms out of the order are zero
+       where( .not. fun % free ) p = 0
+    end if
     call bfgsmin(fun,p,B,gtol,maxiter,verbose,'',iflag)
     reliable = iflag == 0 .or. iflag == 1
 
@@ -435,6 +507,7 @@ contains
     s = p(0)
     pv(1,:) = p(1:npar)
     pv(2,:) = p(npar+1:)
+    if( present(pvi) ) pvi = pv
 
     ! The deformation has been fitted in the rectangular coordinates (u,v),
     ! where u = -xi is flipped against the FITS intermediate world
