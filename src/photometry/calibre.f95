@@ -61,12 +61,19 @@ contains
 
   subroutine syscal(ph,dph,ct,dct,mode,t,dt,sys,verbose)
 
-    ! The calibration t = ph / ct (fmean) with the systematic error:
-    ! mode < 0 (auto): the excess scatter of the relative residuals
-    ! (ph - t*ct) / (t*ct) over their errors (exscatter), mode >= 0:
-    ! the given value [mag]. When the systematic error is positive, it is
-    ! added in quadrature to the relative errors of ct and t is fitted
-    ! again; sys is the systematic error in magnitudes.
+    ! The calibration t = ph / ct with the systematic error:
+    ! mode = 0: t by fmean, no systematic error;
+    ! mode > 0: the given value [mag], added in quadrature to the relative
+    ! errors of ct, t by fmean with these errors;
+    ! mode < 0 (auto): t and the systematic error (the excess scatter of
+    ! the stars over their errors) together by the likelihood of a mixture
+    ! of the calibration stars and outliers (mixture_mean of exscatter):
+    ! log t is the mean of log(ph/ct) weighted by the probabilities of
+    ! the stars to be inliers and by their errors with the excess scatter,
+    ! the excess scatter by the restricted likelihood of the inliers
+    ! (unbiased for few stars), so outliers (misidentified stars, blends,
+    ! variables) have no weight in either.
+    ! sys is the systematic error in magnitudes.
 
     use oakleaf
     use exscatter
@@ -77,29 +84,39 @@ contains
     logical, intent(in) :: verbose
 
     real(dbl), parameter :: mag = 1.0857362047581294_dbl  ! 2.5 / ln(10)
-    real(dbl), dimension(:), allocatable :: r,e,dc
-    real(dbl) :: srel
-    integer :: iter
+    real(dbl), dimension(:), allocatable :: y,e,dc
+    logical, dimension(:), allocatable :: valid
+    real(dbl) :: srel, mu, dmu, fout
 
     call fmean(ph,dph,ct,dct,t,dt,verbose=verbose)
     sys = 0
     if( size(ph) < 3 .or. mode == 0 ) return
 
-    allocate(r(size(ph)),e(size(ph)),dc(size(ph)))
-    dc = dct
-    do iter = 1, 3
-       if( mode < 0 ) then
-          r = (ph - t*ct) / (t*ct)
-          e = sqrt(dph**2 + t**2*dct**2) / (t*ct)
-          call excess_scatter(r,e,srel)
-       else
-          srel = mode / mag
-       end if
-       if( .not. (srel > 0) ) exit
-       dc = sqrt(dct**2 + (srel*ct)**2)
-       call fmean(ph,dph,ct,dc,t,dt,verbose=verbose)
-       if( mode >= 0 ) exit
-    end do
+    if( mode < 0 ) then
+       allocate(y(size(ph)),e(size(ph)),valid(size(ph)))
+       valid = ph > 0 .and. ct > 0 .and. dph >= 0 .and. dct >= 0
+       where( valid )
+          y = log(ph / ct)
+          e = sqrt((dph/ph)**2 + (dct/ct)**2)
+       elsewhere
+          y = 0
+          e = -1
+       end where
+       if( count(valid .and. e > 0) < 3 ) return
+       call mixture_mean(y,e,mu,dmu,srel,fout)
+       t = exp(mu)
+       dt = t * dmu
+       sys = srel * mag
+       if( verbose ) write(*,'(a,f0.5,a,f0.3,a,1pg0.6,a,1pg0.2)') &
+            ' Systematic error: ',sys,' mag, outlier fraction: ',fout, &
+            ', calibration: ',t,' +- ',dt
+       return
+    end if
+
+    allocate(dc(size(ph)))
+    srel = mode / mag
+    dc = sqrt(dct**2 + (srel*ct)**2)
+    call fmean(ph,dph,ct,dc,t,dt,verbose=verbose)
     sys = srel * mag
     if( verbose ) write(*,'(a,f0.5,a)') ' Systematic error: ',sys,' mag'
 
