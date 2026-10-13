@@ -67,7 +67,6 @@ contains
     use calibre
     use fotran
     use mfits
-    use colorex
 
     real, parameter :: pi = 3.14159
 
@@ -256,13 +255,19 @@ contains
     allocate(mag(ncat,nfiles),dmag(ncat,nfiles),phr(ncat,nfiles), &
          dphr(ncat,nfiles))
 
-    if( nfiles > 1 ) then
-       ! estimate effective extinction, passbands correspond to frames
-       if( any(leff < 0) ) stop 'Filter of a frame not found in photometry system.'
-       call scaterr(leff,ctph,airmass,k0,r,lref)
-    else
-       r = -1
-    end if
+    ! No correction for the colour dependence of the extinction is applied
+    ! (r < 0: no extinction model in the header). The correction used for
+    ! more filters (colorex) estimated the extinction from CTPH, which is
+    ! the efficiency of the whole instrument, and corrected the photons of
+    ! the outputs only, not of the calibration: the magnitudes had a colour
+    ! term against the calibration stars themselves (BUGS P43). The colour
+    ! terms of an instrument, the second order extinction among them, are
+    ! the transformation of phfotran (--tratab), fitted by the stars.
+    if( nfiles > 1 .and. any(leff < 0) ) &
+         stop 'Filter of a frame not found in photometry system.'
+    k0 = 0
+    r = -1
+    lref = 0
 
     do i = 1,ncat
        if( nfiles == 1 )then
@@ -309,13 +314,17 @@ contains
 !          write(*,*) sqrt(abs(ph(i,:))),sqrt(dphsky(i,:)**2*nsky(1)**2), &
           !               sqrt(dphsky(i,:)**2*pi*nsky(1)**2)
        else
+          ! the errors of the counts and of the calibration as for one frame
+          where( ct(i,:) > 0 .and. dct(i,:) > 0 )
+             dct(i,:) = sqrt(ctph**2*dct(i,:)**2 + ct(i,:)**2*dctph**2) / xctph
+          elsewhere
+             dct(i,:) = -1
+          end where
           ct(i,:) = ctph * ct(i,:) / xctph
-          dct(i,:) = ctph * dct(i,:) / xctph !! needs correction !!!
           sky(i,:) = ctph * sky(i,:) / xctph
           dsky(i,:) = ctph * dsky(i,:) / xctph
           call fotra(tra,pairs,ct(i,:),dct(i,:),phr(i,:),dphr(i,:))
           call fotra(tra,pairs,sky(i,:),dsky(i,:),phsky(i,:),dphsky(i,:))
-          call correx(leff,lfwhm/2,airmass,k0,r,lref,phr(i,:))
           where( phr(i,:) > 0 )
              dphr(i,:) = sqrt(dphr(i,:)**2 + (srel*phr(i,:))**2)
              ph(i,:) = phr(i,:) * xctph

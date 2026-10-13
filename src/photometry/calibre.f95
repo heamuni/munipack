@@ -124,32 +124,43 @@ contains
 
     real(dbl),dimension(:,:),allocatable :: ct, dct
     real(dbl),dimension(:,:),allocatable :: relerr
+    real(dbl),dimension(:),allocatable :: c, dc
     real(dbl) :: mode, s
     integer :: i,n,ndat,npht
 
     ndat = size(pht,1)
     npht = size(pht,2)
-    allocate(ct(ndat,npht),dct(ndat,npht),relerr(ndat,npht))
+    allocate(ct(ndat,npht),dct(ndat,npht),relerr(ndat,npht),c(ndat),dc(ndat))
 
+    ! the catalogue photons transformed to the instrumental filters
     do i = 1, ndat
        call fotra(tr,pairs,pht(i,:),dpht(i,:),ct(i,:),dct(i,:))
     end do
 
+    ! every filter as in calibr: the missing errors by Poisson
     mode = 0
     if( present(syserr) ) mode = syserr
     do n = 1, npht
        if( verbose ) write(*,*) 'Filter: ',trim(filters(n))
-       call syscal(ct(:,n),dct(:,n),cts(:,n),dcts(:,n),mode,ctph(n),dctph(n), &
-            s,verbose)
+       c = cts(:,n)
+       dc = dcts(:,n)
+       where( ct(:,n) > 0 .and. dct(:,n) < epsilon(dct) )
+          dct(:,n) = sqrt(ct(:,n))
+       end where
+       where( c > 0 .and. dc < epsilon(dc) )
+          dc = sqrt(c)
+       end where
+       call syscal(ct(:,n),dct(:,n),c,dc,mode,ctph(n),dctph(n),s,verbose)
        if( present(sys) ) sys(n) = s
     end do
 
+    ! the counts converted to the photons of the catalogue filters
     do i = 1, ndat
        call fotra(tr1,pairs,cts(i,:)*ctph,dcts(i,:),ct(i,:),dct(i,:))
     end do
 
     do n = 1, npht
-       relerr(:,n) = (pht(:,n) - ct(:,n))/pht(:,n)
+       relerr(:,n) = (pht(:,n) - ct(:,n)) / ((pht(:,n) + ct(:,n)) / 2)
     end do
 
     phres(:)%ctph = ctph
@@ -161,7 +172,7 @@ contains
        phres(i)%res = relerr(:,i)
     end do
 
-    deallocate(ct,dct)
+    deallocate(ct,dct,relerr,c,dc)
 
   end subroutine caliber
 

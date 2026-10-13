@@ -42,7 +42,7 @@ module fotran
   integer, private :: ncts, npht, ndat
   logical, private :: verbose
 
-  private :: res,relerr,robfcn,medtri,derfcn,grouping
+  private :: res,relerr,robfcn,medtri,derfcn,grouping,diagonal
 
 contains
 
@@ -217,6 +217,25 @@ contains
     real(dbl) :: ph,c
     integer:: i,j,k,l,n,m,ntriplets,ntwins,lref
 
+    ! A diagonal matrix (no transformation table: the identity) has no
+    ! colour terms: every filter by itself, so a band is defined when
+    ! the others are not (saturated, faint), as for a single filter.
+    if( all(pack(t,mask=.not. diagonal(size(t,1),size(t,2))) == 0) ) then
+       do n = 1, size(cts)
+          if( cts(n) > 0 ) then
+             pht(n) = t(n,n) * cts(n)
+          else
+             pht(n) = -1
+          end if
+          if( pht(n) > 0 .and. dcts(n) > 0 ) then
+             dpht(n) = t(n,n) * dcts(n)
+          else
+             dpht(n) = -1
+          end if
+       end do
+       return
+    end if
+
     call grouping(pairs,ntriplets,triplets,ntwins,twins,lref,refpair)
 
     do n = 1,ntriplets
@@ -276,7 +295,8 @@ contains
                   ci0*(t(j,i) + t(j,m))/t(j,j))
           end if
           pht(i) = ph * pht(j)
-          dpht(i) = pht(i) * (dcts(j) / cts(j))
+          ! the relative error of the band itself (it was the one of j)
+          dpht(i) = pht(i) * (dcts(i) / cts(i))
        else
           pht(i) = -1
           dpht(i) = -1
@@ -349,6 +369,22 @@ contains
   end subroutine fotra
 
 
+
+
+  pure function diagonal(m,n) result(d)
+
+    ! the mask of the diagonal of a m x n matrix
+
+    integer, intent(in) :: m,n
+    logical, dimension(m,n) :: d
+    integer :: i
+
+    d = .false.
+    do i = 1, min(m,n)
+       d(i,i) = .true.
+    end do
+
+  end function diagonal
 
 
   subroutine ratio(x,y,dx,dy,r,dr)

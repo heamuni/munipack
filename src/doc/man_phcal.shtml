@@ -147,6 +147,28 @@ are transformed from instrumental to a relative standard counts
 and the calibration is performed on the kind of counts.
 </p>
 
+<p id="multi">
+<b>Several filters.</b> The expected photons of every filter are
+derived from the catalogue magnitude in the filter itself (the same
+conversion as <a href="man_artificial.html">artificial</a> uses to render
+a frame). Without <samp>--tratab</samp> the instrumental and standard
+filters are identical (the transformation is the identity) and every
+filter is calibrated by itself: the results equal those of the frames
+calibrated one at a time, except that the calibration stars must be
+found on all the frames and the output tables contain the stars found
+on all of them. Colour terms of an instrument (a passband different from
+the standard one, the colour dependence of the extinction) are described by
+the transformation table of <a href="man_phfotran.html">phfotran</a>;
+with it, the calibration and the conversion of the counts use the colours
+of the stars. Older versions corrected the photons of the outputs of
+more filters by an "effective extinction" estimated from the calibration
+ratios (CTPH, the efficiency of the instrument rather than of the
+atmosphere), not the calibration itself: the magnitudes had a colour
+term against the catalogue, 0.1–0.2 mag per magnitude of B−V
+in B on simulated frames (header keywords EXTIN_K0, EXTIN_R,
+EXTINREF, no longer written).
+</p>
+
 
 <h2 id="modes">Operational modes</h2>
 
