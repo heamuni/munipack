@@ -358,7 +358,12 @@ munipack psfphot [.. parameters ..] file(s)
     uses the sky of aphot (or the clipped mean in the annulus); before the
     next passes, the sky is re-estimated in the annulus of the frame with
     all fitted stars subtracted, so the light of neighbours (and of the
-    star itself) does not bias it. Both are the mean clipped by the noise
+    star itself) does not bias it; the pixels where the subtracted light
+    has a photon variance above a quarter of the variance of the sky are
+    left out (its noise is symmetric, while the clip of the noise model
+    is not: it raised the sky by 4.6% of 0.42 e-/pixel among the stars
+    of a 32 pixel grid and lowered the fluxes of faint stars by 0.2σ in
+    versions before 0.6.2+hg1653 patched). Both are the mean clipped by the noise
     model, as the sky of <a href="man_aphot.html#sky">aphot</a> (a median
     or a mean clipped at 3σ by the median absolute deviation is biased on
     a sky of a few photons per pixel).

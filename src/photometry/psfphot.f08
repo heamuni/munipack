@@ -929,12 +929,20 @@ contains
     subroutine annulus_sky(star)
 
       ! The sky by the clipped mean in the annulus (of aphot) of the frame
-      ! with all fitted stars subtracted.
+      ! with all fitted stars subtracted. The pixels with the light of the
+      ! fitted stars are left out: the photon noise of the subtracted
+      ! light is symmetric, while the clip of the noise model of the sky
+      ! is not (a Poisson tail above, 5 sigma below), so it raised the sky
+      ! (+4.6% of a sky of 0.42 e-/pixel among the stars of a 32 pixel
+      ! grid, faint stars -0.2 sigma low). The light is significant when
+      ! its photon variance exceeds a quarter of the variance of the sky
+      ! (all pixels are used when fewer than 10 are left).
 
       type(StarFit), intent(in out) :: star
 
       real(REAL64), dimension(:), allocatable :: s
-      real(REAL64) :: r1, r2, r, mean, sig, sdev
+      logical, dimension(:), allocatable :: lit
+      real(REAL64) :: r1, r2, r, mean, sig, sdev, v4, g
       integer :: i, j, n, m
 
       if( frame%ring(1) > 0 .and. frame%ring(2) > frame%ring(1) ) then
@@ -945,7 +953,9 @@ contains
          r2 = r1 + max(5.0_REAL64,star%fitrad)
       end if
       m = ceiling(r2)
-      allocate(s((2*m+1)**2))
+      allocate(s((2*m+1)**2),lit((2*m+1)**2))
+      v4 = fr%variance(star%sky) / 4
+      g = max(fr%gain,epsilon(g))
       n = 0
       do j = nint(star%y) - m, nint(star%y) + m
          do i = nint(star%x) - m, nint(star%x) + m
@@ -956,10 +966,15 @@ contains
             if( r1 <= r .and. r <= r2 ) then
                n = n + 1
                s(n) = fr%data(i,j) - fr%mstar(i,j)
+               lit(n) = fr%mstar(i,j) / g > v4
             end if
          end do
       end do
       if( n < 10 ) return
+      if( count(.not. lit(1:n)) >= 10 ) then
+         s(1:count(.not. lit(1:n))) = pack(s(1:n),.not. lit(1:n))
+         n = count(.not. lit(1:n))
+      end if
 
       ! the mean clipped by the noise model (skymean): a symmetric clip
       ! by the scatter (at 3 sigma by the median absolute deviation, as
