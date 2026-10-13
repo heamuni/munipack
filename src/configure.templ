@@ -231,28 +231,37 @@ AC_ARG_ENABLE([caf],
 AS_HELP_STRING([--disable-caf],[disable support for parallel processing in Fortran]),
 	 disable_caf=yes,disable_caf=no)
 
-if test "x$disable_caf" = "xno"; then
-   haveCAF="yes"
-AC_CHECK_LIB([caf_mpich],[_gfortran_caf_num_images],
-	AC_SUBST(CAF_FCFLAGS,["`pkg-config --cflags caf-mpich` -fcoarray=lib"])
-	AC_SUBST(CAF_LIBS,[`pkg-config --libs caf-mpich`]),
-	AC_SUBST(CAF_FCFLAGS,[-fcoarray=single])
-	AC_SUBST(CAF_LIBS,[-lcaf_single]),
-	[`pkg-config --silence-errors --libs caf-mpich`])
-AC_CHECK_LIB([caf_openmpi],[_gfortran_caf_num_images],
-	AC_SUBST(CAF_FCFLAGS,["`pkg-config --cflags caf-openmpi` -fcoarray=lib"])
-	AC_SUBST(CAF_LIBS,[`pkg-config --libs caf-openmpi`]),
-	AC_SUBST(CAF_FCFLAGS,[-fcoarray=single])
-	AC_SUBST(CAF_LIBS,[-lcaf_single]),
-	[`pkg-config --silence-errors --libs caf-openmpi`])
-AC_CHECK_PROGS([cafrun],[mpirun])
-AC_DEFINE([HAVE_CAF],1,[Have support of coarrays in Fortran])
-else
+dnl The programs with coarrays (artificial, astrometry) are built for
+dnl a single process (the single-image library of gfortran). With
+dnl a coarray library on top of MPICH or Open MPI (OpenCoarrays), their
+dnl parallel variants (artificial-caf, astrometry-caf) are built too and
+dnl launched by mpirun for more processes. The checks are exclusive (the
+dnl failed second check replaced the found first library by the single-image
+dnl one); mpirun is used only with an MPI library (a single-image program
+dnl would do the whole task in every process).
 AC_SUBST(CAF_FCFLAGS,[-fcoarray=single])
 AC_SUBST(CAF_LIBS,[-lcaf_single])
+caf=""
+haveCAF="no"
+if test "x$disable_caf" = "xno"; then
+haveCAF="single process only"
+AC_CHECK_LIB([caf_mpich],[_gfortran_caf_num_images],[caf=caf-mpich],[],
+	[`pkg-config --silence-errors --libs caf-mpich`])
+if test "x$caf" = "x"; then
+AC_CHECK_LIB([caf_openmpi],[_gfortran_caf_num_images],[caf=caf-openmpi],[],
+	[`pkg-config --silence-errors --libs caf-openmpi`])
+fi
+if test "x$caf" != "x"; then
+   haveCAF="yes ($caf)"
+   AC_SUBST(CAFMPI_FCFLAGS,["`pkg-config --cflags $caf` -fcoarray=lib"])
+   AC_SUBST(CAFMPI_LIBS,[`pkg-config --libs $caf`])
+   AC_CHECK_PROGS([cafrun],[mpirun])
+fi
+AC_DEFINE([HAVE_CAF],1,[Have support of coarrays in Fortran])
 fi
 
 AM_CONDITIONAL([CAF],[test x$disable_caf = xno])
+AM_CONDITIONAL([CAFMPI],[test "x$caf" != "x"])
 
 
 dnl clean precompiled modules of fortran

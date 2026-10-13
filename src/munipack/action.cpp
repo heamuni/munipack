@@ -73,9 +73,13 @@ void MuniAction::SetCAF(const MuniCmdLineParser& cmd)
   if( cmd.Found("Xproc",&a) )
     xproc = a;
 
-  if( caf_in_action ) {
-    int maxproc = std::thread::hardware_concurrency();
-    int nproc = std::min(std::max(1,maxproc),mproc);
+  int maxproc = std::thread::hardware_concurrency();
+  int nproc = std::max(1,std::min(std::max(1,maxproc),mproc));
+
+  // One process runs the utility directly (built for a single process);
+  // more processes run its parallel variant (MUNIPACK_CAF_SUFFIX, built
+  // with the MPI coarray library) by the launcher.
+  if( caf_in_action && nproc > 1 ) {
     caf_nproc << nproc;
 
     args.push_back(caf_run);
@@ -88,9 +92,15 @@ void MuniAction::SetCAF(const MuniCmdLineParser& cmd)
       for(size_t i = 0; i < cproc.GetCount(); i++)
 	args.push_back(cproc[i]);
     }
-  }
 
-  args.push_back(GetCommand());
+#ifdef MUNIPACK_CAF_SUFFIX
+    args.push_back(GetCommand() + MUNIPACK_CAF_SUFFIX);
+#else
+    args.push_back(GetCommand());
+#endif
+  }
+  else
+    args.push_back(GetCommand());
 
   size_t argc = args.GetCount();
   wxChar **argv = new wxChar*[argc];

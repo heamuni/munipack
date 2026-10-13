@@ -40,6 +40,14 @@ RUN autoreconf -i \
     && make -j"$(nproc)" \
     && make install
 
+# Coarray Fortran on Open MPI (OpenCoarrays) for the parallel processes
+# (--mproc) of artificial and astrometry; configure finds it by pkg-config.
+# Ubuntu's MPICH 4.2.0 does not work: under its mpirun every process runs
+# alone as image 1 of 1.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libcoarrays-openmpi-dev libopenmpi-dev openmpi-bin \
+    && rm -rf /var/lib/apt/lists/*
+
 # Version string the upstream bootstrap would derive from `hg tags`.
 ARG MUNIPACK_VERSION=0.6.2+hg1653
 COPY src /build/src
@@ -54,14 +62,39 @@ RUN ./bootstrap --dev "${MUNIPACK_VERSION}" \
 FROM ubuntu:24.04
 
 ARG DEBIAN_FRONTEND=noninteractive
+# Open MPI depends on UCX, which depends on the AMD GPU runtime (with LLVM,
+# 150 MB), and on the hwloc plugins (libxml2 with ICU, X11; 45 MB). Neither
+# is used (processes on one host, no GPU: UCX and hwloc load them as
+# optional plugins), so empty placeholder packages stand in for them.
+RUN for p in libamdhip64-5 libhwloc-plugins; do \
+        mkdir -p /tmp/placeholder/$p/DEBIAN \
+        && printf 'Package: %s\nVersion: 99\nArchitecture: all\nMaintainer: Munipack Docker build\nDescription: empty placeholder, not used by Munipack\n' $p \
+           > /tmp/placeholder/$p/DEBIAN/control \
+        && dpkg-deb --build /tmp/placeholder/$p /tmp/placeholder/$p.deb \
+        && dpkg -i /tmp/placeholder/$p.deb || exit 1; \
+    done \
+    && rm -rf /tmp/placeholder
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libcurl4t64 ca-certificates \
         libcfitsio10t64 libwcs8 libminpack1 libgfortran5 \
+        libcaf-openmpi-3t64 openmpi-bin \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /opt/munipack /opt/munipack
 RUN echo /opt/munipack/lib > /etc/ld.so.conf.d/munipack.conf && ldconfig
 ENV PATH=/opt/munipack/bin:$PATH
+# One process unless --mproc N is given (MUNIPACK_CAF_MPROC is the default):
+# it runs the programs built for one process, as before, without MPI;
+# --mproc N > 1 runs artificial-caf, astrometry-caf by mpirun. Open MPI:
+# one-sided communication without UCX (UCX failed in MPI_Win_create with one
+# process), mpirun as root (the default user of the container), more
+# processes than cores (--mproc is limited by the logical CPUs, Open MPI
+# counts the cores), no help banners (MPI_ABORT on STOP with a message).
+ENV MUNIPACK_CAF_MPROC=1 \
+    OMPI_MCA_osc=^ucx \
+    OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 \
+    OMPI_MCA_rmaps_base_oversubscribe=1 \
+    OMPI_MCA_orte_execute_quiet=1
 WORKDIR /data
 ENTRYPOINT ["munipack"]
 CMD ["--help"]

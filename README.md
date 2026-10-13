@@ -25,8 +25,8 @@ docker build -t munipack:0.6.2-hg1653-fixes .
 
 What the build does:
 - Downloads and checks wxWidgets 3.3.3 and builds only its non-GUI part. This revision needs the wxWidgets 3.3 API; Ubuntu ships 3.2.
-- Builds OakLeaf from `deps/`, then Munipack.
-- Produces an image of about 170 MB.
+- Builds OakLeaf from `deps/`, then Munipack, with OpenCoarrays (Ubuntu's `libcoarrays-openmpi-dev`) for `--mproc`.
+- Produces an image of about 195 MB (Open MPI for the parallel processes takes 26 MB; placeholder packages keep out the GPU runtime and hwloc plugins that it would pull in, 190 MB).
 
 The first build takes roughly 10 minutes; later builds reuse the cached dependency layers.
 
@@ -119,10 +119,22 @@ munipack phcal --saper 7 -c cone.fits ... frame.fits     # uses APEE when presen
 - **Validation** (QUVIK-like 4096² 16-bit u-band frames, 4 seeds each, aperture 7 = 5.1 px, stars < 17 mag): with the field-dependent PSF (`dpsf.fits`) the residuals versus field radius go from −0.12…−0.07 (centre) to +0.07…+0.08 mag (edge); with `--psf-file` every radial bin is within ±0.015 mag and the robust scatter drops from 0.073–0.077 to 0.041–0.047 mag (psfphot with the file: 0.042–0.053); `--apcorr auto --apcorr-radial` gives the same (±0.016 mag, 0.040–0.046). `--syserr auto` alone finds σ_sys = 0.058–0.062 mag and brings the error-calibration statistic Q (without the 2–3 misidentified detections per frame, BUGS P25) from 1.55–1.63 to 1.05–1.15. On Gaussian frames σ_sys = 0–0.003 mag and the automatic EE is constant, so results are unchanged.
 - **Limits:** the automatic EE needs bright isolated stars (≈30 on these shallow 20 s frames) and a correct FIND FWHM: on a frame with a 9.9 px Gaussian PSF found with FWHM 5.2 (split detections), `--apcorr-radial` fitted a spurious variation (scatter 0.051 → 0.070 mag; the x,y model stayed constant). The additive sky bias of APCOUNT (BUGS P23) and the outliers that kept the unclipped Q of aperture routes high on the `dpsf.fits` frames (BUGS P25: split detections, faint stars in the wings of bright ones) are fixed.
 
+## Parallel processing
+
+`artificial` and `astrometry` distribute the frames over `--mproc N` processes (Fortran coarrays on Open MPI by OpenCoarrays):
+
+```bash
+docker run --rm -u $(id -u):$(id -g) -v "$PWD":/data munipack:0.6.2-hg1653-fixes \
+  artificial -c cone.fits --count 8 --seed 3 --mproc 4
+```
+
+- One process (the default of the image, `MUNIPACK_CAF_MPROC=1`) runs the programs built for one process, exactly as before, without MPI. `--mproc N` > 1 runs their parallel variants (`artificial-caf`, `astrometry-caf`) by `mpirun`.
+- The results do not depend on N: `artificial --seed` frames are bit-identical for 1, 2 and 4 processes (8 frames of 2048² with the SEEING PSF: 69 s with one process, 19.5 s with four), `astrometry` solutions are identical.
+- The image sets `OMPI_*` variables for Open MPI in a container (see the Dockerfile): no UCX one-sided communication, `mpirun` as root, more processes than cores, no help banners.
+
 ## Known limitations
 
-- `--mproc` (coarray multiprocessing) is not available: the image is built with `-fcoarray=single`.
-- The remaining open issues are listed in BUGS.md.
+- The open issues are listed in BUGS.md.
 
 ## Licence
 

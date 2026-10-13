@@ -45,10 +45,20 @@ only important errors should be delivered to users.
 </pre>
 
 <p>
-  Time demanding procedures are run in parallel.
+  Time demanding procedures (<samp>artificial</samp> and
+  <samp>astrometry</samp>, distributing the frames over the processes)
+  are run in parallel.
   If the appropriate amount of cores is available,
   three processes are launched by default.
-  The amount is specified by <samp>--mproc</samp>.
+  The amount is specified by <samp>--mproc</samp>
+  (limited by the number of logical processors).
+  One process runs the program built for a single process, without MPI;
+  more processes run its parallel variant (<samp>artificial-caf</samp>,
+  <samp>astrometry-caf</samp>, built when a coarray library on top of MPI
+  is available) by <samp>mpirun</samp>. The results do not depend on the
+  number of processes (with <samp>artificial --seed</samp>, the frames
+  are bit-identical). The Docker image runs one process by default
+  (MUNIPACK_CAF_MPROC=1).
 </p>
 
 <pre>
