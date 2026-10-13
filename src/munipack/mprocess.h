@@ -42,6 +42,7 @@ class MuniProcess: public wxProcess
   size_t Index;
   wxArrayString Input,Output,Error;
   bool echo;
+  bool broken;
 
   wxChar *chardup(const wxChar *) const;
   void deallocate_argv();

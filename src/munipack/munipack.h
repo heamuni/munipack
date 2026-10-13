@@ -29,6 +29,19 @@
 #include <wx/process.h>
 
 
+// Prints the error message and terminates munipack with the exit code 1.
+// (wxLogFatalError aborts: its exit code, 134 or 139, looks like a crash.)
+[[noreturn]] void MuniFatalError(const wxString&);
+
+// The same with a format string (as wxString::Format).
+template<typename T, typename... Args>
+[[noreturn]] void MuniFatalError(const wxString& fmt, const T& a,
+				 const Args&... args)
+{
+  MuniFatalError(wxString::Format(fmt,a,args...));
+}
+
+
 class MuniCmdLineParser: public wxCmdLineParser
 {
   wxArrayString lstfiles;

@@ -35,12 +35,14 @@
 #include <wx/datetime.h>
 #include <cstring>
 
-#define EXITCODE 13
+// the exit code of a failed utility: STOP with a message (as 'STOP Error:
+// ...') or no STOP 0; it is the exit code of all errors of munipack
+#define EXITCODE 1
 
 MuniProcess::MuniProcess(wxEvtHandler *h, const wxString& c,
   			 const wxArrayString& args):
   wxProcess(h),command(c),argv(0),exitcode(EXITCODE),timer(this),tick(250),Index(0),
-  echo(true)
+  echo(true),broken(false)
 {
   size_t argc = args.GetCount() + 2;
   argv = new wxChar*[argc];
@@ -102,6 +104,9 @@ void MuniProcess::OnStart()
 
   if( pid <= 0 ) {
     wxLogError("Failed to launch the external command `" + command + "'.");
+    // notify the parent process, nothing else would end its event loop
+    exitcode = 1;
+    wxQueueEvent(this,new wxProcessEvent(wxEVT_END_PROCESS,0,exitcode));
     return;
   }
 
@@ -258,6 +263,10 @@ void MuniProcess::OnTerminate(int pid, int status)
   else
     exitcode = status;
 
+  // the input could not be passed (Send)
+  if( broken )
+    exitcode = 1;
+
   wxTimeSpan ts(wxTimeSpan::Milliseconds(stopwatch.Time()));
   wxLogDebug("MuniProcess::OnTerminate: Exitcode: %d, "+
 	     ts.Format("Elapsed time: %Hh %Mm %S.%ls"),exitcode);
@@ -302,9 +311,17 @@ void MuniProcess::Send()
     */
     out.WriteString(Input[Index]+"\n");
 
-    if( GetOutputStream()->GetLastError() == wxSTREAM_WRITE_ERROR )
-      wxLogFatalError("mprocess send(): "
-		      "generic write error on the last write call.");
+    if( GetOutputStream()->GetLastError() == wxSTREAM_WRITE_ERROR ) {
+      // the utility does not read its input (it has probably failed):
+      // stop it; OnTerminate() reports the failure, exit code 1
+      wxLogError("mprocess send(): "
+		 "generic write error on the last write call.");
+      broken = true;
+      Index = Input.GetCount();
+      CloseOutput();
+      Kill(wxSIGKILL);
+      return;
+    }
 
     // if no byte is successfully written, then the output buffer is full
     // of a garbage; we're going to idle state to enable processing

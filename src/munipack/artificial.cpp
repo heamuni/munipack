@@ -33,7 +33,7 @@ static void CheckPair(const MuniCmdLineParser& cmd, const wxString& a,
 		      const wxString& b)
 {
   if( cmd.Found(a) != cmd.Found(b) )
-    wxLogFatalError("Both --"+a+" and --"+b+" must be given together.");
+    MuniFatalError("Both --"+a+" and --"+b+" must be given together.");
 }
 
 MuniArtificial::MuniArtificial(wxEvtHandler *han, const MuniCmdLineParser& cmd):
@@ -42,7 +42,7 @@ MuniArtificial::MuniArtificial(wxEvtHandler *han, const MuniCmdLineParser& cmd):
 #ifdef HAVE_CAF
   long np;
   if( cmd.Found("mproc",&np) && np <= 0 )
-    wxLogFatalError("The number of parallel processes (--mproc) must be positive.");
+    MuniFatalError("The number of parallel processes (--mproc) must be positive.");
   SetCAF(cmd);
 #endif
 
@@ -159,13 +159,13 @@ MuniArtificial::MuniArtificial(wxEvtHandler *han, const MuniCmdLineParser& cmd):
 
   if( cmd.Found("dark",&x) ) {
     if( x < 0 )
-      wxLogFatalError("Dark current (--dark) must be non-negative.");
+      MuniFatalError("Dark current (--dark) must be non-negative.");
     Write("DARK = %.17g",x);
   }
 
   if( cmd.Found("readnoise",&x) ) {
     if( x < 0 )
-      wxLogFatalError("Read-out noise (--readnoise) must be non-negative.");
+      MuniFatalError("Read-out noise (--readnoise) must be non-negative.");
     Write("READNOISE = %.17g",x);
   }
 
@@ -233,6 +233,9 @@ MuniArtificial::MuniArtificial(wxEvtHandler *han, const MuniCmdLineParser& cmd):
   if( cmd.Found("disable-noise") )
     Write("NOISE = F");
 
+  if( cmd.Found("no-watermark") )
+    Write("WATERMARK = F");
+
   if( cmd.Found("c",&cname) || cmd.Found("cat",&cname) ) {
 
     wxString vocat;
@@ -242,6 +245,9 @@ MuniArtificial::MuniArtificial(wxEvtHandler *han, const MuniCmdLineParser& cmd):
       vocat = a;
 
     VOCatConf catalogs(vocat);
+    if( ! catalogs.IsOk() )
+      MuniFatalError("Failed to read the definition file of catalogues `"
+		     + vocat + "'.");
     VOCatResources cat(catalogs.GetCatFits(cname));
 
     if( cmd.Found("col-ra",&a) )

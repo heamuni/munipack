@@ -629,15 +629,18 @@ contains
     tunit(3:4) = ''
     tunit(7) = ''
 
+    ! MATCH of a star (row j, catalogue star i1(j)) is its position
+    ! in the match sequence id1, zero for the stars added by the final
+    ! cross-match; the sequence can be longer than the rows (stars
+    ! of the sequence rejected by the fit), it was used as the row index
     idx = 0
-    do i = 1, size(id1)
-       write(error_unit,*) i,id1(i)
-       do j = 1, size(i1)
-          if( i1(j) == id1(i) ) then
-             idx(i) = j
+    do j = 1, n
+       do i = 1, size(id1)
+          if( id1(i) == i1(j) ) then
+             idx(j) = i
+             exit
           end if
        end do
-       !idx(i) = id(i)
     end do
 
     call fits_insert_btbl(fits,ncols,ttype,tform,tunit,ASTROREPORT,status)

@@ -174,6 +174,9 @@ MuniAstrometry::MuniAstrometry(wxEvtHandler *h, const MuniCmdLineParser& cmd):
 	vocat = a;
 
       VOCatConf catalogs(vocat);
+      if( ! catalogs.IsOk() )
+	MuniFatalError("Failed to read the definition file of catalogues `"
+		       + vocat + "'.");
       VOCatResources cat(catalogs.GetCatFits(cone));
 
       if( cmd.Found("col-ra",&a) )
@@ -222,7 +225,7 @@ MuniAstrometry::MuniAstrometry(wxEvtHandler *h, const MuniCmdLineParser& cmd):
 	Write("NSEQ = %ld",nseq);
       }
       if( nseq != t.CountTokens() )
-	wxLogFatalError("Specified sequences are unequal in length.");
+	MuniFatalError("Specified sequences are unequal in length.");
 
       Write("SEQ1 = '" + a + "'");
     }
@@ -234,7 +237,7 @@ MuniAstrometry::MuniAstrometry(wxEvtHandler *h, const MuniCmdLineParser& cmd):
 	Write("NSEQ = %ld",nseq);
       }
       if( nseq != t.CountTokens() )
-	wxLogFatalError("Specified sequences are unequal in length.");
+	MuniFatalError("Specified sequences are unequal in length.");
 
       Write("SEQ2 = '" + a + "'");
     }

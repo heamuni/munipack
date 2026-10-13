@@ -790,9 +790,6 @@ contains
              call wcs_delete_report(fits,status)
              if( report ) then
                 n = size(ares)
-                write(error_unit,*) 'n=',n
-                write(error_unit,*) 'id1:',id1
-                write(error_unit,*) 'i1:',i1(1:n)
                 call wcsreport(fits,epoch,com,alpha(i1(1:n)),delta(i1(1:n)), &
                      x(i2(1:n)),y(i2(1:n)),ares(1:n),dres(1:n),i1(1:n),id1,status)
              end if

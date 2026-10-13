@@ -34,5 +34,5 @@ MuniSesame::MuniSesame(wxEvtHandler *h, const MuniCmdLineParser& cmd):
   if( cmd.GetParamCount() > 0 )
     Write("OBJECT = '"+cmd.GetParam(0)+"'");
   else
-    wxLogFatalError("Object name not given.");
+    MuniFatalError("Object name not given.");
 }

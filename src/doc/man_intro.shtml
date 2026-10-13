@@ -77,6 +77,9 @@ a default parameters and provide a way for fine tune of a processing.
 The last argument <em>files</em> specify files to be processed.
 Usually, names with wildcards (* or ?) are provided.
 To read filenames from its standard input, a dash (-) should be passed too.
+The action is the first argument which is the name of an action; later
+ones are values of options or files (<samp>munipack astrometry -m cross
+frame.fits</samp> is the astrometry in the cross mode).
 </p>
 
 <p class="indent">
@@ -150,6 +153,16 @@ by cFITSIO library for conventional use in shell scripts.
 Sometimes, one can be difficult to understand error messages.
 The option <samp>--verbose</samp> which prints a lot of garbage
 can help.
+</p>
+
+<h2>Exit status</h2>
+<p>
+The exit status is 0 on success (also for <samp>--help</samp>
+and <samp>--version</samp>) and 1 on an error: an invalid command
+line or option value, an unreadable input, or a failure of the processing
+utility. The reason is printed on the standard error output.
+A utility killed by a signal gives 256 minus the signal number
+(245 for a segmentation fault).
 </p>
 
 <h2>Golden Rule</h2>

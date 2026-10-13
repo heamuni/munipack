@@ -20,6 +20,12 @@ Print this help. Try with a selected action.
 .TP
 .B \-\-version
 Print version and license.
+.SH EXIT STATUS
+0 on success (also for \-\-help and \-\-version), 1 on an error:
+an invalid command line or option value, an unreadable input,
+or a failure of the processing utility. The reason is printed
+on the standard error output. A utility killed by a signal gives
+256 minus the signal number (245 for a segmentation fault).
 .SH COPYRIGHT
 Copyright © 2009-2016 Filip Hroch <hroch@physics.muni.cz>.
 License  GPLv3+:  GNU

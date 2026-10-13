@@ -68,7 +68,7 @@ void Munipack::calibrate(MuniCmdLineParser& cmd)
   size_t cidx = 0;
   wxString tmpname = wxFileName::CreateTempFileName("munipack-calibrate-");
   if( tmpname.IsEmpty() )
-    wxLogFatalError("Failed to create temporary files.");
+    MuniFatalError("Failed to create temporary files.");
     
   MuniProcess *action = new MuniProcess(&pipe,"cone");
   pipe.push(action);

@@ -137,6 +137,8 @@ contains
          col_mag(1),key_epoch,ra1,dec1,flux1,catid1,status)
     call tabcoo(file(2),col_ra(2),col_dec(2),col_pmra(2),col_pmdec(2),&
          col_mag(2),key_epoch,ra2,dec2,flux2,catid2,status)
+    if( status /= 0 .or. .not. (allocated(ra1) .and. allocated(ra2)) ) &
+         stop 'Error: failed to read the coordinates of the tables.'
 
     allocate(idx(NFILE,max(size(ra1),size(ra2))))
 
@@ -266,9 +268,8 @@ contains
     pmalpha = pmalpha / 3.6e6_dbl  ! supposing mas/year
     pmdelta = pmdelta / 3.6e6_dbl
 
-    call fits_close_file(fits,status)
-
-    ! compute coordinates for the epoch
+    ! compute coordinates for the epoch (the file is closed below,
+    ! a second close failed with an invalid fitsfile pointer)
     allocate(ra(nrows),dec(nrows),flux(nrows))
     dt = (t - t0)/ 365.25
 

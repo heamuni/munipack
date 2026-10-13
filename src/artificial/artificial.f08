@@ -78,6 +78,7 @@ program artificial
   real(REAL64) :: readnoise = 0    ! read-out noise [e-]
   real(REAL64) :: bias = 0         ! bias level (pedestal) [ADU]
   logical      :: noise = .true.   ! data has added noise componets
+  logical      :: wmark = .true.   ! the watermark of the artificial origin
   integer      :: seed = 0         ! random generator seed
   logical      :: seed_defined = .false.
   real(REAL64) :: extink = 0.1     ! extinction coefficient
@@ -430,6 +431,10 @@ program artificial
 
            read(val,*) noise
 
+        else if( key == 'WATERMARK' ) then
+
+           read(val,*) wmark
+
         else if( key == 'NFILES' ) then
 
            read(val,*) nfiles
@@ -494,7 +499,7 @@ program artificial
         call catstars(cat,labels,prjcode,scale,angle,crval,crpix,phsys, &
              filter,xcoo,ycoo,flux)
      else
-        call genstars(maglim,naxes,xcoo,ycoo,flux)
+        call genstars(maglim,naxes,scale,xcoo,ycoo,flux)
      end if
      nstars_coo = size(xcoo)
 
@@ -603,6 +608,8 @@ program artificial
         if( cat == '' ) then
            write(error_unit,*) "Star coordinates and fluxes: random generated"
            write(error_unit,'(a,i0)') " Magnitude limit = ",maglim
+           write(error_unit,'(a,i0,a,es9.3,a)') " Random stars: ",size(xcoo), &
+                " in ",real(naxes(1),REAL64)*naxes(2)/scale**2," [deg2]"
         else
            write(error_unit,*) "Star coordinates and fluxes: by `",trim(cat),"'"
         end if
@@ -680,6 +687,7 @@ program artificial
   call co_broadcast(seed,1)
   call co_broadcast(seed_defined,1)
   call co_broadcast(noise,1)
+  call co_broadcast(wmark,1)
   call co_broadcast(extink,1)
   call co_broadcast(longitude,1)
   call co_broadcast(latitude,1)
@@ -847,6 +855,7 @@ contains
     real(REAL64) :: c,s,x,qe,see,extin,hwhms,jd2, sec, back, skyint, ccmag, &
          darkc, skyback, gback
     integer :: year, month, day, hour, minute, m, i, nevents
+    integer, dimension(4) :: wbox
     real(REAL64), dimension(:), allocatable :: xstar,ystar,fluxes,xvar, yvar, fvar
     type(fitsfiles) :: fits
     type(SprayType), target :: spsf
@@ -1017,7 +1026,8 @@ contains
 
     ! watermark, in electrons like the background level; before the
     ! conversion, so the saturation applies to it too
-    call watermark(sky,5*sqrt(back))
+    wbox = 0
+    if( wmark ) call watermark(sky,5*sqrt(back),wbox)
 
     ! make it realistic: analog-digital conversion
     sky = sky / gain + bias
@@ -1062,6 +1072,12 @@ contains
     call fits_write_key(fits,'DARKCUR',dark,-7,'[e-/s/pix] dark current',status)
     call fits_write_key(fits,'RDNOISE',readnoise,-7,'[e-] read-out noise',status)
     call fits_write_key(fits,'BIASLEV',bias,-15,'[ADU] bias level (pedestal)',status)
+    if( all(wbox > 0) ) then
+       call fits_write_key(fits,'WMARKX1',wbox(1),'[pix] watermark region, first x',status)
+       call fits_write_key(fits,'WMARKX2',wbox(2),'[pix] watermark region, last x',status)
+       call fits_write_key(fits,'WMARKY1',wbox(3),'[pix] watermark region, first y',status)
+       call fits_write_key(fits,'WMARKY2',wbox(4),'[pix] watermark region, last y',status)
+    end if
     if( seed_defined ) &
          call fits_write_key(fits,'ARTSEED',seed,'random generator seed',status)
     call fits_write_key(fits,FITS_KEY_HWHM,hwhms,-3, &

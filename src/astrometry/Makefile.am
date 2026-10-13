@@ -22,6 +22,9 @@ ldir = ../lib
 FITSLIBS = $(ldir)/libtitsio.a $(LIBCFITSIO)
 
 pkglibexec_PROGRAMS = astrometry cross
+if CAFMPI
+pkglibexec_PROGRAMS += astrometry-caf
+endif
 
 .NOTPARALLEL:
 
@@ -31,6 +34,20 @@ astrometry_SOURCES = match.f08 nearmatch.f08 estimator.f08 robfit.f08 deform.f08
 # lsfit.f08 absfit.f08
 astrometry_LDADD = $(ldir)/libastrosphere.a $(ldir)/libastrotrafo.a \
                    $(LIBOAKLEAF) $(WCSLIB_LIBS) $(FITSLIBS) $(CAF_LIBS)
+
+# The parallel variant (--mproc > 1, launched by mpirun): the main program,
+# the only source with coarrays, compiled for the MPI coarray library and
+# linked with the modules of astrometry (built for one process as before).
+astrometry_caf_SOURCES = astrometry.f08
+astrometry_caf_FCFLAGS = $(AM_FCFLAGS) $(CAFMPI_FCFLAGS)
+astrometry_caf_LDADD = astrometry-match.$(OBJEXT) astrometry-nearmatch.$(OBJEXT) \
+                       astrometry-estimator.$(OBJEXT) astrometry-robfit.$(OBJEXT) \
+                       astrometry-deform.$(OBJEXT) astrometry-astrofit.$(OBJEXT) \
+                       astrometry-astromatch.$(OBJEXT) astrometry-astrofits.$(OBJEXT) \
+                       $(ldir)/libastrosphere.a $(ldir)/libastrotrafo.a \
+                       $(LIBOAKLEAF) $(WCSLIB_LIBS) $(FITSLIBS) $(CAFMPI_LIBS)
+# the modules are compiled for astrometry
+astrometry_caf-astrometry.$(OBJEXT): astrometry-astrometry.$(OBJEXT)
 
 cross_SOURCES = crossmatch.f95 cross.f08
 cross_LDADD = $(ldir)/libastrosphere.a $(FITSLIBS)

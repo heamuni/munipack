@@ -73,9 +73,13 @@ void MuniAction::SetCAF(const MuniCmdLineParser& cmd)
   if( cmd.Found("Xproc",&a) )
     xproc = a;
 
-  if( caf_in_action ) {
-    int maxproc = std::thread::hardware_concurrency();
-    int nproc = std::min(std::max(1,maxproc),mproc);
+  int maxproc = std::thread::hardware_concurrency();
+  int nproc = std::max(1,std::min(std::max(1,maxproc),mproc));
+
+  // One process runs the utility directly (built for a single process);
+  // more processes run its parallel variant (MUNIPACK_CAF_SUFFIX, built
+  // with the MPI coarray library) by the launcher.
+  if( caf_in_action && nproc > 1 ) {
     caf_nproc << nproc;
 
     args.push_back(caf_run);
@@ -88,9 +92,15 @@ void MuniAction::SetCAF(const MuniCmdLineParser& cmd)
       for(size_t i = 0; i < cproc.GetCount(); i++)
 	args.push_back(cproc[i]);
     }
-  }
 
-  args.push_back(GetCommand());
+#ifdef MUNIPACK_CAF_SUFFIX
+    args.push_back(GetCommand() + MUNIPACK_CAF_SUFFIX);
+#else
+    args.push_back(GetCommand());
+#endif
+  }
+  else
+    args.push_back(GetCommand());
 
   size_t argc = args.GetCount();
   wxChar **argv = new wxChar*[argc];
@@ -130,7 +140,7 @@ void MuniAction::CommonOutputMultiple(const MuniCmdLineParser& cmd)
 
   if( cmd.Found("target-directory",&a) || cmd.Found("t",&a) ) {
     if( ! SetTargetDir(a) )
-      wxLogFatalError("Directory `"+target+"' does not exists.");
+      MuniFatalError("Directory `"+target+"' does not exists.");
   }
 
   if( cmd.Found("O") || cmd.Found("mask",&a) ) {
@@ -243,7 +253,7 @@ void MuniAction::WriteFilesMultiple(const wxArrayString& files)
       output = filenames[1];
     }
     else
-      wxLogFatalError("Required the format of input file: source-file [target-file]");
+      MuniFatalError("Required the format of input file: source-file [target-file]");
 
     Write("FILE = '" + filename + "' '" + output + "'");
   }
@@ -284,7 +294,7 @@ void MuniAction::dblstr(const wxString& a, const wxString &sep,
       n++;
     }
     else {
-      wxLogFatalError("Failed to interpret `"+c+"' as a numerical value.");
+      MuniFatalError("Failed to interpret `"+c+"' as a numerical value.");
       return;
     }
   }
@@ -303,24 +313,24 @@ wxString MuniAction::GetAdvanced(const wxString& filename) const
   wxString output;
 
   if( mask == "" )
-    wxLogFatalError("Regular expression mask is empty.");
+    MuniFatalError("Regular expression mask is empty.");
 
   wxRegEx rf(pattern);
   if( ! rf.IsValid() )
-    wxLogFatalError("Regular expression pattern `"+pattern+"' is invalid.");
+    MuniFatalError("Regular expression pattern `"+pattern+"' is invalid.");
 
   if( rf.Matches(filename) ) {
 
     output = fullname;
     int e = rf.Replace(&output,mask);
     if( e == -1 )
-      wxLogFatalError("Regular expression `"+mask+"'failed to replace.");
+      MuniFatalError("Regular expression `"+mask+"'failed to replace.");
     if( e == 0 )
       wxLogWarning("No replace for regular expression mask: `"+mask+"'.");
   }
   else
-    wxLogFatalError("Regular expression has no match on the filename `"
-		    + filename+"'.");
+    MuniFatalError("Regular expression has no match on the filename `"
+		   + filename+"'.");
 
   return output;
 }

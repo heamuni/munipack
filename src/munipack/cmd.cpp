@@ -111,18 +111,20 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
   wxASSERT(action != "" && xargc > 0); // Requires the action, at least
 
   // filters command-line options:
-  // * actions are not passed
+  // * the action is not passed: its first occurrence, as Munipack::OnInit()
+  //   recognises it (an option value or a file of the same name is passed)
   // * remove stdin "-" switch
   // * remove @in item
   // * read input files and defines files
 
   wxChar **argv = new wxChar*[xargc-1];
   int argc = 0;
+  bool action_found = false;
   for(int i = 0; i < xargc; i++) {
     wxString arg(xargv[i]);
-    if( arg == action )
+    if( i > 0 && arg == action && ! action_found )
       // the action itself is omitted
-      ;
+      action_found = true;
     else if( arg == "-" || arg.substr(0,1) == "@" )
       // Look for - or @in option and eventually read the input files
       InputByFile(arg.substr(1));
@@ -797,6 +799,7 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption("","col-epoch-dec","Reference epoch in Declination column");
     AddOption("","col-mag","Magnitude-like column");
     AddSwitch("","disable-noise","noise free frames (no photon and read noise)");
+    AddSwitch("","no-watermark","no watermark (the mark in the top-right corner)");
     AddOption("","photsys","photometry system");
     AddOption("","phsystab","photometry systems definition table");
     AddOption("","fits-keys-file","add FITS keys into a header");
@@ -877,8 +880,8 @@ void MuniCmdLineParser::InputByFile(const wxString& lstname)
 
   if( lstfile.GetLastError() != 0 ) {
     if( is_stdin )
-      wxLogFatalError("Failed to read the standard input.");
+      MuniFatalError("Failed to read the standard input.");
     else
-      wxLogFatalError("Failed to read the input file `"+lstname+"'.");
+      MuniFatalError("Failed to read the input file `"+lstname+"'.");
   }
 }

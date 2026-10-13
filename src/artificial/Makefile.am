@@ -21,6 +21,9 @@ AM_FCFLAGS = $(FC_MODINC). $(FC_MODINC)../lib $(CAF_FCFLAGS)
 ldir = ../lib
 
 pkglibexec_PROGRAMS = artificial
+if CAFMPI
+pkglibexec_PROGRAMS += artificial-caf
+endif
 
 .NOTPARALLEL:
 
@@ -32,3 +35,20 @@ artificial_LDADD   = $(ldir)/libpsfmodel.a $(ldir)/libnoise.a $(ldir)/libastrotr
                      $(ldir)/libphotometry.a $(ldir)/libastrosphere.a \
                      $(ldir)/libpppack.a $(ldir)/libtitsio.a \
                      $(CAF_LIBS) $(LIBCFITSIO) $(LIBM)
+
+# The parallel variant (--mproc > 1, launched by mpirun): the main program,
+# the only source with coarrays, compiled for the MPI coarray library and
+# linked with the modules of artificial (built for one process as before).
+artificial_caf_SOURCES = artificial.f08
+artificial_caf_FCFLAGS = $(FC_MODINC). $(FC_MODINC)../lib $(CAFMPI_FCFLAGS)
+artificial_caf_LDADD = ftransform.$(OBJEXT) spray.$(OBJEXT) catio.$(OBJEXT) \
+                       lcio.$(OBJEXT) generator.$(OBJEXT) artpicture.$(OBJEXT) \
+                       lcparams.$(OBJEXT) lcurves.$(OBJEXT) marker.$(OBJEXT) \
+                       galaxy.$(OBJEXT) cosmics.$(OBJEXT) flatmodule.$(OBJEXT) \
+                       fitskeys.$(OBJEXT) \
+                       $(ldir)/libpsfmodel.a $(ldir)/libnoise.a $(ldir)/libastrotrafo.a \
+                       $(ldir)/libphotometry.a $(ldir)/libastrosphere.a \
+                       $(ldir)/libpppack.a $(ldir)/libtitsio.a \
+                       $(CAFMPI_LIBS) $(LIBCFITSIO) $(LIBM)
+# the modules are compiled for artificial
+artificial_caf-artificial.$(OBJEXT): artificial.$(OBJEXT)

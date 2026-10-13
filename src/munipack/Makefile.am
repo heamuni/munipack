@@ -24,6 +24,10 @@ AM_CPPFLAGS = -I$(top_srcdir)/lib -I$(top_srcdir)/vo \
 
 if CAF
 CAF_CPPFLAGS = -DHAVE_CAF=1 -DMUNIPACK_CAF_RUN=\"$(cafrun)\"
+if CAFMPI
+# the parallel variants of the utilities (artificial-caf, astrometry-caf)
+CAF_CPPFLAGS += -DMUNIPACK_CAF_SUFFIX=\"-caf\"
+endif
 endif
 
 bin_PROGRAMS = munipack

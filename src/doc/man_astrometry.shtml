@@ -361,7 +361,10 @@ projection).</dd>
 <dt><samp>--remove</samp></dt><dd>remove calibration from FITS header
     (keywords like CTYPE, CRPIX, CRVAL, .. and the detailed log)</dd>
   <dt><samp>--report</samp></dt><dd>add a FITS extension with a reporting of
-    the astrometry fitting</dd>
+    the astrometry fitting: ASTROREPORT table of the stars used, with
+    the catalogue coordinates, the frame coordinates X, Y, the residuals
+    RA_OFF, DEC_OFF [deg] and MATCH, the position of the star in the match
+    sequence (0 for the stars added by the final cross-match)</dd>
 <dt><samp>--show-defaults</samp></dt><dd>show default values of parameters</dd>
 </dl>
 
