@@ -369,7 +369,8 @@ contains
     use fits_fotran
 
     character(len=FLEN_VALUE) :: catid,photosys_instr,photsys1,photsys2
-    character(len=FLEN_VALUE), dimension(:), allocatable :: filter_frames
+    character(len=FLEN_VALUE), dimension(:), allocatable :: filter_frames, &
+         filters_tab
     real(dbl), allocatable, dimension(:) :: refra, refdec, ctph,dctph, &
          exptime, areas, tol, aper, sys
     real(dbl), allocatable, dimension(:,:) :: tr,tr1,trerr,tr1err,refph,drefph,&
@@ -473,15 +474,35 @@ contains
 !    end do
 
     if( tratable/= '' ) then
-       call traload(tratable,photsys2,photsys1,tr,trerr,tr1,tr1err,status)
+       call traload(tratable,photsys2,photsys1,tr,trerr,tr1,tr1err,status, &
+            filters_tab)
        if( status /= 0 ) &
             stop 'Instrumental to standard conversion table not found.'
        if( photsys2 /= photsys_ref ) &
             stop 'Reference photometry system does not match the conversion table.'
-       if( photsys1 /= photsys_instr ) &
-            stop 'Instrumental photometry system does not match the conversion table.'
-       if( size(tr,1) /= size(filters) ) &
+       ! the instrumental system: --photsys-instr, or PHOTSYS of the frames
+       if( photsys_instr /= '' ) photosys_instr = photsys_instr
+       if( photsys1 /= photosys_instr ) then
+          write(error_unit,*) "Instrumental photometry systems: `", &
+               trim(photsys1),"' (table), `",trim(photosys_instr),"' (frames)."
+          stop 'Instrumental photometry system does not match the conversion table.'
+       end if
+       if( size(tr,1) /= size(filters) .or. size(tr,2) /= size(filters) ) &
             stop "Amount of filters doesn't correspons to transformation table."
+       ! both the filters and the table in the order of the photometry system
+       if( any(filters_tab /= filters) ) then
+          write(error_unit,*) 'Filters of the table: ', &
+               (trim(filters_tab(i))//' ',i=1,size(filters_tab))
+          stop 'Filters do not match the conversion table.'
+       end if
+       deallocate(filters_tab)
+       ! The counts are converted to photons by the inverse of the forward
+       ! matrix (photons to counts) that is used for the calibration, so
+       ! a calibration star gets back its photons. The backward matrix of
+       ! the table is fitted independently with the same (tridiagonal)
+       ! structure, while the inverse of a tridiagonal matrix is full:
+       ! 0.2-0.3% colour-dependent errors with off-diagonal terms of 5-13%.
+       call qrinv(tr,tr1)
     else
        allocate(tr(size(refph,2),size(refph,2)),tr1(size(refph,2),size(refph,2)), &
             trerr(size(refph,2),size(refph,2)),tr1err(size(refph,2),size(refph,2)))
@@ -613,40 +634,6 @@ contains
          tol,tr,tr1,trerr,tr1err,cts,dcts,dn,ddn,ra,dec,mag,dmag,ctph,dctph,sys)
 
   end subroutine calibrate
-
-  subroutine filters_arrange(filter_frames,filters,perm)
-
-    ! The frames are arranged by the filters of the photometry system
-    ! (readframes, writecal), while the filters (-f) and the catalogue
-    ! columns (--col-mag, --col-magerr) or the calibrations (-C) follow
-    ! the order given by the user: perm(n) is the index in filters
-    ! of the filter of the n-th frame (the first unused one of the name).
-
-    character(len=*), dimension(:), intent(in) :: filter_frames, filters
-    integer, dimension(:), intent(out) :: perm
-
-    logical, dimension(size(filters)) :: used
-    integer :: i,n
-
-    used = .false.
-    do n = 1, size(filter_frames)
-       perm(n) = 0
-       do i = 1, size(filters)
-          if( .not. used(i) .and. filters(i) == filter_frames(n) ) then
-             perm(n) = i
-             used(i) = .true.
-             exit
-          end if
-       end do
-       if( perm(n) == 0 ) then
-          write(error_unit,*) "Filter `",trim(filter_frames(n)), &
-               "' of a frame is not in the filters (-f): ", &
-               (trim(filters(i))//' ',i=1,size(filters))
-          stop 'Filters of frames and of the calibration do not correspond.'
-       end if
-    end do
-
-  end subroutine filters_arrange
 
   subroutine relmagph(mag,dmag,ph,dph)
 
@@ -855,6 +842,7 @@ contains
 
     use sfits
     use fits_fotran
+    use minpacks
 
     character(len=FLEN_VALUE) :: catid,photsys1,photsys2
     character(len=FLEN_VALUE), dimension(:), allocatable :: filter_frames
@@ -888,6 +876,9 @@ contains
             stop 'Reference photometry system does not match the conversion table.'
        if( photsys1 /= photsys_instr ) &
             stop 'Instrumental photometry system does not match the conversion table.'
+       ! the counts to photons by the inverse of the forward matrix
+       ! (as in calibrate)
+       call qrinv(tr,tr1)
 
     else
 

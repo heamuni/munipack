@@ -231,6 +231,16 @@ contains
 
   subroutine phsysmagph(phsys,filter,pairs,mag,dmag,ph,dph)
 
+    ! Magnitudes to photon rates [ph/s/m2] in the filters, every band
+    ! by its own magnitude (mag2ph0), as artificial renders the frames.
+    !
+    ! The bands other than the reference one were derived along the chain
+    ! of the neighbouring bands (pairs) as ph_i = ph_j (F_i/F_j) leff_i/leff_j,
+    ! F the passband fluxes of mag2flux0 (phsysmagflux): algebraically
+    ! mag2ph0 of the band itself (to 2e-15), but the bands redwards of
+    ! the reference one had the magnitude error of their neighbour.
+    ! The pairs are not needed and kept for the interface.
+
     use photoconv
 
     type(type_phsys), intent(in) :: phsys
@@ -239,206 +249,22 @@ contains
     real(REAL64), dimension(:,:), intent(in) :: mag,dmag
     real(REAL64), dimension(:,:), intent(out) :: ph,dph
 
-    real(REAL64), parameter :: eps = epsilon(ph)
-    real(REAL64), dimension(size(filter)) :: feff,ffwhm,leff,lfwhm,flamref,fnuref
-    integer :: n,i,j,k,status
-!    real(REAL64), dimension(:,:), allocatable :: ph0,dph0,ph3,dph3,mag0,dmag0, &
-!         magx,dmagx,mag3,dmag3,flux,dflux
-    real(REAL64), dimension(:,:), allocatable :: flux,dflux
-    real(REAL64) :: w
+    real(REAL64) :: feff,ffwhm,leff,lfwhm,flamref,fnuref
+    integer :: n,status
 
     if( size(mag,2) /= size(filter) ) stop 'Counts of filters and magnitudes different.'
+    if( size(pairs,1) < 1 ) stop 'Pairs of filters undefined.'
 
-    j = 1
     do n = 1, size(mag,2)
        call selphsystem([phsys],phsys%phsystem,filter(n), &
-            leff(n),lfwhm(n),feff(n),ffwhm(n),flamref(n),fnuref(n),status)
-
+            leff,lfwhm,feff,ffwhm,flamref,fnuref,status)
        if( status /= 0 ) then
           write(error_unit,*) 'Filter `',trim(filter(n)),"' not found in system `",&
                trim(phsys%phsystem),"'."
           stop 'Filter not found.'
        end if
+       call mag2ph0(leff,lfwhm,flamref,mag(:,n),dmag(:,n),ph(:,n),dph(:,n))
     end do
-
-!    allocate(ph0(size(ph,1),size(ph,2)),dph0(size(ph,1),size(ph,2)))
-
-!    write(*,*) leff(2),lfwhm(2),flamref(2)
-!    do j = 1,size(mag,2)
-!       call mag2ph0(leff(j),lfwhm(j),flamref(j),mag(:,j),dmag(:,j),ph(:,j),dph(:,j))
-!    end do
-!    write(*,'(5e10.3)') ph(1,:)
-!    call mag2ph(leff(j),lfwhm(j),flamref(j),mag(:,j),dmag(:,j),ph(:,j),dph(:,j))
-
-
-!    do n = 1,size(mag,1)
-!       call mag2ph3(leff,lfwhm,flamref,mag(n,:),dmag(n,:),ph(n,:),dph(n,:))
-!    end do
-
-!    do j = 1,size(mag,1)
-!       write(*,*) j,mag(j,3),dmag(j,3),ph(j,3),dph(j,3)
-!    end do
-
-!    allocate(mag0(size(ph,1),size(ph,2)),dmag0(size(ph,1),size(ph,2)))
-
-!    call ph2mag0(leff(1),lfwhm(1),flamref(1),ph(:,1),dph(:,1),mag0(:,1),dmag0(:,1))
-!    do j = 1,size(mag,1)
-!       write(*,'(5g15.5)') real(mag(j,3)),real(ph(j,3)),real(ph0(j,3)),real(ph0(j,2)/ph0(j,3)),&
-!            real(ph0(j,3)/ph(j,3))
-!    end do
-
-    allocate(flux(size(ph,1),size(ph,2)),dflux(size(ph,1),size(ph,2)))
-    call phsysmagflux(phsys,filter,pairs,mag,dmag,flux,dflux)
-
-    k = pairs(1,1)
-    call mag2ph0(leff(k),lfwhm(k),flamref(k),mag(:,k),dmag(:,k),ph(:,k),dph(:,k))
-
-    do n = 2, size(pairs,1)
-       i = pairs(n,1)
-       j = pairs(n,2)
-       if( pairs(n,1) < k ) then
-          i = pairs(n,1)
-          j = pairs(n,2)
-          w = leff(i) / leff(j)
-          where( flux(:,i) > 0 .and. flux(:,j) > 0 .and. ph(:,j) > 0 )
-             ph(:,i) = ph(:,j)*(flux(:,i)/flux(:,j))*w
-          elsewhere
-             ph(:,i) = -1
-          end where
-          where( dflux(:,i) > 0 .and. ph(:,i) > 0 .and. flux(:,i) > 0)
-             dph(:,i) = dflux(:,i) * ph(:,i) / flux(:,i)
-          elsewhere
-             dph(:,i) = 0
-          end where
-       else if( pairs(n,2) > k ) then
-          i = pairs(n,1)
-          j = pairs(n,2)
-          w = leff(j) / leff(i)
-          where( flux(:,i) > 0 .and. flux(:,j) > 0 .and. ph(:,i) > 0 )
-             ph(:,j) = ph(:,i)*(flux(:,j)/flux(:,i))*w
-          elsewhere
-             ph(:,j) = -1
-          end where
-          where( dflux(:,j) > 0 .and. ph(:,j) > 0 .and. flux(:,j) > 0)
-             dph(:,j) = dflux(:,j) * ph(:,j) / flux(:,j)
-          elsewhere
-             dph(:,j) = 0
-          end where
-       end if
-    end do
-    deallocate(flux,dflux)
-
-
-
-!    allocate(ph0(size(ph,1),size(ph,2)),dph0(size(ph,1),size(ph,2)), &
-!         ph3(size(ph,1),size(ph,2)),dph3(size(ph,1),size(ph,2)), &
-!         mag3(size(ph,1),size(ph,2)),dmag3(size(ph,1),size(ph,2)),&
-!         mag0(size(ph,1),size(ph,2)),dmag0(size(ph,1),size(ph,2)),&
-!         magx(size(ph,1),size(ph,2)),dmagx(size(ph,1),size(ph,2)),&
-!         )
-
-
-
-!!$    goto 666
-!!$
-!!$
-!!$!    do n = 1,size(mag,1)
-!!$!       call mag2ph(leff,lfwhm,flamref,mag(n,:),dmag(n,:),ph(n,:),dph(n,:))
-!!$!       call mag2ph0(leff,flamref,mag(n,:),dmag(n,:),ph0(n,:),dph0(n,:))
-!!$!       write(*,*) real(mag(n,:)),real(ph(n,:))
-!!$!    end do
-!!$
-!!$    do n = 1,size(mag,1)
-!!$!       call mag2ph(leff,lfwhm,flamref,mag(n,:),dmag(n,:),ph(n,:),dph(n,:))
-!!$!       call mag2ph3(leff,lfwhm,flamref,mag(n,:),dmag(n,:),ph3(n,:),dph3(n,:))
-!!$!       write(*,*) real(mag(n,:)),real(ph(n,:))
-!!$    end do
-!!$
-!!$!    do n = 1,size(mag,1)
-!!$!       call mag2ph(leff,lfwhm,flamref,mag(n,:),dmag(n,:),ph(n,:),dph(n,:))
-!!$!       call mag2ph(leff,lfwhm,flamref,mag(n,:),dmag(n,:),ph(n,:),dph(n,:))
-!!$!       write(*,*) real(mag(n,:)),real(ph(n,:))
-!!$!    end do
-!!$
-!!$!    do n = 1,size(mag,1)
-!!$!       write(*,'(2f10.3,3g15.5)') mag(n,3),mag(n,2)-mag(n,3),ph0(n,3),ph(n,3),ph3(n,3)
-!!$!    end do
-!!$
-!!$    do j = 1,size(mag,2)
-!!$!       call mag2ph0(leff(j),flamref(j),mag(:,j),dmag(:,j),ph0(:,j),dph0(:,j))
-!!$!       call ph2mag0(leff(j),flamref(j),ph0(:,j),dph0(:,j),mag0(:,j),dmag0(:,j))
-!!$    end do
-!!$    do n = 1,size(mag,1)
-!!$       call mag2ph3(leff,lfwhm,flamref,mag(n,:),dmag(n,:),ph3(n,:),dph3(n,:))
-!!$!       call ph2mag3(leff,lfwhm,flamref,ph3(n,:),dph3(n,:),mag3(n,:),dmag3(n,:))
-!!$    end do
-!!$
-!!$    do j = 1,size(mag,2)-2
-!!$!       write(*,*) trim(filter(j))
-!!$       do n = 1,size(mag,1)
-!!$          write(*,'(2f10.3,3g15.5)') mag(n,j),mag(n,j)-mag(n,j+1),ph0(n,j),ph3(n,j)
-!!$       end do
-!!$       do n = 1,size(mag,1)
-!!$          write(*,'(5f10.3)') mag(n,j),mag(n,j)-mag(n,j+1),mag0(n,j),mag3(n,j)
-!!$       end do
-!!$    end do
-!!$    do j = size(mag,2)-1,size(mag,2)
-!!$       write(*,*) trim(filter(j))
-!!$!       do n = 1,size(mag,1)
-!!$!          call mag2ph3(leff,lfwhm,flamref,mag(j,:),dmag(j,:),ph3(j,:),dph3(j,:))
-!!$!          call ph2mag3(leff,lfwhm,flamref,ph3(j,:),dph3(j,:),mag3(j,:),dmag3(j,:))
-!!$!       end do
-!!$       do n = 1,size(mag,1)
-!!$          write(*,'(2f10.3,3g15.5)') mag(n,j),mag(n,j-1)-mag(n,j),ph0(n,j),ph3(n,j)
-!!$       end do
-!!$       do n = 1,size(mag,1)
-!!$          write(*,'(5f10.3)') mag(n,j),mag(n,j-1)-mag(n,j),mag0(n,j),mag3(n,j)
-!!$       end do
-!!$    end do
-!!$
-!!$    do n = 1,size(mag,1)
-!!$!       call ph2mag3(leff,lfwhm,flamref,ph(n,:),dph(n,:),magx(n,:),dmagx(n,:))
-!!$!       call ph2mag0(lfwhm(3),flamref(3),ph0(:,3),dph0(:,3),mag0(:,3),dmag0(:,3))
-!!$!       call ph2mag0(leff(3),lfwhm(3),flamref(3),ph(:,3),dph(:,3),mag0(:,3),dmag0(:,3))
-!!$!       call ph2mag3(leff,lfwhm,flamref,ph3(n,:),dph3(n,:),mag3(n,:),dmag3(n,:))
-!!$    end do
-!!$
-!!$
-!!$    do j = 1,size(mag,2)-2
-!!$       write(*,*) trim(filter(j))
-!!$       do n = 1,size(mag,1)
-!!$          write(*,'(5f10.3)') mag(n,j),mag(n,j)-mag(n,j+1),mag0(n,j),mag3(n,j)
-!!$       end do
-!!$    end do
-!!$    do j = size(mag,2)-1,size(mag,2)
-!!$       write(*,*) trim(filter(j))
-!!$       do n = 1,size(mag,1)
-!!$          write(*,'(5f10.3)') mag(n,j),mag(n,j-1)-mag(n,j),mag0(n,j),mag3(n,j)
-!!$       end do
-!!$    end do
-!!$
-!!$!    stop
-!!$
-!!$!    do n = 1,size(mag,1)
-!!$!       call mag2ph(leff,lfwhm,flamref,mag(n,:),dmag(n,:),ph(n,:),dph(n,:))
-!!$!       call mag2ph3(leff,lfwhm,flamref,mag(n,:),dmag(n,:),ph(n,:),dph(n,:))
-!!$!       call mag2ph3(leff,lfwhm,flamref,mag(n,:),dmag(n,:),ph(n,:),dph(n,:))
-!!$!       write(*,*) real(mag(n,:)),real(ph(n,:))
-!!$!    end do
-!!$
-!!$    ph = ph0
-!!$    dph = dph0
-!!$
-!!$
-!!$    666 continue
-
-    ! when magnitude error is unavailable, we are use the most optimistics
-    ! variant with non-photon noise neglecting
-!    where( dmag > 9 .or. dmag < epsilon(dmag) )
-!       dph = sqrt(ph)
-!    end where
-
-!    deallocate(ph0,dph0,ph3,dph3,mag0,dmag0,magx,dmagx,mag3,dmag3)
 
   end subroutine phsysmagph
 
@@ -483,6 +309,12 @@ contains
 
   subroutine phsysphmag(phsys,filters,pairs,ph,dph,mag,dmag)
 
+    ! Photon rates [ph/s/m2] to magnitudes in the filters, every band
+    ! by its own rate (ph2mag0), the inverse of phsysmagph; the chain
+    ! over the neighbouring bands (pairs) used before gave the same
+    ! magnitudes (to 1e-10 mag), but undefined ones when a neighbour
+    ! was undefined. The pairs are kept for the interface.
+
     use photoconv
 
     type(type_phsys), intent(in) :: phsys
@@ -491,76 +323,16 @@ contains
     real(REAL64), dimension(:,:), intent(in) :: ph,dph
     real(REAL64), dimension(:,:), intent(out) :: mag,dmag
 
-    real(REAL64), dimension(:,:), allocatable :: flux,dflux
-    integer, dimension(size(filters)) :: idx
-    integer :: n,i,j,k
-    real(REAL64) :: w,f
+    integer :: n
 
-    idx = 0
-    do i = 1, size(filters)
-       do j = 1, phsys%nbands
-          if( phsys%filter(j) == filters(i) ) then
-             n = n + 1
-             idx(i) = j
-          end if
-       end do
+    if( size(ph,2) /= size(filters) ) stop 'Counts of filters and rates different.'
+    if( size(pairs,1) < 1 ) stop 'Pairs of filters undefined.'
+
+    do n = 1, size(filters)
+       if( .not. any(phsys%filter(1:phsys%nbands) == filters(n)) ) &
+            stop 'Any filter not found (in phsysphmag).'
+       call phsysphmag1(phsys,filters(n),ph(:,n),dph(:,n),mag(:,n),dmag(:,n))
     end do
-    if( any(idx == 0 ) ) stop 'Any filter not found (in phsysphmag).'
-
-    allocate(flux(size(ph,1),size(ph,2)),dflux(size(ph,1),size(ph,2)))
-
-    k = pairs(1,1)
-    n = idx(k)
-    call ph2flux0(phsys%lam_eff(n),ph(:,k),dph(:,k),flux(:,k),dflux(:,k))
-    call flux2mag0(phsys%lam_fwhm(n),phsys%flam_ref(n),flux(:,k),dflux(:,k), &
-         mag(:,k),dmag(:,k))
-
-    do n = 2, size(pairs,1)
-
-       if( pairs(n,1) < k ) then
-          i = pairs(n,1)
-          j = pairs(n,2)
-          w = phsys%lam_eff(idx(j)) / phsys%lam_eff(idx(i))
-          f = (phsys%lam_fwhm(idx(i))*phsys%flam_ref(idx(i)))/ &
-               (phsys%lam_fwhm(idx(j))*phsys%flam_ref(idx(j)))
-          where( ph(:,i) > 0 .and. ph(:,j) > 0 .and. flux(:,j) > 0 )
-             flux(:,i) = flux(:,j)*(ph(:,i)/ph(:,j))*w/f
-             mag(:,i) = mag(:,j) - 2.5*log10(flux(:,i) / flux(:,j))
-          elsewhere
-             flux(:,i) = -1
-             mag(:,i) = 99.99999
-          end where
-          where( dph(:,i) > 0 .and. ph(:,i) > 0 .and. flux(:,i) > 0)
-             dflux(:,i) = flux(:,i) * dph(:,i) / ph(:,i)
-             dmag(:,i) = 1.086 * dflux(:,i) / flux(:,i)
-          elsewhere
-             dflux(:,i) = 0
-             dmag(:,i) = 9.99999
-          end where
-       else if( pairs(n,2) > k ) then
-          i = pairs(n,1)
-          j = pairs(n,2)
-          w = phsys%lam_eff(idx(i)) / phsys%lam_eff(idx(j))
-          f = (phsys%lam_fwhm(idx(j))*phsys%flam_ref(idx(j)))/ &
-               (phsys%lam_fwhm(idx(i))*phsys%flam_ref(idx(i)))
-          where( ph(:,i) > 0 .and. ph(:,j) > 0 .and. flux(:,i) > 0 )
-             flux(:,j) = flux(:,i)*(ph(:,j)/ph(:,i))*w / f
-             mag(:,j) = mag(:,i) - 2.5*log10(flux(:,j) / flux(:,i))
-          elsewhere
-             flux(:,j) = -1
-             mag(:,j) = 99.99999
-          end where
-          where( dph(:,j) > 0 .and. flux(:,j) > 0 .and. ph(:,j) > 0)
-             dflux(:,j) = dph(:,j) * flux(:,j) / ph(:,j)
-             dmag(:,j) = 1.086 * dflux(:,j) / flux(:,j)
-          elsewhere
-             dflux(:,j) = 0
-             dmag(:,j) = 9.99999
-          end where
-       end if
-    end do
-
-    deallocate(flux,dflux)
 
   end subroutine phsysphmag
 
@@ -620,7 +392,7 @@ contains
              flux(:,j) = -1
           end where
           where( dmag(:,j) < 9 )
-             dflux(:,j) = flux(:,j) * dmag(:,i) / 1.0857
+             dflux(:,j) = flux(:,j) * dmag(:,j) / 1.0857
           elsewhere
              dflux(:,j) = -1
           end where

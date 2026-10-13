@@ -49,7 +49,8 @@ usually created by <samp>-c,-C</samp> options. Useful for relative photometry.</
 <dl>
 <dt><samp>--tratab</samp></dt><dd>Table describing conversion from instrumental
   to reference photo-system. Usually product of <a href="man_phfotran.html">
-phfotran</a>.</dd>
+phfotran</a> with the same filters (see
+<a href="man_phcal.html#multi">Several filters</a>).</dd>
 <dt><samp>--phsystab</samp></dt><dd>A table with photometric system definitions
 (<a href="dataform_photosys.html">specification</a>)</dd>
 <dt><samp>--list</samp></dt><dd>Lists available photometric systems. Their identifiers
@@ -111,15 +112,16 @@ phfotran</a>.</dd>
     error of the calibration [mag], added in quadrature to the errors of
     all calibrated objects (MAGERR and the errors of all quantities).
     <samp>auto</samp> (default): estimated by the residuals of the
-    calibration stars: the excess of their scatter over their errors
-    (the catalogue and the frame), the maximum likelihood value of
-    an additional Gaussian scatter, with 3σ clipping. The calibration
-    (CTPH) is then fitted again with the errors of the stars increased
-    by it, so CTPHERR includes it too. The value is zero when the
+    calibration stars together with the calibration (CTPH), robustly
+    to outliers (misidentified stars, blends, variables): see
+    <a href="man_phcal.html#syserr">Systematic Error</a>. The errors of
+    the stars are increased by it in the weights of the calibration,
+    so CTPHERR includes it too. The value is zero when the
     residuals scatter as their errors say; for a frame with a field
     dependent aperture loss (a PSF varying over the field, no aperture
     correction) it is the size of the unmodelled variation.
-    A <i>value</i> ≥ 0 is applied as given, <samp>0</samp> switches it off
+    A <i>value</i> ≥ 0 is applied as given (CTPH by the robust mean
+    with the errors increased by it), <samp>0</samp> switches it off
     (the errors of older versions). The value is saved as PHSYSERR.
   </dd>
 

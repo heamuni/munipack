@@ -122,11 +122,57 @@ it), so the total flux is calibrated (<samp>--apcorr</samp>).</li>
 <li>The calibration ratio between expected photons and observed counts
     is determined by a robust method.</li>
 <li>The systematic error: the scatter of the calibration stars in excess
-    of their errors (<samp>--syserr</samp>). When present, the ratio is
-    determined again with the errors increased by it, and it is added
-    in quadrature to the errors of all objects.</li>
+    of their errors (<samp>--syserr</samp>), determined together with
+    the ratio (see below), added in quadrature to the errors of all
+    objects.</li>
 <li>All values in frames and tables are recomputed on photons.</li>
 </ul>
+
+<h3 id="syserr">Systematic Error</h3>
+
+<p>
+With <samp>--syserr auto</samp> (default), the calibration ratio
+<i>t</i> (CTPH) and the systematic error σ (PHSYSERR) are determined
+together by the likelihood of a mixture (Hogg, Bovy &amp; Lang 2010,
+<a href="https://arxiv.org/abs/1008.4686">arXiv:1008.4686</a>).
+The logarithm of the ratio of the expected photons and the counts of
+a star, <i>y<sub>i</sub></i> = ln(<i>ph<sub>i</sub></i>/<i>ct<sub>i</sub></i>),
+with the relative error <i>e<sub>i</sub></i> (of both, in quadrature) is
+either a calibration star, distributed as N(ln <i>t</i>,
+<i>e<sub>i</sub></i>² + σ²), with the probability 1 − <i>f</i>, or
+an outlier (a misidentified star, a blend, a variable, a saturated
+star) of a broad distribution N(ln <i>t</i>,
+<i>e<sub>i</sub></i>² + σ² + <i>B</i>²) with the probability <i>f</i>.
+The parameters are found by the EM algorithm: from the median and
+σ by the median absolute deviation, the probabilities
+<i>q<sub>i</sub></i> of the stars to be calibration stars,
+ln <i>t</i> as the mean weighted by
+<i>q<sub>i</sub></i>/(<i>e<sub>i</sub></i>² + σ²),
+σ by the restricted (REML) likelihood of the calibration stars, which
+accounts for the fitted ratio (the leverage of every star), so σ is
+not biased by few stars, <i>f</i> as the mean of 1 − <i>q<sub>i</sub></i>
+(at most ½), and <i>B</i>² as the excess variance of the outliers (at
+least 9 (median <i>e<sub>i</sub></i>² + σ²) and (0.1 mag)²).
+Outliers have a negligible weight in both <i>t</i> and σ and no star
+is clipped, so the stars in the tails of the distribution keep their
+weight. CTPHERR is the error of the weighted mean. With
+<samp>--verbose</samp>, σ, <i>f</i> and <i>t</i> are printed.
+</p>
+
+<p>
+Monte Carlo (stars with errors 0.005–0.08 mag, 1000 sets per case):
+with 30 and 100 stars, σ = 0.01, 0.03, 0.06 mag is recovered within
+1–6% with up to 10% of outliers at 0.3–3 mag; with 10 stars the mean
+estimate is 7–18% low, the root mean square within 5% (the square root
+of an unbiased variance is low), with 5 stars 20–25% low (one deviating
+star of five is often taken for an outlier rather than for a systematic
+scatter); without a systematic error the mean is 1–4 mmag (the median 0).
+Outliers do not move the ratio: with 10 stars and 5% of outliers the
+scatter of the zero point is 3.6 mmag and σ 0.002 mag for a true 0
+(the previous estimator, a robust ratio followed by the excess scatter
+of the residuals clipped at 3σ: 63 mmag and 0.007 mag), with 10% of
+outliers and σ = 0.01 mag 6 mmag and 0.008 mag (179 mmag, 0.053 mag).
+</p>
 
 <p>
 <b>Changed defaults.</b> The systematic error is estimated by default
@@ -142,9 +188,38 @@ it give the same results as before.
 </p>
 
 <p>When photometry transformation table from instrumental to
-standard system is available <samp>--tratab</samp>, the counts
-are transformed from instrumental to a relative standard counts
-and the calibration is performed on the kind of counts.
+standard system is available <samp>--tratab</samp> (made by
+<a href="man_phfotran.html">phfotran</a>), the expected photons of the
+calibration stars in the standard filters are transformed to the counts
+of the instrumental filters by its forward matrix and the calibration
+is performed on the kind of counts (CTPH is then a correction near 1);
+the counts of all stars are converted to the photons of the standard
+filters by the inverse of the forward matrix (the backward matrix of the
+table, fitted independently, is not used). The filters of the table must
+be those of the calibration and its instrumental system (PHOTSYS1) that
+of <samp>--photsys-instr</samp>, or of the frames (PHOTSYS) without it.
+</p>
+
+<p id="multi">
+<b>Several filters.</b> The expected photons of every filter are
+derived from the catalogue magnitude in the filter itself (the same
+conversion as <a href="man_artificial.html">artificial</a> uses to render
+a frame). Without <samp>--tratab</samp> the instrumental and standard
+filters are identical (the transformation is the identity) and every
+filter is calibrated by itself: the results equal those of the frames
+calibrated one at a time, except that the calibration stars must be
+found on all the frames and the output tables contain the stars found
+on all of them. Colour terms of an instrument (a passband different from
+the standard one, the colour dependence of the extinction) are described by
+the transformation table of <a href="man_phfotran.html">phfotran</a>;
+with it, the calibration and the conversion of the counts use the colours
+of the stars. Older versions corrected the photons of the outputs of
+more filters by an "effective extinction" estimated from the calibration
+ratios (CTPH, the efficiency of the instrument rather than of the
+atmosphere), not the calibration itself: the magnitudes had a colour
+term against the catalogue, 0.1–0.2 mag per magnitude of B−V
+in B on simulated frames (header keywords EXTIN_K0, EXTIN_R,
+EXTINREF, no longer written).
 </p>
 
 
@@ -291,7 +366,8 @@ Calibrate against to UCAC5 catalogue:
 $ munipack cone -c UCAC5 -o 0716cat.fits -r 0.1 110.47 71.34
 $ munipack phcal -c 0716cat.fits --col-ra RAJ2000 --col-dec DEJ2000 \
   --col-mag Gmag  --photosys Johnson 0716_?R.fits
-$ munipack phcal -c T_Phe.fits --tratab phfotran.fits  --col-mag B,V,R,I \
+$ munipack phcal -c T_Phe.fits --tratab phfotran.fits --photsys-ref Johnson \
+   -f B,V,R,I --col-mag B,V,R,I \
    TPhe_B.fits,b.fits TPhe_V.fits,v.fits TPhe_R.fits,r.fits TPhe_I.fits,i.fits
 </pre>
 

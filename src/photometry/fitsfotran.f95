@@ -31,12 +31,17 @@ module fits_fotran
 contains
 
   subroutine traload(nametable,photosys_ref,photosys_instr, &
-       tr,trerr,tr1,tr1err,status)
+       tr,trerr,tr1,tr1err,status,filters)
+
+    ! filters (optional) are the names of the columns of the forward
+    ! matrix, the filters of the transformation
 
     character(len=*), intent(in) :: nametable
     character(len=*), intent(out) :: photosys_ref,photosys_instr
     real(dbl), dimension(:,:), allocatable, intent(out) :: tr,trerr,tr1,tr1err
     integer, intent(out) :: status
+    character(len=FLEN_VALUE), dimension(:), allocatable, intent(out), &
+         optional :: filters
 
     character(len=FLEN_KEYWORD) :: key
     character(len=FLEN_VALUE) :: extname
@@ -75,6 +80,13 @@ contains
     do i = 1, ncols
        call fits_read_col(fits,i,frow,nullval,tr(:,i),anyf,status)
     end do
+    if( present(filters) ) then
+       allocate(filters(ncols))
+       do i = 1, ncols
+          call fits_make_keyn('TTYPE',i,key,status)
+          call fits_read_key(fits,key,filters(i),status)
+       end do
+    end if
 
     extname = trim(FTHDUNAME) // '_BACKWARD'
     call fits_movnam_hdu(fits,FITS_ANY_HDU, extname, extver,status)
@@ -329,6 +341,9 @@ contains
     integer, intent(out) :: n,status
     integer :: l
 
+    ! status is intent(out): undefined on entry (it was not reset,
+    ! so the search failed at random: 'CTS or PH columns badly identified')
+    status = 0
     n = 0
     do
        call fits_get_colnum(fits,.true.,temp,l,status)

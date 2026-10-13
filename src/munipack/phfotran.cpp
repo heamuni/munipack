@@ -33,12 +33,17 @@ MuniPhfotran::MuniPhfotran(wxEvtHandler *h, const MuniCmdLineParser& cmd):
   CommonOutputSingle(cmd);
 
   double x;
-  wxString a,c;
+  wxString a,c,vocat;
 
   if( cmd.Found("phsystab",&a) )
     Write("PHSYSTABLE = '" + a + "'");
   else if( FindDataDir("photosystems.fits",&a) )
     Write("PHSYSTABLE = '" + a + "'");
+
+  if( cmd.Found("vocat",&a) )
+    vocat = a;
+  else if( FindDataDir("VOcat_conf.xml",&a) )
+    vocat = a;
 
   if( cmd.Found("list") )
 
@@ -88,14 +93,17 @@ MuniPhfotran::MuniPhfotran(wxEvtHandler *h, const MuniCmdLineParser& cmd):
       Write("PHOTSYS_REF = '"+a+"'");
 
     if( cmd.Found("tol",&x) )
-      Write("TOL = %e",x);
+      Write("TOL = %.17g",x);
 
     if( cmd.Found("area",&x) )
-      Write("AREA = %e",x);
+      Write("AREA = %.17g",x);
 
     if( cmd.Found("c",&c) || cmd.Found("cat",&c) ) {
 
-      VOCatConf catalogs;
+      VOCatConf catalogs(vocat);
+      if( ! catalogs.IsOk() )
+	MuniFatalError("Failed to read the definition file of catalogues `"
+		       + vocat + "'.");
       VOCatResources cat(catalogs.GetCatFits(c));
 
       if( cmd.Found("col-ra",&a) )
@@ -111,6 +119,6 @@ MuniPhfotran::MuniPhfotran(wxEvtHandler *h, const MuniCmdLineParser& cmd):
       Write("CAT = '" + c + "'");
     }
 
-    WriteFilesMultiple(cmd.GetFiles());
+    WriteFilesSingle(cmd.GetFiles());
   }
 }

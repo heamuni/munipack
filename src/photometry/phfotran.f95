@@ -24,6 +24,7 @@ program phfotran
   use titsio
   use mfits
   use phsysfits
+  use iso_fortran_env
 
   implicit none
 
@@ -211,7 +212,7 @@ program phfotran
 
         read(val,*) output
 
-     else if( key == 'NFILE' ) then
+     else if( key == 'NFILE' .or. key == 'NFILES' ) then
 
         read(val,*) nfile
         deallocate(filenames)
@@ -225,19 +226,21 @@ program phfotran
 
         read(val,*) filenames(n)
 
+
      end if
 
   end do
 20 continue
 
-  if( photsys_instr == '' .or. photsys_ref == '' ) &
-       stop 'Reference or instrumental photometry system undefined.'
-
   if( list ) then
      call listphsys(phsystable)
   else if ( nfile == 1 .and. cat == '' ) then
+     if( photsys_instr == '' .or. photsys_ref == '' ) &
+          stop 'Reference or instrumental photometry system undefined.'
      call table
   else
+     if( photsys_ref == '' ) stop 'Reference photometry system undefined.'
+     if( cat == '' ) stop 'Reference catalogue undefined.'
      call frames
   end if
 
@@ -256,10 +259,12 @@ contains
     use jamming
 
     character(len=FLEN_VALUE) :: catid, photsys_frames
-    character(len=FLEN_VALUE), dimension(:), allocatable :: filter
+    character(len=FLEN_VALUE), dimension(:), allocatable :: filter, filter_frames
     real(dbl), allocatable, dimension(:) :: ra, dec, airmass
     real(dbl), allocatable, dimension(:,:) :: tr,tr1,trerr,tr1err, ph,dph,cts,dcts
     integer, dimension(:,:), allocatable :: pairs
+    integer, dimension(:), allocatable :: order, perm
+    type(type_phsys) :: phsys
     real(dbl) :: e
     integer :: k,nph
 
@@ -277,6 +282,26 @@ contains
        allocate(col_mag(size(filters)))
        col_mag = filters
     end if
+    if( size(col_mag) /= size(filters) ) &
+         stop 'Magnitude columns and filters dimensions differs.'
+    if( size(col_magerr) > 0 .and. size(col_magerr) /= size(filters) ) &
+         stop 'Magnitude error columns and filters dimensions differs.'
+
+    ! The transformation supposes the filters in the order of the photometry
+    ! system (by wavelength): the frames are arranged so, and the filters,
+    ! the catalogue columns and the -C, -E values (in the order of -f)
+    ! are paired with the frames by the filters of the frames (as phcal).
+    call phselect(phsystable,photsys_ref,phsys)
+    call file_order(filenames,keys,phsys%filter,order,filters=filter_frames)
+    allocate(perm(size(filenames)))
+    call filters_arrange(filter_frames,filters,perm)
+    filenames = filenames(order)
+    filters = filters(perm)
+    col_mag = col_mag(perm)
+    if( size(col_magerr) > 0 ) col_magerr = col_magerr(perm)
+    if( nctph > 0 ) ctph = ctph(perm)
+    if( nextin > 0 ) extin = extin(perm)
+    deallocate(order,perm,filter_frames)
 
     call jamcatx(cat,phsystable,keys,col_ra,col_dec,col_mag,col_magerr,&
        utol, area, init_area, filters, filenames, catid, filter, ra, dec, airmass, &
@@ -285,7 +310,8 @@ contains
     if( size(ra) < 2 ) &
          stop 'Determination of parameters of line requires more than two points.'
 
-    if( photsys_frames /= '' ) photsys_instr = photsys_frames
+    ! the instrumental system: --photsys-instr, or PHOTSYS of the frames
+    if( photsys_instr == '' ) photsys_instr = photsys_frames
 
     nph = nfilters
     allocate(tr(nph,nph),trerr(nph,nph),tr1(nph,nph),tr1err(nph,nph))

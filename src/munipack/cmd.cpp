@@ -685,22 +685,26 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
   else if( action == "phfotran" ) {
 
     AddUsageText("Usage: munipack "+action+" [options] file(s)");
-    AddUsageText("* Determine photometry system colour transformation.");
+    AddUsageText("* Determine photometry system colour transformation"
+		 " (the table of phcal --tratab).");
 
     AddOption("c","cat","reference photometry catalogue");
-    AddOption("f","filters","list of filters");
-    AddOption("C","cal","calibration ratios in the filters");
-    AddOption("E","extin","extinction coefficients k (exp(k*X) in filters");
+    AddOption("f","filters","list of filters, one per frame");
+    AddOption("C","cal","factors of the counts in the filters (order of -f)");
+    AddOption("E","extin","extinction coefficients k in the filters: "
+	      "counts * exp(k*airmass) (order of -f)");
     AddOption(wxEmptyString,"col-ra","Right Ascension column");
     AddOption(wxEmptyString,"col-dec","Declination column");
-    AddOption(wxEmptyString,"col-mag","magnitude column(s)");
+    AddOption(wxEmptyString,"col-mag","magnitude column(s), order of -f");
     AddOption(wxEmptyString,"col-magerr","magnitude std. error column(s)");
     AddOption("","photsys-ref","reference photometry system (catalogue)");
-    AddOption("","photsys-instr","instrumental photometry system (frames)");
+    AddOption("","photsys-instr","instrumental photometry system "
+	      "(default: PHOTSYS of the frames)");
     AddOption(wxEmptyString,"area","area of input aperture [m2]",wxCMD_LINE_VAL_DOUBLE);
     AddOption(wxEmptyString,"phsystab","photometry systems definition table");
     AddSwitch(wxEmptyString,"list","show available photometry systems");
     AddOption(wxEmptyString,"tol","search radius [deg]",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","vocat","VO catalogue config file (column IDs)");
     COMMON_OPTIONS_SINGLE
     AddParam("file(s)",wxCMD_LINE_VAL_STRING,
   	     wxCMD_LINE_PARAM_MULTIPLE|wxCMD_LINE_PARAM_OPTIONAL);
