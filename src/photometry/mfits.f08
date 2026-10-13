@@ -969,4 +969,39 @@ contains
 
   end subroutine file_order
 
+  subroutine filters_arrange(filter_frames,filters,perm)
+
+    ! The frames are arranged by the filters of the photometry system
+    ! (readframes, writecal, phfotran), while the filters (-f) and
+    ! the catalogue columns (--col-mag, --col-magerr) or the calibrations
+    ! (-C) follow the order given by the user: perm(n) is the index
+    ! in filters of the filter of the n-th frame (the first unused one
+    ! of the name).
+
+    character(len=*), dimension(:), intent(in) :: filter_frames, filters
+    integer, dimension(:), intent(out) :: perm
+
+    logical, dimension(size(filters)) :: used
+    integer :: i,n
+
+    used = .false.
+    do n = 1, size(filter_frames)
+       perm(n) = 0
+       do i = 1, size(filters)
+          if( .not. used(i) .and. filters(i) == filter_frames(n) ) then
+             perm(n) = i
+             used(i) = .true.
+             exit
+          end if
+       end do
+       if( perm(n) == 0 ) then
+          write(error_unit,*) "Filter `",trim(filter_frames(n)), &
+               "' of a frame is not in the filters (-f): ", &
+               (trim(filters(i))//' ',i=1,size(filters))
+          stop 'Filters of frames and of the calibration do not correspond.'
+       end if
+    end do
+
+  end subroutine filters_arrange
+
 end module mfits

@@ -206,16 +206,25 @@ contains
 
   subroutine fotra(t,pairs,cts,dcts,pht,dpht)
 
+    ! The transformation pht = t . cts (photons of the standard filters
+    ! by the counts of the instrumental ones, or the reverse), the errors
+    ! by the propagation of the errors of cts.
+    !
+    ! The bands were combined by the ratios of the neighbouring bands
+    ! (pairs: triplets, twins and the reference band, as stdtra fits
+    ! them), which is algebraically the same product with the elements
+    ! that stdtra estimates (the others are zero); every band had the
+    ! relative error of its counts (a band of a twin that of the other
+    ! band). The pairs are kept for the interface.
+
     integer, dimension(:,:), intent(in) :: pairs
     real(dbl), dimension(:,:), intent(in) :: t
     real(dbl), dimension(:), intent(in) :: cts,dcts
     real(dbl), dimension(:), intent(out) :: pht,dpht
 
-    integer, dimension(size(pairs,1),2) :: twins
-    integer, dimension(size(pairs,1),3) :: triplets
-    integer, dimension(2) :: refpair
-    real(dbl) :: ph,c
-    integer:: i,j,k,l,n,m,ntriplets,ntwins,lref
+    integer :: n
+
+    if( size(pairs,1) < 1 ) stop 'fotra: pairs of filters undefined.'
 
     ! A diagonal matrix (no transformation table: the identity) has no
     ! colour terms: every filter by itself, so a band is defined when
@@ -236,72 +245,18 @@ contains
        return
     end if
 
-    call grouping(pairs,ntriplets,triplets,ntwins,twins,lref,refpair)
-
-    do n = 1,ntriplets
-       i = triplets(n,1)
-       l = triplets(n,2)
-       j = triplets(n,3)
-       if( cts(i) > 0 .and. cts(l) > 0 .and. cts(j) > 0 ) then
-          ph = t(l,l) + ci0*(t(l,i) + t(l,j)) + &
-               t(l,i)*(cts(i)/cts(l) - ci0) + t(l,j)*(cts(j)/cts(l) - ci0)
-          pht(l) = ph * cts(l)
-       else
-          pht(l) = -1
-       end if
-       if( pht(l) > 0 .and. dcts(l) > 0 .and. cts(l) > 0 ) then
-          dpht(l) = pht(l) * (dcts(l) / cts(l))
-       else
-          dpht(l) = -1
-       end if
-    end do
-
-    ! reference
-    if( .not. all( refpair == 0) ) then
-       l = lref
-       i = refpair(1)
-       j = refpair(2)
-       if( cts(i) > 0 .and. cts(j) > 0 ) then
-          ph = t(l,l) + t(l,i) * ci0 + t(l,i)*(cts(i)/cts(j) - ci0)
-          pht(l) = ph * cts(l)
-          dpht(l) = pht(l) * (dcts(l) / cts(l))
-       else
-          pht(l) = -1
-          dpht(l) = -1
-       end if
+    ! the colours are needed: all the bands defined
+    if( all(cts > 0) ) then
+       pht = matmul(t,cts)
+       dpht = sqrt(matmul(t**2,max(dcts,0.0_dbl)**2))
+       where( .not. (pht > 0) )
+          pht = -1
+          dpht = -1
+       end where
+    else
+       pht = -1
+       dpht = -1
     end if
-
-    do n = 1,ntwins
-       i = twins(n,1)
-       j = twins(n,2)
-
-       m = 0
-       do k = 1, ntriplets
-          if( triplets(k,1) == i .and. triplets(k,2) == j ) then
-             m = triplets(k,3)
-          else if( triplets(k,2) == j .and. triplets(k,3) == i ) then
-             m = triplets(k,1)
-          end if
-       end do
-
-       if( cts(i) > 0 .and. cts(j) > 0 .and. pht(j) > 0 ) then
-          c = cts(i)/cts(j) - ci0
-          if( m == 0 ) then
-             ph = t(i,i) / t(j,j) * (c + t(i,j)/t(i,i) + ci0) / &
-                  (1 + t(j,i)/t(j,j)*ci0 + t(j,i)/t(j,j)*c)
-          else
-             ph = t(i,i) / t(j,j) * (c + t(i,j)/t(i,i) + ci0) / &
-                  (1 + t(j,i)/t(j,j) * c + t(j,m)/t(j,j) * (cts(m)/cts(j) - ci0) + &
-                  ci0*(t(j,i) + t(j,m))/t(j,j))
-          end if
-          pht(i) = ph * pht(j)
-          ! the relative error of the band itself (it was the one of j)
-          dpht(i) = pht(i) * (dcts(i) / cts(i))
-       else
-          pht(i) = -1
-          dpht(i) = -1
-       end if
-    end do
 
 !    return
 

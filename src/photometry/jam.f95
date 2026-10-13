@@ -164,7 +164,6 @@ contains
     real(dbl), allocatable, dimension(:,:) :: mag,dmag, xcts,xdcts
     real(dbl) :: ftol,tol,w, aper
     integer, dimension(:), allocatable :: id
-    type(type_phsys), dimension(:), allocatable :: phsyscal
     type(type_phsys) :: phsys
     integer :: status,nfiles,ncat,ncols,j,n,l
 
@@ -349,13 +348,15 @@ contains
 
 !    stop
 
+    ! rates per second and square metre (the errors of the counts
+    ! scale as the counts; the square root was the scale of the variance)
     do n = 1,nfiles
        w = exptime(n) * areas(n)
        cts(:,n) = xcts(1:ncat,n) / w
-       dcts(:,n) = xdcts(1:ncat,n) / sqrt(w)
+       dcts(:,n) = xdcts(1:ncat,n) / w
     end do
 
-    deallocate(mag,dmag,xcts,xdcts,exptime,areas,phsyscal)
+    deallocate(mag,dmag,xcts,xdcts,exptime,areas)
 
   end subroutine jamcatx
 

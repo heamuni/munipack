@@ -49,7 +49,8 @@ usually created by <samp>-c,-C</samp> options. Useful for relative photometry.</
 <dl>
 <dt><samp>--tratab</samp></dt><dd>Table describing conversion from instrumental
   to reference photo-system. Usually product of <a href="man_phfotran.html">
-phfotran</a>.</dd>
+phfotran</a> with the same filters (see
+<a href="man_phcal.html#multi">Several filters</a>).</dd>
 <dt><samp>--phsystab</samp></dt><dd>A table with photometric system definitions
 (<a href="dataform_photosys.html">specification</a>)</dd>
 <dt><samp>--list</samp></dt><dd>Lists available photometric systems. Their identifiers

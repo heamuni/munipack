@@ -100,16 +100,16 @@ star's cross-matching will usually required.
 </p>
 <p class="li">
 The crucial is selection of magnitude columns from catalogue
-<samp>--col-mag B,V,R</samp> for frames in appropriate filters.
-The relation is determined on base of descending order
-(B for m67_B.fits, etc).
+<samp>--col-mag B,V,R</samp> for the filters <samp>-f B,V,R</samp>
+(in the same order); the frames are paired with the filters by their
+FILTER keyword.
 </p>
 <pre>
 $ munipack phfotran \
-  --photsys-instr MonteBoo --photsys-ref Johnson
+  --photsys-instr MonteBoo --photsys-ref Johnson \
   -c m67ids.fits \
   --col-ra RAJ2000 --col-dec DEJ2000 \
-  --col-mag B,V,R \
+  -f B,V,R --col-mag B,V,R \
   --tol 0.0005 \
   --area 0.283  \
   m67_B.fits m67_V.fits m67_R.fits
@@ -138,8 +138,14 @@ used CCD camera).
 </p>
 
 <p class="li">
-The result table can be used on precise of <a href="man_phcal.html">photometric calibration</a>.
+The result table can be used on precise of <a href="man_phcal.html">photometric calibration</a>
+(the same filters and the instrumental system):
 </p>
+<pre>
+$ munipack phcal --tratab phfotran.fits --photsys-instr MonteBoo --photsys-ref Johnson \
+  -c m67ids.fits --col-ra RAJ2000 --col-dec DEJ2000 -f B,V,R --col-mag B,V,R \
+  m67_B.fits m67_V.fits m67_R.fits
+</pre>
 </li>
 </ol>
 

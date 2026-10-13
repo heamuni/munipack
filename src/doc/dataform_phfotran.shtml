@@ -27,67 +27,60 @@ and backward compatibility is not guarantied.
 <h2>File Structure</h2>
 
 <p>
-The file has first HDU dummy without any machine-readable information
-and just a short description and reference in comments.
+The primary HDU has no data; its header identifies the photometry
+systems and records the frames the transformation has been derived from
+(in comments).
 </p>
 
 <div class="table">
 <table>
 <caption>FITS file structure</caption>
 <tr><th>HDU</th><th>EXTNAME</th><th>Description</th></tr>
-<tr><td>0</td><td></td><td>Dummy<sup></sup></td></tr>
-<tr><td>1</td><td>FOTRAN</td><td>The transformation table</td></tr>
+<tr><td>0</td><td></td><td>the systems (keywords), no data</td></tr>
+<tr><td>1</td><td>FOTRAN_FORWARD</td><td>the forward matrix: photon rates to count rates</td></tr>
+<tr><td>2</td><td>FOTRAN_BACKWARD</td><td>the backward matrix: count rates to photon rates</td></tr>
+<tr><td>3</td><td>FOTRAN_FORWARD_ERR</td><td>errors of the fitted parameters of the rows (approximate; 0 not fitted)</td></tr>
+<tr><td>4</td><td>FOTRAN_BACKWARD_ERR</td><td>the same for the backward matrix</td></tr>
+<tr><td>5</td><td>FOTRANdata</td><td>the data of the fit</td></tr>
 </table>
 </div>
-
-<p>
-The second HDU is a table with the transformation matrix.
-EXTNAME is set to FOTRAN.
-The header contains identifiers of input (instrumental) and output
-(standard) photometry systems in keywords PHOTSYS1 and PHOTSYS2.
-Amount of both columns and rows will generally variable and non-equal.
-</p>
 
 <div class="table">
 <table>
-<caption>FOTRAN extension keywords</caption>
-<tr><th>Keyword</th><th>Value</th><th>Description</th></tr>
-<tr><td>EXTNAME</td><td>FOTRAN</td><td>mandatory extension identifier</td></tr>
-<tr><td>PHOTSYS1</td><td></td><td>instrumental photometry system</td></tr>
-<tr><td>PHOTSYS2</td><td></td><td>standard photometry system</td></tr>
-<tr><td>FILTER<i>i</i></td><td></td><td><i>i</i>-th standard filter</td></tr>
+<caption>Primary HDU keywords</caption>
+<tr><th>Keyword</th><th>Description</th></tr>
+<tr><td>PHOTSYS1</td><td>instrumental photometry system</td></tr>
+<tr><td>PHOTSYS2</td><td>reference (standard) photometry system</td></tr>
+<tr><td>AIRMASS</td><td>the mean airmass of the frames</td></tr>
+<tr><td>REFCI</td><td>the reference colour (a ratio of photon rates, 10<sup>−0.2</sup>)</td></tr>
 </table>
 </div>
 
 <p>
-Columns of the table are named as instrumental filters. Rows
-are equivalent filters. Lets elements of tables are <i>C<sub>i,j</sub></i>
-than the values in the standard system (PHOTSYS2) are derived
-from the instrumental system (PHOTSYS1) as
+The matrices are tables with one column per filter (named by the filter,
+in the order of the photometry system) and one row per filter in the
+same order: the element <i>T<sub>ij</sub></i> is in the row <i>i</i>
+and the column <i>j</i>. The rates are per second and square metre:
 </p>
 <p>
-<p>
 <i>
-c'<sub>i</sub> = Σ<sub>j</sub> C<sub>ij</sub> c<sub>j</sub>
+c<sub>i</sub> = Σ<sub>j</sub> T<sub>ij</sub> p<sub>j</sub>
 </i>
 </p>
 <p>
-where <i>i,j = { B,V ...}</i> points on all available filters.
+where <i>c</i> are the count rates in the instrumental filters and
+<i>p</i> the photon rates in the standard filters (the forward matrix).
+phcal checks the systems and the filters (the names of the columns)
+against the calibration, uses the forward matrix for the calibration
+and its inverse for the conversion of counts to photons; the backward
+matrix is not used.
 </p>
 
-<div class="table">
-<table>
-<caption>Photometric System Transformation HDU Table</caption>
-<tr><th>Column</th><th>Type</th><th>Description</th></tr>
-<tr><td>FILTER</td><td>12A</td><td>Filter designation</td></tr>
-<tr><td><i>C<sub>i1</sub></i></td><td>D</td><td>a coefficient</td></tr>
-<tr><td><i>C<sub>i2</sub></i></td><td>D</td><td>a coefficient</td></tr>
-<tr><td>..</td><td>D</td><td>a coefficient</td></tr>
-<tr><td><i>C<sub>ij</sub></i></td><td>D</td><td>a coefficient</td></tr>
-<tr><td>..</td><td>D</td><td>a coefficient</td></tr>
-<tr><td><i>C<sub>iN</sub></i></td><td>D</td><td>a coefficient</td></tr>
-</table>
-</div>
+<p>
+The data table has the columns RAJ2000, DEJ2000, PH_<i>f</i>,
+ePH_<i>f</i> [ph/s/m²] (the catalogue photons), CTS_<i>f</i>,
+eCTS_<i>f</i> [counts/s/m²] (the frames) for every filter <i>f</i>.
+</p>
 
 <p>
 The table can be created by hand, but the structure must be respected

@@ -188,9 +188,16 @@ it give the same results as before.
 </p>
 
 <p>When photometry transformation table from instrumental to
-standard system is available <samp>--tratab</samp>, the counts
-are transformed from instrumental to a relative standard counts
-and the calibration is performed on the kind of counts.
+standard system is available <samp>--tratab</samp> (made by
+<a href="man_phfotran.html">phfotran</a>), the expected photons of the
+calibration stars in the standard filters are transformed to the counts
+of the instrumental filters by its forward matrix and the calibration
+is performed on the kind of counts (CTPH is then a correction near 1);
+the counts of all stars are converted to the photons of the standard
+filters by the inverse of the forward matrix (the backward matrix of the
+table, fitted independently, is not used). The filters of the table must
+be those of the calibration and its instrumental system (PHOTSYS1) that
+of <samp>--photsys-instr</samp>, or of the frames (PHOTSYS) without it.
 </p>
 
 <p id="multi">
@@ -359,7 +366,8 @@ Calibrate against to UCAC5 catalogue:
 $ munipack cone -c UCAC5 -o 0716cat.fits -r 0.1 110.47 71.34
 $ munipack phcal -c 0716cat.fits --col-ra RAJ2000 --col-dec DEJ2000 \
   --col-mag Gmag  --photosys Johnson 0716_?R.fits
-$ munipack phcal -c T_Phe.fits --tratab phfotran.fits  --col-mag B,V,R,I \
+$ munipack phcal -c T_Phe.fits --tratab phfotran.fits --photsys-ref Johnson \
+   -f B,V,R,I --col-mag B,V,R,I \
    TPhe_B.fits,b.fits TPhe_V.fits,v.fits TPhe_R.fits,r.fits TPhe_I.fits,i.fits
 </pre>
 

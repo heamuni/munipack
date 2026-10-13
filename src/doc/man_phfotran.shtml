@@ -43,19 +43,34 @@ expected photons from calibration stars.
 </p>
 
 <p>
-The transformation table can be used to convert observed counts
-<i>c</i> in an instrumental system (identified by PHOTSYS1) to
-counts <i>c'</i> in a standard system (identified by PHOTSYS2).
+The transformation relates the photon rates <i>p</i> [ph/s/m²] of
+the stars in the standard filters (by the catalogue magnitudes, PHOTSYS2)
+and their count rates <i>c</i> [counts/s/m²] in the instrumental
+filters (PHOTSYS1) linearly:
 </p>
 <p>
 <i>
-c'<sub>i</sub> = Σ<sub>j</sub> C<sub>ij</sub> c<sub>j</sub>, i = { B,V ...}
+c<sub>i</sub> = Σ<sub>j</sub> T<sub>ij</sub> p<sub>j</sub>, i,j = { B,V ...}
 </i>
+</p>
+<p>
+The forward matrix <i>T</i> (photons to counts) holds the efficiency
+of the instrument on its diagonal and the colour terms off it: an
+instrumental filter shifted to the red sees a part of the photons of
+the next standard filter. The colour terms of the extinction (of a
+broad passband) are of the same kind. The backward matrix (counts to
+photons) is fitted independently.
 </p>
 
 <p>
-The transformed counts <i>c'</i> will generally proportional to
-observed photons and can be used for calibration.
+<a href="man_phcal.html">phcal</a> <samp>--tratab</samp> uses the
+forward matrix for the calibration (the expected counts of the
+calibration stars, CTPH is then a correction factor near 1 for
+the same instrument) and its inverse to convert the counts of all stars
+to the photons of the standard filters, so the magnitudes have no colour
+term. A frame of a filter needs the frames of the neighbouring filters
+for the colours: stars missing on one of them have no calibrated values,
+and the images are converted by the diagonal only.
 </p>
 
 <p>
@@ -87,7 +102,34 @@ area and exposure time.</li>
 <p>
 A result of the transformation is a nearly tri-diagonal matrix (elements around
 diagonal dominates over other ones). The limitation of the shape is forced
-due to ill-conditioning of the problem.
+due to ill-conditioning of the problem. The filters are taken in the order
+of the photometry system (wavelengths); the row of the reference filter of
+the system (FILTREF, V for Johnson) is fitted against the colour of its
+neighbour, <i>c</i>/<i>p</i> = <i>T</i><sub>VV</sub> +
+<i>T</i><sub>VB</sub> <i>p</i><sub>B</sub>/<i>p</i><sub>V</sub>
+(or of both neighbours, a plane), the other filters through
+the ratios of the counts of neighbouring filters against the ratios of
+their photons (robust line fits).
+</p>
+
+<h2>Validation</h2>
+
+<p>
+Simulated Johnson B,V,R frames (artificial, 400 stars,
+B − V from −0.2 to 1.8) rendered from instrumental magnitudes of
+photon rates mixed by <i>T</i> = [[0.90, 0.12, 0], [0.04, 0.92, 0.05],
+[0, 0.06, 0.95]] (an instrument with filters shifted against the
+standard ones): phfotran recovers the rows normalised by the diagonal
+to 0.0006 ([1, 0.1332, 0], [0.0429, 1, 0.0538], [0, 0.0636, 1]);
+the calibration without the table has colour terms of −0.164 (B),
+−0.022 (V), +0.018 (R) mag per magnitude of B − V, with the table
+−0.0004 ± 0.0002, +0.0001, −0.0001, the scatter of B 0.021 → 0.0016
+mag (0.0014 for frames of the standard filters). Two filters (B,V, no
+leak of R): −0.164 → 0.0000 ± 0.0002. Colour terms linear in magnitudes
+(B' = B + 0.1 (B − V)) are approximated by the photon mixing to 0.013
+mag rms over two magnitudes of B − V. Frames rendered in the standard
+filters give a diagonal table (off-diagonal terms below 0.0005)
+and the same calibration as without it.
 </p>
 
 
@@ -96,23 +138,52 @@ due to ill-conditioning of the problem.
 <h2>Input And Output</h2>
 
 <p>
-On input, FITS frames in several filters are
-required. Ones must be passed in order from short- to long-wavelengths.
+On input, FITS frames in several filters (with the instrumental
+photometry and astrometry, as for phcal) are required, one frame per
+filter. The frames are paired with the filters (<samp>-f</samp>) and
+the catalogue columns (<samp>--col-mag</samp>, <samp>--col-magerr</samp>,
+in the order of <samp>-f</samp>) by their FILTER keyword, in any order.
 Composited frames are recommended.
 </p>
 
 <p>
-On output, a new FITS table representing the transformation is created.
+On output, a new FITS table representing the transformation is created
+(<samp>-o</samp>, phfotran.fits by default;
+<a href="dataform_phfotran.html">format</a>). It contains the data
+of the fit too: a table given as the only file (without a catalogue)
+is fitted again.
 </p>
 
-<!-- #include virtual="/man_phcal_params.shtml" -->
-
-Add -E,--extin option description.
+<h2>Parameters</h2>
+<dl>
+<dt><samp>-c, --cat</samp></dt><dd>reference catalogue (as phcal)</dd>
+<dt><samp>-f, --filters</samp></dt><dd>filters, one per frame</dd>
+<dt><samp>--col-ra, --col-dec, --col-mag, --col-magerr</samp></dt><dd>columns
+  of the catalogue; the magnitudes in the order of <samp>-f</samp></dd>
+<dt><samp>--photsys-ref</samp></dt><dd>the standard photometry system
+  of the catalogue (PHOTSYS2)</dd>
+<dt><samp>--photsys-instr</samp></dt><dd>the name of the instrumental system
+  (PHOTSYS1; default: PHOTSYS of the frames); phcal checks it against
+  its <samp>--photsys-instr</samp> or the frames</dd>
+<dt><samp>-C, --cal</samp></dt><dd>factors multiplying the counts of the
+  filters (in the order of <samp>-f</samp>)</dd>
+<dt><samp>-E, --extin</samp></dt><dd>extinction coefficients <i>k</i>
+  of the filters: the counts are multiplied by exp(<i>k X</i>), <i>X</i>
+  the airmass of the frame (the transformation outside the atmosphere)</dd>
+<dt><samp>--area</samp></dt><dd>the area of the telescope [m²]</dd>
+<dt><samp>--tol</samp></dt><dd>search radius for the cross-match [deg]</dd>
+<dt><samp>--phsystab</samp>, <samp>--list</samp></dt><dd>the table
+  of photometry systems, list of them</dd>
+</dl>
 
 <h2>Caveats</h2>
 
 <p>
 Just equal number of instrumental and standard filters is implemented.
+Stars are selected by fixed limits (signal to noise above 5, relative
+error below 0.1). The front end did not run phfotran before
+(the action was listed, but not dispatched); the utility itself crashed
+at the end of its reading of the frames (BUGS P45).
 </p>
 
 
@@ -120,11 +191,16 @@ Just equal number of instrumental and standard filters is implemented.
 <h2>Examples</h2>
 
 <p>
-Calibrate against to UCAC5 catalogue:
+The transformation of an instrument by the standard field T Phe
+and its use:
 </p>
 <pre>
-$ munipack cone -c UCAC5 -o 0716cat.fits  -r 0.1 110.47 71.34
-$ munipack phfotran --area 1.86 --photsys-instr DK154 -c T_Phe.fits --col-ra RA --col-dec DEC --col-mag B,V,R,I T_Phe_000001.fits T_Phe_000003.fits T_Phe_000005.fits T_Phe_000007.fits
+$ munipack phfotran --area 1.86 --photsys-instr DK154 --photsys-ref Johnson \
+   -c T_Phe.fits --col-ra RA --col-dec DEC -f B,V,R,I --col-mag B,V,R,I \
+   T_Phe_000001.fits T_Phe_000003.fits T_Phe_000005.fits T_Phe_000007.fits
+$ munipack phcal --tratab phfotran.fits --photsys-instr DK154 --photsys-ref Johnson \
+   -c T_Phe.fits --col-ra RA --col-dec DEC -f B,V,R,I --col-mag B,V,R,I \
+   T_Phe_000001.fits T_Phe_000003.fits T_Phe_000005.fits T_Phe_000007.fits
 </pre>
 
 

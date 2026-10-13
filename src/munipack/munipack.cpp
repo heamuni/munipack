@@ -120,6 +120,8 @@ bool Munipack::OnInit()
       proc = new MuniAstrometry(this,cmd);
     else if ( action == "phcal" )
       proc = new MuniPhcal(this,cmd);
+    else if ( action == "phfotran" )
+      proc = new MuniPhfotran(this,cmd);
     else if ( action == "aphot" )
       proc = new MuniAphot(this,cmd);
     else if ( action == "gphot" )
