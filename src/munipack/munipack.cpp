@@ -58,9 +58,10 @@ bool Munipack::OnInit()
     "phfotran", "cross", "artificial", "sesame", 0
   };
 
-  // recognise the action
+  // recognise the action: the first argument which is the name of an action;
+  // later ones are values of options or files (`astrometry -m cross')
   wxString action;
-  for(int i = 0; i < argc; i++) {
+  for(int i = 1; i < argc && action == ""; i++) {
     for(int j = 0; actions[j] != 0; j++)
       if( argv[i] == actions[j] )
 	action = actions[j];

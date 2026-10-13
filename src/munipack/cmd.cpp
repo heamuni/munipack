@@ -111,18 +111,20 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
   wxASSERT(action != "" && xargc > 0); // Requires the action, at least
 
   // filters command-line options:
-  // * actions are not passed
+  // * the action is not passed: its first occurrence, as Munipack::OnInit()
+  //   recognises it (an option value or a file of the same name is passed)
   // * remove stdin "-" switch
   // * remove @in item
   // * read input files and defines files
 
   wxChar **argv = new wxChar*[xargc-1];
   int argc = 0;
+  bool action_found = false;
   for(int i = 0; i < xargc; i++) {
     wxString arg(xargv[i]);
-    if( arg == action )
+    if( i > 0 && arg == action && ! action_found )
       // the action itself is omitted
-      ;
+      action_found = true;
     else if( arg == "-" || arg.substr(0,1) == "@" )
       // Look for - or @in option and eventually read the input files
       InputByFile(arg.substr(1));
