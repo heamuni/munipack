@@ -59,6 +59,17 @@ munipack psfphot [.. parameters ..] file(s)
   bright (S/N &gt; 50), isolated, unsaturated stars in the radius
   of 3 FWHM (the medians of their fits are used), or the PSF by the file,
   or the empirical PSF (see below).
+  The Moffat shape is fitted by the FWHM and <i>u</i> = 1/β (see MOFFAT
+  below): <i>u</i> = 0 is the Gaussian of the same FWHM, the limit of
+  β → ∞, so the fit converges on stars with a Gaussian profile, where
+  α and β grew together without bound. When the median <i>u</i> is below
+  0.001 (β &gt; 1000; such a Moffat profile differs from the Gaussian by
+  less than 0.01% of the flux), the Gaussian of the fitted FWHM is used
+  (PSFSIGMA and PSFLIMIT = 'GAUSS' in the header).
+  Versions before 0.6.2+hg1653 (patched, P18) fitted α and β: on
+  Gaussian stars β ran towards infinity and every shape fit exhausted its
+  iterations (454 s instead of 10 s on a 1024² frame, β = 240–300,
+  fluxes +0.06%, +0.45% on other frames).
 </li>
 <li>The initial fluxes are fitted at the detected positions; the stars are
   ordered by their brightness.
@@ -129,6 +140,18 @@ munipack psfphot [.. parameters ..] file(s)
 <li>The errors are given by the covariance matrix of the fit; the error of
   the fixed sky (SKYERR by aphot) is propagated to the flux error.
 </li>
+<li>Faint stars: measurements with S/N = PSFCOUNT/PSFCOUNTERR &lt; 2 get
+  FLAG 256. At the true positions the fluxes are unbiased down to
+  S/N &lt; 1, but the error is evaluated by the model of the fitted flux
+  (the Poisson variance of the star itself), so it follows the noise of
+  the flux: a low flux has a small error, and the pull (PSFCOUNT − true)
+  / PSFCOUNTERR has the mean −0.10 to −0.16 and SD 1.04–1.10 at S/N &lt; 3
+  on a sky of 0.4 e-/pixel (the same for the Poisson maximum likelihood
+  by simulation; ground-based skies are not affected). The stars of find
+  this faint are mostly noise peaks, and their fluxes are biased up by
+  the selection: treat them as upper-limit-like estimates. phcal does not
+  use the flag (it selects by the relative error, <samp>-e</samp>).
+</li>
 </ul>
 
 <h2>PSF</h2>
@@ -149,7 +172,11 @@ munipack psfphot [.. parameters ..] file(s)
   <dd><i>exp(-(x²/2σ²) - (y²/2σ²q²))</i>, FWHM = 2.3548 σ √q.</dd>
   <dt>MOFFAT</dt>
   <dd><i>(1 + x²/α² + y²/α²q²)<sup>-β</sup></i>,
-    FWHM = 2α √(2<sup>1/β</sup>-1) √q.</dd>
+    FWHM = 2α √(2<sup>1/β</sup>-1) √q. By the FWHM <i>F</i> along the
+    major axis and <i>u</i> = 1/β, <i>(1 + 4(2<sup>u</sup>-1)
+    (x² + y²/q²)/F²)<sup>-1/u</sup></i>, which tends to the Gaussian
+    <i>exp(-4 ln 2 (x² + y²/q²)/F²)</i> of the same FWHM for <i>u</i> → 0
+    (the form of the shape fit).</dd>
   <dt>FILE</dt>
   <dd>The field-dependent PSF in the
     <a href="dataform_artpsf.html">PSF file format</a>. The position in the
@@ -329,7 +356,8 @@ munipack psfphot [.. parameters ..] file(s)
     fitted (the result is printed with <samp>--verbose</samp> and written
     to the header). Moffat β is 2.5 when FWHM is given and β is not.</dd>
   <dt><samp>--beta β</samp></dt>
-  <dd>Moffat exponent (fitted when not given, together with the width).</dd>
+  <dd>Moffat exponent (fitted when not given, together with the width;
+    a fitted β above 1000 is the Gaussian limit).</dd>
   <dt><samp>--elliptic</samp></dt>
   <dd>Fit also the axis ratio and the position angle of the analytic PSF.</dd>
   <dt><samp>--fitrad r</samp></dt>
@@ -342,7 +370,12 @@ munipack psfphot [.. parameters ..] file(s)
     uses the sky of aphot (or the clipped mean in the annulus); before the
     next passes, the sky is re-estimated in the annulus of the frame with
     all fitted stars subtracted, so the light of neighbours (and of the
-    star itself) does not bias it. Both are the mean clipped by the noise
+    star itself) does not bias it; the pixels where the subtracted light
+    has a photon variance above a quarter of the variance of the sky are
+    left out (its noise is symmetric, while the clip of the noise model
+    is not: it raised the sky by 4.6% of 0.42 e-/pixel among the stars
+    of a 32 pixel grid and lowered the fluxes of faint stars by 0.2σ in
+    versions before 0.6.2+hg1653 patched). Both are the mean clipped by the noise
     model, as the sky of <a href="man_aphot.html#sky">aphot</a> (a median
     or a mean clipped at 3σ by the median absolute deviation is biased on
     a sky of a few photons per pixel).
@@ -403,14 +436,17 @@ munipack psfphot [.. parameters ..] file(s)
     (bad, saturated, out of the frame), 4 the position is not fitted,
     8 not converged, 16 the fit failed (the flux is not valid),
     32 another star within the fitting radius, 64 a saturated star added
-    (not detected by find), 128 a star found in the residuals.</dd>
+    (not detected by find), 128 a star found in the residuals, 256 S/N
+    (PSFCOUNT/PSFCOUNTERR) below 2, an upper-limit-like flux (see the
+    faint stars above).</dd>
   <dt>GROUP, GSIZE</dt><dd>The group of the simultaneous fit in the last
     pass (0 for a star fitted alone) and its size.</dd>
 </dl>
 
 <p>
   The header keywords: PSFTYPE, PSFFILE, FWHM, HWHM [pix], PSFSIGMA or
-  PSFALPHA and PSFBETA, PSFAXRAT, PSFPA [deg], PSFNSTAR (stars of the
+  PSFALPHA and PSFBETA (PSFSIGMA and PSFLIMIT = 'GAUSS' for MOFFAT fitted
+  with β → ∞), PSFAXRAT, PSFPA [deg], PSFNSTAR (stars of the
   shape fit), PSFCEN1, PSFCEN2, PSFSCALE (the PSF file geometry),
   PSFZOOM, FITRAD, SKYMODE, NPASS, GROUPDST (the link distance [FWHM]),
   NGROUPS, MAXGROUP, RESDETEC, NRESID (stars found in the residuals),

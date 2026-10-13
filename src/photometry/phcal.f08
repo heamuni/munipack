@@ -378,6 +378,7 @@ contains
     type(type_phsys) :: phsyscal
     type(photores), dimension(:), allocatable :: phres
     integer, dimension(:,:), allocatable :: pairs
+    integer, dimension(:), allocatable :: forder, perm
     integer :: status,nfiles,ncat,i
 
     if( photsys_ref == '' ) &
@@ -402,23 +403,45 @@ contains
 
     ! reference system
     call phselect(phsystable,photsys_ref,phsyscal)
-    call phsyspairs(phsyscal,filters,pairs)
 
     call readframes(filename,keys,phsyscal%filter,photosys_instr,threshold,&
          maxerr,ra,dec,dn,ddn,utol,exptime,areas,filter_frames,tol,init_area,&
-         saper,aper,verbose,status)
+         saper,aper,verbose,status,forder)
     if( status /= 0 ) stop 'Failed to read frames.'
     if( size(filter_frames) /= size(filters) ) &
          stop 'Filters and frames dimensions differs.'
     if( init_area ) areas = area
 
+    ! The frames are arranged by the filters of the photometry system,
+    ! the catalogue columns (--col-mag, --col-magerr) follow the filters
+    ! in the order given by -f: the filters and the columns are arranged
+    ! as the frames, by the filter names of the frames.
+    allocate(perm(nfiles))
+    perm = 1
+    if( nfiles > 1 ) then
+       if( size(mag,2) /= size(filters) ) &
+            stop 'Magnitude columns and filters dimensions differs.'
+       call filters_arrange(filter_frames,filters,perm)
+       filters = filters(perm)
+       mag = mag(:,perm)
+       dmag = dmag(:,perm)
+    end if
+    call phsyspairs(phsyscal,filters,pairs)
+
     if( verbose ) then
        write(*,*) 'Filename, filter, exptime [s], area [m2]:'
        do i = 1,size(filename)
-          write(*,'(2(a,3x),2(f0.3,1x))') trim(filename(i)), &
+          write(*,'(2(a,3x),2(f0.3,1x))') trim(filename(forder(i))), &
                trim(filter_frames(i)),exptime(i), areas(i)
        end do
+       if( nfiles > 1 ) then
+          write(*,*) 'Filter, catalogue magnitude column:'
+          do i = 1,size(filters)
+             write(*,'(1x,a,3x,a)') trim(filters(i)),trim(col_mag(perm(i)))
+          end do
+       end if
     end if
+    deallocate(perm,forder)
 
 !    write(*,*) size(mag), tol
 !    write(*,*) size(cts,1)
@@ -590,6 +613,40 @@ contains
          tol,tr,tr1,trerr,tr1err,cts,dcts,dn,ddn,ra,dec,mag,dmag,ctph,dctph,sys)
 
   end subroutine calibrate
+
+  subroutine filters_arrange(filter_frames,filters,perm)
+
+    ! The frames are arranged by the filters of the photometry system
+    ! (readframes, writecal), while the filters (-f) and the catalogue
+    ! columns (--col-mag, --col-magerr) or the calibrations (-C) follow
+    ! the order given by the user: perm(n) is the index in filters
+    ! of the filter of the n-th frame (the first unused one of the name).
+
+    character(len=*), dimension(:), intent(in) :: filter_frames, filters
+    integer, dimension(:), intent(out) :: perm
+
+    logical, dimension(size(filters)) :: used
+    integer :: i,n
+
+    used = .false.
+    do n = 1, size(filter_frames)
+       perm(n) = 0
+       do i = 1, size(filters)
+          if( .not. used(i) .and. filters(i) == filter_frames(n) ) then
+             perm(n) = i
+             used(i) = .true.
+             exit
+          end if
+       end do
+       if( perm(n) == 0 ) then
+          write(error_unit,*) "Filter `",trim(filter_frames(n)), &
+               "' of a frame is not in the filters (-f): ", &
+               (trim(filters(i))//' ',i=1,size(filters))
+          stop 'Filters of frames and of the calibration do not correspond.'
+       end if
+    end do
+
+  end subroutine filters_arrange
 
   subroutine relmagph(mag,dmag,ph,dph)
 
@@ -800,8 +857,26 @@ contains
     use fits_fotran
 
     character(len=FLEN_VALUE) :: catid,photsys1,photsys2
+    character(len=FLEN_VALUE), dimension(:), allocatable :: filter_frames
     real(dbl), allocatable, dimension(:,:) :: tr,tr1,trerr,tr1err
+    type(type_phsys) :: phsyscal
+    integer, dimension(:), allocatable :: order, perm
     integer :: n,status
+
+    ! the calibrations (-C) follow the filters (-f) in the order given
+    ! by the user, writecal arranges the frames by the filters of
+    ! the photometry system: both are arranged by the filter names
+    if( size(filename) > 1 .and. size(filters) == size(filename) .and. &
+         size(ctph_manual) == size(filters) ) then
+       call phselect(phsystable,photsys_ref,phsyscal)
+       call file_order(filename,keys,phsyscal%filter,order,filters=filter_frames)
+       allocate(perm(size(filters)))
+       call filters_arrange(filter_frames,filters,perm)
+       filters = filters(perm)
+       ctph_manual = ctph_manual(perm)
+       dctph_manual = dctph_manual(perm)
+       deallocate(order,perm,filter_frames)
+    end if
 
     if( tratable/= '' ) then
        call traload(tratable,photsys2,photsys1,tr,trerr,tr1,tr1err,status)

@@ -53,7 +53,8 @@ module psffit
        FLAG_FAILED    = 16,& ! fit failed, the flux is not valid
        FLAG_CROWDED   = 32,& ! a neighbour within the fitting radius
        FLAG_ADDED     = 64,& ! a saturated star added (not detected by find)
-       FLAG_RESID     = 128  ! a star found in the residuals (not by find)
+       FLAG_RESID     = 128,& ! a star found in the residuals (not by find)
+       FLAG_LOWSNR    = 256  ! S/N = flux/error below 2 (an upper-limit-like flux)
 
   type, public :: PsfType
      integer :: ptype = PSF_GAUSS
@@ -1062,10 +1063,14 @@ contains
     ! The fit of an isolated star by the analytic PSF with free shape:
     ! pshape = [width, beta, c1, c2], where the axis ratio and the angle
     ! are q = 1 - hypot(c1,c2), pa = atan2(c2,c1)/2. The sky is local.
-    ! The width (and beta, c1, c2) on input are the initial values.
-    ! The optional betamax is the largest beta: a Moffat profile with
-    ! beta = 10 is Gaussian to 1e-6 of the flux beyond 4 FWHM, while beta
-    ! converges slowly towards infinity for Gaussian stars.
+    ! The width is sigma (GAUSS); for MOFFAT, pshape = [fwhm, u, c1, c2],
+    ! the FWHM along the major axis and u = 1/beta (psf_moffat_usample):
+    ! u = 0 is the Gaussian of the same FWHM, the limit of beta -> infinity,
+    ! where the Moffat parameters (alpha, beta) run away on Gaussian stars
+    ! (alpha and beta growing together, the fit exhausted its iterations);
+    ! u is kept in [1/betamax, 1/1.05] (betamax = infinity by default), held
+    ! at a bound while chi2 decreases outwards. The shape on input is the
+    ! initial value.
 
     type(FrameType), intent(in) :: frame
     type(PsfType), intent(in) :: psf
@@ -1083,10 +1088,10 @@ contains
     integer, dimension(:), allocatable :: ii, jj
     real(REAL64), dimension(npar) :: par, ptry, g, dp
     real(REAL64), dimension(npar,npar) :: a, ad
-    logical, dimension(npar) :: free
-    real(REAL64) :: chi2, chi2try, lambda, step
+    logical, dimension(npar) :: free, fitted
+    real(REAL64) :: chi2, chi2try, lambda, step, ulo, uhi, gu
     integer :: npix, n, k, iter, ntry, i, j
-    logical :: converged
+    logical :: converged, moffat
 
     ok = .false.
     call pixel_set(frame,star,ii,jj,npix,n)
@@ -1098,8 +1103,17 @@ contains
        d(k) = frame%data(ii(k),jj(k)) - frame%mstar(ii(k),jj(k))
     end do
 
-    free = [.true., .true., .true., .true., .true., fitbeta, elliptic, elliptic]
+    ! the domain of u = 1/beta
+    moffat = psf%ptype == PSF_MOFFAT
+    ulo = 0
+    if( present(betamax) ) ulo = 1 / betamax
+    uhi = 1 / 1.05_REAL64
+
+    fitted = [.true., .true., .true., .true., .true., fitbeta .and. moffat, &
+         elliptic, elliptic]
+    free = fitted
     par = [star%flux, star%x, star%y, star%sky, pshape]
+    if( fitted(6) ) par(6) = min(max(par(6),ulo),uhi)
     lambda = 1e-3_REAL64
     converged = .false.
 
@@ -1107,6 +1121,13 @@ contains
        call evaluate(par,m,jac)
        if( any(m /= m) ) return
        w = 1 / frame%variance(m)
+       ! u at a bound is held while chi2 decreases outwards
+       ! (gu > 0: chi2 decreases with increasing u)
+       if( fitted(6) ) then
+          gu = sum(w*jac(:,6)*(d - m))
+          free(6) = .not. ((par(6) <= ulo .and. gu <= 0) .or. &
+               (par(6) >= uhi .and. gu >= 0))
+       end if
        call normal(m,w,chi2,a,g)
 
        do ntry = 1, 12
@@ -1121,8 +1142,7 @@ contains
           ! keep the shape parameters in their domains
           if( dp(5) < -0.5_REAL64*par(5) ) dp = dp * (-0.5_REAL64*par(5) / dp(5))
           ptry = par + dp
-          if( ptry(6) < 1.05_REAL64 ) ptry(6) = 1.05_REAL64
-          if( present(betamax) ) ptry(6) = min(ptry(6),betamax)
+          if( fitted(6) ) ptry(6) = min(max(ptry(6),ulo),uhi)
           if( hypot(ptry(7),ptry(8)) > 0.8_REAL64 ) &
                ptry(7:8) = ptry(7:8) * 0.8_REAL64 / hypot(ptry(7),ptry(8))
           call evaluate(ptry,mt,jact)
@@ -1138,13 +1158,11 @@ contains
           converged = .true.
           exit
        end if
+       ! the step made (the bounds applied)
+       dp = ptry - par
        par = ptry
-       if( present(betamax) ) then
-          ! a Gaussian profile: beta at the limit
-          if( free(6) .and. par(6) >= betamax ) free(6) = .false.
-       end if
        if( maxval(abs(dp(2:3))) < 1e-4_REAL64 .and. &
-            abs(dp(5)) < 1e-5_REAL64*par(5) .and. abs(dp(6)) < 1e-4_REAL64 .and. &
+            abs(dp(5)) < 1e-5_REAL64*par(5) .and. abs(dp(6)) < 1e-5_REAL64 .and. &
             maxval(abs(dp(7:8))) < 1e-5_REAL64 ) then
           converged = .true.
           exit
@@ -1170,7 +1188,7 @@ contains
 
       real(REAL64), dimension(-n:n,-n:n) :: p, pu, pv, p1, p2
       real(REAL64), dimension(npar) :: q
-      real(REAL64) :: h
+      real(REAL64) :: h, hh
       integer :: i0, j0, k, i, j, l
 
       i0 = nint(par(2))
@@ -1187,9 +1205,10 @@ contains
          jac(k,4) = 1
       end do
 
-      ! numerical derivatives by the shape parameters
+      ! numerical derivatives by the shape parameters (u: one-sided
+      ! at the bounds of its domain)
       do l = 5, npar
-         if( .not. free(l) ) cycle
+         if( .not. fitted(l) ) cycle
          if( l == 5 ) then
             h = 1e-4_REAL64*par(5)
          else
@@ -1197,13 +1216,17 @@ contains
          end if
          q = par
          q(l) = par(l) + h
+         if( l == 6 ) q(l) = min(q(l),uhi)
+         hh = q(l)
          call model(q,i0,j0,p1)
          q(l) = par(l) - h
+         if( l == 6 ) q(l) = max(q(l),ulo)
+         hh = hh - q(l)
          call model(q,i0,j0,p2)
          do k = 1, npix
             i = max(min(ii(k) - i0,n),-n)
             j = max(min(jj(k) - j0,n),-n)
-            jac(k,l) = par(1)*(p1(i,j) - p2(i,j)) / (2*h)
+            jac(k,l) = par(1)*(p1(i,j) - p2(i,j)) / hh
          end do
       end do
 
@@ -1224,7 +1247,11 @@ contains
       allocate(sub(-nsub:nsub,-nsub:nsub))
       q = 1 - hypot(par(7),par(8))
       pa = rad*atan2(par(8),par(7)) / 2
-      call psf_analytic_sample(psf%ptype,par(5),par(6),q,pa,psf%zoom,nsub,sub)
+      if( moffat ) then
+         call psf_moffat_usample(par(5),par(6),q,pa,psf%zoom,nsub,sub)
+      else
+         call psf_analytic_sample(psf%ptype,par(5),par(6),q,pa,psf%zoom,nsub,sub)
+      end if
       if( present(pu) ) then
          call psf_pixelize(sub,nsub,psf%zoom,i0 - par(2),j0 - par(3),n,p,pu,pv)
       else

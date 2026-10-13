@@ -37,12 +37,9 @@ contains
     integer, dimension(:), allocatable, intent(out) :: i1,i2
     logical, intent(out) :: status
     real(REAL64), dimension(:), allocatable :: x,y,u,v
-    integer, dimension(:), allocatable :: id1,id2
     type(AstrometryProjection) :: tp
     type(AstrometryGeometry) :: tg
-    real(REAL64) :: smin,smin0,s
-    integer :: nsize,msize,n,i,j,idx
-    logical :: found
+    integer :: nsize,msize
 
     status = .false.
 
@@ -52,13 +49,38 @@ contains
     ! select maximum amount of stars by list
     nsize = size(alpha)
     msize = size(xpix)
-    allocate(u(nsize),v(nsize),id1(nsize),id2(nsize),x(msize),y(msize))
+    allocate(u(nsize),v(nsize),x(msize),y(msize))
 
     call tp % init(type,acen,dcen)
     call tp % proj(alpha,delta,u,v)
 
     call tg % init(scale,rot,refl)
     call tg % pix2uv(xpix-xcen,ypix-ycen,x,y)
+
+    call pairmatch(u,v,x,y,tol,i1,i2)
+    status = size(i1) > 0
+
+  end subroutine listmatch
+
+
+  subroutine pairmatch(u,v,x,y,tol,i1,i2)
+
+    ! The pairs of the nearest reference (u,v) and frame (x,y) stars
+    ! closer than tol, in the same units. Both lists are supposed sorted
+    ! by flux: every reference star takes its nearest frame star,
+    ! a frame star is taken by the brightest reference star only.
+
+    real(REAL64), dimension(:), intent(in) :: u,v,x,y
+    real(REAL64), intent(in) :: tol
+    integer, dimension(:), allocatable, intent(out) :: i1,i2
+    integer, dimension(:), allocatable :: id1,id2
+    real(REAL64) :: smin,smin0,s
+    integer :: nsize,msize,n,i,j,idx
+    logical :: found
+
+    nsize = size(u)
+    msize = size(x)
+    allocate(id1(nsize),id2(nsize))
 
     smin0 = tol
 
@@ -105,9 +127,7 @@ contains
     i1 = id1(1:n)
     i2 = id2(1:n)
 
-    status = n > 0
-
-  end subroutine listmatch
+  end subroutine pairmatch
 
 
 end module nearmatch

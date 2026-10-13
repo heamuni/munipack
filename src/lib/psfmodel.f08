@@ -60,7 +60,8 @@ module psfmodel
 
   public :: psf_file_load, psf_file_save, psf_field_interpolate, &
        psf_pixelize, psf_pixel_weights, psf_analytic_sample, &
-       psf_analytic_fwhm, psf_sampled_fwhm, psf_moffat_alpha
+       psf_analytic_fwhm, psf_sampled_fwhm, psf_moffat_alpha, &
+       psf_moffat_usample
 
 contains
 
@@ -758,6 +759,80 @@ contains
     psf_moffat_alpha = fwhm / (2*sqrt(2**(1/beta) - 1))
 
   end function psf_moffat_alpha
+
+
+  pure subroutine psf_moffat_usample(fwhm,u,q,pa,zoom,nmax,psf)
+
+    ! The Moffat PSF by its FWHM along the major axis and u = 1/beta,
+    ! sampled and normalised as psf_analytic_sample (MOFFAT):
+    !
+    !   (1 + 4 (2**u - 1) r**2 / fwhm**2)**(-1/u),  r**2 = x**2 + y**2/q**2,
+    !
+    ! written as exp(-s L(u s)), s = 4 E r**2 / fwhm**2, E = (2**u - 1)/u,
+    ! L(t) = log(1 + t)/t. For u -> 0 (beta -> infinity), E -> ln 2 and
+    ! L -> 1: the Gaussian of the same FWHM, exp(-4 ln 2 r**2 / fwhm**2),
+    ! reached smoothly (u = 0 is the Gaussian itself). The shape fit of
+    ! psfphot uses it: the Moffat of the parameters (alpha, beta) runs
+    ! towards beta, alpha -> infinity on Gaussian stars, while u = 0 is
+    ! a finite boundary of (fwhm, u) where the fit converges.
+
+    real(REAL64), intent(in) :: fwhm, u, q, pa
+    integer, intent(in) :: zoom, nmax
+    real(REAL64), dimension(-nmax:nmax,-nmax:nmax), intent(out) :: psf
+
+    real(REAL64) :: e, f2, c, sn, x, y, r2, sr, norm
+    integer :: i, j
+
+    c = cos(pa / rad)
+    sn = sin(pa / rad)
+    e = log(2.0_REAL64) * expm1x(u*log(2.0_REAL64))
+    f2 = (fwhm*zoom)**2
+    norm = zoom**2 * 4 * (1 - u) * e / (pi*f2*q)
+    do j = -nmax, nmax
+       do i = -nmax, nmax
+          x = ( i*c + j*sn)
+          y = (-i*sn + j*c) / q
+          r2 = x**2 + y**2
+          sr = 4*e*r2 / f2
+          psf(i,j) = norm*exp(-sr*log1px(u*sr))
+       end do
+    end do
+
+  contains
+
+    pure real(REAL64) function expm1x(x)
+
+      ! (exp(x) - 1)/x, accurate for small x (Kahan)
+
+      real(REAL64), intent(in) :: x
+      real(REAL64) :: w
+
+      w = exp(x)
+      if( w == 1 ) then
+         expm1x = 1
+      else
+         expm1x = (w - 1) / log(w)
+      end if
+
+    end function expm1x
+
+    pure real(REAL64) function log1px(t)
+
+      ! log(1 + t)/t, accurate for small t (Kahan)
+
+      real(REAL64), intent(in) :: t
+      real(REAL64) :: w
+
+      w = 1 + t
+      if( w == 1 ) then
+         log1px = 1
+      else
+         log1px = log(w) / (w - 1)
+      end if
+
+    end function log1px
+
+  end subroutine psf_moffat_usample
 
 
   pure real(REAL64) function psf_sampled_fwhm(psf,zoom)

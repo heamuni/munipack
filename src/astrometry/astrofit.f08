@@ -169,11 +169,16 @@ contains
 
        if( ptype == 'TPV' ) then
 
-          if( fitmethod == 'ROBUST' ) then
+          if( fitmethod == 'ROBUST' .and. n > size(pv) + 1 ) then
 
-             call defmin(pcode,alpha,delta,refl,xstar,ystar,s,&
-                  acen,dcen,sc,rot,rms,pv,verbose,reliable)
+             call tpvstaged
              if( .not. reliable ) return
+          else if( fitmethod == 'ROBUST' ) then
+             if( verbose ) write(error_unit,*) &
+                  'Warning in astrofit(): too few stars for deformations.'
+             pv = 0
+             pv(1,1) = 1
+             pv(2,1) = 1
           else
              if( verbose ) write(error_unit,*) &
                   'Warning in astrofit(): deformations needs robust methods.'
@@ -255,6 +260,73 @@ contains
 
     deallocate(alpha,delta,xstar,ystar)
     deallocate(id1,id2)
+
+  contains
+
+    subroutine tpvstaged
+
+      ! The staged fit of the TPV deformation. The stars cross-matched by
+      ! the TAN solution miss the edges of the field where the deformation
+      ! moves them by more than the match limit, so a polynomial fitted on
+      ! them is extrapolated there. The deformation of the order 2 is
+      ! fitted first, all stars are cross-matched again by that solution
+      ! (within the limit by the scatter of the fit, xsig*max(sig,rms)),
+      ! and refitted; when the matched set does not change, the order is
+      ! raised to 3 and the iterations continue until the set is stable.
+
+      integer, parameter :: maxstage = 12
+      real(REAL64), dimension(size(pv,1),0:size(pv,2)-1) :: pvi
+      integer, dimension(:), allocatable :: j1, j2
+      real(REAL64) :: tlim
+      integer :: order, stage, nset
+      logical :: stable
+
+      pvi = 0
+      order = 2
+      stable = .false.
+      do stage = 1, maxstage
+         call defmin(pcode,alpha,delta,refl,xstar,ystar,s,&
+              acen,dcen,sc,rot,rms,pv,verbose,reliable,order,pvi)
+         if( .not. reliable ) return
+
+         ! the cross-match by the solution
+         tlim = xsig*max(sig / sc,rms)
+         call defmatch(pcode,a,d,x,y,acen,dcen,xcen,ycen,sc,rot,refl,pvi, &
+              tlim,j1,j2)
+         nset = size(j1)
+         stable = nset == n
+         if( stable ) stable = all(j1 == id1) .and. all(j2 == id2)
+         if( verbose ) write(error_unit,'(a,i0,a,i0,a,i0,a,f0.2,a,i0,a,l1)') &
+              '# TPV stage ',stage,', order ',order,': ',n,' stars fitted, rms ', &
+              rms*sc,' pix, cross-matched by the solution: ',nset,', stable: ',stable
+         if( stable .and. order == 3 ) exit
+
+         if( .not. stable ) then
+            if( nset <= size(pv) + 1 ) then
+               ! too few stars by the solution: the last fit is kept
+               if( order == 3 ) exit
+            else
+               n = nset
+               call move_alloc(j1,id1)
+               call move_alloc(j2,id2)
+               deallocate(alpha,delta,xstar,ystar)
+               allocate(alpha(n),delta(n),xstar(n),ystar(n))
+               alpha = a(id1)
+               delta = d(id1)
+               xstar = x(id2) - xcen
+               ystar = y(id2) - ycen
+            end if
+         end if
+         if( stable .or. stage >= maxstage/2 ) order = 3
+      end do
+
+      ! the final solution of the order 3 on the last set
+      if( .not. (stable .and. order == 3) ) then
+         call defmin(pcode,alpha,delta,refl,xstar,ystar,s,&
+              acen,dcen,sc,rot,rms,pv,verbose,reliable,3,pvi)
+      end if
+
+    end subroutine tpvstaged
 
   end subroutine astrofit
 

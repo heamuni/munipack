@@ -207,26 +207,37 @@ will produce the output file <samp>blazar_01R_MAG.fits</samp>. Be warned, that
 output files are overwritten in any case by default.</p>
 
 
-<!--
-<h2>Filters Selection</h2>
+<h2 id="filters">Filters Selection</h2>
 <p>
-The correspondence between filter in reference catalogue and
-frames is selected just only on base of their order: first specified
-label (via \-\-col-mag) correspond do first image, etc.. The designations
-in catalogue and filter in FITS frame are not compared by any
-way.
+The filters of a multi-filter calibration are given by <samp>-f</samp>,
+the catalogue columns by <samp>--col-mag</samp> and
+<samp>--col-magerr</samp>, and the calibrations of the manual mode
+by <samp>-C</samp>, all in the same order: the <i>n</i>-th column
+(or value) belongs to the <i>n</i>-th filter. The frames are paired
+with the filters by the filter of the frame (the keyword
+<samp>FILTER</samp>), so neither the order of <samp>-f</samp> nor
+that of the files matters; the filter of every frame must be
+in <samp>-f</samp>.
+Internally, the frames are arranged by the order of the filters
+in the photometry system.
 </p>
 
 <p>
 For example, bands in reference table
-are labelled as Bmag, Vmag and filters as B,V (filters
-are for clarity included also in FITS names, but unchecked):
+are labelled as Bmag, Vmag and filters as B,V;
+the two commands give identical results:
 </p>
 <pre>
-$ munipack phcal ... \-\-col-mag Bmag,Vmag frame_B.fits frame_V.fits
+$ munipack phcal ... -f B,V --col-mag Bmag,Vmag frame_B.fits frame_V.fits
+$ munipack phcal ... -f V,B --col-mag Vmag,Bmag frame_V.fits frame_B.fits
 </pre>
--->
-
+<p>
+Older versions paired the catalogue columns (in the order of
+<samp>-f</samp>) with the frames arranged by the photometry system:
+with <samp>-f</samp> not in the order of the system (V,B for Johnson)
+the calibration failed (the second filter undefined) or a frame got
+the calibration of another filter.
+</p>
 
 <h2 id="prep">Preparation Of Photometry Catalogue</h2>
 

@@ -5,7 +5,8 @@
 <dt><samp>-C,--cal</samp></dt><dd>The calibration is specified by
 an exterior entity. The values are saved to a PHOTOMETRY extension
 header and counts are converted to photons for both image and table
-values.
+values. With more frames, the values follow the order of the filters
+(-f option).
 </dd>
 <dt><samp>-c,--cat</samp></dt><dd>Reference photometric catalogue. A fits table with
 coordinates and magnitudes of reference stars. One can be a selection from a "real"
@@ -15,12 +16,16 @@ how create this table by hand.
 </dd>
 <dt><samp>-r,--ref</samp></dt><dd>Reference frame is used. The reference frame
 usually created by <samp>-c,-C</samp> options. Useful for relative photometry.</dd>
-<dt><samp>-f,--filters</samp></dt><dd>Filters used for calibration. </dd>
+<dt><samp>-f,--filters</samp></dt><dd>Filters used for calibration,
+    one per frame; the frames are paired with them by their
+    <samp>FILTER</samp> keyword, in any order
+    (<a href="man_phcal.html#filters">Filters Selection</a>).</dd>
 <dt><samp>-F,--filter-ref</samp></dt><dd>Reference filter for calibration.</dd>
 <dt><samp>--col-ra</samp></dt><dd>Right Ascension column. Default is RAJ2000.</dd>
 <dt><samp>--col-dec</samp></dt><dd>Declination column. Default is DEJ2000.</dd>
-<dt><samp>--col-mag</samp></dt><dd>Magnitude column(s). Default is the filter
-    (-f option) with 'mag' suffix like <samp>-f V --col-mag Vmag</samp> (?).</dd>
+<dt><samp>--col-mag</samp></dt><dd>Magnitude column(s), in the order
+    of the filters (-f option), like
+    <samp>-f V,B --col-mag Vmag,Bmag</samp>.</dd>
 <dt><samp>--col-magerr</samp></dt><dd>Magnitude std. error column(s) (no default).
     If this parameter is omited, errors are estimated
     as the square of photons derived from magnitudes.</dd>
