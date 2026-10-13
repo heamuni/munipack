@@ -84,7 +84,7 @@ MuniColouring::MuniColouring(wxEvtHandler *h, const MuniCmdLineParser& cmd):
       Write(label + " = %f %f",x,y);
     }
     else {
-      wxLogFatalError("Failed to interpred `"+a+"' as cartesian coordinates.");
+      MuniFatalError("Failed to interpred `"+a+"' as cartesian coordinates.");
       return;
     }
   }
@@ -94,7 +94,7 @@ MuniColouring::MuniColouring(wxEvtHandler *h, const MuniCmdLineParser& cmd):
     size_t n;
     dblstr(a,sep,n,line);
     if( n != files.GetCount() ) {
-      wxLogFatalError("Count of weight items differs to passed filenames.");
+      MuniFatalError("Count of weight items differs to passed filenames.");
       return;
     }
 
@@ -107,7 +107,7 @@ MuniColouring::MuniColouring(wxEvtHandler *h, const MuniCmdLineParser& cmd):
     size_t n;
     dblstr(a,sep,n,line);
     if( n != files.GetCount() ) {
-      wxLogFatalError("Count of ctph items differs to passed filenames.");
+      MuniFatalError("Count of ctph items differs to passed filenames.");
       return;
     }
 
@@ -120,7 +120,7 @@ MuniColouring::MuniColouring(wxEvtHandler *h, const MuniCmdLineParser& cmd):
     size_t n;
     dblstr(a,sep,n,line);
     if( n != files.GetCount() ) {
-      wxLogFatalError("Count of background items differs to filenames.");
+      MuniFatalError("Count of background items differs to filenames.");
       return;
     }
 

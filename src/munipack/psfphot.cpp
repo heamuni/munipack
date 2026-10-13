@@ -46,18 +46,18 @@ MuniPsfphot::MuniPsfphot(wxEvtHandler *h, const MuniCmdLineParser& cmd):
     psf = a.Upper();
     if( ! (psf == "GAUSS" || psf == "MOFFAT" || psf == "FILE" ||
 	   psf == "EMPIRICAL") )
-      wxLogFatalError("Unknown PSF `%s' (GAUSS, MOFFAT, FILE, EMPIRICAL).",a);
+      MuniFatalError("Unknown PSF `%s' (GAUSS, MOFFAT, FILE, EMPIRICAL).",a);
   }
 
   if( cmd.Found("psf-file",&a) ) {
     if( psf == "" )
       psf = "FILE";
     else if( ! (psf == "FILE" || psf == "EMPIRICAL") )
-      wxLogFatalError("--psf-file requires --psf=FILE or EMPIRICAL.");
+      MuniFatalError("--psf-file requires --psf=FILE or EMPIRICAL.");
     Write("PSFFILE = '" + a + "'");
   }
   else if( psf == "FILE" )
-    wxLogFatalError("--psf=FILE requires --psf-file.");
+    MuniFatalError("--psf=FILE requires --psf-file.");
 
   if( psf != "" )
     Write("PSF = '" + psf + "'");
@@ -67,18 +67,18 @@ MuniPsfphot::MuniPsfphot(wxEvtHandler *h, const MuniCmdLineParser& cmd):
 			  "psf-stars", "psf-list", "psf-save", "psf-smooth" };
   for(size_t i = 0; i < sizeof(eopts)/sizeof(eopts[0]); i++)
     if( cmd.Found(eopts[i]) && psf != "EMPIRICAL" )
-      wxLogFatalError("--%s requires --psf=EMPIRICAL.",eopts[i]);
+      MuniFatalError("--%s requires --psf=EMPIRICAL.",eopts[i]);
 
   if( cmd.Found("psf-core",&a) ) {
     wxString core = a.Upper();
     if( ! (core == "GAUSS" || core == "MOFFAT") )
-      wxLogFatalError("Unknown core `%s' of the empirical PSF (GAUSS, MOFFAT).",a);
+      MuniFatalError("Unknown core `%s' of the empirical PSF (GAUSS, MOFFAT).",a);
     Write("PSFCORE = '" + core + "'");
   }
 
   if( cmd.Found("psf-zoom",&n) ) {
     if( n < 1 )
-      wxLogFatalError("--psf-zoom must be positive.");
+      MuniFatalError("--psf-zoom must be positive.");
     Write("PSFZOOM = %ld",n);
   }
 
@@ -87,19 +87,19 @@ MuniPsfphot::MuniPsfphot(wxEvtHandler *h, const MuniCmdLineParser& cmd):
 
   if( cmd.Found("psf-var",&n) ) {
     if( n < 0 || n > 2 )
-      wxLogFatalError("--psf-var is 0, 1 or 2.");
+      MuniFatalError("--psf-var is 0, 1 or 2.");
     Write("PSFVAR = %ld",n);
   }
 
   if( cmd.Found("psf-stars",&n) ) {
     if( n < 1 )
-      wxLogFatalError("--psf-stars must be positive.");
+      MuniFatalError("--psf-stars must be positive.");
     Write("PSFSTARS = %ld",n);
   }
 
   if( cmd.Found("psf-smooth",&x) ) {
     if( x < 0 )
-      wxLogFatalError("--psf-smooth must be non-negative.");
+      MuniFatalError("--psf-smooth must be non-negative.");
     Write("PSFSMOOTH = %.17g",x);
   }
 
@@ -108,19 +108,19 @@ MuniPsfphot::MuniPsfphot(wxEvtHandler *h, const MuniCmdLineParser& cmd):
 
   if( cmd.Found("psf-save",&a) ) {
     if( cmd.GetFiles().GetCount() > 1 )
-      wxLogFatalError("--psf-save is available for a single file only.");
+      MuniFatalError("--psf-save is available for a single file only.");
     Write("PSFSAVE = '" + a + "'");
   }
 
   if( cmd.Found("group",&x) ) {
     if( x < 0 )
-      wxLogFatalError("--group must be non-negative.");
+      MuniFatalError("--group must be non-negative.");
     Write("GROUP = %.17g",x);
   }
 
   if( cmd.Found("residual-detect",&n) ) {
     if( n < 0 )
-      wxLogFatalError("--residual-detect must be non-negative.");
+      MuniFatalError("--residual-detect must be non-negative.");
     Write("RESDETECT = %ld",n);
   }
 
@@ -139,7 +139,7 @@ MuniPsfphot::MuniPsfphot(wxEvtHandler *h, const MuniCmdLineParser& cmd):
   if( cmd.Found("sky",&a) ) {
     wxString sky = a.Upper();
     if( ! (sky == "FIXED" || sky == "LOCAL") )
-      wxLogFatalError("Unknown sky mode `%s' (fixed, local).",a);
+      MuniFatalError("Unknown sky mode `%s' (fixed, local).",a);
     Write("SKY = '" + sky + "'");
   }
 
@@ -168,17 +168,17 @@ MuniPsfphot::MuniPsfphot(wxEvtHandler *h, const MuniCmdLineParser& cmd):
     while( t.HasMoreTokens() && i < 2 ) {
       wxString token(t.GetNextToken());
       if( ! token.ToDouble(&c[i]) )
-	wxLogFatalError("Failed to interpret `%s' as a coordinate.",token);
+	MuniFatalError("Failed to interpret `%s' as a coordinate.",token);
       i++;
     }
     if( i != 2 )
-      wxLogFatalError("--psf-centre requires x,y.");
+      MuniFatalError("--psf-centre requires x,y.");
     Write("PSFCENTRE = %.17g %.17g",c[0],c[1]);
   }
 
   if( cmd.Found("residual",&a) ) {
     if( cmd.GetFiles().GetCount() > 1 )
-      wxLogFatalError("--residual is available for a single file only.");
+      MuniFatalError("--residual is available for a single file only.");
     Write("RESIDUAL = '" + a + "'");
   }
 

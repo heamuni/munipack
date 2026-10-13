@@ -867,8 +867,8 @@ void MuniCmdLineParser::InputByFile(const wxString& lstname)
 
   if( lstfile.GetLastError() != 0 ) {
     if( is_stdin )
-      wxLogFatalError("Failed to read the standard input.");
+      MuniFatalError("Failed to read the standard input.");
     else
-      wxLogFatalError("Failed to read the input file `"+lstname+"'.");
+      MuniFatalError("Failed to read the input file `"+lstname+"'.");
   }
 }

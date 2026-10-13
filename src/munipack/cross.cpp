@@ -47,7 +47,7 @@ MuniCross::MuniCross(wxEvtHandler *h, const MuniCmdLineParser& cmd):
   */
 
   if( cmd.GetParamCount() != 2 )
-    wxLogFatalError("Cross-match needs exactly two tables.");
+    MuniFatalError("Cross-match needs exactly two tables.");
 
   if( cmd.Found("tol",&x) )
     Write("TOL = %e",x);

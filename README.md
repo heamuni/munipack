@@ -62,6 +62,7 @@ docker run --rm -u $(id -u):$(id -g) -v "$PWD":/data munipack:0.6.2-hg1653-fixes
 - **The `HWHM` keyword written by `aphot` is now a true HWHM.** It used to be σ. Re-run `aphot` on frames processed by an older version before using the new `phcal` (see BUGS.md §5).
 - **`phcal -q` quantities FLAM, FNU, PHOTLAM, PHOTNU, ABMAG and STMAG** are now physically correct. Previously FLAM was wrong by ×0.0013 and STMAG by +9.7 mag. MAG is unchanged.
 - **The sky of `aphot`, `find` and `psfphot` is the mean of the sky**, clipped by the noise model of the frame (GAIN, READNS or RDNOISE, BIASLEV), not a robust mean or a median. On a sky of a few photo-electrons per pixel the old estimates were 13–30% low and faint stars too bright by up to +23% (BUGS P23). `aphot` leaves the other detected stars out of the sky ring and invalidates (−1) the apertures contaminated by a brighter neighbour (P29). On ground-based frames (hundreds of e⁻/pixel and more) SKY changes within its noise.
+- **Exit status:** 0 on success, 1 on every error, with the reason on stderr (front-end errors gave 139, which looked like a crash, utility failures 13; BUGS A24).
 - **`find` rejects detections explained by the wing of a brighter star** (the halo of an extended PSF, a saturated core; BUGS P25); its threshold now uses the clipped scatter of the sky, so on photon-starved frames it finds fewer noise peaks.
 
 Example simulation of a 16-bit frame with a realistic detector:

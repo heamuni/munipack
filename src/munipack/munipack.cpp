@@ -28,11 +28,22 @@
 
 wxIMPLEMENT_APP_CONSOLE(Munipack);
 
+void MuniFatalError(const wxString& msg)
+{
+  wxLogError("%s",msg);
+  wxLog::FlushActive();
+  exit(1);
+}
+
 bool Munipack::OnInit()
 {
   exitcode = 3;
   proc = 0;
   SetCLocale();
+
+  // the exit code when OnInit() returns false: an invalid command line
+  // (wxWidgets returns 255 by default), 0 for --help and --version
+  SetErrorExitCode(1);
 
   // switch-off timestamps in logs
   wxLog::DisableTimestamp();
@@ -58,17 +69,24 @@ bool Munipack::OnInit()
   if( action == "" ) {
     MuniCmdLineParser cmd(argc,argv);
     OnInitCmdLine(cmd);
-    if( cmd.Parse(true) == 0 ) {
+    int parse = cmd.Parse(true);
+    if( parse == 0 ) {
       if( cmd.Found("version") ) {
 	wxPrintf("%s %s, %s\n",PACKAGE_NAME,PACKAGE_VERSION,PACKAGE_COPYLEFT);
 	wxPrintf("%s\n\n",PACKAGE_DESCRIPTION);
 	wxPrintf("This program comes with ABSOLUTELY NO WARRANTY;\n"
 		 "for details, see the GNU General Public License,"
 		 "version 3 or later.\n");
+	SetErrorExitCode(0);
       }
-      else
+      else {
 	cmd.Usage();
+	if( cmd.GetParamCount() > 0 )
+	  wxLogError("Unknown action `%s'.",cmd.GetParam(0));
+      }
     }
+    else if( parse < 0 )
+      SetErrorExitCode(0); // --help
     return false;
   }
 
@@ -76,7 +94,11 @@ bool Munipack::OnInit()
   MuniCmdLineParser cmd(action,argc,argv);
   OnInitCmdLine(cmd);
 
-  if( cmd.Parse(true) == 0 ) {
+  int parse = cmd.Parse(true);
+  if( parse < 0 )
+    SetErrorExitCode(0); // --help
+
+  if( parse == 0 ) {
 
     if( cmd.Found("verbose") )
       wxLog::SetLogLevel(wxLOG_Debug);
@@ -119,6 +141,8 @@ bool Munipack::OnInit()
       proc = new MuniCross(this,cmd);
     else if( action == "artificial" )
       proc = new MuniArtificial(this,cmd);
+    else
+      MuniFatalError("The action `"+action+"' is not available.");
 
     Bind(wxEVT_END_PROCESS,&Munipack::OnFinish,this);
 

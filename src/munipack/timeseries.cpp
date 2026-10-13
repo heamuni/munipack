@@ -62,14 +62,14 @@ MuniTimeseries::MuniTimeseries(wxEvtHandler *h, const MuniCmdLineParser& cmd):
       if( ! token.IsEmpty() && token.ToDouble(&q) )
 	a.push_back(q);
       else
-	wxLogFatalError("Failed to interpret `%s' as Right Ascension.",token);
+	MuniFatalError("Failed to interpret `%s' as Right Ascension.",token);
 
       // Dec
       token = tokenizer.GetNextToken();
       if( ! token.IsEmpty() && token.ToDouble(&q) )
 	d.push_back(q);
       else
-	wxLogFatalError("Failed to interpret `%s' as Declination.",token);
+	MuniFatalError("Failed to interpret `%s' as Declination.",token);
     }
 
     Write("NCOO = %d",a.size());

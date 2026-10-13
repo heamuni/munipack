@@ -113,7 +113,7 @@ MuniPhcal::MuniPhcal(wxEvtHandler *h, const MuniCmdLineParser& cmd):
     if( cmd.Found("photometry",&a) ) {
       wxString ph = a.Upper();
       if( ! (ph == "APER" || ph == "GROW" || ph == "PSF") )
-	wxLogFatalError("Unknown photometry `%s' (aper, grow, psf).",a);
+	MuniFatalError("Unknown photometry `%s' (aper, grow, psf).",a);
       Write("PHOTOMETRY = '" + ph + "'");
     }
 
@@ -135,7 +135,7 @@ MuniPhcal::MuniPhcal(wxEvtHandler *h, const MuniCmdLineParser& cmd):
 	Write("APCORR = %.17g",x);
       }
       else
-	wxLogFatalError("Unknown --apcorr `%s' (auto, none, or a positive factor).",a);
+	MuniFatalError("Unknown --apcorr `%s' (auto, none, or a positive factor).",a);
     }
 
     // systematic error: auto (by residuals, default) or a value [mag]
@@ -145,7 +145,7 @@ MuniPhcal::MuniPhcal(wxEvtHandler *h, const MuniCmdLineParser& cmd):
       else if( a.ToDouble(&x) && x >= 0 )
 	Write("SYSERR = %.17g",x);
       else
-	wxLogFatalError("Unknown --syserr `%s' (auto, or a non-negative value in mag).",a);
+	MuniFatalError("Unknown --syserr `%s' (auto, or a non-negative value in mag).",a);
     }
 
     if( cmd.Found("C",&a) || cmd.Found("cal",&a) ) {
@@ -161,6 +161,9 @@ MuniPhcal::MuniPhcal(wxEvtHandler *h, const MuniCmdLineParser& cmd):
     if( cmd.Found("c",&c) || cmd.Found("cat",&c) ) {
 
       VOCatConf catalogs(vocat);
+      if( ! catalogs.IsOk() )
+	MuniFatalError("Failed to read the definition file of catalogues `"
+		       + vocat + "'.");
       VOCatResources cat(catalogs.GetCatFits(c));
 
       if( cmd.Found("col-ra",&a) )

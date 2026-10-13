@@ -82,11 +82,17 @@ wxString VOCatResources::GetSort() const
 
 VOCatConf::VOCatConf(const wxString& path): wxXmlDocument()
 {
-  if( ! wxFileExists(path) )
-    wxLogFatalError("VOCatConf::VOCatConf(): There is no file `"+path+"'.");
+  // an error leaves the configuration empty: IsOk() is false
+  // (callers report it; wxLogFatalError aborted the program)
+  if( ! wxFileExists(path) ) {
+    wxLogError("VOCatConf::VOCatConf(): There is no file `"+path+"'.");
+    return;
+  }
 
-  if( !( Load(path) && GetRoot()->GetName() == "VOTABLE" ) )
-    wxLogFatalError("File `"+path+"' not recognized as a VOTable.");
+  if( !( Load(path) && GetRoot()->GetName() == "VOTABLE" ) ) {
+    wxLogError("File `"+path+"' not recognized as a VOTable.");
+    return;
+  }
 
   const wxXmlNode *node = GetRoot()->GetChildren();
   while (node) {

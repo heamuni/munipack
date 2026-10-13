@@ -152,6 +152,14 @@ The option <samp>--verbose</samp> which prints a lot of garbage
 can help.
 </p>
 
+<h2>Exit status</h2>
+<p>
+The exit status is 0 on success (also for <samp>--help</samp>
+and <samp>--version</samp>) and 1 on an error: an invalid command
+line or option value, an unreadable input, or a failure of the processing
+utility. The reason is printed on the standard error output.
+</p>
+
 <h2>Golden Rule</h2>
 <p>
 Before start to play with Munipack, please remember the golden rule:

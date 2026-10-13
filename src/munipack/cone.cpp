@@ -51,8 +51,8 @@ MuniCone::MuniCone(wxEvtHandler *h, const MuniCmdLineParser& cmd):
   VOCatConf catalogs(vocat);
 
   if( ! catalogs.IsOk() ) {
-    wxLogFatalError("Failed to parse the definition file of catalogues: `" +
-		    vocat+"'.");
+    MuniFatalError("Failed to parse the definition file of catalogues: `" +
+		   vocat+"'.");
     return;
   }
 
@@ -97,24 +97,24 @@ MuniCone::MuniCone(wxEvtHandler *h, const MuniCmdLineParser& cmd):
     pars["SR"] = "0.1";
 
   if ( cmd.GetParamCount() != 2 )
-    wxLogFatalError("Unspecified position? Use: RA DEC (both in degress, sexadecimal).");
+    MuniFatalError("Unspecified position? Use: RA DEC (both in degress, sexadecimal).");
 
   a = cmd.GetParam(0);
   if( a.ToDouble(&ra) )
     pars["RA"] = wxString::FromCDouble(ra);
   else
-    wxLogFatalError("Right Ascension unrecognized.");
+    MuniFatalError("Right Ascension unrecognized.");
 
   a = cmd.GetParam(1);
   if( a.ToDouble(&dec) )
     pars["DEC"] = wxString::FromCDouble(dec);
   else
-    wxLogFatalError("Declination unrecognized.");
+    MuniFatalError("Declination unrecognized.");
 
   if( cmd.Found("server",&a) ) {
     bool b = catalogs.SetSite(a);
     if( ! b )
-      wxLogFatalError("Selected VO server unavailable (try --list-servers).");
+      MuniFatalError("Selected VO server unavailable (try --list-servers).");
   }
 
   if( cmd.Found("id",&a) ) {
@@ -131,7 +131,7 @@ MuniCone::MuniCone(wxEvtHandler *h, const MuniCmdLineParser& cmd):
     if( cmd.Found("cat",&a) || cmd.Found("c",&a) ) {
       bool b = catalogs.SetCat(a);
       if( ! b )
-	wxLogFatalError("Required catalogue unavailable (try --list-catalogues).");
+	MuniFatalError("Required catalogue unavailable (try --list-catalogues).");
     }
 
     Write("URL = '"+catalogs.GetUrl(pars)+"'");
