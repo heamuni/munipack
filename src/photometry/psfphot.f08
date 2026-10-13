@@ -81,6 +81,9 @@ program psfphot
   real(REAL64) :: cell
   integer :: nstars, ncx, ncy, nfind, nsat, npassdone
 
+  ! the Moffat shape fit reached beta -> infinity: the Gaussian limit used
+  logical :: gauss_limit
+
   ! the empirical PSF: its stars, the radius of the tables [pix]
   logical :: empirical
   integer, dimension(:), allocatable :: psfsel
@@ -323,6 +326,7 @@ contains
     niter = 0
     nres = 0
     empirical = psfkind == 'EMPIRICAL'
+    gauss_limit = .false.
 
     exitus = .false.
     status = 0
@@ -559,6 +563,8 @@ contains
        end if
        if( psf%ptype == PSF_GAUSS ) then
           write(error_unit,'(a,f0.4)',advance='no') ', sigma=',psf%width
+          if( gauss_limit ) write(error_unit,'(a)',advance='no') &
+               ' (beta -> infinity, the Gaussian limit)'
        else
           write(error_unit,'(2(a,f0.4))',advance='no') ', alpha=',psf%width, &
                ', beta=',psf%beta
@@ -689,6 +695,7 @@ contains
     hdr%fwhm = fwhm
     hdr%width = psf%width
     hdr%beta = psf%beta
+    hdr%gauss_limit = gauss_limit
     hdr%q = psf%q
     hdr%pa = psf%pa
     hdr%fitrad = fitrad_par
@@ -1118,7 +1125,7 @@ contains
       real(REAL64), dimension(:,:), allocatable :: shapes
       real(REAL64), dimension(4) :: pshape
       type(StarFit) :: star
-      real(REAL64) :: snrmin, c1, c2, rs
+      real(REAL64) :: snrmin, c1, c2, rs, fw, u
       integer :: n, k, i, j, m
       logical :: ok, sat
 
@@ -1166,7 +1173,13 @@ contains
          star = stars(k)
          star%fitrad = rs
          call linear_flux(fr,psf,star,.true.)
-         pshape = [psf%width, psf%beta, 0.0_REAL64, 0.0_REAL64]
+         ! Moffat: the FWHM along the major axis and u = 1/beta
+         if( psf%ptype == PSF_MOFFAT ) then
+            pshape = [psf_analytic_fwhm(PSF_MOFFAT,psf%width,psf%beta,1.0_REAL64), &
+                 1 / psf%beta, 0.0_REAL64, 0.0_REAL64]
+         else
+            pshape = [psf%width, psf%beta, 0.0_REAL64, 0.0_REAL64]
+         end if
          if( empirical ) then
             ! the core: beta up to 10 (the tables correct the shape)
             call fit_shape(fr,psf,star,psf%ptype == PSF_MOFFAT .and. beta_par < 0, &
@@ -1178,9 +1191,17 @@ contains
          if( .not. ok ) cycle
          nshape = nshape + 1
          shapes(:,nshape) = pshape
-         if( verbose ) write(error_unit,'(a,2f9.2,a,es10.3,a,f7.4,a,f7.3,a,2f8.4)') &
-              ' Shape star at',star%x,star%y,' flux',star%flux,' width',pshape(1), &
-              ' beta',pshape(2),' c1,c2',pshape(3:4)
+         if( verbose ) then
+            if( psf%ptype == PSF_MOFFAT ) then
+               write(error_unit,'(a,2f9.2,a,es10.3,a,f7.4,a,f7.4,a,2f8.4)') &
+                    ' Shape star at',star%x,star%y,' flux',star%flux,' fwhm',pshape(1), &
+                    ' 1/beta',pshape(2),' c1,c2',pshape(3:4)
+            else
+               write(error_unit,'(a,2f9.2,a,es10.3,a,f7.4,a,f7.3,a,2f8.4)') &
+                    ' Shape star at',star%x,star%y,' flux',star%flux,' width',pshape(1), &
+                    ' beta',pshape(2),' c1,c2',pshape(3:4)
+            end if
+         end if
       end do
 
       if( nshape == 0 ) then
@@ -1189,9 +1210,28 @@ contains
          return
       end if
 
-      psf%width = median(shapes(1,1:nshape))
-      if( psf%ptype == PSF_MOFFAT .and. beta_par < 0 ) &
-           psf%beta = median(shapes(2,1:nshape))
+      if( psf%ptype == PSF_MOFFAT ) then
+         ! the median FWHM and u = 1/beta; u < 0.001 (beta > 1000, Gaussian
+         ! stars give 0 to 1e-3) is the Gaussian of the FWHM: the Moffat
+         ! profile differs from it by u/10 of the flux (fitted on Gaussian
+         ! stars: +0.09% for beta = 100, +0.47% for beta = 20)
+         fw = median(shapes(1,1:nshape))
+         if( beta_par < 0 ) then
+            u = median(shapes(2,1:nshape))
+         else
+            u = 1 / psf%beta
+         end if
+         if( u >= 1e-3_REAL64 .or. beta_par > 0 ) then
+            psf%beta = 1 / u
+            psf%width = psf_moffat_alpha(fw,psf%beta)
+         else
+            psf%ptype = PSF_GAUSS
+            psf%width = fw * fwhm2sig
+            gauss_limit = .true.
+         end if
+      else
+         psf%width = median(shapes(1,1:nshape))
+      end if
       if( elliptic .or. empirical ) then
          c1 = median(shapes(3,1:nshape))
          c2 = median(shapes(4,1:nshape))

@@ -70,6 +70,8 @@ module fitspsfphot
      real(REAL64) :: scale = -1
      integer :: zoom = 0, nshape = 0, npass = 0
      logical :: fwhm_fitted = .false.
+     ! MOFFAT fitted with beta -> infinity: the Gaussian limit (PSFSIGMA)
+     logical :: gauss_limit = .false.
      ! the empirical PSF: the base (GAUSS, MOFFAT, FILE), the order of
      ! the spatial variation, PSF stars, the table radius [pix], the rms
      ! of the residual table (relative to the peak), median chi2 of PSF
@@ -397,6 +399,11 @@ contains
     if( hdr%psftype == 'GAUSS' .or. hdr%core == 'GAUSS' ) then
        call fits_write_key(fits,'PSFSIGMA',hdr%width,-6, &
             '[pix] Gaussian sigma (major axis)',status)
+    else if( hdr%gauss_limit ) then
+       call fits_write_key(fits,'PSFSIGMA',hdr%width,-6, &
+            '[pix] Gaussian sigma (major axis)',status)
+       call fits_write_key(fits,'PSFLIMIT','GAUSS', &
+            'Moffat fitted with beta -> infinity: Gaussian',status)
     else if( hdr%psftype == 'MOFFAT' .or. hdr%core == 'MOFFAT' ) then
        call fits_write_key(fits,'PSFALPHA',hdr%width,-6, &
             '[pix] Moffat alpha (major axis)',status)

@@ -59,6 +59,17 @@ munipack psfphot [.. parameters ..] file(s)
   bright (S/N &gt; 50), isolated, unsaturated stars in the radius
   of 3 FWHM (the medians of their fits are used), or the PSF by the file,
   or the empirical PSF (see below).
+  The Moffat shape is fitted by the FWHM and <i>u</i> = 1/β (see MOFFAT
+  below): <i>u</i> = 0 is the Gaussian of the same FWHM, the limit of
+  β → ∞, so the fit converges on stars with a Gaussian profile, where
+  α and β grew together without bound. When the median <i>u</i> is below
+  0.001 (β &gt; 1000; such a Moffat profile differs from the Gaussian by
+  less than 0.01% of the flux), the Gaussian of the fitted FWHM is used
+  (PSFSIGMA and PSFLIMIT = 'GAUSS' in the header).
+  Versions before 0.6.2+hg1653 (patched, P18) fitted α and β: on
+  Gaussian stars β ran towards infinity and every shape fit exhausted its
+  iterations (454 s instead of 10 s on a 1024² frame, β = 240–300,
+  fluxes +0.06%, +0.45% on other frames).
 </li>
 <li>The initial fluxes are fitted at the detected positions; the stars are
   ordered by their brightness.
@@ -149,7 +160,11 @@ munipack psfphot [.. parameters ..] file(s)
   <dd><i>exp(-(x²/2σ²) - (y²/2σ²q²))</i>, FWHM = 2.3548 σ √q.</dd>
   <dt>MOFFAT</dt>
   <dd><i>(1 + x²/α² + y²/α²q²)<sup>-β</sup></i>,
-    FWHM = 2α √(2<sup>1/β</sup>-1) √q.</dd>
+    FWHM = 2α √(2<sup>1/β</sup>-1) √q. By the FWHM <i>F</i> along the
+    major axis and <i>u</i> = 1/β, <i>(1 + 4(2<sup>u</sup>-1)
+    (x² + y²/q²)/F²)<sup>-1/u</sup></i>, which tends to the Gaussian
+    <i>exp(-4 ln 2 (x² + y²/q²)/F²)</i> of the same FWHM for <i>u</i> → 0
+    (the form of the shape fit).</dd>
   <dt>FILE</dt>
   <dd>The field-dependent PSF in the
     <a href="dataform_artpsf.html">PSF file format</a>. The position in the
@@ -329,7 +344,8 @@ munipack psfphot [.. parameters ..] file(s)
     fitted (the result is printed with <samp>--verbose</samp> and written
     to the header). Moffat β is 2.5 when FWHM is given and β is not.</dd>
   <dt><samp>--beta β</samp></dt>
-  <dd>Moffat exponent (fitted when not given, together with the width).</dd>
+  <dd>Moffat exponent (fitted when not given, together with the width;
+    a fitted β above 1000 is the Gaussian limit).</dd>
   <dt><samp>--elliptic</samp></dt>
   <dd>Fit also the axis ratio and the position angle of the analytic PSF.</dd>
   <dt><samp>--fitrad r</samp></dt>
@@ -410,7 +426,8 @@ munipack psfphot [.. parameters ..] file(s)
 
 <p>
   The header keywords: PSFTYPE, PSFFILE, FWHM, HWHM [pix], PSFSIGMA or
-  PSFALPHA and PSFBETA, PSFAXRAT, PSFPA [deg], PSFNSTAR (stars of the
+  PSFALPHA and PSFBETA (PSFSIGMA and PSFLIMIT = 'GAUSS' for MOFFAT fitted
+  with β → ∞), PSFAXRAT, PSFPA [deg], PSFNSTAR (stars of the
   shape fit), PSFCEN1, PSFCEN2, PSFSCALE (the PSF file geometry),
   PSFZOOM, FITRAD, SKYMODE, NPASS, GROUPDST (the link distance [FWHM]),
   NGROUPS, MAXGROUP, RESDETEC, NRESID (stars found in the residuals),
