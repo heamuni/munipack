@@ -468,7 +468,9 @@ contains
     call fits_write_comment(fits,'  32 a neighbour within the fitting radius, ' // &
          '64 a saturated star added (not found by find),',status)
     call fits_write_comment(fits,'  128 a star found in the residuals ' // &
-         '(not found by find).',status)
+         '(not found by find),',status)
+    call fits_write_comment(fits,'  256 S/N = PSFCOUNT/PSFCOUNTERR < 2 ' // &
+         '(an upper-limit-like flux).',status)
     call fits_write_comment(fits,'GROUP: the group of the simultaneous fit ' // &
          '(0 fitted alone), GSIZE: its size.',status)
     call fits_write_comment(fits,'SHARP: relative residual in the core ' // &

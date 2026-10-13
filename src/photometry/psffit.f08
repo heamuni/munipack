@@ -53,7 +53,8 @@ module psffit
        FLAG_FAILED    = 16,& ! fit failed, the flux is not valid
        FLAG_CROWDED   = 32,& ! a neighbour within the fitting radius
        FLAG_ADDED     = 64,& ! a saturated star added (not detected by find)
-       FLAG_RESID     = 128  ! a star found in the residuals (not by find)
+       FLAG_RESID     = 128,& ! a star found in the residuals (not by find)
+       FLAG_LOWSNR    = 256  ! S/N = flux/error below 2 (an upper-limit-like flux)
 
   type, public :: PsfType
      integer :: ptype = PSF_GAUSS

@@ -140,6 +140,18 @@ munipack psfphot [.. parameters ..] file(s)
 <li>The errors are given by the covariance matrix of the fit; the error of
   the fixed sky (SKYERR by aphot) is propagated to the flux error.
 </li>
+<li>Faint stars: measurements with S/N = PSFCOUNT/PSFCOUNTERR &lt; 2 get
+  FLAG 256. At the true positions the fluxes are unbiased down to
+  S/N &lt; 1, but the error is evaluated by the model of the fitted flux
+  (the Poisson variance of the star itself), so it follows the noise of
+  the flux: a low flux has a small error, and the pull (PSFCOUNT − true)
+  / PSFCOUNTERR has the mean −0.10 to −0.16 and SD 1.04–1.10 at S/N &lt; 3
+  on a sky of 0.4 e-/pixel (the same for the Poisson maximum likelihood
+  by simulation; ground-based skies are not affected). The stars of find
+  this faint are mostly noise peaks, and their fluxes are biased up by
+  the selection: treat them as upper-limit-like estimates. phcal does not
+  use the flag (it selects by the relative error, <samp>-e</samp>).
+</li>
 </ul>
 
 <h2>PSF</h2>
@@ -424,7 +436,9 @@ munipack psfphot [.. parameters ..] file(s)
     (bad, saturated, out of the frame), 4 the position is not fitted,
     8 not converged, 16 the fit failed (the flux is not valid),
     32 another star within the fitting radius, 64 a saturated star added
-    (not detected by find), 128 a star found in the residuals.</dd>
+    (not detected by find), 128 a star found in the residuals, 256 S/N
+    (PSFCOUNT/PSFCOUNTERR) below 2, an upper-limit-like flux (see the
+    faint stars above).</dd>
   <dt>GROUP, GSIZE</dt><dd>The group of the simultaneous fit in the last
     pass (0 for a star fitted alone) and its size.</dd>
 </dl>

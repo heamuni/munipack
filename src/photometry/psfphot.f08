@@ -45,6 +45,8 @@ program psfphot
 
   real(REAL64), parameter :: rad = 45 / atan(1.0_REAL64)
   real(REAL64), parameter :: fwhm2sig = 1 / (2*sqrt(2*log(2.0_REAL64)))
+  ! the S/N of FLAG 256 (low S/N)
+  real(REAL64), parameter :: snrlow = 2
 
   ! the largest group fitted simultaneously
   integer, parameter :: maxgroup = 15
@@ -660,6 +662,12 @@ contains
        else if( k > nfind ) then
           stars(k)%flag = stars(k)%flag + FLAG_ADDED
        end if
+       ! S/N below 2: the detections of find this faint are mostly noise
+       ! peaks (their fluxes are biased up by the selection) and the error
+       ! follows the noise of the flux (pull mean -0.1 at the true positions)
+       if( stars(k)%fluxerr > 0 .and. &
+            stars(k)%flux < snrlow*stars(k)%fluxerr ) &
+            stars(k)%flag = stars(k)%flag + FLAG_LOWSNR
     end do
 
     ! output
