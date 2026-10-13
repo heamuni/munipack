@@ -137,25 +137,44 @@ contains
   end subroutine catstars
 
 
-  subroutine genstars(maglim,naxes,xcoo,ycoo,flux)
+  subroutine genstars(maglim,naxes,scale,xcoo,ycoo,flux)
+
+    ! The random star field: stardist gives the number of stars per
+    ! square degree in every magnitude bin, the frame covers
+    ! naxes(1)*naxes(2)/scale**2 square degrees (scale in pix/deg).
+    ! The expected number of stars in a bin is rounded down or up
+    ! with the probability of its fractional part, so the mean density
+    ! is that of stardist for a frame of any size.
 
     integer, intent(in) :: maglim
     integer, dimension(:), intent(in) :: naxes
+    real(REAL64), intent(in) :: scale
     real(REAL64), dimension(:), allocatable, intent(out) :: xcoo,ycoo,flux
-    integer, dimension(0:maglim) :: nsq
+    integer, dimension(0:maglim) :: nsq, nstars
+    real(REAL64) :: farea, w
     real :: x,y
     integer :: mag,n,i
 
     call stardist(maglim,nsq)
 
-    n = sum(nsq)
+    ! the area of the frame in square degrees
+    farea = real(naxes(1),REAL64) * real(naxes(2),REAL64) / scale**2
+
+    do mag = 0, maglim
+       w = nsq(mag) * farea
+       call random_number(x)
+       nstars(mag) = int(w)
+       if( x < w - int(w) ) nstars(mag) = nstars(mag) + 1
+    end do
+
+    n = sum(nstars)
     allocate(xcoo(n),ycoo(n),flux(n))
 
     n = 0
 
     do mag = 0, maglim
 
-       do i = 1,nsq(mag)
+       do i = 1,nstars(mag)
 
           n = n + 1
 

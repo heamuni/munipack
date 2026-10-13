@@ -499,7 +499,7 @@ program artificial
         call catstars(cat,labels,prjcode,scale,angle,crval,crpix,phsys, &
              filter,xcoo,ycoo,flux)
      else
-        call genstars(maglim,naxes,xcoo,ycoo,flux)
+        call genstars(maglim,naxes,scale,xcoo,ycoo,flux)
      end if
      nstars_coo = size(xcoo)
 
@@ -608,6 +608,8 @@ program artificial
         if( cat == '' ) then
            write(error_unit,*) "Star coordinates and fluxes: random generated"
            write(error_unit,'(a,i0)') " Magnitude limit = ",maglim
+           write(error_unit,'(a,i0,a,es9.3,a)') " Random stars: ",size(xcoo), &
+                " in ",real(naxes(1),REAL64)*naxes(2)/scale**2," [deg2]"
         else
            write(error_unit,*) "Star coordinates and fluxes: by `",trim(cat),"'"
         end if
