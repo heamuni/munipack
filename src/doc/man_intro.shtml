@@ -161,6 +161,8 @@ The exit status is 0 on success (also for <samp>--help</samp>
 and <samp>--version</samp>) and 1 on an error: an invalid command
 line or option value, an unreadable input, or a failure of the processing
 utility. The reason is printed on the standard error output.
+A utility killed by a signal gives 256 minus the signal number
+(245 for a segmentation fault).
 </p>
 
 <h2>Golden Rule</h2>
