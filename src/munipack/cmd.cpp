@@ -786,6 +786,7 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption("","col-epoch-dec","Reference epoch in Declination column");
     AddOption("","col-mag","Magnitude-like column");
     AddSwitch("","disable-noise","noise free frames (no photon and read noise)");
+    AddSwitch("","no-watermark","no watermark (the mark in the top-right corner)");
     AddOption("","photsys","photometry system");
     AddOption("","phsystab","photometry systems definition table");
     AddOption("","fits-keys-file","add FITS keys into a header");

@@ -233,6 +233,9 @@ MuniArtificial::MuniArtificial(wxEvtHandler *han, const MuniCmdLineParser& cmd):
   if( cmd.Found("disable-noise") )
     Write("NOISE = F");
 
+  if( cmd.Found("no-watermark") )
+    Write("WATERMARK = F");
+
   if( cmd.Found("c",&cname) || cmd.Found("cat",&cname) ) {
 
     wxString vocat;
