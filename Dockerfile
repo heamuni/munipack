@@ -105,3 +105,12 @@ ENV MUNIPACK_CAF_MPROC=1 \
 WORKDIR /data
 ENTRYPOINT ["munipack"]
 CMD ["--help"]
+
+# Tests of the installed tools (tests/run.sh): docker build --target test .
+# A plain build skips this stage (BuildKit builds only the stages the
+# target needs).
+FROM runtime AS test
+COPY tests /opt/munipack-tests
+RUN /opt/munipack-tests/run.sh
+
+FROM runtime

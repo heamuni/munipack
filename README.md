@@ -13,6 +13,8 @@ Every bug, its measured impact and the commit that fixes it are listed in **[BUG
 | `src/` | Munipack source: upstream hg1653 plus the fixes |
 | `deps/oakleaf/` | OakLeaf robust-statistics library, upstream hg snapshot (unmodified) |
 | `Dockerfile` | Builds the command-line tools (no GUI) on Ubuntu 24.04 |
+| `tests/` | Tests of the installed tools on simulated frames (`tests/run.sh`) |
+| `.github/workflows/ci.yml` | CI: builds the image and runs the tests on every push to `main`/`develop` and on pull requests |
 | `BUGS.md` | Bug catalogue, compatibility notes, suggested improvements |
 
 The history starts with the untouched upstream tree (commit `003cb0d`), and each fix is a separate commit on top of it. `git diff 003cb0d -- src` therefore shows every change to Munipack, and `git log` gives the reason for each one.
@@ -29,6 +31,17 @@ What the build does:
 - Produces an image of about 195 MB (Open MPI for the parallel processes takes 26 MB; placeholder packages keep out the GPU runtime and hwloc plugins that it would pull in, 190 MB).
 
 The first build takes roughly 10 minutes; later builds reuse the cached dependency layers.
+
+## Tests
+
+```bash
+docker build --target test .          # build, upstream make check, then tests/run.sh
+tests/run.sh [t_name ...]             # the same against the munipack on PATH (KEEP=1 keeps the work files)
+```
+
+- The build runs the upstream test suite (`make check`: find, aphot, astrometry, phcal on the bundled Barnard frame); a failure stops the build. Its pass condition is CTPH within twice its error of 11.5 (it was 11–12, narrower than the error of 1.3).
+- `tests/` has a test per area, each on frames that `artificial` simulates from a synthetic catalogue, so the truth is known and no network is needed: `t_cli` (exit status, rejected options), `t_artificial` (seeds, the noise model, `--mproc`), `t_pipeline` (find → aphot → astrometry from scratch → phcal, and psfphot → phcal against the catalogue, with the pulls of the errors), `t_astrometry` (rotated frames at Dec +60), `t_kombine` (flux and positions of a stack), `t_calib` (bias, dark at 0.13 e⁻/px, phcorr), `t_phcal_filters` (two filters in any order, no colour term). The comments of each test name the bugs of BUGS.md it covers. The whole set takes 2–3 minutes.
+- CI runs on the group's self-hosted runner (`varda`): every push to `main` or `develop` and every pull request gets a ✓ or ✗ in the Actions tab.
 
 ## Usage
 
