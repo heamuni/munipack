@@ -12,7 +12,7 @@ ok() { echo "  ok: $*"; }
 # check NAME VALUE LO HI: LO <= VALUE <= HI (numbers, any format awk reads)
 check() {
     awk -v v="$2" -v lo="$3" -v hi="$4" \
-        'BEGIN { exit !(v == v + 0 && lo <= v + 0 && v + 0 <= hi) }' \
+        'BEGIN { exit !(v ~ /^[-+]?[0-9.]+([eEdD][-+]?[0-9]+)?$/ && lo <= v + 0 && v + 0 <= hi) }' \
         || fail "$1 = $2, expected $3 .. $4"
     ok "$1 = $2 ($3 .. $4)"
 }
@@ -67,13 +67,10 @@ imsum() { munipack fits -li "$1" | md5sum | cut -d" " -f1; }
 # mkcat FILE.fits N SEED [RA DEC RADIUS MAGMIN MAGMAX MINSEP]
 # A synthetic catalogue: N stars at random positions within RADIUS [deg] of
 # RA, DEC, uniform in V from MAGMIN to MAGMAX, B - V uniform in 0 .. 1.5,
-# no two stars closer than MINSEP [deg]. Columns RAJ2000, DEJ2000 [deg],
-# pmRA, pmDE [mas/yr, zero], Vmag, e_Vmag, Bmag, e_Bmag (errors 0.001 mag:
-# the frames of artificial render the magnitudes exactly).
+# no two stars closer than MINSEP [deg] (see catfits for the columns).
 mkcat() {
     local out=$1 n=$2 seed=$3 ra=${4:-180} dec=${5:-0} rad=${6:-0.08}
     local m1=${7:-10} m2=${8:-15} sep=${9:-0.004}
-    local lst=${out%.fits}.lst
     awk -v n="$n" -v seed="$seed" -v ra0="$ra" -v dec0="$dec" -v r="$rad" \
         -v m1="$m1" -v m2="$m2" -v sep="$sep" '
     # Park-Miller generator: reproducible (mawk ignores srand(seed))
@@ -91,6 +88,22 @@ mkcat() {
             if (near) continue
             k++; x[k] = dx; y[k] = dy
         }
+        for (j = 1; j <= k; j++) {
+            v = m1 + (m2 - m1) * rnd(); bv = 1.5 * rnd()
+            printf "%.10f %.10f %.4f %.4f\n", ra0 + x[j] / cd, dec0 + y[j], v, v + bv
+        }
+    }' | catfits "$out"
+    [ "$(nrows "$out[1]")" = "$n" ] || fail "mkcat: $(nrows "$out[1]") of $n stars"
+}
+
+# catfits FILE.fits < "RA DEC V B" lines: a catalogue with the columns
+# RAJ2000, DEJ2000 [deg], pmRA, pmDE [mas/yr, zero], Vmag, e_Vmag, Bmag,
+# e_Bmag (errors 0.001 mag: the frames of artificial render the
+# magnitudes exactly).
+catfits() {
+    local out=$1 lst=${1%.fits}.lst
+    awk '{ row[++k] = sprintf("%s %s 0 0 %s 0.001 %s 0.001", $1, $2, $3, $4) }
+    END {
         print "# BEGIN HDU 0"
         print "SIMPLE  =                    T"
         print "BITPIX  =                    8"
@@ -107,36 +120,19 @@ mkcat() {
         print "PCOUNT  =                    0"
         print "GCOUNT  =                    1"
         print "TFIELDS =                    8"
-        print "TTYPE1  = '\''RAJ2000'\''"
-        print "TFORM1  = '\''D'\''"
-        print "TUNIT1  = '\''deg'\''"
-        print "TTYPE2  = '\''DEJ2000'\''"
-        print "TFORM2  = '\''D'\''"
-        print "TUNIT2  = '\''deg'\''"
-        print "TTYPE3  = '\''pmRA'\''"
-        print "TFORM3  = '\''D'\''"
-        print "TUNIT3  = '\''mas/yr'\''"
-        print "TTYPE4  = '\''pmDE'\''"
-        print "TFORM4  = '\''D'\''"
-        print "TUNIT4  = '\''mas/yr'\''"
-        print "TTYPE5  = '\''Vmag'\''"
-        print "TFORM5  = '\''E'\''"
-        print "TTYPE6  = '\''e_Vmag'\''"
-        print "TFORM6  = '\''E'\''"
-        print "TTYPE7  = '\''Bmag'\''"
-        print "TFORM7  = '\''E'\''"
-        print "TTYPE8  = '\''e_Bmag'\''"
-        print "TFORM8  = '\''E'\''"
+        n = split("RAJ2000 D deg DEJ2000 D deg pmRA D mas/yr pmDE D mas/yr " \
+                  "Vmag E - e_Vmag E - Bmag E - e_Bmag E -", c, " ")
+        for (i = 1; i <= n / 3; i++) {
+            printf "TTYPE%-3d= '\''%s'\''\n", i, c[3 * i - 2]
+            printf "TFORM%-3d= '\''%s'\''\n", i, c[3 * i - 1]
+            if (c[3 * i] != "-") printf "TUNIT%-3d= '\''%s'\''\n", i, c[3 * i]
+        }
         print "EXTNAME = '\''SYNTHETIC'\''"
         print "END"
-        for (j = 1; j <= k; j++) {
-            v = m1 + (m2 - m1) * rnd(); bv = 1.5 * rnd()
-            printf "%.10f %.10f 0 0 %.4f 0.001 %.4f 0.001\n", ra0 + x[j] / cd, dec0 + y[j], v, v + bv
-        }
+        for (j = 1; j <= k; j++) print row[j]
         print "# END HDU 1"
     }' > "$lst"
     munipack fits --restore "$lst" > /dev/null
-    [ "$(nrows "$out[1]")" = "$n" ] || fail "mkcat: $(nrows "$out[1]") of $n stars"
 }
 
 # The columns of mkcat for artificial and astrometry.
