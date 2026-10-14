@@ -454,28 +454,44 @@ contains
     ! (by more than three times their error) are invalidated (-1): a
     ! faint star a few pixels from a bright one keeps its light in the
     ! aperture. The light of the neighbour m in the aperture of the
-    ! radius a of the star n at the distance d is estimated by the growth
-    ! curve of m (its apertures, linear in the area between them): the
-    ! light of m in the annulus d-a .. d+a times the fraction of the
-    ! annulus the aperture covers, at least the light of m inside a-d
-    ! (the aperture over the centre of m). The estimate must be
-    ! significant too (three times its error by the errors of m's
-    ! apertures): the growth curves of faint detections are noise.
-    ! A neighbour without valid apertures (saturated, at the border)
-    ! contaminates the apertures reaching its mask. ncont is the number
-    ! of invalidated apertures.
+    ! radius a of the star n at the distance d is the light of m in the
+    ! annulus d-a .. d+a times the fraction of the annulus the aperture
+    ! covers, at least the light of m inside a-d (the aperture over the
+    ! centre of m).
+    !
+    ! The light of m in the annulus is its flux times the mean profile of
+    ! the frame: the median growth curve of isolated bright stars (no
+    ! detection within the last aperture plus three reference radii),
+    ! normalised by their last aperture; the flux of m is its reference
+    ! aperture (nearest to 2 pix) divided by the profile there. The
+    ! growth curve of m itself cannot be used at the distance of n: its
+    ! apertures there contain n, so n's own light was taken for m's and
+    ! invalidated the stars beside any brighter neighbour closer than the
+    ! largest aperture (28 of 150 on a Gaussian field, pairs 15-20 px).
+    ! With fewer than three isolated stars the growth curve of m is used,
+    ! the light of n taken out of it (n's growth curve within d/2, spread
+    ! over d - r90 .. d + r90 around m, r90 enclosing 90% of it).
+    !
+    ! The estimate must be significant too (three times its error by the
+    ! errors of m's apertures): the growth curves of faint detections are
+    ! noise. A neighbour without valid apertures (saturated, at the
+    ! border) contaminates the apertures reaching its mask. ncont is the
+    ! number of invalidated apertures.
+
+    use oakleaf, only: median
 
     real, dimension(:), intent(in) :: xstar, ystar, raper, rmask
     real, dimension(:,:), intent(in out) :: apcts, apcts_err
     integer, intent(out) :: ncont
 
-    real, parameter :: pi = 3.14159265358979
     real, parameter :: kappa = 3
-    real, dimension(:,:), allocatable :: g, ge
-    real, dimension(:), allocatable :: bright, rcurve
+    real, parameter :: snmin = 30
+    real, dimension(:,:), allocatable :: g, ge, q
+    real, dimension(:), allocatable :: bright, rcurve, gm, ee
     integer, dimension(:), allocatable :: nval
-    integer :: n, m, k, nstar, naper, kref
-    real :: d, a, rlo, rhi, c, e, f, reach
+    logical :: profile
+    integer :: n, m, k, nstar, naper, kref, np, kt
+    real :: d, a, rlo, rhi, c, e, f, reach, tn, r90, tm, tmerr, risol
 
     nstar = size(xstar)
     naper = size(raper)
@@ -484,7 +500,8 @@ contains
 
     ! the growth curves (a copy: the flags do not change them), valid
     ! from the first aperture to the last valid one in a row
-    allocate(g(nstar,naper),nval(nstar),bright(nstar),rcurve(nstar))
+    allocate(g(nstar,naper),ge(nstar,naper),nval(nstar),bright(nstar), &
+         rcurve(nstar),gm(naper),ee(naper))
     g = apcts
     ge = apcts_err
     do n = 1, nstar
@@ -514,6 +531,27 @@ contains
     end do
     reach = raper(naper) + max(maxval(rcurve),maxval(rmask))
 
+    ! the mean profile by isolated bright stars
+    risol = raper(naper) + 3*raper(kref)
+    allocate(q(nstar,naper))
+    np = 0
+    do n = 1, nstar
+       if( nval(n) < naper ) cycle
+       if( .not. (g(n,kref) > snmin*ge(n,kref)) ) cycle
+       if( any(hypot(xstar - xstar(n),ystar - ystar(n)) < risol .and. &
+            (xstar /= xstar(n) .or. ystar /= ystar(n))) ) cycle
+       np = np + 1
+       q(np,:) = g(n,:) / g(n,naper)
+    end do
+    profile = np >= 3
+    if( profile ) then
+       do k = 1, naper
+          ee(k) = median(q(1:np,k))
+          if( k > 1 ) ee(k) = max(ee(k),ee(k-1))
+       end do
+       ee = ee / ee(naper)
+    end if
+
     do n = 1, nstar
        if( nval(n) == 0 ) cycle
        do m = 1, nstar
@@ -521,6 +559,22 @@ contains
           if( abs(xstar(m) - xstar(n)) > reach .or. &
                abs(ystar(m) - ystar(n)) > reach ) cycle
           d = hypot(xstar(m) - xstar(n),ystar(m) - ystar(n))
+          if( nval(m) > 0 ) then
+             if( profile ) then
+                ! the flux of m by its reference aperture
+                kt = min(kref,nval(m))
+                tm = g(m,kt) / ee(kt)
+                tmerr = ge(m,kt) / ee(kt)
+             else
+                ! the growth curve of m without the light of n
+                tn = max(curve(g(n,:),nval(n),min(d/2,rcurve(n))),0.0)
+                r90 = max(rfrac(g(n,:),nval(n),0.9*tn),raper(1))
+                do k = 1, nval(m)
+                   gm(k) = g(m,k) - tn * &
+                        min(max((raper(k) - d) / (2*r90) + 0.5,0.0),1.0)
+                end do
+             end if
+          end if
           do k = 1, naper
              if( .not. (apcts(n,k) > 0 .and. apcts_err(n,k) > 0) ) cycle
              a = raper(k)
@@ -535,13 +589,20 @@ contains
              end if
              rlo = max(d - a,0.0)
              rhi = d + a
-             if( rlo >= rcurve(m) ) cycle
              f = min(a**2 / (rhi**2 - rlo**2),1.0)
-             c = (curve(m,rhi) - curve(m,rlo)) * f
-             e = curverr(m,rhi) * f
-             if( a > d ) then
-                c = max(c,curve(m,a - d))
-                e = max(e,curverr(m,a - d))
+             if( profile ) then
+                if( rlo >= raper(naper) ) cycle
+                c = tm * (curve(ee,naper,rhi) - curve(ee,naper,rlo)) * f
+                if( a > d ) c = max(c,tm * curve(ee,naper,a - d))
+                e = tmerr * c / tm
+             else
+                if( rlo >= rcurve(m) ) cycle
+                c = (curve(gm,nval(m),rhi) - curve(gm,nval(m),rlo)) * f
+                e = curverr(m,rhi) * f
+                if( a > d ) then
+                   c = max(c,curve(gm,nval(m),a - d))
+                   e = max(e,curverr(m,a - d))
+                end if
              end if
              if( c > kappa*apcts_err(n,k) .and. c > kappa*e ) then
                 apcts(n,k) = -1
@@ -554,30 +615,60 @@ contains
 
   contains
 
-    real function curve(m,r)
+    real function curve(gc,nv,r)
 
-      ! the growth curve of the star m at the radius r: linear in r**2
-      ! between the apertures, from zero at the centre, constant beyond
-      ! the last valid aperture
+      ! the growth curve gc (its first nv apertures) at the radius r:
+      ! linear in r**2 between the apertures, from zero at the centre,
+      ! constant beyond the last valid aperture
 
-      integer, intent(in) :: m
+      real, dimension(:), intent(in) :: gc
+      integer, intent(in) :: nv
       real, intent(in) :: r
       integer :: k
       real :: r1, g1
 
-      curve = g(m,nval(m))
+      curve = gc(nv)
       r1 = 0
       g1 = 0
-      do k = 1, nval(m)
+      do k = 1, nv
          if( r <= raper(k) ) then
-            curve = g1 + (g(m,k) - g1)*(r**2 - r1**2) / (raper(k)**2 - r1**2)
+            curve = g1 + (gc(k) - g1)*(r**2 - r1**2) / (raper(k)**2 - r1**2)
             return
          end if
          r1 = raper(k)
-         g1 = g(m,k)
+         g1 = gc(k)
       end do
 
     end function curve
+
+    real function rfrac(gc,nv,t)
+
+      ! the radius where the growth curve gc reaches t (the inverse of
+      ! curve; the last valid aperture when it does not)
+
+      real, dimension(:), intent(in) :: gc
+      integer, intent(in) :: nv
+      real, intent(in) :: t
+      integer :: k
+      real :: r1, g1
+
+      rfrac = raper(nv)
+      r1 = 0
+      g1 = 0
+      do k = 1, nv
+         if( t <= gc(k) ) then
+            if( gc(k) > g1 ) then
+               rfrac = sqrt(r1**2 + (t - g1)*(raper(k)**2 - r1**2) / (gc(k) - g1))
+            else
+               rfrac = raper(k)
+            end if
+            return
+         end if
+         r1 = raper(k)
+         g1 = gc(k)
+      end do
+
+    end function rfrac
 
     real function curverr(m,r)
 
