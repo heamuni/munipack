@@ -58,8 +58,15 @@ RUN ./bootstrap --dev "${MUNIPACK_VERSION}" \
     && ./configure --prefix=$PREFIX --disable-gui FCFLAGS="-O2 -I$PREFIX/include" \
     && make -j"$(nproc)" \
     && make install
+# Upstream test suite (test/check.sh: find, aphot, astrometry, phcal on a
+# bundled frame); a failure stops the build and prints the test log. It runs
+# with the Open MPI settings of the final image below.
+RUN MUNIPACK_CAF_MPROC=1 OMPI_MCA_osc=^ucx \
+    OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 \
+    OMPI_MCA_rmaps_base_oversubscribe=1 OMPI_MCA_orte_execute_quiet=1 \
+    make check || { cat test/check.sh.log; exit 1; }
 
-FROM ubuntu:24.04
+FROM ubuntu:24.04 AS runtime
 
 ARG DEBIAN_FRONTEND=noninteractive
 # Open MPI depends on UCX, which depends on the AMD GPU runtime (with LLVM,
@@ -98,3 +105,12 @@ ENV MUNIPACK_CAF_MPROC=1 \
 WORKDIR /data
 ENTRYPOINT ["munipack"]
 CMD ["--help"]
+
+# Tests of the installed tools (tests/run.sh): docker build --target test .
+# A plain build skips this stage (BuildKit builds only the stages the
+# target needs).
+FROM runtime AS test
+COPY tests /opt/munipack-tests
+RUN /opt/munipack-tests/run.sh
+
+FROM runtime

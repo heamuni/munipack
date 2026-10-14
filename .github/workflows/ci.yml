@@ -1,0 +1,49 @@
+# Builds the Docker image on the group's self-hosted runner (varda) and runs
+# the tests: the upstream test suite (make check) inside the build, then
+# tests/run.sh against the installed tools (the `test` stage).
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch or pull request cancels the older run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker:
+    runs-on: [self-hosted, varda]
+    timeout-minutes: 90
+    env:
+      IMAGE: munipack:ci-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Build and make check
+        run: docker build --progress=plain --target runtime -t "$IMAGE" .
+
+      - name: Tests (tests/run.sh)
+        run: docker build --progress=plain --target test .
+
+      - name: Smoke test of the final image
+        run: |
+          docker build -q -t "$IMAGE" .
+          docker run --rm "$IMAGE" --version
+          docker run --rm -u "$(id -u):$(id -g)" -v "$RUNNER_TEMP:/data" "$IMAGE" \
+            artificial --seed 1 --mask smoke.fits
+          test -s "$RUNNER_TEMP/smoke.fits"
+
+      # The build cache stays (capped in /etc/docker/daemon.json on varda),
+      # so later builds reuse the wxWidgets and OakLeaf layers.
+      - name: Remove image
+        if: always()
+        run: |
+          docker image rm -f "$IMAGE" || true
+          rm -f "$RUNNER_TEMP/smoke.fits"
