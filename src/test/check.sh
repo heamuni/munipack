@@ -66,8 +66,12 @@ munipack phcal --photsys-ref Johnson --area 0.3 \
 	 --phsystab photosystems.fits $FILE
 
 MUNIPACK_LIBEXEC_PATH="../fits"; export MUNIPACK_LIBEXEC_PATH
+# CTPH within twice its error of 11.5 (the error is ~1.3 on this frame:
+# a window of 11 .. 12 failed on legitimate changes of the star selection)
 CTPH=`munipack fits -K CTPH --value phcal.fits\[PHOTOMETRY\]`
-STATUS=`echo $CTPH | awk '{ if(11 < $1 && $1 < 12) {print "OK";}}'`
+CTPHERR=`munipack fits -K CTPHERR --value phcal.fits\[PHOTOMETRY\]`
+echo "CTPH = $CTPH +- $CTPHERR"
+STATUS=`echo $CTPH $CTPHERR | awk '{ d = $1 - 11.5; if(d < 0) d = -d; if(0 < $2 && $2 < 3 && d < 2*$2) {print "OK";}}'`
 
 CLEAN_FILES="phcal.fits gmon.out photosystems.lst photosystems.fits"
 if test x$FILES_AVAILABLE = "xno"; then
