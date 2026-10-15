@@ -26,7 +26,7 @@ docker build -t munipack:0.6.2-hg1653-fixes .
 What the build does:
 - Downloads and checks wxWidgets 3.3.3 and builds only its non-GUI part. This revision needs the wxWidgets 3.3 API; Ubuntu ships 3.2.
 - Builds OakLeaf from `deps/`, then Munipack, with OpenCoarrays (Ubuntu's `libcoarrays-openmpi-dev`) for `--mproc`.
-- Produces an image of about 195 MB (Open MPI for the parallel processes takes 26 MB; placeholder packages keep out the GPU runtime and hwloc plugins that it would pull in, 190 MB).
+- Produces an image of about 450 MB, most of it Open MPI for the parallel processes (`--mproc`) and the libraries its packages depend on (UCX with the AMD GPU runtime, hwloc plugins), which Munipack does not use.
 
 The first build takes roughly 10 minutes; later builds reuse the cached dependency layers.
 
