@@ -135,6 +135,44 @@ catfits() {
     munipack fits --restore "$lst" > /dev/null
 }
 
+# tabfits FILE.fits "NAME FORM UNIT ..." < lines: a binary table of the
+# columns (FORM D or E, UNIT - for none) from the whitespace-separated
+# lines on stdin, extension CATALOGUE.
+tabfits() {
+    local out=$1 cols=$2 lst=${1%.fits}.lst
+    awk -v cols="$cols" '{ row[++k] = $0 }
+    END {
+        n = split(cols, c, " "); nc = n / 3; w = 0
+        for (i = 1; i <= nc; i++) w += (c[3 * i - 1] == "D") ? 8 : 4
+        print "# BEGIN HDU 0"
+        print "SIMPLE  =                    T"
+        print "BITPIX  =                    8"
+        print "NAXIS   =                    0"
+        print "EXTEND  =                    T"
+        print "END"
+        print "# END HDU 0"
+        print "# BEGIN HDU 1"
+        print "XTENSION= '\''BINTABLE'\''"
+        print "BITPIX  =                    8"
+        print "NAXIS   =                    2"
+        printf "NAXIS1  = %20d\n", w
+        printf "NAXIS2  = %20d\n", k
+        print "PCOUNT  =                    0"
+        print "GCOUNT  =                    1"
+        printf "TFIELDS = %20d\n", nc
+        for (i = 1; i <= nc; i++) {
+            printf "TTYPE%-3d= '\''%s'\''\n", i, c[3 * i - 2]
+            printf "TFORM%-3d= '\''%s'\''\n", i, c[3 * i - 1]
+            if (c[3 * i] != "-") printf "TUNIT%-3d= '\''%s'\''\n", i, c[3 * i]
+        }
+        print "EXTNAME = '\''CATALOGUE'\''"
+        print "END"
+        for (j = 1; j <= k; j++) print row[j]
+        print "# END HDU 1"
+    }' > "$lst"
+    munipack fits --restore "$lst" > /dev/null
+}
+
 # The columns of mkcat for artificial and astrometry.
 CATCOLS="--col-ra RAJ2000 --col-dec DEJ2000 --col-pm-ra pmRA --col-pm-dec pmDE --col-mag Vmag"
 
