@@ -38,19 +38,21 @@ aphot_LDADD   = $(ldir)/libpsfmodel.a $(ldir)/libclipmean.a $(LIBOAKLEAF) \
 aphottester_SOURCES = skymean.f08 daofotometr.f08 fitsaphot.f08 aphottester.f08
 aphottester_LDADD   = $(ldir)/libclipmean.a $(LIBOAKLEAF) $(LIBMINPACK) $(FITSADD)
 
-gphot_SOURCES = growinit.f95 growmodel.f95 growfit.f95\
-                growreport.f95 growcurve.f95 fitsgphot.f08 gphot.f08
-gphot_LDADD   = $(ldir)/liblmin.a $(ldir)/libpppack.a $(ldir)/libminpacks.a \
+gphot_SOURCES = skymean.f08 daosky.f95 daofotometr.f08 exscatter.f08 apee.f08 \
+                growinit.f95 growmodel.f95 growfit.f95 \
+                growreport.f95 growcurve.f95 growee.f08 fitsgphot.f08 gphot.f08
+gphot_LDADD   = $(ldir)/libpsfmodel.a $(ldir)/libclipmean.a \
+                $(ldir)/liblmin.a $(ldir)/libpppack.a $(ldir)/libminpacks.a \
                 $(ldir)/libfmm.a $(LIBOAKLEAF) $(LIBMINPACK) $(FITSADD)
 
 phcal_SOURCES =  fitsfotran.f95 rational.f95 rplane.f95 \
-                 fotran.f95 mfits.f08 exscatter.f08 calibre.f95 jam.f95 \
+                 fotran.f95 mfits.f08 exscatter.f08 colterm.f08 calibre.f95 jam.f95 \
                  sfits.f08 phcal.f08
 phcal_LDADD = $(ldir)/liblmin.a $(ldir)/libsort.a $(ldir)/libastrotrafo.a \
               $(ldir)/libphotometry.a  $(WCSLIB_LIBS) \
               $(ldir)/libastrosphere.a $(LIBOAKLEAF) $(LIBMINPACK) $(FITSADD)
 
-phfotran_SOURCES = mfits.f08 jam.f95 fitsfotran.f95 rplane.f95 \
+phfotran_SOURCES = mfits.f08 jam.f95 fitsfotran.f95 colterm.f08 rplane.f95 \
                    rational.f95 fotran.f95 phfotran.f95
 phfotran_LDADD   = $(ldir)/libastrotrafo.a $(ldir)/libphotometry.a \
                    $(ldir)/libminpacks.a $(ldir)/liblmin.a \

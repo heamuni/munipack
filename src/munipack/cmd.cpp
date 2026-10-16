@@ -423,7 +423,17 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddUsageText("Usage: munipack "+action+" [options] file(s)[,results(s)]");
     AddUsageText("* Growth-curve photometry");
 
-    AddOption("th","threshold","threshold in sigmas above background",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","var","order of the spatial variation of the growth "
+	      "curve 0, 1, 2 (default: 2, raised while significant)",
+	      wxCMD_LINE_VAL_NUMBER);
+    AddSwitch("","radial","the variation by the distance from the field "
+	      "centre (default: x,y)");
+    AddOption("","centre","x,y field centre for --radial [pix] "
+	      "(default: NAXIS/2)");
+    AddSwitch("","legacy","the growth-curve fit of the versions before "
+	      "0.6.2+hg1653 (patched)");
+    AddOption("th","threshold","--legacy: the stars of the curve brighter "
+	      "than threshold times the sky in the aperture",wxCMD_LINE_VAL_DOUBLE);
     COMMON_OPTIONS_MULTIPLE
     AddParam("file(s)[,results(s)]",wxCMD_LINE_VAL_STRING,wxCMD_LINE_PARAM_MULTIPLE);
   }
@@ -667,6 +677,12 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption(wxEmptyString,"col-dec","Declination column");
     AddOption(wxEmptyString,"col-mag","magnitude column(s)");
     AddOption(wxEmptyString,"col-magerr","magnitude std. error column(s)");
+    AddOption("","color-term","colour term by the catalogue colour A-B: "
+	      "columns A,B[,errA,errB]");
+    AddOption("","color-order","order of the colour term: 1 (default) or 2",
+	      wxCMD_LINE_VAL_NUMBER);
+    AddOption("","color-ref","reference colour of the colour term [mag]: "
+	      "mean (of the calibration stars, default) or a value");
     AddOption("","photsys-ref","reference photometry system (catalogue)");
     AddOption("","photsys-instr","instrumental photometry system (frames)");
     AddOption(wxEmptyString,"area","area of input aperture [m2]",wxCMD_LINE_VAL_DOUBLE);
@@ -699,6 +715,10 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption(wxEmptyString,"col-dec","Declination column");
     AddOption(wxEmptyString,"col-mag","magnitude column(s), order of -f");
     AddOption(wxEmptyString,"col-magerr","magnitude std. error column(s)");
+    AddOption("","model","mag (colour terms of magnitudes, default) or "
+	      "flux (linear mixing of photon rates)");
+    AddOption("","color-order","order of the colour terms of the mag model: "
+	      "1 (default) or 2",wxCMD_LINE_VAL_NUMBER);
     AddOption("","photsys-ref","reference photometry system (catalogue)");
     AddOption("","photsys-instr","instrumental photometry system "
 	      "(default: PHOTSYS of the frames)");

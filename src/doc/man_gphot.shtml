@@ -13,11 +13,11 @@
 <p class="abstract">
   Growth-curve photometry is primary intended
   for the absolute photometry calibration.
-  This routine constructs a mean radial growth-curve by using of
-  machine selected bright stars. Total absolute fluxes of all stars
-  are determined from the growth-curve.
-  As a side effect, the method produces less scattered
-  data for well radially defined images of stars. <em>Unfinished!</em>
+  This routine constructs a growth curve of the frame, the enclosed
+  energy of the apertures, by using of machine selected bright isolated
+  stars; it may vary over the field. Total fluxes of all stars
+  are determined from the growth curve and the apertures of the stars,
+  with the errors including the uncertainty of the curve.
 </p>
 
 <h2>Synopsis</h2>
@@ -29,41 +29,122 @@ munipack gphot [.. parameters ..] file(s)[,result(s)]
 <h2>Description</h2>
 
 <p>
-  Growth-curve photometry determines absolute fluxes
-  of all star-like objects of frames.
-
-  sum of counts from a star in predefined apertures.
+  Growth-curve photometry determines total fluxes (GCOUNT) of all
+  star-like objects of frames processed by
+  <a href="man_aphot.html">aperture photometry</a>: the sums of
+  counts from a star in predefined apertures (APERPHOT). The frames
+  need many apertures from about the FWHM to several FWHM, all inside
+  the sky ring, for example
+  <samp>aphot --apertures 1,1.313,1.7241,2.2637,2.9724,3.9028,5.1245,6.7287,8.8349,11.601,15.232,20,23,26.4,30.4,35,40 --ring 45,60</samp>.
 </p>
 
-<h2>Apperture correction determination</h2>
+<h2>The growth curve</h2>
 
 <p>
-  The counts of the apertures of a star are fitted by the growth curve
-  and a residual background <i>b</i> per pixel: <i>C<sub>k</sub></i> =
-  GCOUNT · <i>G<sub>k</sub></i> + <i>b</i> · <i>A<sub>k</sub></i>.
-  The corrected sky is SKY + <i>b</i>. The errors are propagated from the
-  covariance of the nested apertures (they share pixels): the noise of
-  the pixels of the smaller aperture. The error of the mean sky of the
-  ring (SKYERR of APERPHOT) is common to all apertures of a star and is
-  absorbed by <i>b</i> entirely, so it cancels in SKY + <i>b</i>: the
-  error SKYERR of GROWPHOT is that of <i>b</i> by the noise of the
-  pixels (versions before 0.6.2+hg1653 (patched) added the error of the
-  ring once more, 24–41% too large).
+  The growth curve is the enclosed energy EE<sub><i>k</i></sub> of the
+  apertures, the fraction of the total flux in the aperture <i>k</i>,
+  determined exactly as the automatic aperture correction
+  of aphot (<samp>aphot --apcorr auto</samp>): bright (S/N &gt; 30, at
+  least the 30 brightest), unsaturated stars without a neighbour brighter
+  than 1% within 5.5 FWHM (of FIND), whose apertures inside the sky ring
+  are valid (apertures contaminated by brighter neighbours are invalid);
+  the total flux is the mean of three plateau apertures, the first window
+  from 1.3 FWHM whose slope relative to the total is consistent with zero,
+  searched up to twice the radius enclosing 99% of the stacked curve
+  (keys EERTOT1, EERTOT2, EEPLAT, EER99, EERCAP). EE of every aperture is
+  a polynomial in x,y (or in the distance from the field centre,
+  <samp>--radial</samp>) of the order raised from zero while significant,
+  up to <samp>--var</samp>; the errors of the counts are those of nested
+  apertures.
+</p>
+<p>
+  The errors of EE are the errors of a prediction for the stars which
+  did not make the curve: the covariance of the polynomial and the
+  scatter of the stars over it are inflated (by EELAM<i>k</i>) so that
+  the stars predicted without themselves (leave one out) scatter as their
+  errors say, and the stars outside the range of the curve's stars add
+  the uncertainty of the extrapolation. On frames with few stars and a
+  PSF varying over the field the variation is often not significant, and
+  the errors then describe it.
 </p>
 
+<h2>The total flux</h2>
+
+<p>
+  The counts of the apertures of a star are
+  <i>C<sub>k</sub></i> = GCOUNT · EE<sub><i>k</i></sub> + noise, the
+  covariance of the noise is that of nested apertures (they share their
+  pixels and the error of the mean sky):
+  Cov(<i>C<sub>i</sub></i>,<i>C<sub>j</sub></i>) =
+  <i>V</i><sub>p</sub>(<i>C</i><sub>min(<i>i</i>,<i>j</i>)</sub>) +
+  <i>A<sub>i</sub></i> <i>A<sub>j</sub></i> SKYERR², <i>V</i><sub>p</sub>
+  the sky and read noise of the pixels and the photon noise of the star by
+  the model (the gain APERRGN of APERPHOT). GCOUNT is the estimate of the
+  least variance among the single apertures
+  <i>C<sub>k</sub></i>/EE<sub><i>k</i></sub> and the best linear unbiased
+  estimates by the apertures 1 … <i>m</i> (up to the end of the plateau);
+  its variance includes the error of EE (bounded as fully correlated
+  between the apertures). Faint stars get the sum of the apertures
+  weighted by the profile, with the precision of PSF photometry; bright
+  stars the larger apertures, where EE is known better than their photon
+  noise. GCOUNTERR is the standard deviation of GCOUNT.
+</p>
+<p>
+  GCOUNT is the flux within the plateau apertures (EERTOT1 … EERTOT2),
+  the total flux of aphot's APCOUNT/APEE: the light of a PSF beyond the
+  plateau is a constant fraction absorbed by the calibration.
+</p>
+<p>
+  SKY of GROWPHOT is the sky of APERPHOT plus a residual sky <i>b</i>
+  estimated by the apertures of the star with the prior 0 ± SKYERR of the
+  ring (the error of the mean of the ring is common to all apertures); its
+  SKYERR is the posterior error. The apertures hold the light of faint
+  neighbours, so SKY is higher than the true sky in crowded fields (by
+  0.3 SKYERR on the simulated dense fields, 0.6 with Moffat wings and
+  40 px plateau apertures).
+</p>
+<p>
+  Versions before 0.6.2+hg1653 (patched) fitted the growth curve by a
+  model of profiles and selected its stars by HWHM; on frames with a PSF
+  of a sharp core and a halo the curve was built from a few stars and no
+  star had a valid GCOUNT, and the errors of bright stars missed the
+  error of the curve (1.4–1.8 times too small). The old method is
+  <samp>--legacy</samp> (bit-identical results).
+</p>
+
+<h2>Output</h2>
+<p>
+  The extension GROWPHOT (X, Y, SKY, SKYERR, GCOUNT, GCOUNTERR, GROWFLAG:
+  1 for the stars of the curve; HWHM and RADFLX90 of the curve, GROWMETH
+  and the EE* keys of the curve as in APERPHOT of aphot --apcorr auto) and
+  the extension GROWCURVE (R, GROW, GROWERR: the median EE of the stars and
+  its error, RPROF: the mean surface brightness of the annuli relative to
+  the total flux). Stars without a valid GCOUNT have −1.
+</p>
 
 <h2>Parameters</h2>
 <dl>
+  <dt><samp>--var</samp></dt><dd>
+    The highest order of the polynomial of the spatial variation of the
+    growth curve, 0, 1 or 2 (default 2); the order is raised from zero
+    while significant, and lowered for few stars.
+    </dd>
+  <dt><samp>--radial</samp></dt><dd>
+    The variation by the distance from the field centre (default: x,y),
+    for PSFs varying with the field radius.
+    </dd>
+  <dt><samp>--centre</samp></dt><dd>
+    x,y: the field centre of <samp>--radial</samp> [pix] (default: NAXIS/2).
+    </dd>
+  <dt><samp>--legacy</samp></dt><dd>
+    The growth-curve fit of the versions before.
+    </dd>
   <dt><samp>-th, --threshold</samp></dt><dd>
-    The
+    With <samp>--legacy</samp>: the stars of the curve are brighter than
+    the threshold times the sky in their aperture (default 0.1).
     </dd>
 <dt><samp>--verbose</samp></dt><dd>With this (common) parameter,
-    additional extensions GROWFUNC and GROWDATA are added to processed
-    files and create a report file (replaces .fits with .png)
-    with plotted details about growth curve photometry.
-    See <a href="dataform_growrep.html">detailed</a> description.
-    The graphs requires <b>gnuplot</b> to be installed.
-    Any error is silently ignored.
+    the growth curve and the apertures of GCOUNT are printed.
 </dd>
 </dl>
 
@@ -73,7 +154,9 @@ munipack gphot [.. parameters ..] file(s)[,result(s)]
 Common usage
 </p>
 <code>
-$ munipack gphot --verbose pleiades.fits
+$ munipack gphot --verbose pleiades.fits<br>
+$ munipack gphot --radial frame.fits<br>
+$ munipack phcal --photometry grow -c catalogue.fits ... frame.fits
 </code>
 
 

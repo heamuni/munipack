@@ -95,6 +95,33 @@ MuniPhcal::MuniPhcal(wxEvtHandler *h, const MuniCmdLineParser& cmd):
     if( cmd.Found("tratab",&a) )
       Write("TRATABLE = '" + a + "'");
 
+    // the colour term: the catalogue columns A,B of the colour A - B,
+    // optionally with the columns of their errors (A,B,errA,errB)
+    if( cmd.Found("color-term",&a) ) {
+      long i;
+      apstr(a,i,c);
+      if( ! (i == 2 || i == 4) )
+	MuniFatalError("--color-term `%s': two columns A,B (the colour A - B), "
+		       "or four A,B,errA,errB.",a);
+      Write("COL_NCOLOR = %ld",i);
+      Write("COL_COLOR = " + c);
+    }
+
+    if( cmd.Found("color-order",&n) ) {
+      if( ! (n == 1 || n == 2) )
+	MuniFatalError("--color-order is 1 (linear) or 2 (quadratic).");
+      Write("COLOR_ORDER = %ld",n);
+    }
+
+    if( cmd.Found("color-ref",&a) ) {
+      if( a.Upper() == "MEAN" )
+	;
+      else if( a.ToDouble(&x) )
+	Write("COLOR_REF = %.17g",x);
+      else
+	MuniFatalError("Unknown --color-ref `%s' (mean, or a colour in mag).",a);
+    }
+
     if( cmd.Found("photsys-instr",&a) )
       Write("PHOTSYS_INSTR = '"+a+"'");
 
