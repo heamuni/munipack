@@ -64,13 +64,18 @@ program phcal
   ! < 0: estimated by the residuals of the calibration stars
   real(dbl) :: syserr = -1
   real(dbl), dimension(:), allocatable :: ctph_manual,dctph_manual
-  ! the colour term (--color-term): the catalogue columns A,B of the colour
-  ! A - B (and of their errors), the order of the polynomial, the reference
-  ! colour (huge: the mean colour of the calibration stars)
-  character(len=FLEN_VALUE), dimension(:), allocatable :: col_color
-  integer :: color_order = 1
-  real(dbl) :: color_ref = huge(1.0_dbl)
-  integer :: eq,nfile,n,nmag,nmagerr,nfilters,nctph,saper,ncolor
+  ! the colour terms (--color-term, repeatable, at most ncoltmax): the
+  ! catalogue columns A,B of every colour A - B (and of their errors), their
+  ! number (2 or 4), the orders of the polynomials and the reference
+  ! colours (huge: the mean colour of the calibration stars), one value
+  ! for all the colours or one for every colour
+  integer, parameter :: ncoltmax = 3
+  character(len=FLEN_VALUE), dimension(4,ncoltmax) :: col_color
+  integer, dimension(ncoltmax) :: ncolor
+  integer :: ncterm = 0
+  integer, dimension(:), allocatable :: color_order
+  real(dbl), dimension(:), allocatable :: color_ref
+  integer :: eq,nfile,n,nmag,nmagerr,nfilters,nctph,saper,ncol1
   character(len=FLEN_KEYWORD), dimension(8) :: keys
   integer :: nqlabels
 
@@ -86,7 +91,12 @@ program phcal
   allocate(qlabels(nqlabels))
   qlabels = [ character(len=FLEN_VALUE) :: 'FLUX', 'MAG' ]
 
-  allocate(col_mag(0), col_magerr(0), filters(0), col_color(0))
+  allocate(col_mag(0), col_magerr(0), filters(0))
+  col_color = ''
+  ncolor = 0
+  allocate(color_order(1),color_ref(1))
+  color_order = 1
+  color_ref = huge(1.0_dbl)
   allocate(ctph_manual(0), dctph_manual(0))
   allocate(filename(0), output(0))
   nfilters = 0
@@ -197,22 +207,38 @@ program phcal
 
      else if( key == 'COL_NCOLOR' ) then
 
-        read(val,*) ncolor
-        if( .not. (ncolor == 2 .or. ncolor == 4) ) &
+        ! the next colour term (every --color-term)
+        read(val,*) ncol1
+        if( .not. (ncol1 == 2 .or. ncol1 == 4) ) &
              stop 'Error: --color-term takes two columns (A,B) or four (A,B,errA,errB).'
-        deallocate(col_color)
-        allocate(col_color(ncolor))
-        col_color = ''
+        ncterm = ncterm + 1
+        if( ncterm > ncoltmax ) stop 'Error: at most three colour terms (--color-term).'
+        ncolor(ncterm) = ncol1
 
      else if( key == 'COL_COLOR' ) then
 
-        read(val,*) col_color
+        if( ncterm == 0 ) stop 'Malformed input record (COL_COLOR).'
+        read(val,*) col_color(1:ncolor(ncterm),ncterm)
+
+     else if( key == 'COLOR_NORDER' ) then
+
+        read(val,*) ncol1
+        deallocate(color_order)
+        allocate(color_order(ncol1))
+        color_order = 1
 
      else if( key == 'COLOR_ORDER' ) then
 
         read(val,*) color_order
-        if( color_order < 1 .or. color_order > 2 ) &
+        if( any(color_order < 1 .or. color_order > 2) ) &
              stop 'Error: --color-order is 1 or 2.'
+
+     else if( key == 'COLOR_NREF' ) then
+
+        read(val,*) ncol1
+        deallocate(color_ref)
+        allocate(color_ref(ncol1))
+        color_ref = huge(1.0_dbl)
 
      else if( key == 'COLOR_REF' ) then
 
@@ -365,8 +391,14 @@ program phcal
      if( .not. (area > 0) ) &
           stop 'Error: The specified area is negative or zero, very funny!'
 
-     if( size(col_color) > 0 .and. cat == '' ) &
+     if( ncterm > 0 .and. cat == '' ) &
           stop 'Error: --color-term needs a reference catalogue (-c).'
+     if( ncterm > 0 .and. .not. (size(color_order) == 1 .or. &
+          size(color_order) == ncterm) ) &
+          stop 'Error: --color-order needs one value, or one for every --color-term.'
+     if( ncterm > 0 .and. .not. (size(color_ref) == 1 .or. &
+          size(color_ref) == ncterm) ) &
+          stop 'Error: --color-ref needs one value, or one for every --color-term.'
 
      if( cat /= '' ) then
         call calibrate   ! catcal ?
@@ -381,7 +413,7 @@ program phcal
   end if
 
   deallocate(filename,output,col_mag,col_magerr,filters,ctph_manual, &
-       dctph_manual,col_color)
+       dctph_manual,color_order,color_ref)
 
   stop 0
 !  write(error_unit,*) 'STOP 0'
@@ -406,17 +438,18 @@ contains
     character(len=FLEN_VALUE), dimension(:), allocatable :: filter_frames, &
          filters_tab, colmag, tcola, tcolb
     real(dbl), allocatable, dimension(:) :: refra, refdec, ctph,dctph, &
-         exptime, areas, tol, aper, sys, cra, cdec, ccol, dccol, &
+         exptime, areas, tol, aper, sys, cra, cdec, &
          tcref, tzp, tdzp, tk1, tdk1, tk2, tdk2
     real(dbl), allocatable, dimension(:,:) :: tr,tr1,trerr,tr1err,refph,drefph,&
-         cts,dcts,dn,ddn,ra,dec,mag,dmag,cmag,cdmag,magx,dmagx,ccl,dccl,ccy,sysint
+         cts,dcts,dn,ddn,ra,dec,mag,dmag,cmag,cdmag,magx,dmagx,sysint,ccol,dccol
+    real(dbl), allocatable, dimension(:,:,:) :: ccl,dccl,ccy,ccv,cerr
     real(dbl) :: q, d
     type(type_phsys) :: phsyscal
     type(photores), dimension(:), allocatable :: phres
     type(colour_term) :: ctm
     integer, dimension(:,:), allocatable :: pairs
     integer, dimension(:), allocatable :: forder, perm, nsys
-    integer :: status,nfiles,ncat,i,nf,ia,ib
+    integer :: status,nfiles,ncat,i,nf,ia,ib,j,k,l
 
     if( photsys_ref == '' ) &
          stop 'No identificator for reference photometry system.'
@@ -438,29 +471,52 @@ contains
     if( status /= 0 ) stop 'Failed to read a catalogue.'
     if( .not. allocated(mag) ) stop 'An empty catalogue.'
 
-    ! the colour term: the colour A - B of the catalogue (and its error
-    ! by the error columns, zero without them), undefined (an error < 0)
-    ! when a magnitude is missing
-    if( size(col_color) > 0 ) then
+    ! the colour terms: the colours A - B of the catalogue (and their
+    ! errors by the error columns, zero without them), undefined (an error
+    ! < 0) when a magnitude is missing; the covariances of the colours
+    ! sharing a band (u - g and g - r: -err(g)**2)
+    if( ncterm > 0 ) then
        if( tratable /= '' ) stop &
             'Error: --color-term and --tratab exclude each other (the table has the colours).'
-       call readcat(cat,(/col_ra,col_dec/),col_color(1:2), &
-            col_color(3:size(col_color)),cra,cdec,cmag,cdmag,catid1,status)
-       if( status /= 0 ) stop 'Failed to read the colour columns of the catalogue.'
-       allocate(ccol(size(cmag,1)),dccol(size(cmag,1)))
-       where( cmag(:,1) < 99 .and. cmag(:,2) < 99 )
-          ccol = cmag(:,1) - cmag(:,2)
-          dccol = 0
-       elsewhere
-          ccol = 0
-          dccol = -1
-       end where
-       if( size(col_color) == 4 ) then
-          where( dccol >= 0 .and. cdmag(:,1) < 9 .and. cdmag(:,2) < 9 )
-             dccol = sqrt(cdmag(:,1)**2 + cdmag(:,2)**2)
+       call colour_check
+       do j = 1, ncterm
+          call readcat(cat,(/col_ra,col_dec/),col_color(1:2,j), &
+               col_color(3:ncolor(j),j),cra,cdec,cmag,cdmag,catid1,status)
+          if( status /= 0 ) stop 'Failed to read the colour columns of the catalogue.'
+          if( j == 1 ) then
+             allocate(ccol(size(cmag,1),ncterm),dccol(size(cmag,1),ncterm), &
+                  cerr(size(cmag,1),2,ncterm),ccv(size(cmag,1),ncterm,ncterm))
+             cerr = 0
+          end if
+          if( size(cmag,1) /= size(ccol,1) ) stop 'Colour columns of different lengths.'
+          where( cmag(:,1) < 99 .and. cmag(:,2) < 99 )
+             ccol(:,j) = cmag(:,1) - cmag(:,2)
+             dccol(:,j) = 0
+          elsewhere
+             ccol(:,j) = 0
+             dccol(:,j) = -1
           end where
-       end if
-       deallocate(cra,cdec,cmag,cdmag)
+          if( ncolor(j) == 4 ) then
+             where( dccol(:,j) >= 0 .and. cdmag(:,1) < 9 .and. cdmag(:,2) < 9 )
+                dccol(:,j) = sqrt(cdmag(:,1)**2 + cdmag(:,2)**2)
+                cerr(:,1,j) = cdmag(:,1)
+                cerr(:,2,j) = cdmag(:,2)
+             end where
+          end if
+          deallocate(cra,cdec,cmag,cdmag)
+       end do
+       ccv = 0
+       do j = 1, ncterm
+          do k = 1, ncterm
+             if( j == k ) cycle
+             where( dccol(:,j) >= 0 .and. dccol(:,k) >= 0 )
+                ccv(:,j,k) = shared(1,j,1,k)*cerr(:,1,j)**2 &
+                     - shared(1,j,2,k)*cerr(:,1,j)**2 &
+                     - shared(2,j,1,k)*cerr(:,2,j)**2 &
+                     + shared(2,j,2,k)*cerr(:,2,j)**2
+             end where
+          end do
+       end do
     end if
 
     ! reference system
@@ -517,28 +573,45 @@ contains
     if( allocated(ccol) ) then
        ! the colours of all stars of the catalogue for the outputs,
        ! the colours of the calibration stars joint with the magnitudes
-       call colterm_init(ctm,COLT_CAT,nfiles)
-       ctm%cola = col_color(1)
-       ctm%colb = col_color(2)
-       ctm%order = color_order
-       ctm%cref = color_ref
+       call colterm_init(ctm,COLT_CAT,nfiles,ncterm)
+       do j = 1, ncterm
+          ctm%cola(j,:) = col_color(1,j)
+          ctm%colb(j,:) = col_color(2,j)
+          ctm%order(j,:) = color_order(min(j,size(color_order)))
+          ctm%cref(j,:) = color_ref(min(j,size(color_ref)))
+       end do
        ctm%ra = refra
        ctm%dec = refdec
        ctm%col = ccol
        ctm%dcol = dccol
+       ctm%ccov = ccv
        ctm%tol = tol(1)
        nf = size(mag,2)
-       allocate(magx(size(mag,1),nf+2),dmagx(size(mag,1),nf+2))
+       l = nf + 2*ncterm + ncterm**2
+       allocate(magx(size(mag,1),l),dmagx(size(mag,1),l))
        magx(:,1:nf) = mag
-       magx(:,nf+1) = ccol
-       magx(:,nf+2) = dccol
+       do j = 1, ncterm
+          magx(:,nf+2*j-1) = ccol(:,j)
+          magx(:,nf+2*j) = dccol(:,j)
+          do k = 1, ncterm
+             magx(:,nf+2*ncterm+(j-1)*ncterm+k) = ccv(:,j,k)
+          end do
+       end do
        dmagx(:,1:nf) = dmag
        dmagx(:,nf+1:) = 0
        call jamcat(tol, refra, refdec, magx, dmagx, ra,dec,dn,ddn,cts,dcts)
        mag = magx(:,1:nf)
        dmag = dmagx(:,1:nf)
-       ccol = magx(:,nf+1)
-       dccol = magx(:,nf+2)
+       deallocate(ccol,dccol,ccv)
+       allocate(ccol(size(magx,1),ncterm),dccol(size(magx,1),ncterm), &
+            ccv(size(magx,1),ncterm,ncterm))
+       do j = 1, ncterm
+          ccol(:,j) = magx(:,nf+2*j-1)
+          dccol(:,j) = magx(:,nf+2*j)
+          do k = 1, ncterm
+             ccv(:,j,k) = magx(:,nf+2*ncterm+(j-1)*ncterm+k)
+          end do
+       end do
        deallocate(magx,dmagx)
     else
        call jamcat(tol, refra, refdec, mag, dmag, ra,dec,dn,ddn,cts,dcts)
@@ -607,14 +680,14 @@ contains
                stop 'Filters of the colours of the conversion table not found.'
           ctm%ia(n) = ia
           ctm%ib(n) = ib
-          ctm%cola(n) = tcola(n)
-          ctm%colb(n) = tcolb(n)
-          ctm%cref(n) = tcref(n)
+          ctm%cola(1,n) = tcola(n)
+          ctm%colb(1,n) = tcolb(n)
+          ctm%cref(1,n) = tcref(n)
           ctm%beta(1,n) = -tk1(n) / magln
           ctm%beta(2,n) = -tk2(n) / magln
           ctm%cov(2,2,n) = (tdk1(n) / magln)**2
           ctm%cov(3,3,n) = (tdk2(n) / magln)**2
-          ctm%order(n) = merge(2,1,tk2(n) /= 0)
+          ctm%order(1,n) = merge(2,1,tk2(n) /= 0)
        end do
        ctm%tol = tol(1)
        deallocate(filters_tab,tcola,tcolb,tcref,tzp,tdzp,tk1,tdk1,tk2,tdk2)
@@ -744,39 +817,48 @@ contains
        ! of ln(ph) and the colour (the colour of a band containing
        ! the catalogue magnitude of the band: -dmag**2/magln for A,
        ! +dmag**2/magln for B, with the errors of the colour only)
-       allocate(ccl(ncat,nfiles),dccl(ncat,nfiles),ccy(ncat,nfiles))
+       allocate(ccl(ncat,nfiles,ctm%nterm),dccl(ncat,nfiles,ctm%nterm), &
+            ccy(ncat,nfiles,ctm%nterm))
        ccy = 0
        do n = 1, nfiles
           if( ctm%model == COLT_CAT ) then
-             ccl(:,n) = ccol(1:ncat)
-             dccl(:,n) = dccol(1:ncat)
-             if( size(col_color) == 4 ) then
-                d = 0
-                if( col_color(1) == colmag(n) ) d = d - 1
-                if( col_color(2) == colmag(n) ) d = d + 1
-                where( dccl(:,n) >= 0 .and. dmag(1:ncat,n) < 9 )
-                   ccy(:,n) = d * dmag(1:ncat,n)**2 / magln
-                end where
-             end if
+             do j = 1, ncterm
+                ccl(:,n,j) = ccol(1:ncat,j)
+                dccl(:,n,j) = dccol(1:ncat,j)
+                if( ncolor(j) == 4 ) then
+                   d = 0
+                   if( col_color(1,j) == colmag(n) ) d = d - 1
+                   if( col_color(2,j) == colmag(n) ) d = d + 1
+                   where( dccl(:,n,j) >= 0 .and. dmag(1:ncat,n) < 9 )
+                      ccy(:,n,j) = d * dmag(1:ncat,n)**2 / magln
+                   end where
+                end if
+             end do
           else
              ia = ctm%ia(n)
              ib = ctm%ib(n)
-             ccl(:,n) = mag(1:ncat,ia) - mag(1:ncat,ib)
+             ccl(:,n,1) = mag(1:ncat,ia) - mag(1:ncat,ib)
              where( dmag(1:ncat,ia) < 9 .and. dmag(1:ncat,ib) < 9 )
-                dccl(:,n) = sqrt(dmag(1:ncat,ia)**2 + dmag(1:ncat,ib)**2)
+                dccl(:,n,1) = sqrt(dmag(1:ncat,ia)**2 + dmag(1:ncat,ib)**2)
              elsewhere
-                dccl(:,n) = 0
+                dccl(:,n,1) = 0
              end where
              d = 0
              if( ia == n ) d = d - 1
              if( ib == n ) d = d + 1
              where( dmag(1:ncat,ia) < 9 .and. dmag(1:ncat,ib) < 9 )
-                ccy(:,n) = d * dmag(1:ncat,n)**2 / magln
+                ccy(:,n,1) = d * dmag(1:ncat,n)**2 / magln
              end where
           end if
        end do
-       call calibr_colour(refph,drefph,cts(1:ncat,:),dcts(1:ncat,:),ccl,dccl, &
-            ccy,ctm,ctph,dctph,phres,verbose,syserr,sys,sysint,nsys)
+       if( ctm%model == COLT_CAT ) then
+          call calibr_colour(refph,drefph,cts(1:ncat,:),dcts(1:ncat,:),ccl,dccl, &
+               ccy,ctm,ctph,dctph,phres,verbose,syserr,sys,sysint,nsys, &
+               ccv=ccv(1:ncat,:,:))
+       else
+          call calibr_colour(refph,drefph,cts(1:ncat,:),dcts(1:ncat,:),ccl,dccl, &
+               ccy,ctm,ctph,dctph,phres,verbose,syserr,sys,sysint,nsys)
+       end if
        deallocate(ccl,dccl,ccy)
     else if( nfiles == 1 ) then
        call calibr(refph,drefph,cts(1:ncat,:),dcts(1:ncat,:),ctph,dctph, &
@@ -1148,5 +1230,59 @@ contains
     deallocate(tr,tr1,trerr,tr1err)
 
   end subroutine mancal
+
+  subroutine colour_check
+
+    ! the colours of the terms must be independent: two colours of
+    ! the same bands, or three of three bands (u - g, g - r, u - r) make
+    ! the fit singular
+
+    character(len=FLEN_VALUE), dimension(2*ncoltmax) :: bands
+    real(dbl), dimension(ncoltmax,2*ncoltmax) :: a
+    real(dbl), dimension(ncoltmax,ncoltmax) :: gm
+    real(dbl) :: det
+    integer :: nb, j, k
+
+    nb = 0
+    do j = 1, ncterm
+       if( col_color(1,j) == col_color(2,j) ) &
+            stop 'Error: --color-term A,B with A = B.'
+       do k = 1, 2
+          if( .not. any(bands(1:nb) == col_color(k,j)) ) then
+             nb = nb + 1
+             bands(nb) = col_color(k,j)
+          end if
+       end do
+    end do
+    a = 0
+    do j = 1, ncterm
+       a(j,findloc(bands(1:nb),col_color(1,j),1)) = 1
+       a(j,findloc(bands(1:nb),col_color(2,j),1)) = -1
+    end do
+    ! the Gram determinant (an integer) is zero for dependent colours
+    gm = 0
+    gm(1:ncterm,1:ncterm) = matmul(a(1:ncterm,1:nb),transpose(a(1:ncterm,1:nb)))
+    select case (ncterm)
+    case (1)
+       det = gm(1,1)
+    case (2)
+       det = gm(1,1)*gm(2,2) - gm(1,2)*gm(2,1)
+    case default
+       det = gm(1,1)*(gm(2,2)*gm(3,3) - gm(2,3)*gm(3,2)) &
+            - gm(1,2)*(gm(2,1)*gm(3,3) - gm(2,3)*gm(3,1)) &
+            + gm(1,3)*(gm(2,1)*gm(3,2) - gm(2,2)*gm(3,1))
+    end select
+    if( .not. (abs(det) > 0.5_dbl) ) &
+         stop 'Error: the colours of --color-term are not independent.'
+
+  end subroutine colour_check
+
+  real(dbl) function shared(a,j,b,k)
+    ! 1 when the band a (1: A, 2: B) of the colour j is the band b of
+    ! the colour k, else 0
+    integer, intent(in) :: a, j, b, k
+    shared = 0
+    if( col_color(a,j) == col_color(b,k) ) shared = 1
+  end function shared
 
 end program phcal
