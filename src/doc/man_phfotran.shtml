@@ -65,7 +65,9 @@ colour of the stars (the coefficients nearly uncorrelated with ZP). The fit
 is that of the colour term of <a href="man_phcal.html#colterm">phcal</a>:
 the mixture likelihood with the systematic error (outliers without weight),
 the errors of the colours propagated with their covariance with
-the magnitude of the filter. With <samp>--verbose</samp> the coefficients,
+the magnitude of the filter, the errors of the coefficients with
+the uncertainty of the systematic error
+(<a href="man_phcal.html#ctpherr">phcal</a>). With <samp>--verbose</samp> the coefficients,
 the systematic error, the fraction of outliers and the scatter of the stars
 without and with the colour terms are printed.
 </p>

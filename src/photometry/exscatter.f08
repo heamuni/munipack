@@ -116,7 +116,7 @@
 !  (54-69% before), of the slope of a colour term 66-76% for 5-100 stars;
 !  for sigma = 0, 70-87% (few stars cannot tell sigma = 0 from 0.03 mag,
 !  so the intervals that cover 0.03 cover more at 0). With 30 and more
-!  stars the errors grow by 1-3%. A fixed sigma (fixsig >= 0) keeps
+!  stars the errors grow by 1-6% (100: 1-3%). A fixed sigma (fixsig >= 0) keeps
 !  (X' U X)**(-1).
 !
 !  The interval of sigma (optional) is given by the profile of

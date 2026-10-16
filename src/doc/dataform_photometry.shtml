@@ -118,7 +118,9 @@ further processing.
 <tr><td>ANNULUS1</td><td>inner sky annulus radius<td>deg</td></tr>
 <tr><td>ANNULUS2</td><td>outer sky annulus radius<td>deg</td></tr>
 <tr><td>CTPH</td><td>counts per photons<td></td></tr>
-<tr><td>CTPHERR</td><td>Statistical Error of CTPH<td></td></tr>
+<tr><td>CTPHERR</td><td>Statistical Error of CTPH (with an estimated
+    PHSYSERR including its uncertainty, see
+    <a href="man_phcal.html#ctpherr">phcal</a>)<td></td></tr>
 <tr><td>PHSYSERR</td><td>systematic error of the calibration, added
     in quadrature to the errors of all objects (0 when none,
     see <a href="man_phcal.html">phcal --syserr</a>)<td>mag</td></tr>
