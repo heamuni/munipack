@@ -28,13 +28,17 @@ and backward compatibility is not guarantied.
 
 <p>
 The primary HDU has no data; its header identifies the photometry
-systems and records the frames the transformation has been derived from
-(in comments).
+systems, the model of the transformation (TRAMODEL) and records the frames
+the transformation has been derived from (in comments). There are two
+models: FLUX, the linear mixing of photon rates (the matrices below), and
+MAG, the colour terms of the magnitudes (the table FOTRAN_MAG). A table
+without TRAMODEL (written by the versions before the magnitude model) is
+a FLUX table.
 </p>
 
 <div class="table">
 <table>
-<caption>FITS file structure</caption>
+<caption>FITS file structure (FLUX)</caption>
 <tr><th>HDU</th><th>EXTNAME</th><th>Description</th></tr>
 <tr><td>0</td><td></td><td>the systems (keywords), no data</td></tr>
 <tr><td>1</td><td>FOTRAN_FORWARD</td><td>the forward matrix: photon rates to count rates</td></tr>
@@ -47,14 +51,64 @@ systems and records the frames the transformation has been derived from
 
 <div class="table">
 <table>
+<caption>FITS file structure (MAG)</caption>
+<tr><th>HDU</th><th>EXTNAME</th><th>Description</th></tr>
+<tr><td>0</td><td></td><td>the systems (keywords), no data</td></tr>
+<tr><td>1</td><td>FOTRAN_MAG</td><td>the colour terms, one row per filter</td></tr>
+<tr><td>2</td><td>FOTRANdata</td><td>the data of the fit</td></tr>
+</table>
+</div>
+
+<div class="table">
+<table>
 <caption>Primary HDU keywords</caption>
 <tr><th>Keyword</th><th>Description</th></tr>
 <tr><td>PHOTSYS1</td><td>instrumental photometry system</td></tr>
 <tr><td>PHOTSYS2</td><td>reference (standard) photometry system</td></tr>
+<tr><td>TRAMODEL</td><td>FLUX or MAG (FLUX when missing)</td></tr>
 <tr><td>AIRMASS</td><td>the mean airmass of the frames</td></tr>
-<tr><td>REFCI</td><td>the reference colour (a ratio of photon rates, 10<sup>−0.2</sup>)</td></tr>
+<tr><td>REFCI</td><td>the reference colour (a ratio of photon rates, 10<sup>−0.2</sup>; FLUX)</td></tr>
 </table>
 </div>
+
+<h2>The magnitude model</h2>
+
+<p>
+The table FOTRAN_MAG has one row per filter (in the order of
+the photometry system):
+</p>
+<p>
+<i>m</i><sub>std</sub> − <i>m</i><sub>inst</sub> = ZP +
+K1 (<i>c</i> − CREF) + K2 (<i>c</i> − CREF)²,
+<i>c</i> = <i>m</i><sub>std</sub>(COLOR_A) − <i>m</i><sub>std</sub>(COLOR_B),
+</p>
+<p>
+<i>m</i><sub>inst</sub> = −2.5 log<sub>10</sub>(count rate [counts/s/m²]),
+<i>m</i><sub>std</sub> the magnitude of the standard system.
+</p>
+
+<div class="table">
+<table>
+<caption>Columns of FOTRAN_MAG</caption>
+<tr><th>Column</th><th>Description</th><th>Units</th></tr>
+<tr><td>FILTER</td><td>the filter</td><td></td></tr>
+<tr><td>COLOR_A, COLOR_B</td><td>the filters of the colour <i>c</i></td><td></td></tr>
+<tr><td>CREF</td><td>the reference colour</td><td>mag</td></tr>
+<tr><td>ZP, ZPERR</td><td>the zero point and its error (phcal fits its own)</td><td>mag</td></tr>
+<tr><td>K1, K1ERR</td><td>the linear colour term and its error</td><td>mag/mag</td></tr>
+<tr><td>K2, K2ERR</td><td>the quadratic colour term (0 for the order 1)</td><td>mag/mag²</td></tr>
+<tr><td>SYSERR</td><td>the systematic error of the fit</td><td>mag</td></tr>
+<tr><td>RMS</td><td>the scatter of the stars around the fit</td><td>mag</td></tr>
+<tr><td>NSTARS</td><td>the stars of the fit</td><td></td></tr>
+</table>
+</div>
+
+<p>
+phcal checks the systems and the filters, takes K1, K2, CREF and
+the colours, and fits the zero points itself.
+</p>
+
+<h2>The flux model</h2>
 
 <p>
 The matrices are tables with one column per filter (named by the filter,

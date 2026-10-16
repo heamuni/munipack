@@ -187,15 +187,102 @@ The enclosed energy is used by default when APERPHOT contains it
 it give the same results as before.
 </p>
 
+<h3 id="colterm">Colour Term</h3>
+
+<p>
+The passband of an instrument is never that of the catalogue: QUVIK's
+260–360 nm band is calibrated against SDSS <i>u</i> or GALEX NUV,
+a CCD with a V filter against Johnson V or Gaia G. The ratio of the
+expected photons and the counts then depends on the colour of the star,
+and even a calibration in one filter needs a colour term. With
+<samp>--color-term A,B</samp> (two catalogue columns, the colour
+<i>c</i> = A − B; <samp>A,B,errA,errB</samp> adds the columns of their
+errors) the calibration is
+</p>
+<p>
+<i>m</i><sub>cat</sub> − <i>m</i><sub>inst</sub> = ZP +
+<i>k</i><sub>1</sub> (<i>c</i> − <i>c</i><sub>ref</sub>)
+[+ <i>k</i><sub>2</sub> (<i>c</i> − <i>c</i><sub>ref</sub>)²
+with <samp>--color-order 2</samp>],
+</p>
+<p>
+fitted as ln(<i>ph</i>/<i>ct</i>) = ln CTPH + <i>b</i><sub>1</sub> <i>d</i>
++ <i>b</i><sub>2</sub> <i>d</i>², <i>d</i> = <i>c</i> − <i>c</i><sub>ref</sub>,
+<i>k</i> = −2.5 <i>b</i>/ln 10, by the same mixture likelihood as the
+<a href="#syserr">systematic error</a>: the EM algorithm from a robust
+start (the median of the slopes of pairs of stars), the weighted least
+squares of the polynomial with the weights of the calibration stars, σ by
+the restricted likelihood with the leverage of the polynomial, so outliers
+have no weight in the zero point, in <i>k</i> nor in σ. The variance of a
+star includes the error of its colour propagated by the slope,
+(d<i>g</i>/d<i>c</i>)² σ<sub>c</sub>², and its covariance with the
+catalogue magnitude of the calibration when the band is one of A, B
+(the colour B − V has the error of V). A fixed <samp>--syserr</samp>
+fixes σ. The stars without a colour in the catalogue are not used.
+</p>
+<p>
+The colour term multiplies the photons, <i>ph</i> = CTPH
+exp(<i>g</i>(<i>c</i>)) <i>ct</i>, so all quantities (MAG, FLUX, PHOTON, …)
+have it consistently. CTPH is the calibration of a star of the reference
+colour <i>c</i><sub>ref</sub> (COLTREF): by default
+(<samp>--color-ref mean</samp>) the weighted mean colour of the calibration
+stars, where CTPH is nearly uncorrelated with <i>k</i><sub>1</sub>
+and close to the calibration without the colour term; the calibrated image
+is that of a star of this colour. CTPH of different fields is comparable
+only for a fixed reference (<samp>--color-ref 0</samp>, the usual zero
+point of the zero colour, has a larger CTPHERR far from the colours of
+the stars). Every star of the output is matched to the catalogue (the
+search radius of the calibration): with a colour it gets its correction,
+the error of the calibration at its colour (the covariance of CTPH and
+the coefficients) and the error of its colour; a star without a colour
+(not in the catalogue, or a magnitude missing) gets the mean correction of
+the calibration stars and its scatter as an error, so its magnitude is
+right on average and its error says how uncertain it is (COLORSRC 0;
+<i>k</i>σ<sub>c</sub> = 0.06 mag for <i>k</i> = 0.1 and the colours of
+a field). The table gets the columns COLOR, COLORERR, COLORSRC and the
+header the coefficients (<a href="dataform_photometry.html#colterm">format</a>).
+With several filters every filter has its own colour term by the same
+colour. <samp>--color-term</samp> needs a catalogue (<samp>-c</samp>) and
+excludes <samp>--tratab</samp> (whose transformation has the colours).
+</p>
+
+<p>
+Validation: a simulated V frame (400 stars, B − V from −0.2 to 1.8)
+calibrated against a catalogue band X = V + <i>k</i>(B − V) + N(0, 0.01)
+with catalogue B, V of errors 0.01: <i>k</i> = 0.0005 ± 0.0009,
+0.1007 ± 0.0009, 0.2996 ± 0.0009 for <i>k</i> = 0, 0.1, 0.3, the slope of
+the residuals against the colour below 0.0008 (without the colour term
+−0.100, −0.300 and a systematic error of 0.058, 0.171 mag); 30 realisations
+of the catalogue with 5% outliers: <i>k</i> 0.29998, standard deviation
+0.00091 for the quoted error 0.00100; the outliers (found as 5.1%) do not
+move <i>k</i>; the residual scatter is 0.0009 mag for every <i>k</i> with
+noiseless colours, as without a mismatch (the noise of the catalogue colours
+adds <i>k</i>·0.014 mag, included in MAGERR: pull 1.01); 10% of the stars
+without a colour: their residuals scatter by 0.058 (<i>k</i> = 0.1) for
+MAGERR 0.057. Without <samp>--color-term</samp> the results are
+bit-identical to the previous version.
+</p>
+
 <p>When photometry transformation table from instrumental to
 standard system is available <samp>--tratab</samp> (made by
-<a href="man_phfotran.html">phfotran</a>), the expected photons of the
+<a href="man_phfotran.html">phfotran</a>), the calibration follows its model.
+A flux table (TRAMODEL = 'FLUX', and the tables without the keyword):
+the expected photons of the
 calibration stars in the standard filters are transformed to the counts
 of the instrumental filters by its forward matrix and the calibration
 is performed on the kind of counts (CTPH is then a correction near 1);
 the counts of all stars are converted to the photons of the standard
 filters by the inverse of the forward matrix (the backward matrix of the
-table, fitted independently, is not used). The filters of the table must
+table, fitted independently, is not used). A magnitude table
+(TRAMODEL = 'MAG'): CTPH of every filter is fitted with the colour terms
+of the table fixed, by the catalogue colours of the calibration stars, and
+the magnitudes of every star are those of the standard system,
+<i>m</i> = <i>m</i><sub>0</sub> + <i>k</i><sub>1</sub>
+(<i>c</i> − <i>c</i><sub>ref</sub>) + <i>k</i><sub>2</sub>
+(<i>c</i> − <i>c</i><sub>ref</sub>)² with <i>m</i><sub>0</sub> calibrated
+by CTPH and <i>c</i> the colour of the standard magnitudes, solved for all
+filters together (Newton's method); MAGERR includes the errors of
+the coefficients, COLOR the colours. The filters of the table must
 be those of the calibration and its instrumental system (PHOTSYS1) that
 of <samp>--photsys-instr</samp>, or of the frames (PHOTSYS) without it.
 </p>
@@ -210,8 +297,9 @@ filter is calibrated by itself: the results equal those of the frames
 calibrated one at a time, except that the calibration stars must be
 found on all the frames and the output tables contain the stars found
 on all of them. Colour terms of an instrument (a passband different from
-the standard one, the colour dependence of the extinction) are described by
-the transformation table of <a href="man_phfotran.html">phfotran</a>;
+the standard one, the colour dependence of the extinction) are fitted with
+the calibration by <a href="#colterm"><samp>--color-term</samp></a>, or
+described by the transformation table of <a href="man_phfotran.html">phfotran</a>;
 with it, the calibration and the conversion of the counts use the colours
 of the stars. Older versions corrected the photons of the outputs of
 more filters by an "effective extinction" estimated from the calibration
@@ -373,6 +461,15 @@ $ munipack phcal -c T_Phe.fits --tratab phfotran.fits --photsys-ref Johnson \
 
 <pre>
 munipack phcal --verbose -r grb140423-2_C_0002_cal.fits --photsys-ref Johnson  grb140423-2_C_0003.fits
+</pre>
+
+<p>
+A colour term against the catalogue colour B − V (with its errors),
+the instrumental band calibrated by the catalogue band of V:
+</p>
+<pre>
+$ munipack phcal -c cat.fits --photsys-ref Johnson -f V --col-mag Vmag --col-magerr e_Vmag \
+   --color-term Bmag,Vmag,e_Bmag,e_Vmag --verbose frame.fits
 </pre>
 
 
