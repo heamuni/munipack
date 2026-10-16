@@ -34,7 +34,12 @@ contains
   subroutine readtable(filename, label_alpha, label_delta, label_pmalpha, &
        label_pmdelta, label_mag, label_epoch_alpha, label_epoch_delta, &
        maxstar, alpha, delta, pmalpha, pmdelta, epalpha, epdelta, &
-       refflux, rframe, catid, epoch, verbose,status)
+       refflux, rframe, catid, epoch, verbose,status,pmignored)
+
+    ! The stars are sorted by the magnitude (the brightest first, the stars
+    ! without a magnitude column in the order of the table), maxstar
+    ! of them are selected. pmignored (optional) indicates proper motions
+    ! ignored for the lack of epochs (no JEPOCH, no epoch columns).
 
     character(len=*), intent(in) :: filename, label_alpha, label_delta, &
          label_pmalpha, label_pmdelta, label_mag, &
@@ -46,6 +51,7 @@ contains
     real(REAL64), intent(out) :: epoch
     logical, intent(in) :: verbose
     integer, intent(out) :: status
+    logical, intent(out), optional :: pmignored
 
     real(REAL64), parameter :: macheps = epsilon(1.0_REAL64)
     real(REAL64), parameter :: nullcoo = 1e33_REAL64
@@ -56,7 +62,8 @@ contains
     integer, parameter :: ncols = 7
     integer, dimension(ncols) :: col, statuses
     real(REAL64), allocatable, dimension(:) :: ra,dec,pmra,pmdec,mag,epra,epdec
-    integer :: nrows,i,l,n,frow,srows,stat
+    integer :: nrows,i,l,n,frow,srows,stat,npmlost,k
+    integer, dimension(:), allocatable :: idx
     real(REAL64) :: nullep
     logical :: anyf
     character(len=FLEN_VALUE), dimension(ncols) :: label,colname
@@ -72,6 +79,7 @@ contains
     label(7) = label_epoch_delta
 
     status = 0
+    if( present(pmignored) ) pmignored = .false.
 
     ! open, and move, to a table extension
     call fits_open_table(fits,filename,FITS_READONLY,status)
@@ -85,6 +93,8 @@ contains
     if( status /= 0 ) goto 666
     if( .not. (nrows > 0) )then
        write(error_unit,*) 'Error: empty table in the file `',trim(filename),"'."
+       ! (the status was zero: the empty arrays were not allocated)
+       status = -1
        goto 666
     end if
 
@@ -140,6 +150,8 @@ contains
     epdec = epoch
     pmra = 0.0_REAL64
     pmdec = 0.0_REAL64
+    ! without the magnitude column, the order of the table is kept
+    mag = 0
 
     call fits_get_rowsize(fits,srows,status)
 
@@ -172,38 +184,54 @@ contains
        if( status /= 0 ) goto 666
     end do
 
-    ! select valid stars
+    ! the valid stars sorted by magnitude (the brightest first: the
+    ! match takes the brightest stars, the table can be in any order),
+    ! the first maxstar are selected
+    allocate(idx(nrows))
     n = 0
     do i = 1, nrows
-       if( abs(ra(i)) < rlim .and. abs(dec(i)) < rlim .and. mag(i) < 99 &
-            .and. n < maxstar ) then
+       if( abs(ra(i)) < rlim .and. abs(dec(i)) < rlim .and. mag(i) < 99 ) then
           n = n + 1
-          ra(n) = ra(i)
-          dec(n) = dec(i)
-          mag(n) = mag(i)
-          if( abs(pmra(i)) < pmlim .and. abs(pmdec(i)) < pmlim ) then
-             pmra(n) = pmra(i) !/ 3.6e6_REAL64  ! [mas/year] -> [deg/year]
-             pmdec(n) = pmdec(i) !/ 3.6e6_REAL64
-          else
-             pmra(n) = 0
-             pmdec(n) = 0
-          end if
-          if( IEEE_IS_NORMAL(epra(i)) .and. IEEE_IS_NORMAL(epdec(i)) ) then
-             epra(n) = epra(i)
-             epdec(n) = epdec(i)
-          else if( IEEE_IS_NORMAL(epoch) ) then
-             epra(n) = epoch
-             epdec(n) = epoch
-          else
-             ! no time info, the proper motion is ignored
-             epra(n) = 0
-             epdec(n) = 0
-             pmra(n) = 0
-             pmdec(n) = 0
-          end if
-!          write(*,*) ra(n),dec(n),pmra(n),pmdec(n),mag(n),epra(n),epdec(n)
+          idx(n) = i
        end if
     end do
+    call magorder(mag,idx(1:n))
+    n = min(n,maxstar)
+    ! the selected stars in the order (the arrays are permuted)
+    ra(1:n) = ra(idx(1:n))
+    dec(1:n) = dec(idx(1:n))
+    mag(1:n) = mag(idx(1:n))
+    pmra(1:n) = pmra(idx(1:n))
+    pmdec(1:n) = pmdec(idx(1:n))
+    epra(1:n) = epra(idx(1:n))
+    epdec(1:n) = epdec(idx(1:n))
+    npmlost = 0
+    do k = 1, n
+       if( .not. (abs(pmra(k)) < pmlim .and. abs(pmdec(k)) < pmlim) ) then
+          pmra(k) = 0
+          pmdec(k) = 0
+       end if
+       if( IEEE_IS_NORMAL(epra(k)) .and. IEEE_IS_NORMAL(epdec(k)) ) then
+          continue
+       else if( IEEE_IS_NORMAL(epoch) ) then
+          epra(k) = epoch
+          epdec(k) = epoch
+       else
+          ! no time info, the proper motion is ignored
+          if( pmra(k) /= 0 .or. pmdec(k) /= 0 ) npmlost = npmlost + 1
+          epra(k) = 0
+          epdec(k) = 0
+          pmra(k) = 0
+          pmdec(k) = 0
+       end if
+    end do
+
+    if( npmlost > 0 ) then
+       write(error_unit,'(a,i0,5a)') 'Warning: the proper motions of ',npmlost, &
+            ' stars of `',trim(filename),"' are ignored: the epoch of the catalogue (", &
+            trim(FITS_KEY_EPOCH),') is missing.'
+       if( present(pmignored) ) pmignored = .true.
+    end if
 
     allocate(alpha(n),delta(n),pmalpha(n),pmdelta(n),refflux(n), &
          epalpha(n), epdelta(n), stat=stat,errmsg=errmsg)
@@ -231,13 +259,84 @@ contains
   end subroutine readtable
 
 
+  subroutine fluxsort(f,idx)
+
+    ! sorts the indices idx by the fluxes f(idx) in the descending order
+    ! (the brightest first), stable
+
+    real(REAL64), dimension(:), intent(in) :: f
+    integer, dimension(:), intent(in out) :: idx
+
+    call magorder(-f,idx)
+
+  end subroutine fluxsort
+
+
+  subroutine magorder(m,idx)
+
+    ! sorts the indices idx by the values m(idx) in the ascending order
+    ! (the brightest magnitude first), stable: the equal values
+    ! are in their original order (heapsort by the value and the index)
+
+    real(REAL64), dimension(:), intent(in) :: m
+    integer, dimension(:), intent(in out) :: idx
+    integer :: n, j, k, t
+
+    n = size(idx)
+    do k = n/2, 1, -1
+       call sift(k,n)
+    end do
+    do j = n, 2, -1
+       t = idx(1)
+       idx(1) = idx(j)
+       idx(j) = t
+       call sift(1,j-1)
+    end do
+
+  contains
+
+    logical function after(a,b)
+      ! the star a is after b: fainter, or as bright and later
+      integer, intent(in) :: a,b
+      after = m(a) > m(b) .or. (m(a) == m(b) .and. a > b)
+    end function after
+
+    subroutine sift(start,last)
+      integer, intent(in) :: start,last
+      integer :: root, child
+      root = start
+      do
+         child = 2*root
+         if( child > last ) exit
+         if( child < last ) then
+            if( after(idx(child+1),idx(child)) ) child = child + 1
+         end if
+         if( after(idx(child),idx(root)) ) then
+            t = idx(root)
+            idx(root) = idx(child)
+            idx(child) = t
+            root = child
+         else
+            exit
+         end if
+      end do
+    end subroutine sift
+
+  end subroutine magorder
+
+
   subroutine readfile(filename, key_dateobs, maxstar, &
        xcoo, ycoo, flux, crpix, epoch, radesys, crval,status,alpha,delta, &
-       scale,rot,refl,wcsok)
+       scale,rot,refl,wcsok,frame,perr)
 
     ! On output, crval are spherical coordinates of the reference point crpix
     ! (the centre of the frame) by its astrometry calibration (if any);
     ! scale, rot and refl describe the calibration, wcsok indicates its presence.
+    ! The stars with the aperture photometry are sorted by their flux
+    ! (the brightest first) and maxstar of them are selected; perr
+    ! (optional) is the estimate of the error of their centroids [pix]:
+    ! sqrt(2) sigma / (S/N) of the first aperture, sigma of the PSF by HWHM
+    ! of APERPHOT or FWHM of FIND (not allocated when unavailable).
 
     character(len=*), intent(in) :: filename, key_dateobs
     integer, intent(in) :: maxstar
@@ -249,12 +348,17 @@ contains
     real(REAL64), allocatable, dimension(:), intent(out), optional :: alpha, delta
     real(REAL64), intent(out), optional :: scale, rot, refl
     logical, intent(out), optional :: wcsok
+    integer, dimension(:), intent(out), optional :: frame
+    real(REAL64), allocatable, dimension(:), intent(out), optional :: perr
 
     integer :: naxis, bitpix, nrows, n, ns, i, l, srows, frow, wstatus
     integer, dimension(2) :: naxes
     logical :: anyf
     integer, parameter :: extver = 0
-    real(REAL64), allocatable, dimension(:) :: x,y,cts
+    real(REAL64), allocatable, dimension(:) :: x,y,cts,dcts
+    integer, allocatable, dimension(:) :: idx
+    real(REAL64) :: fwhm, hwhm
+    integer :: col3, kstatus
     real(REAL64), parameter :: nullval = 0.0_REAL64
     character(len=FLEN_CARD) :: colname1, colname2, dateobs, aplabel
     integer :: col1, col2, nkeys
@@ -284,6 +388,7 @@ contains
        goto 666
     end if
     crpix = naxes / 2.0_REAL64
+    if( present(frame) ) frame = naxes
 
     call fits_read_key(fits,key_dateobs,dateobs,status)
 !    call fits_get_dateobs(fits,key_dateobs,dateobs,status)
@@ -331,6 +436,11 @@ contains
     call fits_get_num_rows(fits,nrows,status)
     if( status /= 0 ) goto 666
 
+    ! the width of stars
+    kstatus = 0
+    call fits_read_key(fits,FITS_KEY_FWHM,fwhm,kstatus)
+    if( kstatus /= 0 ) fwhm = -1
+
     allocate(x(nrows),y(nrows))
 
     ! the column labels are specific for MUNIPACK extension only
@@ -366,23 +476,47 @@ contains
        ! to improve reliability
        aplabel = trim(FITS_COL_APCOUNT)//"1"
        call fits_get_colname(fits,.false.,aplabel,colname1,col1,status)
-       allocate(cts(nrows))
+       allocate(cts(nrows),dcts(nrows))
        frow = 1
        call fits_read_col(fits,col1,frow,nullval,cts,anyf,status)
+       ! the errors (for the centroids)
+       kstatus = 0
+       aplabel = trim(FITS_COL_APCOUNTERR)//"1"
+       call fits_get_colname(fits,.false.,aplabel,colname1,col3,kstatus)
+       if( kstatus == 0 ) call fits_read_col(fits,col3,frow,nullval,dcts,anyf,kstatus)
+       if( kstatus /= 0 ) dcts = -1
+       kstatus = 0
+       call fits_read_key(fits,FITS_KEY_HWHM,hwhm,kstatus)
+       if( kstatus /= 0 ) then
+          if( fwhm > 0 ) then
+             hwhm = fwhm / 2
+          else
+             hwhm = -1
+          end if
+       end if
 
-       ! we're selecting stars having valid photometry only
-       ns = min(count(cts > 0.0),maxstar)
-       allocate(xcoo(ns),ycoo(ns),flux(ns))
+       ! we're selecting stars having valid photometry only,
+       ! the brightest first (the matching takes the first ones)
+       allocate(idx(nrows))
        ns = 0
        do n = 1,nrows
-          if( cts(n) > 0.0 .and. ns < size(xcoo) .and. ns <= maxstar ) then
+          if( cts(n) > 0.0 ) then
              ns = ns + 1
-             xcoo(ns) = x(n)
-             ycoo(ns) = y(n)
-             flux(ns) = cts(n)
+             idx(ns) = n
           end if
        end do
-       deallocate(cts)
+       call fluxsort(cts,idx(1:ns))
+       ns = min(ns,maxstar)
+       allocate(xcoo(ns),ycoo(ns),flux(ns))
+       xcoo = x(idx(1:ns))
+       ycoo = y(idx(1:ns))
+       flux = cts(idx(1:ns))
+       if( present(perr) .and. hwhm > 0 .and. all(dcts(idx(1:ns)) > 0) ) then
+          allocate(perr(ns))
+          perr = sqrt(2.0_REAL64)*(hwhm / 1.1774100225154747_REAL64) &
+               * dcts(idx(1:ns)) / cts(idx(1:ns))
+       end if
+       deallocate(cts,dcts,idx)
 
     end if
     if( status /= 0 ) goto 666
@@ -401,7 +535,8 @@ contains
 666 continue
 
     if( allocated(x) ) deallocate(x,y)
-    if( allocated(cts) ) deallocate(cts)
+    if( allocated(cts) ) deallocate(cts,dcts)
+    if( allocated(idx) ) deallocate(idx)
 
     call fits_close_file(fits,status)
     call fits_report_error(error_unit,status)
@@ -559,10 +694,10 @@ contains
     integer, intent(in out) :: status
     integer :: i, j, nbegin, nend
     character(len=FLEN_CARD) :: card
-    character(len=7), dimension(16) :: keys = [ &
+    character(len=8), dimension(17) :: keys = [ character(len=8) :: &
          'CTYPE1 ', 'CTYPE2 ','CRVAL1 ','CRVAL2 ','CRDER1 ','CRDER2 ', &
          'CRPIX1 ', 'CRPIX2 ','CUNIT1 ','CUNIT2 ','CD1_1  ','CD1_2  ', &
-         'CD2_1  ', 'CD2_2  ','RADESYS','JEPOCH ' ]
+         'CD2_1  ', 'CD2_2  ','RADESYS','JEPOCH ','ASTRMETH' ]
     character(len=FLEN_KEYWORD) :: pvkey
 
     call fits_write_errmark

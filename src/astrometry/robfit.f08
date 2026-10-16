@@ -31,8 +31,12 @@ module astrometry_affinefun
   type, abstract, extends(bfgs_function) :: astro_bfgs
      real(REAL64), dimension(:), pointer :: x,y,u,v
      real(REAL64) :: refl
+     ! the weights of the stars (the inverse errors relative to their
+     ! mean square), none: equal weights
+     real(REAL64), dimension(:), pointer :: w => null()
    contains
      procedure(fstdsig), deferred :: stdsig
+     procedure :: wt
   end type astro_bfgs
 
   type, extends(astro_bfgs) :: huber_bfgs
@@ -65,6 +69,21 @@ module astrometry_affinefun
 
 contains
 
+  pure real(REAL64) function wt(this,i)
+
+    ! the weight of the star i
+
+    class(astro_bfgs), intent(in) :: this
+    integer, intent(in) :: i
+
+    if( associated(this % w) ) then
+       wt = this % w(i)
+    else
+       wt = 1
+    end if
+
+  end function wt
+
   real(REAL64) function lvalue(this,x)
 
     use astrotrafo
@@ -85,7 +104,7 @@ contains
          call tg % uv2pix(u(i),v(i),xx,yy)
          dx = x(i) - (xx + xoff)
          dy = y(i) - (yy + yoff)
-         s2 = s2 + dx**2 + dy**2
+         s2 = s2 + this%wt(i)**2*(dx**2 + dy**2)
       end do
     end associate
 
@@ -114,8 +133,8 @@ contains
       fgrad = 0
       do i = 1, size(x)
          call tg % uv2pix(u(i),v(i),xx,yy)
-         dx = x(i) - (xx + xoff)
-         dy = y(i) - (yy + yoff)
+         dx = this%wt(i)**2*(x(i) - (xx + xoff))
+         dy = this%wt(i)**2*(y(i) - (yy + yoff))
          fgrad(1) = fgrad(1) + dx
          fgrad(2) = fgrad(2) + dy
          fgrad(3) = fgrad(3) + dx*xx + dy*yy
@@ -155,8 +174,8 @@ contains
       fhess = 0
       do i = 1, size(x)
          call tg % uv2pix(u(i),v(i),xx,yy)
-         dfx = 1
-         dfy = 1
+         dfx = this%wt(i)**2
+         dfy = dfx
          fhess(1,1) = fhess(1,1) + dfx
          fhess(1,3) = fhess(1,3) + dfx*xx
          fhess(1,4) = fhess(1,4) + dfx*yy
@@ -222,8 +241,8 @@ contains
       ravg = 0
       do i = 1, n
          call tg % uv2pix(u(i),v(i),xx,yy)
-         dx = x(i) - (xx + xoff)
-         dy = y(i) - (yy + yoff)
+         dx = this%wt(i)*(x(i) - (xx + xoff))
+         dy = this%wt(i)*(y(i) - (yy + yoff))
          ravg = ravg + ipshuber(dx/s) + ipshuber(dy/s)
       end do
     end associate
@@ -256,8 +275,9 @@ contains
          call tg % uv2pix(u(i),v(i),xx,yy)
          dx = x(i) - (xx + xoff)
          dy = y(i) - (yy + yoff)
-         fx = pshuber(dx / s)
-         fy = pshuber(dy / s)
+         ! the weighted residual w*dx: psi(w*dx/s)*w by the parameters
+         fx = this%wt(i)*pshuber(this%wt(i)*dx / s)
+         fy = this%wt(i)*pshuber(this%wt(i)*dy / s)
          fgrad(0) = fgrad(0) + fx*dx + fy*dy
          fgrad(1) = fgrad(1) + fx
          fgrad(2) = fgrad(2) + fy
@@ -319,10 +339,10 @@ contains
          dy = y(i) - (yy + yoff)
          rx = dx / s
          ry = dy / s
-         fx = pshuber(rx)
-         fy = pshuber(ry)
-         dfx = dpshuber(rx)
-         dfy = dpshuber(ry)
+         fx = this%wt(i)*pshuber(this%wt(i)*rx)
+         fy = this%wt(i)*pshuber(this%wt(i)*ry)
+         dfx = this%wt(i)**2*dpshuber(this%wt(i)*rx)
+         dfy = this%wt(i)**2*dpshuber(this%wt(i)*ry)
          fhess(0,0) = fhess(0,0) + dfx*rx**2 + dfy*ry**2
          fhess(0,1) = fhess(0,1) + dfx*dx
          fhess(0,2) = fhess(0,2) + dfy*dy
@@ -410,8 +430,8 @@ contains
       do i = 1, n
          call tg % uv2pix(u(i),v(i),xx,yy)
          ! both xoff, yoff should be nullified in the minimum
-         sx = (x(i) - xx) / s
-         sy = (y(i) - yy) / s
+         sx = this%wt(i)*(x(i) - xx) / s
+         sy = this%wt(i)*(y(i) - yy) / s
          psi2 = psi2 + huber(sx)**2 + huber(sy)**2
          dpsi = dpsi + dhuber(sx) + dhuber(sy)
       end do
@@ -520,9 +540,10 @@ module robfit
 contains
 
   subroutine robmin(type,fit,a,d,refl,x,y,s,acen,dacen,dcen,ddcen, &
-       sc,dsc,rot,drot,stdsig,verbose,reliable)
+       sc,dsc,rot,drot,stdsig,verbose,reliable,w)
 
-    ! fitting of the transformation
+    ! fitting of the transformation; w (optional) are the weights
+    ! of the stars (the inverse errors, relative to their mean square)
 
     use astrometry_affinefun
     use oakleaf
@@ -537,6 +558,7 @@ contains
     real(REAL64),intent(out) :: dacen,ddcen,dsc,drot,stdsig
     logical, intent(in) :: verbose
     logical, intent(out) :: reliable
+    real(REAL64), dimension(:), target, intent(in), optional :: w
 
     real(REAL64), parameter :: macheps = epsilon(1.0_REAL64)
     integer, parameter :: npar = 4
@@ -566,9 +588,18 @@ contains
 
     ndat = size(a)
 
-    if( .not. (ndat > npar) ) stop 'Robust fitting requires at least five stars.'
-    if( .not. s > 0 .and. fit == 'ROBUST' ) &
-         stop 'Robust fitting needs statistical scale > 0.'
+    ! too few stars, or no scale for the robust fit: no solution
+    ! (the frame fails, the next frames are processed)
+    if( .not. (ndat > npar) ) then
+       write(error_unit,'(a,i0,a)') 'Warning: the astrometry fit of ',ndat, &
+            ' stars: at least five stars are required.'
+       return
+    end if
+    if( .not. s > 0 .and. fit == 'ROBUST' ) then
+       write(error_unit,'(a)') &
+            'Warning: the robust astrometry fit needs a statistical scale > 0.'
+       return
+    end if
 
     allocate(uref(ndat),vref(ndat),u(ndat),v(ndat))
 
@@ -591,6 +622,7 @@ contains
        if( fit == 'SQUARES' ) then
 
           fun = lsq_bfgs(x,y,uref,vref,refl)
+          if( present(w) ) fun % w => w
           call bfgsmin(fun,p(1:),B(1:,1:),gtol,200*npar,verbose,'',iflag)
           B(0,:) = 0
           B(:,0) = 0
@@ -606,6 +638,7 @@ contains
        else ! fit == 'ROBUST' ) then
 
           fun = huber_bfgs(x,y,uref,vref,refl)
+          if( present(w) ) fun % w => w
           call bfgsmin(fun,p,B,gtol,200*npar,verbose,'',iflag)
           ! s is the scale parameter of a robust function
           s = p(0)

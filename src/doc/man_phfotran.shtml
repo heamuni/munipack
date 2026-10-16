@@ -11,10 +11,10 @@
 <h1>Photometric System Transformation</h1>
 
 <p class="abstract">
-An approximation of photon fluxes in
-a standard set of filters by a linear combination of
-an instrumental set of filters
-is determined on a field with known calibration sources.
+The transformation of an instrumental set of filters to a standard
+one is determined on a field with known calibration sources: colour
+terms of the magnitudes (the default), or the photon fluxes of
+the instrumental filters as a linear combination of the standard ones.
 </p>
 
 <h2>Synopsis</h2>
@@ -39,8 +39,47 @@ a linear approximation.
 <p>
 This action determines such transformation by application
 of the linear approximation between observed sum of counts and
-expected photons from calibration stars.
+expected photons from calibration stars. Two models are available
+(<samp>--model</samp>).
 </p>
+
+<h3 id="mag">Magnitude model (<samp>--model mag</samp>, default)</h3>
+
+<p>
+The standard transformation of every filter <i>n</i> by the colour
+of the standard magnitudes of the filter and its neighbour:
+</p>
+<p>
+<i>m</i><sub>std</sub> − <i>m</i><sub>inst</sub> = ZP +
+<i>k</i><sub>1</sub> (<i>c</i> − <i>c</i><sub>ref</sub>)
+[+ <i>k</i><sub>2</sub> (<i>c</i> − <i>c</i><sub>ref</sub>)²,
+<samp>--color-order 2</samp>],
+</p>
+<p>
+<i>m</i><sub>inst</sub> = −2.5 log<sub>10</sub> of the count rate
+[counts/s/m²], <i>c</i> = <i>m</i><sub><i>n</i>−1</sub> −
+<i>m</i><sub><i>n</i></sub> in the order of the photometry system, for the
+first filter <i>m</i><sub>1</sub> − <i>m</i><sub>2</sub> (B − V for B and V,
+V − R for R, R − I for I of Johnson BVRI), <i>c</i><sub>ref</sub> the mean
+colour of the stars (the coefficients nearly uncorrelated with ZP). The fit
+is that of the colour term of <a href="man_phcal.html#colterm">phcal</a>:
+the mixture likelihood with the systematic error (outliers without weight),
+the errors of the colours propagated with their covariance with
+the magnitude of the filter, the errors of the coefficients with
+the uncertainty of the systematic error
+(<a href="man_phcal.html#ctpherr">phcal</a>). With <samp>--verbose</samp> the coefficients,
+the systematic error, the fraction of outliers and the scatter of the stars
+without and with the colour terms are printed.
+</p>
+<p>
+<a href="man_phcal.html">phcal</a> <samp>--tratab</samp> fits CTPH of every
+filter with the coefficients fixed (by the catalogue colours of the
+calibration stars) and gives every star the standard magnitudes solved from
+its calibrated magnitudes in all filters, with the errors of
+the coefficients in MAGERR.
+</p>
+
+<h3 id="flux">Flux model (<samp>--model flux</samp>)</h3>
 
 <p>
 The transformation relates the photon rates <i>p</i> [ph/s/m²] of
@@ -64,13 +103,28 @@ photons) is fitted independently.
 
 <p>
 <a href="man_phcal.html">phcal</a> <samp>--tratab</samp> uses the
-forward matrix for the calibration (the expected counts of the
+forward matrix of a flux table for the calibration (the expected counts of the
 calibration stars, CTPH is then a correction factor near 1 for
 the same instrument) and its inverse to convert the counts of all stars
 to the photons of the standard filters, so the magnitudes have no colour
 term. A frame of a filter needs the frames of the neighbouring filters
 for the colours: stars missing on one of them have no calibrated values,
-and the images are converted by the diagonal only.
+and the images are converted by the diagonal only (by CTPH with the magnitude
+model).
+</p>
+
+<h3>The choice of the model</h3>
+
+<p>
+The magnitude model is the default: it is the transformation of
+the standard photometry (Landolt, Stetson), its coefficients are those
+quoted for instruments and comparable with them, and a passband shifted
+or reshaped against the standard one gives colour terms nearly linear
+in magnitudes. The flux model is exact for a passband that is a linear
+combination of the standard ones (a leak of a neighbouring band, a red
+leak) and approximates the colour terms linear in magnitudes to 0.013 mag
+rms over two magnitudes of B − V; the magnitude model approximates a strong
+mixing (10–13%) only with <samp>--color-order 2</samp> (see Validation).
 </p>
 
 <p>
@@ -100,7 +154,8 @@ area and exposure time.</li>
 </ul>
 
 <p>
-A result of the transformation is a nearly tri-diagonal matrix (elements around
+The magnitude model is fitted filter by filter (see above). In the flux
+model, a result of the transformation is a nearly tri-diagonal matrix (elements around
 diagonal dominates over other ones). The limitation of the shape is forced
 due to ill-conditioning of the problem. The filters are taken in the order
 of the photometry system (wavelengths); the row of the reference filter of
@@ -132,6 +187,37 @@ filters give a diagonal table (off-diagonal terms below 0.0005)
 and the same calibration as without it.
 </p>
 
+<p>
+Both models, the table fitted on one simulated field (400 stars,
+B − V from −0.2 to 1.8) and applied by phcal to another field, the scatter
+of MAG − standard magnitude in B, V, R:
+</p>
+<div class="table">
+<table>
+<caption>Residual scatter [mag] of B, V, R</caption>
+<tr><th>instrument</th><th>no table</th><th>flux</th><th>mag</th><th>mag, order 2</th></tr>
+<tr><td>standard filters</td><td>0.0012, 0.0010, 0.0008</td>
+    <td>0.0012, 0.0010, 0.0008</td><td>0.0012, 0.0010, 0.0008</td>
+    <td>0.0012, 0.0010, 0.0008</td></tr>
+<tr><td>colour terms linear in magnitudes: 0.10 (B−V), −0.04 (B−V),
+    0.06 (V−R)</td><td>0.058, 0.023, 0.019</td>
+    <td>0.0136, 0.0011, 0.0026</td><td>0.0012, 0.0010, 0.0008</td>
+    <td>0.0012, 0.0010, 0.0008</td></tr>
+<tr><td>the photon mixing <i>T</i> above</td><td>0.096, 0.016, 0.010</td>
+    <td>0.0012, 0.0010, 0.0008</td><td>0.021, 0.008, 0.0013</td>
+    <td>0.0025, 0.0011, 0.0008</td></tr>
+<tr><td>linear + a quadratic term −0.03 (B−V−0.8)² in B</td>
+    <td>0.057, 0.023, 0.019</td><td>0.0057, 0.0011, 0.0026</td>
+    <td>0.0100, 0.0011, 0.0008</td><td>0.0012, 0.0010, 0.0008</td></tr>
+</table>
+</div>
+<p>
+The colour slopes of the residuals: without a table −0.100, +0.040,
+−0.033 (linear terms), −0.163, −0.024, +0.017 (mixing); with the magnitude
+table within ±0.0001 for the linear terms; the coefficients are recovered
+as 0.1001, −0.0399, 0.0602 (± 0.0005–0.0009).
+</p>
+
 
 <!-- #include virtual="/man_phcal_common.shtml" -->
 
@@ -160,6 +246,10 @@ is fitted again.
 <dt><samp>-f, --filters</samp></dt><dd>filters, one per frame</dd>
 <dt><samp>--col-ra, --col-dec, --col-mag, --col-magerr</samp></dt><dd>columns
   of the catalogue; the magnitudes in the order of <samp>-f</samp></dd>
+<dt><samp>--model</samp></dt><dd>mag (colour terms of the magnitudes,
+  default) or flux (the linear mixing of photon rates)</dd>
+<dt><samp>--color-order</samp></dt><dd>the order of the colour terms
+  of the magnitude model, 1 (default) or 2</dd>
 <dt><samp>--photsys-ref</samp></dt><dd>the standard photometry system
   of the catalogue (PHOTSYS2)</dd>
 <dt><samp>--photsys-instr</samp></dt><dd>the name of the instrumental system
@@ -183,7 +273,10 @@ Just equal number of instrumental and standard filters is implemented.
 Stars are selected by fixed limits (signal to noise above 5, relative
 error below 0.1). The front end did not run phfotran before
 (the action was listed, but not dispatched); the utility itself crashed
-at the end of its reading of the frames (BUGS P45).
+at the end of its reading of the frames (BUGS P45). The default model
+is the magnitude one: for the matrix of the earlier versions, give
+<samp>--model flux</samp>. The colours of the magnitude model are fixed
+(a filter and its neighbour).
 </p>
 
 

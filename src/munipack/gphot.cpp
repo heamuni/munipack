@@ -33,12 +33,57 @@ using namespace std;
 MuniGphot::MuniGphot(wxEvtHandler *h, const MuniCmdLineParser& cmd):
   MuniAction(h,"gphot")
 {
+  // determine character representing the decimal point
+  const wxString decimal = wxLocale::GetInfo(wxLOCALE_DECIMAL_POINT,
+					     wxLOCALE_CAT_NUMBER);
+  const wxString sep = decimal == "." ? ",;" : ";";
+
   CommonOutputMultiple(cmd);
 
   double x;
+  long n;
+  wxString a;
 
-  if( cmd.Found("th",&x) || cmd.Found("threshold",&x) )
-    Write("THRESHOLD = %lf",x);
+  bool legacy = cmd.Found("legacy");
+  if( legacy )
+    Write("METHOD = 'LEGACY'");
+
+  if( cmd.Found("th",&x) || cmd.Found("threshold",&x) ) {
+    if( ! legacy )
+      MuniFatalError("--threshold applies to --legacy only.");
+    Write("THRESHOLD = %.17g",x);
+  }
+
+  if( cmd.Found("var",&n) ) {
+    if( n < 0 || n > 2 )
+      MuniFatalError("--var is 0, 1 or 2.");
+    if( legacy )
+      MuniFatalError("--var and --legacy are exclusive.");
+    Write("EEVAR = %ld",n);
+  }
+
+  if( cmd.Found("radial") ) {
+    if( legacy )
+      MuniFatalError("--radial and --legacy are exclusive.");
+    Write("EERADIAL = T");
+  }
+
+  if( cmd.Found("centre",&a) ) {
+    if( ! cmd.Found("radial") )
+      MuniFatalError("--centre requires --radial.");
+    wxStringTokenizer t(a,sep);
+    double c[2];
+    int i = 0;
+    while( t.HasMoreTokens() && i < 2 ) {
+      wxString token(t.GetNextToken());
+      if( ! token.ToDouble(&c[i]) )
+	MuniFatalError("Failed to interpret `%s' as a coordinate.",token);
+      i++;
+    }
+    if( i != 2 || t.HasMoreTokens() )
+      MuniFatalError("--centre requires x,y.");
+    Write("EECENTRE = %.17g %.17g",c[0],c[1]);
+  }
 
   WriteFilesMultiple(cmd.GetFiles());
 }

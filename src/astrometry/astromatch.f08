@@ -35,15 +35,24 @@ contains
 
   subroutine astromatch(minmatch,maxmatch,type,rec,dec,rflux,xpix,ypix,flux, &
        acen,dcen,xcen,ycen,id1,id2,sig1,sig2,flxmin,flxmax,fluxtest,luckymatch,&
-       verbose,status,nskip)
+       verbose,status,nskip,scale0,scaletol,ntrial)
 
     ! nskip (optional): on input, the number of chunk pairs to skip
     ! (a match found there has been rejected by a previous attempt),
     ! on output, the number of the chunk pair providing the match,
-    ! so a next call with it continues by next chunks of stars
+    ! so a next call with it continues by next chunks of stars;
+    ! scale0, scaletol (optional): the scale prior [pix/deg] and its
+    ! relative tolerance (see match); ntrial (optional): the number
+    ! of the starting pairs of the sequences tried, accumulated.
+    !
+    ! The chunk pairs are matched in parallel by OpenMP threads
+    ! (OMP_NUM_THREADS): the match is the one of the first chunk pair
+    ! in their order which succeeds (the pairs after it are abandoned),
+    ! with the trials of the pairs up to it, as by one thread.
 
     use matcher
     use astrotrafo
+    !$ use omp_lib
 
     integer, intent(in) :: minmatch, maxmatch, luckymatch
     logical, intent(in) :: verbose, fluxtest
@@ -54,13 +63,25 @@ contains
     integer, dimension(:), allocatable, intent(out) :: id1,id2
     logical, intent(out) :: status
     integer, intent(in out), optional :: nskip
+    real(REAL64), intent(in), optional :: scale0, scaletol
+    real(REAL64), intent(in out), optional :: ntrial
 
     real(REAL64), parameter :: rad = 57.29577951308232_REAL64
 
     real(REAL64), dimension(:), allocatable :: u,v,x,y
     logical, dimension(:), allocatable :: idx1, idx2
     type(AstrometryProjection) :: tp
-    integer :: n1,n2,m,n,l,k,ichunk,maxskip
+    integer :: n1,n2,m,n,l,k,ichunk,maxskip,nch,nthreads,j
+    real(REAL64) :: ntried
+    ! the chunk pairs: the first stars, the last ones minus the first,
+    ! the results
+    type chunkres
+       integer, dimension(:), allocatable :: id1, id2
+       logical :: status = .false.
+       real(REAL64) :: ntried = 0
+    end type chunkres
+    integer, dimension(:), allocatable :: ck, cl, cn1, cn2
+    type(chunkres), dimension(:), allocatable :: res
 
     status = .false.
     ichunk = 0
@@ -93,6 +114,11 @@ contains
             "#: {seq1} -> {seq2} | scale, rel.flux: sq.(angle, scale) < Xi2(0.95)"
     end if
 
+    nthreads = 1
+    !$ nthreads = omp_get_max_threads()
+    if( verbose ) write(error_unit,'(a,i0,a)') " The chunk pairs by ",nthreads," thread(s)."
+    if( nthreads > 1 ) goto 50
+
     ! the stars are processed in chunks k..k+n2 (l..l+n1) of maxmatch
     ! length at most, the last chunk contains the remaining stars
     k = 1
@@ -113,7 +139,8 @@ contains
           call match(u(l:l+n1),v(l:l+n1),rflux(l:l+n1),idx1(l:l+n1), &
                x(k:k+n2),y(k:k+n2),flux(k:k+n2),idx2(k:k+n2), &
                minmatch,maxmatch,sig1,sig2,flxmin,flxmax,fluxtest,id1,id2,&
-               luckymatch,verbose,status)
+               luckymatch,verbose,status,scale0,scaletol,ntried)
+          if( present(ntrial) ) ntrial = ntrial + ntried
           if( status ) then
              id1 = l + id1 - 1
              id2 = k + id2 - 1
@@ -124,6 +151,60 @@ contains
        end do
        k = k + maxmatch
     end do
+    goto 99
+
+    ! the parallel match: the chunk pairs in the same order
+50  continue
+    nch = min((size(x)-1)/maxmatch + 1, maxloop)*((size(u)-1)/maxmatch + 1)
+    allocate(ck(nch),cl(nch),cn1(nch),cn2(nch),res(nch))
+    ichunk = 0
+    k = 1
+    do m = 1, min((size(x)-1)/maxmatch + 1, maxloop)
+       l = 1
+       do n = 1, (size(u)-1)/maxmatch + 1
+          ichunk = ichunk + 1
+          ck(ichunk) = k
+          cl(ichunk) = l
+          cn2(ichunk) = min(maxmatch,size(x)-k+1) - 1
+          cn1(ichunk) = min(maxmatch,size(u)-l+1) - 1
+          l = l + maxmatch
+       end do
+       k = k + maxmatch
+    end do
+
+    ! the first successful chunk pair (the pairs after it stop)
+    matchfound = huge(matchfound)
+    !$omp parallel do schedule(dynamic,1) default(shared) private(j,k,l,n1,n2)
+    do j = maxskip + 1, nch
+       k = ck(j)
+       l = cl(j)
+       n1 = cn1(j)
+       n2 = cn2(j)
+       call match(u(l:l+n1),v(l:l+n1),rflux(l:l+n1),idx1(l:l+n1), &
+            x(k:k+n2),y(k:k+n2),flux(k:k+n2),idx2(k:k+n2), &
+            minmatch,maxmatch,sig1,sig2,flxmin,flxmax,fluxtest,res(j)%id1,res(j)%id2,&
+            luckymatch,verbose,res(j)%status,scale0,scaletol,res(j)%ntried,j)
+       if( res(j)%status ) then
+          !$omp atomic
+          matchfound = min(matchfound,j)
+       end if
+    end do
+    !$omp end parallel do
+
+    do j = maxskip + 1, nch
+       if(verbose) write(error_unit,'(2(2(a,i0),a))') &
+            " Reference stars ",cl(j)," -- ",cl(j)+cn1(j),".", &
+            " Frame stars ",ck(j)," -- ",ck(j)+cn2(j),"."
+       if( present(ntrial) ) ntrial = ntrial + res(j)%ntried
+       if( res(j)%status ) then
+          id1 = cl(j) + res(j)%id1 - 1
+          id2 = ck(j) + res(j)%id2 - 1
+          status = .true.
+          if( present(nskip) ) nskip = j
+          exit
+       end if
+    end do
+
 99  continue
 
   end subroutine astromatch

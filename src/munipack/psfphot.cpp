@@ -64,7 +64,8 @@ MuniPsfphot::MuniPsfphot(wxEvtHandler *h, const MuniCmdLineParser& cmd):
 
   // the empirical PSF
   const char *eopts[] = { "psf-core", "psf-zoom", "psf-radius", "psf-var",
-			  "psf-stars", "psf-list", "psf-save", "psf-smooth" };
+			  "psf-var-radial", "psf-stars", "psf-list", "psf-save",
+			  "psf-smooth" };
   for(size_t i = 0; i < sizeof(eopts)/sizeof(eopts[0]); i++)
     if( cmd.Found(eopts[i]) && psf != "EMPIRICAL" )
       MuniFatalError("--%s requires --psf=EMPIRICAL.",eopts[i]);
@@ -89,6 +90,12 @@ MuniPsfphot::MuniPsfphot(wxEvtHandler *h, const MuniCmdLineParser& cmd):
     if( n < 0 || n > 2 )
       MuniFatalError("--psf-var is 0, 1 or 2.");
     Write("PSFVAR = %ld",n);
+  }
+
+  if( cmd.Found("psf-var-radial",&n) ) {
+    if( n < 0 || n > 3 )
+      MuniFatalError("--psf-var-radial is 0, 1, 2 or 3.");
+    Write("PSFVARRAD = %ld",n);
   }
 
   if( cmd.Found("psf-stars",&n) ) {

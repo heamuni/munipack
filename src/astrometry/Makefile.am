@@ -28,7 +28,9 @@ endif
 
 .NOTPARALLEL:
 
-astrometry_FCFLAGS = $(AM_FCFLAGS) $(CAF_FCFLAGS)
+# OpenMP: the threads of the blind match (OMP_NUM_THREADS)
+astrometry_FCFLAGS = $(AM_FCFLAGS) $(CAF_FCFLAGS) $(OPENMP_FCFLAGS)
+astrometry_LDFLAGS = $(OPENMP_FCFLAGS)
 astrometry_SOURCES = match.f08 nearmatch.f08 estimator.f08 robfit.f08 deform.f08 \
                      astrofit.f08 astromatch.f08 astrofits.f08 astrometry.f08
 # lsfit.f08 absfit.f08
@@ -39,7 +41,8 @@ astrometry_LDADD = $(ldir)/libastrosphere.a $(ldir)/libastrotrafo.a \
 # the only source with coarrays, compiled for the MPI coarray library and
 # linked with the modules of astrometry (built for one process as before).
 astrometry_caf_SOURCES = astrometry.f08
-astrometry_caf_FCFLAGS = $(AM_FCFLAGS) $(CAFMPI_FCFLAGS)
+astrometry_caf_FCFLAGS = $(AM_FCFLAGS) $(CAFMPI_FCFLAGS) $(OPENMP_FCFLAGS)
+astrometry_caf_LDFLAGS = $(OPENMP_FCFLAGS)
 astrometry_caf_LDADD = astrometry-match.$(OBJEXT) astrometry-nearmatch.$(OBJEXT) \
                        astrometry-estimator.$(OBJEXT) astrometry-robfit.$(OBJEXT) \
                        astrometry-deform.$(OBJEXT) astrometry-astrofit.$(OBJEXT) \
