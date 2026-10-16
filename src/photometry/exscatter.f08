@@ -71,6 +71,32 @@
 !  - 2 g' cov(y,x) (g' the slope of the polynomial at x(i)). The covariance
 !  of beta is (X' U X)**(-1). mixture_mean is mixture_fit of the order 0.
 !
+!  Few stars (n - p + 1 < 8, p the number of the coefficients): f and B
+!  cannot be estimated from few values, and the likelihood has two modes,
+!  a deviating value either an outlier or a part of the scatter; EM from
+!  the robust start, which prefers the first, biased sigma low by 15-25%
+!  for 3-7 values (Monte Carlo). For few values, f is fixed at 0.1 and B
+!  at 1 mag (at least 3 times the inliers), EM runs from the robust start
+!  and from the plain restricted likelihood of all values (q = 1), and
+!  the solution of the larger posterior is taken: the restricted
+!  likelihood of the mixture, sum ln((1-f) N(r,v) + f N(r,v+B**2))
+!  - 1/2 ln det X'UX, with a weak prior of sigma, half-normal of the scale
+!  0.1 mag (a scatter of 0.2 mag is unlikely, an outlier of 0.4 mag is
+!  not). Sigma is then nearly as unbiased as by the plain REML (its square
+!  within 1-2% for 3-7 values) and the outliers far from the others are
+!  still found; moderate ones (a few sigma) cannot be told from
+!  the scatter. The results of 8 and more values are those of the mixture
+!  above.
+!
+!  The interval of sigma (optional) is given by the profile of
+!  the restricted likelihood of the calibration stars (q fixed),
+!
+!      -1/2 (sum q ln v + ln det X'UX + sum u r**2),
+!
+!  the values of sigma where it falls by 1/2 from its value at the estimate
+!  (68%); the lower bound is zero when the likelihood at sigma = 0 is
+!  within 1/2, so the interval is an upper limit for sigma = 0.
+!
 
 module exscatter
 
@@ -82,6 +108,13 @@ module exscatter
   integer, parameter, private :: dbl = REAL64
 
   public :: excess_scatter, mixture_mean, mixture_fit
+
+  ! few stars, n - p + 1 < nfew (p the number of the coefficients):
+  ! the fraction of outliers fixed at ffew, their width at 1 mag; the two
+  ! modes of the likelihood compared with a prior of sigma, half-normal
+  ! of the scale sfew [mag]
+  integer, parameter :: nfew = 8
+  real(dbl), parameter :: ffew = 0.1_dbl, sfew = 0.1_dbl
 
 contains
 
@@ -162,31 +195,37 @@ contains
   end subroutine excess_scatter
 
 
-  subroutine mixture_mean(y,err,mu,dmu,sigma,fout,member,bmin)
+  subroutine mixture_mean(y,err,mu,dmu,sigma,fout,member,bmin,sigint,nfit)
 
     ! The mean of y with the errors err and the excess scatter sigma,
     ! robust to outliers (see above); dmu is the error of mu, fout the
     ! fraction of outliers, member (optional) the probabilities of
     ! the values to be inliers (0 for err <= 0), bmin (optional) the
-    ! smallest width B of the distribution of outliers.
+    ! smallest width B of the distribution of outliers, sigint (optional)
+    ! the 68% interval of sigma (-1 when not estimated), nfit (optional)
+    ! the number of the values used.
 
     real(dbl), dimension(:), intent(in) :: y, err
     real(dbl), intent(out) :: mu, dmu, sigma, fout
     real(dbl), dimension(:), intent(out), optional :: member
     real(dbl), intent(in), optional :: bmin
+    real(dbl), dimension(2), intent(out), optional :: sigint
+    integer, intent(out), optional :: nfit
 
     real(dbl), dimension(size(y)) :: x0
     real(dbl), dimension(0:2) :: beta
     real(dbl), dimension(3,3) :: cov
 
     x0 = 0
-    call mixfit(y,err,x0,x0,x0,0,-1.0_dbl,beta,cov,sigma,fout,member,bmin,dmu)
+    call mixfit(y,err,x0,x0,x0,0,-1.0_dbl,beta,cov,sigma,fout,member,bmin, &
+         sigint,nfit,dmu)
     mu = beta(0)
 
   end subroutine mixture_mean
 
 
-  subroutine mixture_fit(y,e,x,ex,cxy,order,fixsig,beta,cov,sigma,fout,member,bmin)
+  subroutine mixture_fit(y,e,x,ex,cxy,order,fixsig,beta,cov,sigma,fout,member, &
+       bmin,sigint,nfit)
 
     ! The polynomial y = beta(0) + beta(1) x + beta(2) x**2
     ! (beta(order+1:) = 0) with the excess scatter sigma by the likelihood
@@ -197,7 +236,9 @@ contains
     ! the covariance of beta, fout the fraction of outliers, member
     ! (optional) the probabilities of the stars to be calibration stars
     ! (0 for e <= 0), bmin (optional) the smallest width B of
-    ! the distribution of outliers. A value is used when e > 0, ex >= 0
+    ! the distribution of outliers, sigint (optional) the 68% interval of
+    ! sigma (-1 when not estimated, sigma for a fixed one), nfit (optional)
+    ! the number of the stars used. A value is used when e > 0, ex >= 0
     ! and y, x finite.
 
     real(dbl), dimension(:), intent(in) :: y, e, x, ex, cxy
@@ -208,14 +249,17 @@ contains
     real(dbl), intent(out) :: sigma, fout
     real(dbl), dimension(:), intent(out), optional :: member
     real(dbl), intent(in), optional :: bmin
+    real(dbl), dimension(2), intent(out), optional :: sigint
+    integer, intent(out), optional :: nfit
 
-    call mixfit(y,e,x,ex,cxy,order,fixsig,beta,cov,sigma,fout,member,bmin)
+    call mixfit(y,e,x,ex,cxy,order,fixsig,beta,cov,sigma,fout,member,bmin, &
+         sigint,nfit)
 
   end subroutine mixture_fit
 
 
   subroutine mixfit(y,e,x,ex,cxy,order,fixsig,beta,cov,sigma,fout,member,bmin, &
-       dbeta0)
+       sigint,nfit,dbeta0)
 
     ! The implementation of mixture_fit and mixture_mean; dbeta0
     ! (optional) is the error of beta(0). For the order 0 (the mean),
@@ -230,6 +274,8 @@ contains
     real(dbl), intent(out) :: sigma, fout
     real(dbl), dimension(:), intent(out), optional :: member
     real(dbl), intent(in), optional :: bmin
+    real(dbl), dimension(2), intent(out), optional :: sigint
+    integer, intent(out), optional :: nfit
     real(dbl), intent(out), optional :: dbeta0
 
     real(dbl), parameter :: q50 = 0.6744897501960817_dbl
@@ -239,11 +285,11 @@ contains
     real(dbl), dimension(:), allocatable :: yy, e0, xx, ex2, cc, e2, r, q, v, w
     real(dbl), dimension(:,:), allocatable :: xm
     logical, dimension(size(y)) :: mask
-    real(dbl), dimension(3) :: th, th1
+    real(dbl), dimension(3) :: th, th1, th2
     real(dbl), dimension(3,3) :: ainv
-    real(dbl) :: vb, vbmin, smax, f, sig1, f1, emin, e2med, sq, xs
-    integer :: n, p, iter, k
-    logical :: conv
+    real(dbl) :: vb, vbmin, smax, f, f2, s2, l1, emin, e2med, xs, lmax
+    integer :: n, p
+    logical :: few
 
     beta = 0
     cov = 0
@@ -251,9 +297,11 @@ contains
     fout = 0
     if( present(member) ) member = 0
     if( present(dbeta0) ) dbeta0 = 0
+    if( present(sigint) ) sigint = -1
 
     mask = e > 0 .and. ex >= 0 .and. abs(y) < huge(y) .and. abs(x) < huge(x)
     n = count(mask)
+    if( present(nfit) ) nfit = n
     if( n == 0 ) return
 
     yy = pack(y,mask)
@@ -300,6 +348,9 @@ contains
     vbmin = (0.1_dbl*bmag)**2
     if( present(bmin) ) vbmin = bmin**2
 
+    ! few stars: the fraction and the width of the outliers are fixed
+    few = fixsig < 0 .and. n - p + 1 < nfew
+
     ! the robust start: the slope by the median of the slopes of pairs,
     ! the intercept by the median, the scatter by the median absolute
     ! deviation of the normalised residuals
@@ -317,41 +368,28 @@ contains
     end if
     f = 0.1_dbl
 
-    do iter = 1, 1000
-
-       ! the effective variances by the current slope, E-step
-       call effvar(th)
-       call estep(th,sigma,f)
-
-       ! M-step: beta, sigma (REML), f
-       v = e2 + sigma**2
-       w = q/v + (1 - q)/(v + vb)
-       th1 = th
-       call wls(w,th1,ainv)
-       r = yy - matmul(xm(:,1:p),th1(1:p))
-       smax = 10*maxval(abs(r)) + tiny(smax)
-       if( fixsig >= 0 ) then
-          sig1 = fixsig
-       else if( remlfun(0.0_dbl) > 0 ) then
-          sig1 = bisect(remlfun,0.0_dbl,smax)
-       else
-          sig1 = 0
+    if( few ) then
+       ! the likelihood of few stars has two modes (a deviating star as
+       ! an outlier, or as a part of the scatter); EM from the robust start
+       ! and from the plain restricted likelihood of all stars, the mode of
+       ! the larger posterior (the likelihood with the prior of sigma)
+       th2 = th
+       s2 = sigma
+       f = ffew
+       call emloop(th,sigma,f)
+       l1 = mixlike(th,sigma,f) - (sigma/(sfew*bmag))**2/2
+       q = 1
+       call remlfit(th2,s2)
+       f2 = ffew
+       call emloop(th2,s2,f2)
+       if( mixlike(th2,s2,f2) - (s2/(sfew*bmag))**2/2 >= l1 ) then
+          th = th2
+          sigma = s2
        end if
-       f1 = min(sum(1 - q)/n, fmax)
-       sq = sum(1 - q)
-       if( sq > 0.5_dbl ) &
-            vb = max(sum((1 - q)*(r**2 - e2 - sig1**2))/sq, &
-            9*(e2med + sig1**2), vbmin)
-
-       conv = abs(sig1 - sigma) <= tol*emin .and. abs(f1 - f) <= tol
-       do k = 1, p
-          conv = conv .and. abs(th1(k) - th(k))*xs**(k-1) <= tol*emin
-       end do
-       th = th1
-       sigma = sig1
-       f = f1
-       if( conv ) exit
-    end do
+       vb = max(bmag**2,9*(e2med + sigma**2))
+    else
+       call emloop(th,sigma,f)
+    end if
     fout = f
 
     call effvar(th)
@@ -362,10 +400,203 @@ contains
     beta(0:p-1) = th(1:p)
     cov(1:p,1:p) = ainv(1:p,1:p)
     if( present(dbeta0) ) dbeta0 = 1 / sqrt(sum(w))
+    ! the fraction of outliers found
+    if( few ) fout = sum(1 - q) / n
 
     if( present(member) ) member = unpack(q,mask,0.0_dbl)
 
+    ! the interval of sigma by the profile of the restricted likelihood
+    ! of the calibration stars (q and the effective variances fixed):
+    ! the values where it decreases by 1/2 from its value at sigma
+    if( present(sigint) ) then
+       if( fixsig >= 0 ) then
+          sigint = sigma
+       else
+          call reml_interval(sigint)
+       end if
+    end if
+
   contains
+
+    subroutine emloop(th,sigma,f)
+      ! the EM algorithm from th, sigma, f; the fraction f and the width B
+      ! of the outliers fixed for few stars
+      real(dbl), dimension(3), intent(in out) :: th
+      real(dbl), intent(in out) :: sigma, f
+      real(dbl), dimension(3) :: th1
+      real(dbl) :: sig1, f1, sq
+      integer :: iter, k
+      logical :: conv
+
+      if( few ) vb = max(bmag**2,9*(e2med + sigma**2))
+
+      do iter = 1, 1000
+
+         ! the effective variances by the current slope, E-step
+         call effvar(th)
+         call estep(th,sigma,f)
+
+         ! M-step: beta, sigma (REML), f
+         v = e2 + sigma**2
+         w = q/v + (1 - q)/(v + vb)
+         th1 = th
+         call wls(w,th1,ainv)
+         r = yy - matmul(xm(:,1:p),th1(1:p))
+         smax = 10*maxval(abs(r)) + tiny(smax)
+         if( fixsig >= 0 ) then
+            sig1 = fixsig
+         else if( remlfun(0.0_dbl) > 0 ) then
+            sig1 = bisect(remlfun,0.0_dbl,smax)
+         else
+            sig1 = 0
+         end if
+         if( few ) then
+            f1 = ffew
+            vb = max(bmag**2,9*(e2med + sig1**2))
+         else
+            f1 = min(sum(1 - q)/n, fmax)
+            sq = sum(1 - q)
+            if( sq > 0.5_dbl ) &
+                 vb = max(sum((1 - q)*(r**2 - e2 - sig1**2))/sq, &
+                 9*(e2med + sig1**2), vbmin)
+         end if
+
+         conv = abs(sig1 - sigma) <= tol*emin .and. abs(f1 - f) <= tol
+         do k = 1, p
+            conv = conv .and. abs(th1(k) - th(k))*xs**(k-1) <= tol*emin
+         end do
+         th = th1
+         sigma = sig1
+         f = f1
+         if( conv ) exit
+      end do
+
+    end subroutine emloop
+
+    subroutine remlfit(th,sigma)
+      ! the weighted fit and sigma by the restricted likelihood of all
+      ! the stars (q = 1, no outliers), iterated from th, sigma
+      real(dbl), dimension(3), intent(in out) :: th
+      real(dbl), intent(in out) :: sigma
+      real(dbl), dimension(3) :: th1
+      real(dbl) :: sig1
+      integer :: iter, k
+      logical :: conv
+      do iter = 1, 1000
+         call effvar(th)
+         v = e2 + sigma**2
+         w = q / v
+         th1 = th
+         call wls(w,th1,ainv)
+         r = yy - matmul(xm(:,1:p),th1(1:p))
+         smax = 10*maxval(abs(r)) + tiny(smax)
+         if( remlfun(0.0_dbl) > 0 ) then
+            sig1 = bisect(remlfun,0.0_dbl,smax)
+         else
+            sig1 = 0
+         end if
+         conv = abs(sig1 - sigma) <= tol*emin
+         do k = 1, p
+            conv = conv .and. abs(th1(k) - th(k))*xs**(k-1) <= tol*emin
+         end do
+         th = th1
+         sigma = sig1
+         if( conv ) exit
+      end do
+    end subroutine remlfit
+
+    real(dbl) function mixlike(th,s,f)
+      ! the restricted log-likelihood of the mixture (q by the E-step):
+      ! sum ln((1-f) N(r,v) + f N(r,v+B**2)) - 1/2 ln det X'UX
+      real(dbl), dimension(3), intent(in) :: th
+      real(dbl), intent(in) :: s, f
+      real(dbl), dimension(3,3) :: am
+      real(dbl), dimension(n) :: u
+      integer :: i, j
+      call effvar(th)
+      call estep(th,s,f)
+      mixlike = sum(log((1 - f)*exp(-r**2/(2*v))/sqrt(v) + &
+           f*exp(-r**2/(2*(v + vb)))/sqrt(v + vb)))
+      u = q / v
+      am = 0
+      do i = 1, p
+         do j = 1, p
+            am(i,j) = sum(u*xm(:,i)*xm(:,j))
+         end do
+      end do
+      mixlike = mixlike - logdet(am,p) / 2
+    end function mixlike
+
+    subroutine reml_interval(sint)
+      ! sint(1) = 0 when the likelihood at zero is within 1/2 (an upper
+      ! limit sint(2) for sigma = 0); sint(2) = -1 when the likelihood
+      ! does not fall by 1/2 below 10 mag (the calibration stars, sum q,
+      ! hardly more than the coefficients)
+      real(dbl), dimension(2), intent(out) :: sint
+      real(dbl) :: d, a
+      logical :: found
+      integer :: i
+      lmax = remlike(sigma)
+      ! the upper bound: expanding steps, then bisection
+      d = max(sigma,0.1_dbl*sqrt(e2med),tiny(d))
+      a = sigma
+      found = .false.
+      do i = 1, 200
+         if( remlike(sigma + d) <= lmax - 0.5_dbl ) then
+            found = .true.
+            exit
+         end if
+         a = sigma + d
+         d = 2*d
+         if( sigma + d > 10*bmag ) exit
+      end do
+      if( found ) then
+         sint(2) = bisect(hifun,a,sigma + d)
+      else
+         sint(2) = -1
+      end if
+      sint(1) = 0
+      if( sigma > 0 ) then
+         if( remlike(0.0_dbl) < lmax - 0.5_dbl ) &
+              sint(1) = sigma - bisect(lofun,0.0_dbl,sigma)
+      end if
+    end subroutine reml_interval
+
+    real(dbl) function hifun(s)
+      real(dbl), intent(in) :: s
+      hifun = remlike(s) - (lmax - 0.5_dbl)
+    end function hifun
+
+    real(dbl) function lofun(t)
+      real(dbl), intent(in) :: t
+      lofun = remlike(sigma - t) - (lmax - 0.5_dbl)
+    end function lofun
+
+    real(dbl) function remlike(s)
+      ! the restricted log-likelihood of the calibration stars,
+      ! -1/2 (sum q ln v + ln det X'UX + sum u r**2), u = q/v, v = e2 + s**2,
+      ! r the residuals of the weighted fit at s
+      real(dbl), intent(in) :: s
+      real(dbl), dimension(n) :: vs, u, rs
+      real(dbl), dimension(3,3) :: am, ai
+      real(dbl), dimension(3) :: b, t
+      integer :: i, j
+      vs = e2 + s**2
+      u = q / vs
+      am = 0
+      b = 0
+      do i = 1, p
+         b(i) = sum(u*xm(:,i)*yy)
+         do j = 1, p
+            am(i,j) = sum(u*xm(:,i)*xm(:,j))
+         end do
+      end do
+      call syminv(am,p,ai)
+      t = 0
+      t(1:p) = matmul(ai(1:p,1:p),b(1:p))
+      rs = yy - matmul(xm(:,1:p),t(1:p))
+      remlike = -(sum(q*log(vs)) + logdet(am,p) + sum(u*rs**2)) / 2
+    end function remlike
 
     subroutine effvar(th)
       ! the variance of y - g(x) by the errors of y and x
@@ -472,6 +703,36 @@ contains
     end function remlfun
 
   end subroutine mixfit
+
+
+  real(dbl) function logdet(a,p)
+
+    ! the logarithm of the determinant of the symmetric positive definite
+    ! matrix a(1:p,1:p) by the Cholesky decomposition (p <= 3)
+
+    real(dbl), dimension(3,3), intent(in) :: a
+    integer, intent(in) :: p
+
+    real(dbl), dimension(3,3) :: l
+    real(dbl) :: s
+    integer :: i, j
+
+    logdet = 0
+    l = 0
+    do j = 1, p
+       s = a(j,j) - sum(l(j,1:j-1)**2)
+       if( .not. (s > 0) ) then
+          logdet = -huge(s)
+          return
+       end if
+       l(j,j) = sqrt(s)
+       logdet = logdet + log(s)
+       do i = j+1, p
+          l(i,j) = (a(i,j) - sum(l(i,1:j-1)*l(j,1:j-1))) / l(j,j)
+       end do
+    end do
+
+  end function logdet
 
 
   subroutine syminv(a,p,ai)
