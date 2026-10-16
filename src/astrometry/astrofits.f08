@@ -233,7 +233,7 @@ contains
 
   subroutine readfile(filename, key_dateobs, maxstar, &
        xcoo, ycoo, flux, crpix, epoch, radesys, crval,status,alpha,delta, &
-       scale,rot,refl,wcsok)
+       scale,rot,refl,wcsok,frame)
 
     ! On output, crval are spherical coordinates of the reference point crpix
     ! (the centre of the frame) by its astrometry calibration (if any);
@@ -249,6 +249,7 @@ contains
     real(REAL64), allocatable, dimension(:), intent(out), optional :: alpha, delta
     real(REAL64), intent(out), optional :: scale, rot, refl
     logical, intent(out), optional :: wcsok
+    integer, dimension(:), intent(out), optional :: frame
 
     integer :: naxis, bitpix, nrows, n, ns, i, l, srows, frow, wstatus
     integer, dimension(2) :: naxes
@@ -284,6 +285,7 @@ contains
        goto 666
     end if
     crpix = naxes / 2.0_REAL64
+    if( present(frame) ) frame = naxes
 
     call fits_read_key(fits,key_dateobs,dateobs,status)
 !    call fits_get_dateobs(fits,key_dateobs,dateobs,status)

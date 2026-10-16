@@ -214,6 +214,34 @@ The known sequence of stars can be used to determine astrometry transformation:
     minimisation.</li>
 </ul>
 
+<h3 id="significance">Significance of the solution</h3>
+
+<p>
+A match can be false: on a dense field, or against a catalogue of another
+part of the sky, a sequence of five or more stars that fulfils all the tests
+is found by chance (the search tries millions of pairs of stars). The
+solution is therefore tested against chance coincidences: the stars whose
+residuals are within <i>r</i> = 3 × the scatter of the fit (at least
+<samp>--sig</samp>, at most the limit of the cross-match) are counted;
+two of them fix the transformation and match by construction, the others
+are compared with the Poisson distribution of the coincidences of the frame
+stars with the catalogue stars, whose density is that in the overlap of the
+catalogue and the frame. The probability is multiplied by the number of
+the transformations tried by the match (the starting pairs of the
+sequences: the trials) and the solution is accepted when it is below 10<sup>−3</sup>.
+The <samp>--verbose</samp> output shows the numbers (significance). The test
+is disabled by <samp>--disable-rms-check</samp>.
+</p>
+<p>
+On QUVIK-like simulated frames (512² to 2048², 5 to 430 stars) against
+catalogues of other parts of the sky (88 runs) the test rejected all the
+false solutions (the previous test, which counted all cross-matched stars
+including the matched sequence, without the trials, by the density in the
+bounding box of the frame stars, accepted 4 of them, with scales of
+13–18″/pixel for the true 0.76″/pixel); the probability of the true
+solutions was below 10<sup>−9</sup>, also with five or six stars.
+</p>
+
 <p>
 The matching needs at least of tree stars (to construct of a triangle. The
 astrometry algorithm needs at least 5 stars (for 4 parameters) but
@@ -362,8 +390,10 @@ for checking. This switch disables flux check completely. A possibility
 of mismatching will increase, especially on crowded fields.
 </dd>
 <dt><samp>--disable-rms-check</samp></dt><dd>Normally, RMS (in pixels) is smaller that
-xsig*dig (in pixels) for successful fit and one is on condition for the calibration. This
-option disables the test and must be used very carefully. Useful in cases when
+xsig*dig (in pixels) for successful fit and one is on condition for the calibration,
+and the solution must be <a href="#significance">significant</a> against chance
+coincidences. This
+option disables the tests and must be used very carefully. Useful in cases when
 statistical errors are insignificant to  systematical ones (due to an improper
 projection).</dd>
 </dl>

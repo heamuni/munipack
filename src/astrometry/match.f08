@@ -79,12 +79,15 @@ module matcher
 contains
 
   subroutine match(x1,y1,f1,index1,x2,y2,f2,index2,minmatch,maxmatch,sigma1,sigma2, &
-       flxmin,flxmax,fluxtest,id1,id2,luckymatch,verbose,status,scale0,scaletol)
+       flxmin,flxmax,fluxtest,id1,id2,luckymatch,verbose,status,scale0,scaletol, &
+       ntrial)
 
     ! scale0 (optional, > 0) is an expected scale (the frame units per
     ! the reference units: pix/deg) known within the relative tolerance
     ! scaletol: the starting pairs of the sequences whose ratio of
-    ! lengths is far from it are skipped (the scale prior)
+    ! lengths is far from it are skipped (the scale prior);
+    ! ntrial (optional) is the number of the starting pairs tried
+    ! (the transformations tested, for the significance of the match)
 
     implicit none
 
@@ -113,9 +116,10 @@ contains
     logical, intent(in) :: verbose
     logical, intent(out) :: status
     real(REAL64), intent(in), optional :: scale0, scaletol
+    real(REAL64), intent(out), optional :: ntrial
 
     integer :: i1,i2,j1,j2,ns,ntot,n1,n2
-    real(REAL64) :: r,d1,d2,s0,stol,sabs
+    real(REAL64) :: r,d1,d2,s0,stol,sabs,ntried
     type(sequences) :: seq
     type(dataseq) :: ref, lst
 
@@ -168,6 +172,7 @@ contains
     end if
 
     ns = 0
+    ntried = 0
     n1 = size(x1)
     n2 = size(x2)
     ntot = (n1 + 1) * (n1 / 2)
@@ -272,6 +277,7 @@ contains
 !!$                      end if
 
                       ! start of recursive search
+                      ntried = ntried + 1
                       seq%found = .false.
                       call aqualung(seq,ref,lst)
 
@@ -295,6 +301,8 @@ contains
     end do
 
 666 continue
+
+    if( present(ntrial) ) ntrial = ntried
 
     if( seq%nseq >= minmatch ) then
 

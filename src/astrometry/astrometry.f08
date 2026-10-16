@@ -533,7 +533,8 @@ contains
     ! the solution (the parameters given by the user, --scale, --angle,
     ! --reflex, are user_scale, user_angle, user_refl, unchanged
     ! for the next frames)
-    real(REAL64) :: scale, angle, refl, scale0
+    real(REAL64) :: scale, angle, refl, scale0, ntrial
+    integer, dimension(2) :: naxes
     integer :: n,nmin,nskip,nattempt
     logical :: matched = .false., reliable, zwcs
     real(REAL64), dimension(2) :: crval0
@@ -557,7 +558,7 @@ contains
 
     status = 0
     call readfile(filename,key_dateobs,maxstars,x,y,flux,zcrpix,epoch,xframe,&
-         zcrval,status,scale=zscale,rot=zangle,refl=zrefl,wcsok=zwcs)
+         zcrval,status,scale=zscale,rot=zangle,refl=zrefl,wcsok=zwcs,frame=naxes)
     if( status /= 0 ) then
        write(error_unit,*) "Error: Failed to open  `" //trim(filename)//"'"
        goto 77
@@ -593,6 +594,7 @@ contains
     ! significant; a false match), the next match is tried.
     nskip = 0
     nattempt = 0
+    ntrial = 0
     crval0 = crval
 55  continue
     nattempt = nattempt + 1
@@ -607,7 +609,7 @@ contains
        call astromatch(minmatch,maxmatch,pcode,rec,dec,rflux,x,y,flux, &
             crval(1),crval(2),crpix(1),crpix(2), &
             id1,id2,sig1,sig2,flxmin,flxmax,fluxtest,&
-            luckymatch,verbose,matched,nskip,scale0,scaletol)
+            luckymatch,verbose,matched,nskip,scale0,scaletol,ntrial)
 !           write(*,'(a,f10.7)') "=MATCH> End "
 
     else if( mode == 'SEQUENCE' ) then
@@ -678,7 +680,7 @@ contains
        call astrofit(fit,ptype,pcode,rec,dec,x,y,sig2,xsig, &
             crpix(1),crpix(2),crval(1),dcrval(1),crval(2),dcrval(2),&
             scale,dscale,refl,rms,angle,dangle,pv,ares,dres,id1,id2,i1,i2, &
-            rmscheck,verbose,plog,reliable,scale0,scaletol)
+            rmscheck,verbose,plog,reliable,scale0,scaletol,naxes,ntrial)
 
        if( .not. reliable .and. mode == 'MATCH' .and. nattempt < maxattempt ) then
           ! try a next match, nskip is the chunk pair of the rejected one
