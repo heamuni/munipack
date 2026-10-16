@@ -430,7 +430,20 @@ powers by their unbiased estimates for Gaussian errors,
 3σ⁴, and the products with <i>y</i>), for one colour and for several
 (<a href="#colterm2">below</a>; the covariances of colours sharing
 a band included). The errors of the coefficients are those of
-the corrected estimate (larger by about 1/<i>λ</i>). The covariance of
+the corrected estimate (larger by about 1/<i>λ</i>), with the covariance of
+the errors of the colour and of the residual (Fuller 1987, 2.2: the variance
+of <i>c r</i> includes (cov(<i>c</i>, <i>y</i>) − σ<sub><i>c</i></sub>²
+<i>k</i>)²; without it ⟨<i>z</i>²⟩ of <i>k</i> was 1.09–1.19 for
+<i>λ</i> 0.6–0.8, the coverage of its error 0.63–0.66; now 0.89–0.99,
+0.67–0.70). With
+<samp>--color-order 2</samp> the weights of the corrected moments are by
+the slope of the linear term (at the reference colour), not at the observed
+colour, which depends on its error (the zero point was biased by +0.008,
+CTPH covered in 15% of the sets; now −0.0002, 65%); the E-step and σ keep
+the slope at the colour. The interval of σ (PHSYSERE) is the profile of
+the corrected fit (of the plain one it was shifted to zero, an upper limit
+in every set; the coverage of σ 0.51–1.00 → 0.67–0.85, the larger when σ
+is small against the errors of the colours). The covariance of
 the catalogue magnitude of the calibration and a colour containing it,
 −σ<sub>A</sub>² (A − B against A) or +σ<sub>B</sub>² (against B), is by
 the error column of that band in <samp>--color-term</samp>, the one of
@@ -464,7 +477,8 @@ the SDSS cones, −1.13 on the frames); use <samp>--color-err-correct no</samp>;
 system with the scatter of the transformation as its error).</li>
 </ul>
 <p>
-<b>The cap.</b> When the colours are hardly wider than their errors, the
+<b>The cap.</b> When the colours (or a combination of the terms) are hardly
+wider than their errors, the
 correction (1/<i>λ</i>) is a ratio of noisy moments with a heavy tail: in
 a Monte Carlo with the SDSS errors doubled and tripled (the unweighted
 <i>λ</i> below zero) the corrected <i>k</i> of 10–100 stars had an unbounded
@@ -472,9 +486,24 @@ standard deviation (a few sets with the corrected variance near zero), and
 a nearly singular corrected matrix (6 stars and the order 2) gave errors of
 10<sup>12</sup>. The correction is therefore capped: the corrected variance
 of every combination of the terms (the colour, its square, the other
-colours) is at least 0.5 of the observed one, the correction at most
-a factor of 2. A capped fit keeps a part of the dilution (biased towards
-zero); it is reported by a warning and a COMMENT (COLTDILU = T). Tried in
+colours) is at least 0.5 of the observed one, the correction of
+the dilution at most a factor of 2 (COLTCAP the fraction applied); the
+covariance of <i>y</i> with the colours (the band of the calibration in
+the colour) is subtracted in full, as it is not a dilution (scaled with
+the dilution it left a bias of either sign). A capped fit keeps a part of
+the dilution, shrunk towards zero in the combination of the terms that was
+capped, not necessarily every coefficient (the square of a colour, of
+reliability about <i>λ</i>², is capped while COLTLAM of the colour is
+0.8–0.9; two correlated colours with a noisy shared band, Monte Carlo of 30
+stars: the bias +0.15, −0.36 of the coefficients −0.3, +0.2, which was
+−0.06, +0.14 with the scaled covariance, and +0.04, −0.10 for 300 stars,
+was −0.05, +0.13); it is reported by a warning and a COMMENT (COLTDILU = T).
+The iteration of the corrected fit is not an EM of a likelihood: capped
+fits of the order 2 cycled between two states (773 runs not converged per
+1000 sets of 10 stars with errors comparable to the spread of the colours,
+31 of 100 stars); with the weights above none in the same Monte Carlo, the steps are damped after
+50 iterations and a fit still not converged is reported (a warning,
+a COMMENT, the status 3 in the verbose output). Tried in
 the Monte Carlo: the fall-back to the uncorrected fit below the cap
 (discontinuous, the whole dilution left in those sets), the caps 0.3 (the
 tail back: the standard deviation 1.2–1.5 times that of 0.5 for 10 stars of
@@ -482,19 +511,24 @@ tripled errors) and 0.7 (for 10 such stars a smaller scatter, 0.36 instead
 of 0.44 for <i>k</i> = −0.686, but it caps 5 of the 12 QUVIK-like frames of
 two colours below, moving them from their validated values, and up to 20%
 of the sets of 100 stars). With the cap 0.5 the SDSS errors as they are cap
-at most 3% of the sets (of <i>k</i> ≈ 0, whose weights do not include
+at most 5% of the sets (of <i>k</i> ≈ 0, whose weights do not include
 the colour errors; none for |<i>k</i>| ≥ 0.1 and 30 or more stars), and
 the results of several colours of 30 and more stars are unchanged.
 </p>
 <p>
 <b>The header.</b> With the error columns: COLTDILU = T when the fit is
 corrected (F with <samp>--color-err-correct no</samp>, or when no
-correction is possible), COLTLAM the reliability ratio of the colour of the
-calibration stars (the weighted variance of the true colours over that of
-the catalogue colours; COLTLAM<i>j</i> for the colour <i>j</i> of several),
-a COMMENT; without the error columns the outputs are those of the previous
-version, bit for bit, and so are those with <samp>--color-err-correct no</samp>
-(only COLTDILU, COLTLAM and the COMMENT added).
+correction is possible), COLTCAP the fraction of the correction of
+the dilution applied (1 full, below 1 capped), COLTLAM the reliability
+ratio of the colour of the calibration stars (the weighted variance of
+the true colours over that of the catalogue colours, of the linear term;
+COLTLAM<i>j</i> for the colour <i>j</i> of several), a COMMENT. Without
+the error columns the outputs are those of the previous version, bit for
+bit. With them and <samp>--color-err-correct no</samp> one colour gives
+the values of the previous version (the keys and the COMMENT added); several
+colours give the uncorrected fit, which is new (the previous version always
+corrected them; <samp>yes</samp> gives its coefficients of the order 1, their
+errors with the term above).
 </p>
 <p>
 Validation (one colour). Monte Carlo of the calibration (the stars drawn
@@ -507,24 +541,27 @@ sets per case; before → after the correction): the stars fainter than
 <i>u</i> = 20.5, the bias of <i>k</i> +0.011…+0.047 → −0.024…+0.001
 (30 and more stars −0.006…+0.001, below 0.15 of the errors; 100 stars
 +0.011…+0.027, one to two errors, → −0.003…+0.001), the coverage of
-COLTK1E 0.40–0.72 → 0.68–0.75 (100 stars 0.40–0.46 → 0.68–0.72); all
-the stars +0.004…+0.015 → −0.004…+0.001, coverage 0.57–0.72 → 0.66–0.74;
+COLTK1E 0.40–0.72 → 0.68–0.76 (100 stars 0.40–0.46 → 0.68–0.72); all
+the stars +0.004…+0.015 → −0.005…+0.001, coverage 0.57–0.72 → 0.67–0.75;
 the stars brighter than <i>u</i> = 20 (<i>λ</i> 0.99) −0.001…+0.005 →
 −0.008…+0.001; a band against <i>g</i>, X = <i>g</i> +
 0.3 (<i>u</i> − <i>g</i>) (all the stars), +0.002…+0.003 → −0.002…0, coverage
 0.64–0.75 → 0.68–0.77; the errors doubled and tripled: +0.03…+0.31
-(coverage 0.01–0.65) → −0.06…+0.01 for 30 and more stars, coverage
-0.60–0.73, and for 10 stars −0.17…−0.02 (over-corrected: 1/<i>λ</i> of
-a noisy <i>λ</i> is too large on average), coverage 0.71–0.77.
-The order 2 (the faint stars, <i>k</i><sub>2</sub> = 0 and 0.15, 30 and 100
-stars): <i>k</i><sub>1</sub> −0.039…−0.002 → −0.013…+0.019,
-<i>k</i><sub>2</sub> +0.007…+0.058 → −0.018…+0.006, the coverage of COLTK1E
-0.56–0.67 → 0.60–0.73, of COLTK2E 0.38–0.62 → 0.55–0.75; the corrected
-moments of the powers are noisy, so the coefficients scatter more (up to
-1.6 times with <i>k</i><sub>2</sub> = 0.15) and their errors, which do not
-include it, are up to 1.9 times too small (1.7 without the correction):
-with the order 2 the correction pays when the bias matters (large
-coefficients, faint stars). QUVIK-like 2048² frames (validation of
+(coverage 0.01–0.65) → −0.05…0 for 30 and more stars, coverage
+0.66–0.74, and for 10 stars −0.20…−0.02 (over-corrected: 1/<i>λ</i> of
+a noisy <i>λ</i> is too large on average), coverage 0.72–0.82.
+The order 2 (the stars fainter than <i>u</i> = 20.5,
+<i>k</i><sub>2</sub> = 0 and 0.15, 30 and 100 stars):
+<i>k</i><sub>1</sub> −0.039…−0.002 → −0.012…+0.015,
+<i>k</i><sub>2</sub> +0.007…+0.058 → −0.014…+0.006, the coverage of COLTK1E
+0.56–0.67 → 0.55–0.77, of COLTK2E 0.38–0.62 → 0.61–0.80; the scatter over
+the errors 0.65–1.3 (before 1.2–1.7); the zero point (CTPH) by
+a driver of the fit (300 stars, a curved relation, σ<sub><i>c</i></sub>
+0.05–0.25 mag): the bias +0.0013 uncorrected, +0.0079 corrected with the
+weights at the observed colour, −0.0002 now, the coverage 0.57, 0.15, 0.65.
+The corrected moments of the powers are noisy, so the coefficients of
+the order 2 scatter more (up to 1.4 times): with the order 2 the correction
+pays when the bias matters (large coefficients, faint stars). QUVIK-like 2048² frames (validation of
 <a href="#colterm2">several colours</a> below; the catalogue the truth plus
 the SDSS errors, 15–67 stars, COLTLAM 0.97–0.995): <i>k</i><sub>1</sub>
 of <i>u</i> − <i>g</i> −0.623 → −0.640 on average, the same frames against
@@ -533,12 +570,12 @@ all the stars is not in the catalogue colours but in the faint stars
 of the frames, detected and measured near the limit; two colours on them
 against the exact catalogue are −0.78, +0.32 for −0.86, +0.37), the rms of
 (<i>k</i> − <i>k</i><sub>true</sub>)/σ<sub><i>k</i></sub> 1.13 → 0.94;
-the order 2 −0.633 → −0.657. The band of the calibration in the colour
+the order 2 −0.633 → −0.658. The band of the calibration in the colour
 and noisy (calibrated against <i>g</i> with <i>u</i> − <i>g</i>, the errors
 of <i>g</i> 0.3 mag in both, all the SDSS stars): the bias of <i>k</i>
 −0.05…−0.22 (coverage 0.00–0.30, 30 and more stars) → +0.003…+0.08
 (100 stars +0.003…+0.012 without outliers, up to +0.04 with 5%),
-coverage 0.60–0.69; with
+coverage 0.64–0.75; with
 the errors of <i>g</i> as they are −0.005…+0.005 → ±0.001.
 </p>
 
@@ -602,7 +639,14 @@ that the catalogue colours are the true ones plus their errors (a measured
 catalogue); a simulation that draws the true magnitudes about
 the catalogue (a catalogue more precise than its errors say) is
 over-corrected (−1.03 for −0.86): give such a catalogue without the error
-columns or use <samp>--color-err-correct no</samp>.</li>
+columns or use <samp>--color-err-correct no</samp>. A colour given without
+the error columns is taken as exact, also in the covariances with the other
+colours (they were built from the colour with the errors only, not
+symmetric: the result depended on the order of the colours, +0.284 or
++0.331 for the same coefficient; now +0.284 in both orders). The missing
+colours of a star are predicted by the observed colour–colour relation of
+the calibration stars (their covariances include the errors), not by
+the relation of the true colours.</li>
 <li>The calibration stars are those with all the colours. A star of
 the output without some of its colours (COLORSRC the bit <i>j</i> − 1 set
 for the colour <i>j</i> of the catalogue: 3 both of two, 2 only the second,
