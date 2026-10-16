@@ -1361,7 +1361,7 @@ contains
     integer, intent(in out) :: status
 
     character(len=FLEN_CARD) :: buf
-    integer :: j
+    integer :: j, ios
 
     if( ctm%nterm > 1 ) then
        call fits_write_comment(fitscal,"Colour terms: m_cat - m_inst = ZP + " // &
@@ -1369,12 +1369,12 @@ contains
        if( any(ctm%order(:,n) >= 2) ) &
             call fits_write_comment(fitscal,"  + k2_j*(c_j - ref_j)**2",status)
        do j = 1, ctm%nterm
-          write(buf,'(a,i0,3a,f0.4,a,f0.5,a,f0.5)') "  c",j," = ", &
+          write(buf,'(a,i0,3a,f0.4,a,f0.5,a,f0.5)',iostat=ios) "  c",j," = ", &
                trim(ctm%cola(j,n))//'-'//trim(ctm%colb(j,n)),", ref = ", &
                ctm%cref(j,n),", k1 = ",-magln*ctm%beta(2*j-1,n)," +- ", &
                magln*sqrt(max(ctm%cov(2*j,2*j,n),0.0_dbl))
           if( ctm%order(j,n) >= 2 ) then
-             write(buf,'(a,a,f0.5,a,f0.5)') trim(buf),", k2 = ", &
+             write(buf,'(a,a,f0.5,a,f0.5)',iostat=ios) trim(buf),", k2 = ", &
                   -magln*ctm%beta(2*j,n)," +- ", &
                   magln*sqrt(max(ctm%cov(2*j+1,2*j+1,n),0.0_dbl))
           end if
@@ -1393,11 +1393,11 @@ contains
          ctm%cref(1,n),")"
     if( ctm%order(1,n) >= 2 ) buf = trim(buf) // " + k2*(c - ref)**2"
     call fits_write_comment(fitscal,buf,status)
-    write(buf,'(3a,f0.5,a,f0.5)') "  c = ",trim(ctm%cola(1,n))//'-'// &
+    write(buf,'(3a,f0.5,a,f0.5)',iostat=ios) "  c = ",trim(ctm%cola(1,n))//'-'// &
          trim(ctm%colb(1,n)),", k1 = ",-magln*ctm%beta(1,n)," +- ", &
          magln*sqrt(max(ctm%cov(2,2,n),0.0_dbl))
     if( ctm%order(1,n) >= 2 ) then
-       write(buf,'(a,a,f0.5,a,f0.5)') trim(buf),", k2 = ",-magln*ctm%beta(2,n), &
+       write(buf,'(a,a,f0.5,a,f0.5)',iostat=ios) trim(buf),", k2 = ",-magln*ctm%beta(2,n), &
             " +- ",magln*sqrt(max(ctm%cov(3,3,n),0.0_dbl))
     end if
     call fits_write_comment(fitscal,buf,status)
