@@ -71,6 +71,27 @@
 !  - 2 g' cov(y,x) (g' the slope of the polynomial at x(i)). The covariance
 !  of beta is (X' U X)**(-1). mixture_mean is mixture_fit of the order 0.
 !
+!  The routine mixture_fit_multi is the same for several colours (at most
+!  ncolmax), y = beta(0) + sum_j beta(2j-1) x_j + beta(2j) x_j**2 (the order
+!  of every colour 1 or 2; a passband depending on two colours, QUVIK
+!  260-360 nm against SDSS u by u - g and g - r). The effective variance has
+!  the gradient of the polynomial by all the colours, the covariances of
+!  the colours of a star (u - g and g - r share g: -err(g)**2) and their
+!  covariances with y; the start of the slopes is the least absolute
+!  deviations (iteratively reweighted). The observed colours scatter about
+!  the true ones by their errors, which biases the slopes towards zero (the
+!  regression dilution); with one colour of a large range it is small
+!  (0.7% for k = 0.3 with SDSS errors) and the fit is kept as it was, while
+!  two colours as correlated as u - g and g - r of the stars (0.96) amplify
+!  it to 4% and 10% (k = -0.3, +0.2), more than the errors of 30-100 stars
+!  (Monte Carlo: the coverage of the errors 46-53% for 100 stars). For
+!  several colours the weighted least squares is corrected for the errors
+!  of the colours (the moments of the linear terms, Fuller 1987,
+!  Measurement Error Models, 2.2; see wls): bias below 0.15 of the errors,
+!  coverage 65-73% (10-100 stars, with and without 5% outliers). It assumes
+!  the classical model of the errors, the catalogue colour the true one
+!  plus its error; quadratic terms are not corrected.
+!
 !  Few stars (n - p + 1 < 16, p the number of the coefficients): f and B
 !  cannot be estimated from few values, and the likelihood has two modes,
 !  a deviating value either an outlier or a part of the scatter; EM from
@@ -138,7 +159,12 @@ module exscatter
 
   integer, parameter, private :: dbl = REAL64
 
-  public :: excess_scatter, mixture_mean, mixture_fit
+  public :: excess_scatter, mixture_mean, mixture_fit, mixture_fit_multi
+
+  ! the colours of mixture_fit_multi (at most), the coefficients of
+  ! the polynomial (the intercept, linear and quadratic terms)
+  integer, parameter, public :: ncolmax = 3
+  integer, parameter :: pmax = 1 + 2*ncolmax
 
   ! few stars, n - p + 1 < nfew (p the number of the coefficients):
   ! the fraction of outliers fixed at ffew, their width at 1 mag; the two
@@ -243,13 +269,15 @@ contains
     real(dbl), dimension(2), intent(out), optional :: sigint
     integer, intent(out), optional :: nfit
 
-    real(dbl), dimension(size(y)) :: x0
+    real(dbl), dimension(size(y),1) :: x0
+    real(dbl), dimension(size(y),1,1) :: xx0
     real(dbl), dimension(0:2) :: beta
     real(dbl), dimension(3,3) :: cov
 
     x0 = 0
-    call mixfit(y,err,x0,x0,x0,0,-1.0_dbl,beta,cov,sigma,fout,member,bmin, &
-         sigint,nfit,dmu)
+    xx0 = 0
+    call mixfit(y,err,x0,x0,xx0,x0,[0],-1.0_dbl,beta,cov,sigma,fout,member, &
+         bmin,sigint,nfit,dmu)
     mu = beta(0)
 
   end subroutine mixture_mean
@@ -283,25 +311,73 @@ contains
     real(dbl), dimension(2), intent(out), optional :: sigint
     integer, intent(out), optional :: nfit
 
-    call mixfit(y,e,x,ex,cxy,order,fixsig,beta,cov,sigma,fout,member,bmin, &
-         sigint,nfit)
+    real(dbl), dimension(size(y),1,1) :: xx0
+
+    xx0 = 0
+    call mixfit(y,e,reshape(x,[size(x),1]),reshape(ex,[size(ex),1]),xx0, &
+         reshape(cxy,[size(cxy),1]),[order],fixsig,beta,cov,sigma,fout,member, &
+         bmin,sigint,nfit)
 
   end subroutine mixture_fit
 
 
-  subroutine mixfit(y,e,x,ex,cxy,order,fixsig,beta,cov,sigma,fout,member,bmin, &
-       sigint,nfit,dbeta0)
+  subroutine mixture_fit_multi(y,e,x,ex,exx,cxy,order,fixsig,beta,cov,sigma, &
+       fout,member,bmin,sigint,nfit)
 
-    ! The implementation of mixture_fit and mixture_mean; dbeta0
-    ! (optional) is the error of beta(0). For the order 0 (the mean),
-    ! the weighted mean and its error are computed directly (not by
-    ! the inverse of a 1x1 matrix).
+    ! The polynomial of several colours (at most ncolmax),
+    !
+    !   y = beta(0) + sum_j beta(2j-1) x(:,j) + beta(2j) x(:,j)**2,
+    !
+    ! (beta(2j) = 0 for the order 1 of the colour j, order(j)) with
+    ! the excess scatter sigma by the likelihood of a mixture, as
+    ! mixture_fit: x(:,j) the colours minus a reference, ex(:,j) their
+    ! errors, exx(:,j,k) the covariances of the colours j /= k of every
+    ! star (the colours sharing a band; the diagonal is not used),
+    ! cxy(:,j) the covariances of y and the colours; beta(0:2*ncol) and
+    ! cov(1+2*ncol,1+2*ncol) in this order (the elements of the missing
+    ! quadratic terms zero). A value is used when e > 0, all ex >= 0
+    ! and y, x finite. The other arguments as mixture_fit.
 
-    real(dbl), dimension(:), intent(in) :: y, e, x, ex, cxy
-    integer, intent(in) :: order
+    real(dbl), dimension(:), intent(in) :: y, e
+    real(dbl), dimension(:,:), intent(in) :: x, ex, cxy
+    real(dbl), dimension(:,:,:), intent(in) :: exx
+    integer, dimension(:), intent(in) :: order
     real(dbl), intent(in) :: fixsig
-    real(dbl), dimension(0:2), intent(out) :: beta
-    real(dbl), dimension(3,3), intent(out) :: cov
+    real(dbl), dimension(0:), intent(out) :: beta
+    real(dbl), dimension(:,:), intent(out) :: cov
+    real(dbl), intent(out) :: sigma, fout
+    real(dbl), dimension(:), intent(out), optional :: member
+    real(dbl), intent(in), optional :: bmin
+    real(dbl), dimension(2), intent(out), optional :: sigint
+    integer, intent(out), optional :: nfit
+
+    if( size(x,2) > ncolmax ) stop 'mixture_fit_multi: too many colours.'
+    call mixfit(y,e,x,ex,exx,cxy,order,fixsig,beta,cov,sigma,fout,member, &
+         bmin,sigint,nfit)
+
+  end subroutine mixture_fit_multi
+
+
+  subroutine mixfit(y,e,x,ex,exx,cxy,order,fixsig,beta,cov,sigma,fout,member, &
+       bmin,sigint,nfit,dbeta0)
+
+    ! The implementation of mixture_fit, mixture_fit_multi and
+    ! mixture_mean; dbeta0 (optional) is the error of beta(0). For
+    ! the order 0 (the mean), the weighted mean and its error are computed
+    ! directly (not by the inverse of a 1x1 matrix). The design matrix
+    ! has the columns 1, x(:,1), [x(:,1)**2], x(:,2), ... (the column k
+    ! the power cpow(k) of the colour cind(k)); one colour is computed
+    ! exactly as before the colours were generalised (the robust start by
+    ! Theil-Sen, the effective variance), several colours start by
+    ! the least absolute deviations.
+
+    real(dbl), dimension(:), intent(in) :: y, e
+    real(dbl), dimension(:,:), intent(in) :: x, ex, cxy
+    real(dbl), dimension(:,:,:), intent(in) :: exx
+    integer, dimension(:), intent(in) :: order
+    real(dbl), intent(in) :: fixsig
+    real(dbl), dimension(0:), intent(out) :: beta
+    real(dbl), dimension(:,:), intent(out) :: cov
     real(dbl), intent(out) :: sigma, fout
     real(dbl), dimension(:), intent(out), optional :: member
     real(dbl), intent(in), optional :: bmin
@@ -313,14 +389,17 @@ contains
     real(dbl), parameter :: fmax = 0.5_dbl, tol = 1e-10_dbl
     ! 1 mag in the natural logarithm of flux
     real(dbl), parameter :: bmag = 0.4_dbl*2.302585092994046_dbl
-    real(dbl), dimension(:), allocatable :: yy, e0, xx, ex2, cc, e2, r, q, v, w
-    real(dbl), dimension(:,:), allocatable :: xm
+    real(dbl), dimension(:), allocatable :: yy, e0, xx, e2, r, q, v, w
+    real(dbl), dimension(:,:), allocatable :: xm, xc, ex2, cc
+    real(dbl), dimension(:,:,:), allocatable :: cxx
     logical, dimension(size(y)) :: mask
-    real(dbl), dimension(3) :: th, th1, th2
-    real(dbl), dimension(3,3) :: ainv
-    real(dbl) :: vb, vbmin, smax, f, f2, s2, l1, emin, e2med, xs, lmax
-    integer :: n, p
-    logical :: few
+    real(dbl), dimension(pmax) :: th, th1, th2, colsc
+    real(dbl), dimension(pmax,pmax) :: ainv
+    real(dbl), dimension(ncolmax) :: xs
+    integer, dimension(pmax) :: cind, cpow
+    real(dbl) :: vb, vbmin, smax, f, f2, s2, l1, emin, e2med, lmax
+    integer :: n, p, nc, j, k
+    logical :: few, eiv
 
     beta = 0
     cov = 0
@@ -330,30 +409,63 @@ contains
     if( present(dbeta0) ) dbeta0 = 0
     if( present(sigint) ) sigint = -1
 
-    mask = e > 0 .and. ex >= 0 .and. abs(y) < huge(y) .and. abs(x) < huge(x)
+    nc = size(x,2)
+    mask = e > 0 .and. abs(y) < huge(y)
+    do j = 1, nc
+       mask = mask .and. ex(:,j) >= 0 .and. abs(x(:,j)) < huge(x)
+    end do
     n = count(mask)
     if( present(nfit) ) nfit = n
     if( n == 0 ) return
 
     yy = pack(y,mask)
     e0 = pack(e,mask)
-    xx = pack(x,mask)
-    ex2 = pack(ex,mask)**2
-    cc = pack(cxy,mask)
+    allocate(xc(n,nc),ex2(n,nc),cc(n,nc),cxx(n,nc,nc))
+    do j = 1, nc
+       xc(:,j) = pack(x(:,j),mask)
+       ex2(:,j) = pack(ex(:,j),mask)**2
+       cc(:,j) = pack(cxy(:,j),mask)
+       do k = 1, nc
+          cxx(:,j,k) = pack(exx(:,j,k),mask)
+       end do
+    end do
+    xx = xc(:,1)
     allocate(e2(n),r(n),q(n),v(n),w(n))
 
-    ! the order is limited by the stars and by the range of the colours
-    p = min(order,2) + 1
+    ! the columns of the design matrix: the order is limited by the stars
+    ! and by the range of the colours (a colour of a single value has no
+    ! term)
+    cind = 0
+    cpow = 0
+    p = 1
+    do j = 1, nc
+       xs(j) = maxval(abs(xc(:,j)))
+       if( .not. (maxval(xc(:,j)) - minval(xc(:,j)) > &
+            1e-6_dbl*max(xs(j),1.0_dbl)) ) cycle
+       do k = 1, min(order(j),2)
+          if( p < pmax ) then
+             p = p + 1
+             cind(p) = j
+             cpow(p) = k
+          end if
+       end do
+    end do
     p = max(min(p,n),1)
-    xs = maxval(abs(xx))
-    if( .not. (maxval(xx) - minval(xx) > 1e-6_dbl*max(xs,1.0_dbl)) ) p = 1
     if( p == 1 ) xs = 1
     xs = max(xs,epsilon(xs))
+    colsc = 1
+    do k = 2, p
+       colsc(k) = xs(cind(k))**cpow(k)
+    end do
 
-    allocate(xm(n,3))
+    allocate(xm(n,p))
     xm(:,1) = 1
-    xm(:,2) = xx
-    xm(:,3) = xx**2
+    do k = 2, p
+       xm(:,k) = xc(:,cind(k))**cpow(k)
+    end do
+    ! several colours: the weighted least squares corrected for the errors
+    ! of the colours (see wls)
+    eiv = nc > 1 .and. any(cpow(2:p) == 1)
 
     q = 1
     th = 0
@@ -368,8 +480,7 @@ contains
        v = e2 + sigma**2
        w = 1 / v
        call wls(w,th,ainv)
-       beta(0:p-1) = th(1:p)
-       cov(1:p,1:p) = ainv(1:p,1:p)
+       call layout(th,ainv)
        if( present(dbeta0) ) dbeta0 = 1 / sqrt(sum(w))
        if( present(member) ) member = merge(1.0_dbl,0.0_dbl,mask)
        return
@@ -382,12 +493,18 @@ contains
     ! few stars: the fraction and the width of the outliers are fixed
     few = fixsig < 0 .and. n - p + 1 < nfew
 
-    ! the robust start: the slope by the median of the slopes of pairs,
-    ! the intercept by the median, the scatter by the median absolute
-    ! deviation of the normalised residuals
+    ! the robust start: the slope by the median of the slopes of pairs
+    ! (several colours: by the least absolute deviations), the intercept
+    ! by the median, the scatter by the median absolute deviation of
+    ! the normalised residuals
     th = 0
-    if( p >= 2 ) th(2) = theilsen(xx,yy)
-    th(1) = median(yy - th(2)*xx)
+    if( nc == 1 ) then
+       if( p >= 2 ) th(2) = theilsen(xx,yy)
+       th(1) = median(yy - th(2)*xx)
+    else
+       if( p >= 2 ) call ladfit(th)
+       th(1) = median(yy - matmul(xm(:,2:p),th(2:p)))
+    end if
     call effvar(th)
     e2med = median(e2)
     emin = sqrt(minval(e2))
@@ -428,8 +545,7 @@ contains
     w = q / (e2 + sigma**2)
     if( .not. (sum(w) > 0) ) w = 1 / (e2 + sigma**2)
     call wls(w,th1,ainv)
-    beta(0:p-1) = th(1:p)
-    cov(1:p,1:p) = ainv(1:p,1:p)
+    call layout(th,ainv)
     if( present(dbeta0) ) dbeta0 = 1 / sqrt(sum(w))
     ! the uncertainty of the estimated sigma in the errors of beta
     if( fixsig < 0 ) call smallsample(th)
@@ -451,29 +567,77 @@ contains
 
   contains
 
+    subroutine layout(th,ainv)
+      ! the coefficients and their covariance in the order of beta,
+      ! 0 (the intercept), 2j-1 (x(:,j)), 2j (x(:,j)**2)
+      real(dbl), dimension(:), intent(in) :: th
+      real(dbl), dimension(:,:), intent(in) :: ainv
+      integer, dimension(pmax) :: l
+      integer :: i, k
+      l(1) = 0
+      do k = 2, p
+         l(k) = 2*(cind(k) - 1) + cpow(k)
+      end do
+      do k = 1, p
+         beta(l(k)) = th(k)
+         do i = 1, p
+            cov(l(i)+1,l(k)+1) = ainv(i,k)
+         end do
+      end do
+    end subroutine layout
+
     subroutine smallsample(th)
       ! the covariance of beta (and dbeta0) with the uncertainty of
       ! the estimated sigma (see above): scaled by the scatter of
       ! the calibration stars about the fit th (weights w, at least 1)
       ! and by the square of the quantile of Student's t of nu degrees
       ! of freedom (at least 1)
-      real(dbl), dimension(3), intent(in) :: th
+      real(dbl), dimension(:), intent(in) :: th
       real(dbl) :: nu, qhk, fac
       nu = sum(q) - p
       if( .not. (nu > 0.5_dbl) ) return
       r = yy - matmul(xm(:,1:p),th(1:p))
       qhk = max(sum(w*r**2) / nu, 1.0_dbl)
       fac = tquant68(max(nu,1.0_dbl))**2 * qhk
-      cov(1:p,1:p) = fac * cov(1:p,1:p)
+      cov = fac * cov
       if( present(dbeta0) ) dbeta0 = sqrt(fac) * dbeta0
     end subroutine smallsample
+
+    subroutine ladfit(th)
+      ! the least absolute deviations of the polynomial (iteratively
+      ! reweighted least squares), the start of several colours
+      real(dbl), dimension(:), intent(out) :: th
+      real(dbl), dimension(pmax) :: t1
+      real(dbl), dimension(pmax,pmax) :: ai
+      real(dbl), dimension(n) :: wl, rl
+      real(dbl) :: dl
+      integer :: iter
+      logical :: eiv0
+      eiv0 = eiv
+      eiv = .false.
+      wl = 1
+      th = 0
+      call wls(wl,th,ai)
+      do iter = 1, 100
+         rl = yy - matmul(xm(:,1:p),th(1:p))
+         dl = max(1e-6_dbl*median(abs(rl)),1e-10_dbl)
+         wl = 1 / max(abs(rl),dl)
+         call wls(wl,t1,ai)
+         if( all(abs(t1(1:p) - th(1:p))*colsc(1:p) <= 1e-9_dbl) ) then
+            th = t1
+            exit
+         end if
+         th = t1
+      end do
+      eiv = eiv0
+    end subroutine ladfit
 
     subroutine emloop(th,sigma,f)
       ! the EM algorithm from th, sigma, f; the fraction f and the width B
       ! of the outliers fixed for few stars
-      real(dbl), dimension(3), intent(in out) :: th
+      real(dbl), dimension(:), intent(in out) :: th
       real(dbl), intent(in out) :: sigma, f
-      real(dbl), dimension(3) :: th1
+      real(dbl), dimension(pmax) :: th1
       real(dbl) :: sig1, f1, sq
       integer :: iter, k
       logical :: conv
@@ -513,7 +677,7 @@ contains
 
          conv = abs(sig1 - sigma) <= tol*emin .and. abs(f1 - f) <= tol
          do k = 1, p
-            conv = conv .and. abs(th1(k) - th(k))*xs**(k-1) <= tol*emin
+            conv = conv .and. abs(th1(k) - th(k))*colsc(k) <= tol*emin
          end do
          th = th1
          sigma = sig1
@@ -526,9 +690,9 @@ contains
     subroutine remlfit(th,sigma)
       ! the weighted fit and sigma by the restricted likelihood of all
       ! the stars (q = 1, no outliers), iterated from th, sigma
-      real(dbl), dimension(3), intent(in out) :: th
+      real(dbl), dimension(:), intent(in out) :: th
       real(dbl), intent(in out) :: sigma
-      real(dbl), dimension(3) :: th1
+      real(dbl), dimension(pmax) :: th1
       real(dbl) :: sig1
       integer :: iter, k
       logical :: conv
@@ -547,7 +711,7 @@ contains
          end if
          conv = abs(sig1 - sigma) <= tol*emin
          do k = 1, p
-            conv = conv .and. abs(th1(k) - th(k))*xs**(k-1) <= tol*emin
+            conv = conv .and. abs(th1(k) - th(k))*colsc(k) <= tol*emin
          end do
          th = th1
          sigma = sig1
@@ -558,9 +722,9 @@ contains
     real(dbl) function mixlike(th,s,f)
       ! the restricted log-likelihood of the mixture (q by the E-step):
       ! sum ln((1-f) N(r,v) + f N(r,v+B**2)) - 1/2 ln det X'UX
-      real(dbl), dimension(3), intent(in) :: th
+      real(dbl), dimension(:), intent(in) :: th
       real(dbl), intent(in) :: s, f
-      real(dbl), dimension(3,3) :: am
+      real(dbl), dimension(pmax,pmax) :: am
       real(dbl), dimension(n) :: u
       integer :: i, j
       call effvar(th)
@@ -628,8 +792,8 @@ contains
       ! r the residuals of the weighted fit at s
       real(dbl), intent(in) :: s
       real(dbl), dimension(n) :: vs, u, rs
-      real(dbl), dimension(3,3) :: am, ai
-      real(dbl), dimension(3) :: b, t
+      real(dbl), dimension(pmax,pmax) :: am, ai
+      real(dbl), dimension(pmax) :: b, t
       integer :: i, j
       vs = e2 + s**2
       u = q / vs
@@ -649,23 +813,45 @@ contains
     end function remlike
 
     subroutine effvar(th)
-      ! the variance of y - g(x) by the errors of y and x
-      real(dbl), dimension(3), intent(in) :: th
+      ! the variance of y - g(x) by the errors of y and x: g' the slopes
+      ! of the polynomial by the colours, the covariances of the colours
+      ! and of y with them
+      real(dbl), dimension(:), intent(in) :: th
       real(dbl), dimension(n) :: gp
-      if( p >= 2 ) then
-         gp = th(2)
-         if( p >= 3 ) gp = gp + 2*th(3)*xx
+      real(dbl), dimension(n,nc) :: gpm
+      integer :: j, k
+      if( nc == 1 ) then
+         if( p >= 2 ) then
+            gp = th(2)
+            if( p >= 3 ) gp = gp + 2*th(3)*xx
+         else
+            gp = 0
+         end if
+         e2 = e0**2 + gp**2*ex2(:,1) - 2*gp*cc(:,1)
       else
-         gp = 0
+         gpm = 0
+         do k = 2, p
+            if( cpow(k) == 1 ) then
+               gpm(:,cind(k)) = gpm(:,cind(k)) + th(k)
+            else
+               gpm(:,cind(k)) = gpm(:,cind(k)) + 2*th(k)*xc(:,cind(k))
+            end if
+         end do
+         e2 = e0**2
+         do j = 1, nc
+            e2 = e2 + gpm(:,j)**2*ex2(:,j) - 2*gpm(:,j)*cc(:,j)
+            do k = j + 1, nc
+               e2 = e2 + 2*gpm(:,j)*gpm(:,k)*cxx(:,j,k)
+            end do
+         end do
       end if
-      e2 = e0**2 + gp**2*ex2 - 2*gp*cc
       ! the covariance cannot make the variance smaller than the parts
       ! independent of the catalogue magnitude (a numerical guard)
       e2 = max(e2,0.01_dbl*e0**2)
     end subroutine effvar
 
     subroutine estep(th,sigma,f)
-      real(dbl), dimension(3), intent(in) :: th
+      real(dbl), dimension(:), intent(in) :: th
       real(dbl), intent(in) :: sigma, f
       real(dbl), dimension(n) :: lin, lout, den
       v = e2 + sigma**2
@@ -682,12 +868,23 @@ contains
 
     subroutine wls(w,th,ainv)
       ! weighted least squares: th = (X'WX)**-1 X'W y, ainv = (X'WX)**-1;
-      ! the mean directly
+      ! the mean directly. Several colours (eiv): the observed colours
+      ! scatter about the true ones by their errors, which biases
+      ! the slopes towards zero (the regression dilution; the colours of
+      ! u - g and g - r are correlated, so 4% and 10% for k = -0.3, +0.2
+      ! with SDSS errors, more than the errors of 100 stars). The moments
+      ! of the linear terms are corrected by the expected contribution of
+      ! the errors (Fuller 1987, Measurement Error Models, 2.2):
+      ! X'WX - sum w S, X'Wy - sum w C, S the covariances of the colours
+      ! of a star, C their covariances with y; ainv the covariance of
+      ! the corrected estimate, A**-1 X'WX A**-1. The correction is not
+      ! applied when the corrected matrix is not well positive (errors
+      ! comparable to the range of the colours)
       real(dbl), dimension(:), intent(in) :: w
-      real(dbl), dimension(3), intent(out) :: th
-      real(dbl), dimension(3,3), intent(out) :: ainv
-      real(dbl), dimension(3,3) :: am
-      real(dbl), dimension(3) :: b
+      real(dbl), dimension(:), intent(out) :: th
+      real(dbl), dimension(:,:), intent(out) :: ainv
+      real(dbl), dimension(pmax,pmax) :: am, ac, ai
+      real(dbl), dimension(pmax) :: b, bc
       real(dbl) :: sw
       integer :: i, j
       th = 0
@@ -708,6 +905,30 @@ contains
       end do
       call syminv(am,p,ainv)
       th(1:p) = matmul(ainv(1:p,1:p),b(1:p))
+      if( .not. eiv ) return
+
+      ac = am
+      bc = b
+      do i = 2, p
+         if( cpow(i) /= 1 ) cycle
+         bc(i) = bc(i) - sum(w*cc(:,cind(i)))
+         do j = 2, p
+            if( cpow(j) /= 1 ) cycle
+            if( cind(i) == cind(j) ) then
+               ac(i,j) = ac(i,j) - sum(w*ex2(:,cind(i)))
+            else
+               ac(i,j) = ac(i,j) - sum(w*cxx(:,cind(i),cind(j)))
+            end if
+         end do
+      end do
+      ! a guard: the corrected diagonal at least a half of the observed one
+      do i = 2, p
+         if( .not. (ac(i,i) > 0.5_dbl*am(i,i)) ) return
+      end do
+      call syminv(ac,p,ai)
+      if( .not. (ai(1,1) > 0) ) return
+      th(1:p) = matmul(ai(1:p,1:p),bc(1:p))
+      ainv(1:p,1:p) = matmul(ai(1:p,1:p),matmul(am(1:p,1:p),ai(1:p,1:p)))
     end subroutine wls
 
     real(dbl) function madnorm(s)
@@ -725,7 +946,7 @@ contains
       ! h the leverage of the polynomial (of the mean: u/sum(u))
       real(dbl), intent(in) :: s
       real(dbl), dimension(n) :: u, ws, h
-      real(dbl), dimension(3,3) :: am, ai
+      real(dbl), dimension(pmax,pmax) :: am, ai
       real(dbl) :: su
       integer :: i, j
       ws = 1 / (e2 + s**2)
@@ -856,12 +1077,12 @@ contains
   real(dbl) function logdet(a,p)
 
     ! the logarithm of the determinant of the symmetric positive definite
-    ! matrix a(1:p,1:p) by the Cholesky decomposition (p <= 3)
+    ! matrix a(1:p,1:p) by the Cholesky decomposition (p <= pmax)
 
-    real(dbl), dimension(3,3), intent(in) :: a
+    real(dbl), dimension(pmax,pmax), intent(in) :: a
     integer, intent(in) :: p
 
-    real(dbl), dimension(3,3) :: l
+    real(dbl), dimension(pmax,pmax) :: l
     real(dbl) :: s
     integer :: i, j
 
@@ -886,13 +1107,13 @@ contains
   subroutine syminv(a,p,ai)
 
     ! the inverse of the symmetric positive definite matrix a(1:p,1:p)
-    ! by the Cholesky decomposition (p <= 3); ai = 0 for a singular one
+    ! by the Cholesky decomposition (p <= pmax); ai = 0 for a singular one
 
-    real(dbl), dimension(3,3), intent(in) :: a
+    real(dbl), dimension(pmax,pmax), intent(in) :: a
     integer, intent(in) :: p
-    real(dbl), dimension(3,3), intent(out) :: ai
+    real(dbl), dimension(pmax,pmax), intent(out) :: ai
 
-    real(dbl), dimension(3,3) :: l, li
+    real(dbl), dimension(pmax,pmax) :: l, li
     integer :: i, j, k
     real(dbl) :: s
 
