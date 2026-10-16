@@ -38,9 +38,11 @@ aphot_LDADD   = $(ldir)/libpsfmodel.a $(ldir)/libclipmean.a $(LIBOAKLEAF) \
 aphottester_SOURCES = skymean.f08 daofotometr.f08 fitsaphot.f08 aphottester.f08
 aphottester_LDADD   = $(ldir)/libclipmean.a $(LIBOAKLEAF) $(LIBMINPACK) $(FITSADD)
 
-gphot_SOURCES = growinit.f95 growmodel.f95 growfit.f95\
-                growreport.f95 growcurve.f95 fitsgphot.f08 gphot.f08
-gphot_LDADD   = $(ldir)/liblmin.a $(ldir)/libpppack.a $(ldir)/libminpacks.a \
+gphot_SOURCES = skymean.f08 daosky.f95 daofotometr.f08 exscatter.f08 apee.f08 \
+                growinit.f95 growmodel.f95 growfit.f95 \
+                growreport.f95 growcurve.f95 growee.f08 fitsgphot.f08 gphot.f08
+gphot_LDADD   = $(ldir)/libpsfmodel.a $(ldir)/libclipmean.a \
+                $(ldir)/liblmin.a $(ldir)/libpppack.a $(ldir)/libminpacks.a \
                 $(ldir)/libfmm.a $(LIBOAKLEAF) $(LIBMINPACK) $(FITSADD)
 
 phcal_SOURCES =  fitsfotran.f95 rational.f95 rplane.f95 \

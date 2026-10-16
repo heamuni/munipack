@@ -43,7 +43,7 @@ module grow_curve
 
 !  private :: growcurve, select_valid_isolated, curve_init, grow_deepest, &
   private :: growcurve, select_valid_isolated, curve_init, model_curve, &
-       curve_spline, grow_phot, estim_rflux90, estim_hwhm
+       curve_spline, grow_phot
 
 contains
 
