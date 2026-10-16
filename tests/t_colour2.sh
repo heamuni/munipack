@@ -133,6 +133,10 @@ check "their |MAG - g - median| / MAGERR (max)" "$(awk -v m="$med" '$5 == 2 {
     z = ($1 - m) / $4; if (z < 0) z = -z; if (z > zm) zm = z } END { print zm + 0 }' res.txt)" 0 3
 
 # with the errors of the colours: their correlation (g shared) in the errors
+# (the catalogue is exact here, so the correction for the errors of
+# the colours, BUGS P57, over-corrects a little: lambda 0.99, within
+# the checks; a real catalogue measured with these errors is the case of
+# t_colerr)
 munipack phcal $C --color-term upmag,gpmag,e_upmag,e_gpmag \
     --color-term gpmag,rpmag,e_gpmag,e_rpmag -t t2e x.fits > /dev/null 2>&1
 h="t2e/x.fits[PHOTOMETRY]"

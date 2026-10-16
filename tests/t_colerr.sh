@@ -52,8 +52,10 @@ munipack phcal $C --color-term Bmag,Vmag,e_Bmag,e_Vmag --color-err-correct no \
     -t cn V.fits > /dev/null 2>&1
 h="cn/V.fits[PHOTOMETRY]"
 check "not corrected: COLTDILU" "$(key "$h" COLTDILU | grep -c F)" 1 1
-check "not corrected: COLTLAM as corrected" "$(key "$h" COLTLAM)" \
-    "$(key "ce/V.fits[PHOTOMETRY]" COLTLAM)" "$(key "ce/V.fits[PHOTOMETRY]" COLTLAM)"
+# (COLTLAM by the weights of the fit, which depend on its slope a little)
+lc=$(key "ce/V.fits[PHOTOMETRY]" COLTLAM)
+check "not corrected: COLTLAM near the corrected one" "$(key "$h" COLTLAM)" \
+    "$(awk -v l="$lc" 'BEGIN { print l - 0.01 }')" "$(awk -v l="$lc" 'BEGIN { print l + 0.01 }')"
 check "not corrected: (COLTK1 + 0.3) / COLTK1E" "$(pull cn)" 2.5 10
 
 # without the error columns: no correction, no keys of it
@@ -87,6 +89,74 @@ munipack phcal $CV --col-magerr e_Vlow --color-term Bmag,Vmag,e_Bmag,e_Vmag -t s
     > /dev/null 2> svl/err.txt
 check "noisy V, --col-magerr of 0.01: (COLTK1 + 0.3) / COLTK1E" "$(pull svl)" -2.5 2.5
 check "noisy V, --col-magerr of 0.01: the warning" "$(grep -c 'differ' svl/err.txt)" 1 9
+
+# the zero point: CTPH of the colour 0.75 against the one of the exact
+# catalogue (the truth, no error columns), orders 1 and 2; the order 2 of
+# these colours is capped (the square of the colour hardly wider than its
+# errors), which is reported
+mkdir zt zc zt2 zc2
+CT="--photsys-ref Johnson -f V --col-ra RAJ2000 --col-dec DEJ2000 -c truth.fits --col-mag Vmag"
+dz() {   # dz A B: (CTPH(A) - CTPH(B)) / the errors
+    awk -v a="$(key "$1/V.fits[PHOTOMETRY]" CTPH)" -v ea="$(key "$1/V.fits[PHOTOMETRY]" CTPHERR)" \
+        -v b="$(key "$2/V.fits[PHOTOMETRY]" CTPH)" -v eb="$(key "$2/V.fits[PHOTOMETRY]" CTPHERR)" \
+        'BEGIN { print (a - b) / sqrt(ea * ea + eb * eb) }'
+}
+munipack phcal $CT --color-term Bmag,Vmag --color-ref 0.75 -t zt V.fits > /dev/null 2>&1
+munipack phcal $C --color-term Bmag,Vmag,e_Bmag,e_Vmag --color-ref 0.75 -t zc V.fits \
+    > /dev/null 2>&1
+check "CTPH of the colour 0.75 against the truth (in errors)" "$(dz zc zt)" -3 3
+munipack phcal $CT --color-term Bmag,Vmag --color-ref 0.75 --color-order 2 -t zt2 V.fits \
+    > /dev/null 2>&1
+munipack phcal $C --color-term Bmag,Vmag,e_Bmag,e_Vmag --color-ref 0.75 --color-order 2 \
+    -t zc2 V.fits > /dev/null 2> zc2/err.txt
+h="zc2/V.fits[PHOTOMETRY]"
+check "order 2: the cap reported" "$(grep -c capped zc2/err.txt)" 1 9
+check "order 2: COLTDILU" "$(key "$h" COLTDILU | grep -c T)" 1 1
+check "order 2: COLTCAP" "$(key "$h" COLTCAP)" 0.01 0.99
+check "order 2: (COLTK1 + 0.3) / COLTK1E" "$(pull zc2)" -3 3
+check "order 2: COLTK2 (0) / COLTK2E" "$(awk -v k="$(key "$h" COLTK2)" \
+    -v e="$(key "$h" COLTK2E)" 'BEGIN { print k / e }')" -3 3
+check "order 2: CTPH against the truth (in errors)" "$(dz zc2 zt2)" -3 3
+
+# two colours sharing the noisy band of the calibration: V (0.1 mag) in
+# y, B - V and V - R (cov -0.1**2), R - V independent of B - V; the frame
+# of X = V + 0.3 (B - V) - 0.2 (V - R), so k = -0.3, +0.2
+column "truth.fits[1]" RAJ2000 DEJ2000 Vmag Bmag | awk '
+    function rnd() { s = (s * 16807) % 2147483647; return s / 2147483647 }
+    BEGIN { s = 99 }
+    { print $1, $2, $3, $4, $3 - 0.3 - 0.8 * rnd() }' > vbr.txt
+awk '{ print $1, $2, $3 + 0.3 * ($4 - $3) - 0.2 * ($3 - $5), $4 }' vbr.txt | catfits inst3.fits
+munipack artificial -c inst3.fits $CATCOLS -f V --rcen 200 --dcen -20 \
+    --scale 3600 --width 540 --height 540 --exptime 60 --psf GAUSS --hwhm 1.4 \
+    --gain 2 --readnoise 4 --bias 100 --seed 5 --no-watermark --mask V3.fits \
+    > /dev/null 2>&1
+munipack find -f 3.3 V3.fits > /dev/null 2>&1
+munipack aphot V3.fits > /dev/null 2>&1
+awk '
+    function rnd() { s = (s * 16807) % 2147483647; return s / 2147483647 }
+    function gauss() { return sqrt(-2 * log(rnd())) * cos(2 * pi * rnd()) }
+    BEGIN { s = 555; pi = atan2(0, -1) }
+    { printf "%s %s 0 0 %.4f 0.1 %.4f 0.01 %.4f 0.01\n", $1, $2, $3 + 0.1 * gauss(), \
+        $4 + 0.01 * gauss(), $5 + 0.01 * gauss() }' vbr.txt \
+    | tabfits cat3.fits "RAJ2000 D deg DEJ2000 D deg pmRA D mas/yr pmDE D mas/yr \
+    Vmag E - e_Vmag E - Bmag E - e_Bmag E - Rmag E - e_Rmag E -"
+C3="--photsys-ref Johnson -f V --col-ra RAJ2000 --col-dec DEJ2000 -c cat3.fits \
+    --col-mag Vmag --col-magerr e_Vmag --color-term Bmag,Vmag,e_Bmag,e_Vmag \
+    --color-term Vmag,Rmag,e_Vmag,e_Rmag"
+mkdir t3 t3n
+munipack phcal $C3 -t t3 V3.fits > /dev/null 2>&1
+munipack phcal $C3 --color-err-correct no -t t3n V3.fits > /dev/null 2>&1
+p3() {   # p3 DIR KEY TRUTH: the pull of a coefficient
+    awk -v k="$(key "$1/V3.fits[PHOTOMETRY]" $2)" -v e="$(key "$1/V3.fits[PHOTOMETRY]" ${2}E)" \
+        -v t="$3" 'BEGIN { print (k - t) / e }'
+}
+check "two colours: (COLTK1 + 0.3) / COLTK1E" "$(p3 t3 COLTK1 -0.3)" -3 3
+check "two colours: (COLT2K1 - 0.2) / COLT2K1E" "$(p3 t3 COLT2K1 0.2)" -3 3
+check "two colours: COLTLAM2" "$(key "t3/V3.fits[PHOTOMETRY]" COLTLAM2)" 0.5 0.99
+check "two colours, not corrected: COLTDILU" \
+    "$(key "t3n/V3.fits[PHOTOMETRY]" COLTDILU | grep -c F)" 1 1
+check "two colours, not corrected: |pull of COLT2K1|" \
+    "$(p3 t3n COLT2K1 0.2 | awk '{ print ($1 < 0 ? -$1 : $1) }')" 3 100
 
 expect_fail "--color-err-correct maybe" munipack phcal $C \
     --color-term Bmag,Vmag,e_Bmag,e_Vmag --color-err-correct maybe V.fits
