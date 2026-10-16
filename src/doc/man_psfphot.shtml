@@ -215,17 +215,7 @@ munipack psfphot [.. parameters ..] file(s)
   representation as a PSF file. <i>P<sub>t</sub></i> are the terms of
   a polynomial of the order 0, 1 or 2 (<samp>--psf-var</samp>; 1, 3
   or 6 terms: 1, x, y, x², xy, y²) in the coordinates normalised to
-  ±1 over the frame (DAOPHOT VARIABLE = 0, 1, 2), followed by the
-  powers ρ, ρ², ρ³ of the field radius up to the order of
-  <samp>--psf-var-radial</samp> (ρ² is left out with the order 2 in x, y,
-  which contains it). ρ is the distance from the field centre of PSF
-  files (NAXIS/2 or <samp>--psf-centre</samp>, the convention of
-  artificial and of PSF files) divided by the distance of the farthest
-  corner of the frame. Optics of a wide field change the PSF with the
-  field radius (a core mixed with a halo, the defocus of a curved
-  field), which a polynomial in x, y of a low order does not follow;
-  the radial terms do, and combined with <samp>--psf-var 1</samp> they
-  add a linear tilt over the field.
+  ±1 over the frame (DAOPHOT VARIABLE = 0, 1, 2).
 </p>
 
 <ul>
@@ -253,91 +243,36 @@ munipack psfphot [.. parameters ..] file(s)
   PSF star is fitted together with the tables, on its pixels and a ring
   just outside of the table radius (a quarter of it, at least 3 pixels),
   where the tables are zero: inside of the table a sky error cannot be
-  told from a pedestal of the tables. The weights are those of the fits
-  (no floor of one electron, as before 0.6.2+hg1653 patched, P53).
-  A regularisation by the squared Laplacian of the tables keeps them
-  smooth where few stars sample the grid. It is relative to the
-  information of every sample (the local diagonal of the normal
-  matrix): the wing samples of bright stars carry orders of magnitude
-  more weight than those of the core, so a regularisation relative to
-  the mean of the diagonal (before P53) smoothed the core strongly. Its
-  strength is chosen by the cross-validation: the tables built on three
-  quarters of the PSF stars predict the pixels of the other quarter
-  (four folds, the decades 0.001 to 10, from 0.1 to the lower score;
-  at least 16 PSF stars, 0.01 otherwise; <samp>--psf-smooth</samp> sets
-  it, PSFSMOOT records it).
+  told from a pedestal of the tables. A light
+  regularisation by the squared Laplacian of the tables
+  (<samp>--psf-smooth</samp>, relative to the mean of the diagonal of the
+  normal matrix) keeps them smooth where few stars sample the grid.
   The system is solved by the preconditioned conjugate gradients.
 </li>
-<li>The tables do not move the centroid: after every build they are
-  corrected by a combination of the base and its derivatives so that
-  their first moments are zero and their sums are those of the flux
-  normalisation (below), and the model is rescaled accordingly. The
-  centre of the PSF is the centroid of the base (for a symmetric core,
-  the centroid of the star; in the correction mode, the convention of
-  the file). The tables are zero outside of their radius, where no data
-  constrain them; beyond the table the PSF is the base.
-</li>
-<li>The flux normalisation: the base carries the light beyond the table
-  in its wings, which need not be those of the stars (a halo), and the
-  fluxes were biased by the difference: −4.4% on frames of a PSF with
-  a halo (dpsf.fits) with an analytic core, −8% at the field edge. The
-  PSF stars measure it: the light in the aperture of the radius
-  2.5 times the table radius of 4 FWHM (15–40 pixels; just outside of
-  the table with a file or <samp>--psf-radius</samp>; PSFNAPER), the sky
-  in the ring outside of it and the neighbours subtracted, plus the light
-  of the base beyond the aperture, is the total flux T of a star.
-  For every star, the flux of the tables which makes the flux fitted at
-  its position equal to T (by the response of the fit to the added
-  flux) is fitted by the terms of the variation, with the variance of
-  the difference by the pixels, a systematic error added when the
-  scatter is significant (χ² above its 99% quantile; PSFSYSER),
-  outliers clipped at 5σ, and applied when significant: its χ² above
-  the quantile of the probability of 3σ of the Normal distribution (9
-  for one term), fully above 4σ, linearly between (a correct base or core
-  is not changed by the noise of the apertures); repeated until the
-  change is below 0.1σ. The stars with saturated stars in the aperture
-  and its ring, or with neighbours brighter than a half of the star
-  together, are not used (1% of the light of the neighbours is added to
-  the variance); with fewer stars than the terms plus three, the
-  normalisation is not done (PSFNORMN). PSFNORM, PSFNORME are the flux
-  of the tables at the field centre and its error. Without a file, the
-  table radius is the radius of 99.5% of the flux by the growth curves
-  of the PSF stars (fitted linearly in the field radius, the largest at
-  the PSF stars, PSFR995), at least 4 FWHM, at most 0.75 of the
-  aperture; the PSF stars are then selected again for it.
-</li>
-<li>The uncertainty of the model is added to the errors of the fluxes
-  (PSFMODERR, included in PSFCOUNTERR): the tables are built also on
-  eight interleaved subsets of the PSF stars (at least four per subset);
-  the fluxes of a star by the tables of the subsets, linearised at its
-  fit, scatter by the noise of the tables, and the variance of their
-  mean is that of its flux; the variance of the applied normalisation
-  at the position of the star and the systematic error of the
-  normalisation (the scatter of the PSF stars about it, which measures
-  a PSF the variation does not follow) are added. On a PSF with a halo
-  that the constant PSF cannot follow, the pulls of bright stars are
-  1.04 instead of 9 (the error is large: 4.6%); where the model follows
-  the PSF, PSFMODERR is 0.01–0.03% and the pulls are those of the file
-  PSF.
+<li>The tables carry no flux and do not move the centroid: after every
+  build they are corrected by a combination of the base and its
+  derivatives so that their sums and first moments are zero, and the
+  model is rescaled accordingly. The flux of the PSF is the flux of the
+  base (the analytic core is normalised to the unit flux over the whole
+  plane, the light beyond the table is in its wings); the centre of the
+  PSF is the centroid of the base (for a symmetric core, the centroid
+  of the star; in the correction mode, the convention of the file).
+  The tables are zero outside of their radius, where no data constrain
+  them.
 </li>
 <li>The correction of a PSF file shrinks towards zero where the data
-  do not support it, so a correct base is not changed by the noise: in
-  radial zones (0, 1, 1.5, 2, 3, 4, 6, 8, 11, 15, 21, 30 pixels) and
-  for every term, the mean of the table (a change of the encircled
-  energy) and the fluctuation about it are kept when their power
-  relative to the variance by the subsets exceeds the square of the
-  97.5% quantile of Student's t of the subsets − 1 degrees of freedom
-  (5.6 for eight subsets), zeroed below that of the 90% quantile (2.0),
-  linearly between (before P53: 4 and 2). The variance of the mean
-  includes a systematic floor of 0.05% of the flux per zone: the
-  background and the crowding of a frame are not known better (a
-  correct dpsf.fits base gained up to ±0.25% without it). The
-  correction of a field-dependent file (more than one PSF) varies with
-  the field radius (<samp>--psf-var-radial 1</samp>) by default when
-  there are at least 20 PSF stars: a 10% broader dpsf.fits base is
-  corrected from +2.2% to −0.01% (−0.30%, +0.33% at the centre and the
-  edge with a constant correction), an asymmetric one from +0.9% to
-  −0.003%; a correct base gives the fluxes of the file.
+  do not support it, so a correct base is not changed by the noise: the
+  tables are built also on eight interleaved subsets of the PSF stars;
+  in radial zones (0, 1, 1.5, 2, 3, 4, 6, 8, 11, 15, 21, 30 pixels) and
+  for every polynomial term, the mean of the table (a change of the
+  encircled energy) and the fluctuation about it are kept when their
+  power exceeds four times the variance by the subsets (2σ), zeroed
+  below twice it, linearly between. The variance of the mean includes a
+  systematic floor of 0.05% of the flux per zone: the background and
+  the crowding of a frame are not known better (a correct dpsf.fits
+  base gained up to ±0.25% without it). Corrections below that level
+  are not applied: a 10% broader base is corrected from +2.2% to
+  about ±0.3%, an asymmetric one from +0.9% to +0.05–0.13%.
 </li>
 <li>Iterations (three): all stars are fitted by the current PSF
   (neighbours subtracted, groups fitted simultaneously), the tables are
@@ -345,14 +280,12 @@ munipack psfphot [.. parameters ..] file(s)
 </li>
 <li>The zoom is 4 for FWHM &lt; 5 pixels and 2 otherwise
   (<samp>--psf-zoom</samp>), the zoom of the file in the correction mode.
-  The table radius is that of 99.5% of the flux, at least 4 FWHM
-  (<samp>--psf-radius</samp>, see the normalisation); in the
+  The table radius is 4 FWHM (<samp>--psf-radius</samp>); in the
   correction mode it covers the whole stamps of the file (a halo of
   the field PSFs can reach far beyond 4 FWHM).
 </li>
-<li>The variation requires three stars per term (an order 1 or 2: 9,
-  18; a radial order adds one term per power); with fewer stars the
-  order in x, y is lowered first, then the radial one, with a warning. The
+<li>The variation of the order 1 or 2 requires three stars per term
+  (9, 18); with fewer stars a lower order is used with a warning. The
   analytic core does not vary over the field, the tables absorb the
   variation of the width (as in DAOPHOT).
 </li>
@@ -363,22 +296,16 @@ munipack psfphot [.. parameters ..] file(s)
   A varying PSF (or a correction of a file) is sampled on rings around
   the field centre (NAXIS/2 or <samp>--psf-centre</samp>, the same
   convention as for PSF files) up to the farthest corner of the frame:
-  2 rings for the order 0 or 1 and the radial order 0 or 1 (the file
-  interpolates linearly in the radius), 12 rings otherwise, by 16
-  angles for the order 0 or 1, 32 for 2 (plus the rings of the base
-  file inside of the frame).
+  2 rings by 16 angles for the order 0 or 1, 12 rings by 32 angles
+  for the order 2 (plus the rings of the base file inside of the frame).
   RADCOO is the distance in pixels divided by the scale of the frame
   [pix/deg] (WCS or <samp>--scale</samp>); without a scale, RADCOO is in
   pixels (the scale 1) and the file is used with <samp>--scale 1</samp>.
   The primary header records PSFCEN1, PSFCEN2, PSFSCALE, FWHM and PSFRAD.
   The file interpolates linearly between the rings and angles: the saved
   PSF of the order 2 reproduces the fluxes of the internal one to
-  0.05% (99% of stars), the constant one and the radial order 1 to
-  0.001%. The stamps contain the core out to 99.9% of its flux; with the
-  normalisation they sum to the flux of the model in them (psfphot and
-  artificial warn of a sum other than ZOOM²: the light of the stars
-  beyond the stamps is not modelled, 0.4% at the edge of dpsf.fits
-  frames).
+  0.05% (99% of stars), the constant one to 0.001%. The stamps contain
+  the core out to 99.9% of its flux.
 </li>
 </ul>
 
@@ -386,16 +313,12 @@ munipack psfphot [.. parameters ..] file(s)
   Limitations: the polynomial represents smooth variations (focus,
   astigmatism, coma growing over the field). A PSF which changes its
   structure over the field (for example a sharp core and a wide halo
-  mixed linearly with the radius) is not a low-order polynomial in x, y
-  (<samp>--psf-var 2</samp> leaves ±0.8% in radial zones of dpsf.fits
-  frames); when it changes with the field radius, the radial terms
-  follow it (<samp>--psf-var-radial 1</samp>: −0.02%, within ±0.04% in
-  every zone), otherwise the correction mode with a model of the PSF
-  (from the laboratory or an optics simulation) as the base is suitable.
-  The normalisation needs isolated bright stars: in a field where few
-  apertures are clean, the wings beyond the table are those of the core.
-  The PSF stars must be mostly single: in a field where most stars are
-  unresolved blends the PSF is too broad.
+  mixed linearly with the radius) is not a low-order polynomial;
+  the correction mode with a model of the PSF (from the laboratory or
+  an optics simulation) as the base is suitable for it. The wings
+  beyond the table radius are those of the core. The PSF stars must be
+  mostly single: in a field where most stars are unresolved blends the
+  PSF is too broad.
 </p>
 
 <h2>Parameters</h2>
@@ -415,22 +338,16 @@ munipack psfphot [.. parameters ..] file(s)
   <dd>The samples per pixel of the empirical PSF: 4 for FWHM &lt; 5
     pixels, 2 otherwise.</dd>
   <dt><samp>--psf-radius r</samp></dt>
-  <dd>The radius of the residual tables in pixels; by default the
-    radius of 99.5% of the flux of the PSF stars, at least 4 FWHM.</dd>
+  <dd>The radius of the residual tables in pixels, 4 FWHM by default.</dd>
   <dt><samp>--psf-var 0|1|2</samp></dt>
   <dd>The order of the polynomial variation over the field, 0 by default.</dd>
-  <dt><samp>--psf-var-radial 0|1|2|3</samp></dt>
-  <dd>The order of the variation with the field radius (the powers of
-    the field radius added to the terms), 0 by default; 1 for the
-    correction of a field-dependent PSF file with at least 20 PSF stars.</dd>
   <dt><samp>--psf-stars n</samp></dt>
   <dd>The maximum of the PSF stars, 100 by default.</dd>
   <dt><samp>--psf-list file</samp></dt>
   <dd>The PSF stars: x y [pix] per line (# for comments), or a FITS table
     (.fits, .fit, .fts) with the columns X, Y.</dd>
   <dt><samp>--psf-smooth s</samp></dt>
-  <dd>The regularisation of the tables relative to the local diagonal
-    of the normal matrix; by default chosen by the cross-validation.</dd>
+  <dd>The regularisation of the tables, 0.01 by default.</dd>
   <dt><samp>--psf-save file</samp></dt>
   <dd>Save the empirical PSF to the PSF file (overwritten); for a single
     input file.</dd>
@@ -505,8 +422,7 @@ munipack psfphot [.. parameters ..] file(s)
   <dt>PSFCOUNT, PSFCOUNTERR</dt><dd>The total flux of the star (the integral
     of the PSF) and its error in the units of the frame (ADU), the same
     quantity as GCOUNT of <a href="man_gphot.html">gphot</a> or
-    aperture-corrected APCOUNT. PSFCOUNTERR is -1 when the fit failed;
-    with the empirical PSF it includes PSFMODERR.</dd>
+    aperture-corrected APCOUNT. PSFCOUNTERR is -1 when the fit failed.</dd>
   <dt>SKY, SKYERR</dt><dd>The sky and its error [ADU].</dd>
   <dt>CHI2</dt><dd>The reduced χ² of the fit (about 1 for a good fit).</dd>
   <dt>SHARP</dt><dd>The relative residual in the core (inside the half of
@@ -525,9 +441,6 @@ munipack psfphot [.. parameters ..] file(s)
     faint stars above).</dd>
   <dt>GROUP, GSIZE</dt><dd>The group of the simultaneous fit in the last
     pass (0 for a star fitted alone) and its size.</dd>
-  <dt>PSFMODERR</dt><dd>(the empirical PSF only, after GSIZE) The error
-    of PSFCOUNT by the uncertainty of the PSF (see the empirical PSF),
-    included in PSFCOUNTERR in quadrature [ADU].</dd>
 </dl>
 
 <p>
@@ -540,14 +453,10 @@ munipack psfphot [.. parameters ..] file(s)
   RESTHRES (the threshold of the detection in the residuals [σ]) and
   the detector parameters used for the weights: GAIN, READNS, BIASLEV,
   SATURATE. The empirical PSF adds PSFCORE (GAUSS, MOFFAT, FILE), PSFVAR,
-  PSFVARR (the radial order), PSFNSTAR (the PSF stars), PSFNSHAP (stars
-  of the core fit), PSFRAD [pix], PSFR995 (the radius of 99.5% of the
-  flux by the growth curve [pix]), PSFRESRM (the rms of the constant
-  table relative to the peak of the core), PSFCHI2 (the median χ² of
-  the PSF stars), PSFITER, PSFSMOOT (the regularisation), PSFNAPER (the
-  aperture of the normalisation [pix]), PSFNORMN (its stars), PSFNORM,
-  PSFNORME (the flux of the tables at the field centre and its error),
-  PSFSYSER (the relative systematic error of the fluxes) and PSFSAVED; FWHM is that of the empirical PSF at the field centre and
+  PSFNSTAR (the PSF stars), PSFNSHAP (stars of the core fit), PSFRAD
+  [pix], PSFRESRM (the rms of the constant table relative to the peak of
+  the core), PSFCHI2 (the median χ² of the PSF stars), PSFITER and
+  PSFSAVED; FWHM is that of the empirical PSF at the field centre and
   PSFSIGMA (PSFALPHA, PSFBETA), PSFAXRAT, PSFPA describe the core.
 </p>
 
@@ -587,14 +496,6 @@ $ munipack phcal --photometry=psf -c cat.fits ... artificial.fits
 $ munipack psfphot --psf EMPIRICAL --psf-var 2 --psf-save epsf.fits --verbose frame.fits<br>
 $ munipack psfphot --psf-file epsf.fits other.fits<br>
 $ munipack artificial --psf-file epsf.fits -c cat.fits ...
-</code>
-
-<p>
-  The empirical PSF of a wide-field optics, changing with the field
-  radius (and tilted linearly over the field):
-</p>
-<code>
-$ munipack psfphot --psf EMPIRICAL --psf-var 1 --psf-var-radial 1 frame.fits
 </code>
 
 <p>

@@ -59,14 +59,13 @@ program psfphot
   character(len=80) :: msg
   real(REAL64) :: fwhm_par = -1, beta_par = -1, fitrad_par = -1, &
        saturate_par = -1, gain_par = -1, readns_par = -1, scale_par = -1, &
-       psfrad_par = -1, group_par = 1.5_REAL64, psfsmooth_par = -1, &
+       psfrad_par = -1, group_par = 1.5_REAL64, psfsmooth = 0.01_REAL64, &
        resthresh_par = -1, resthresh = -1
   real(REAL64), dimension(2) :: psfcen_par = 0
   logical :: psfcen_set = .false., elliptic = .false., verbose = .false.
   logical :: plog = .false., exitus = .true., ex
   integer :: maxiter = 50, npass = 3, eq, stat, status, nfiles, &
-       psfzoom_par = -1, psfvar = 0, psfvarrad = -1, psfstars = 100, resdetect = 0, &
-       nbuild = 3
+       psfzoom_par = -1, psfvar = 0, psfstars = 100, resdetect = 0, nbuild = 3
 
   ! the field-dependent PSF
   real(REAL64), dimension(:,:,:), allocatable :: stamps
@@ -92,8 +91,6 @@ program psfphot
   integer, dimension(:), allocatable :: psfsel
   integer :: npsfsel
   real(REAL64) :: psfrad
-  ! the stars of the flux normalisation
-  integer :: nnorm
 
   ! groups: the members of the group g are glist(gfirst(g):gfirst(g+1)-1)
   integer, dimension(:), allocatable :: gfirst, glist
@@ -171,12 +168,6 @@ program psfphot
         read(val,*) psfvar
         if( psfvar < 0 .or. psfvar > 2 ) stop 'Error: PSF variation is 0, 1 or 2.'
 
-     else if( key == 'PSFVARRAD' ) then
-
-        read(val,*) psfvarrad
-        if( psfvarrad < 0 .or. psfvarrad > 3 ) &
-             stop 'Error: PSF radial variation is 0, 1, 2 or 3.'
-
      else if( key == 'PSFSTARS' ) then
 
         read(val,*) psfstars
@@ -192,8 +183,8 @@ program psfphot
 
      else if( key == 'PSFSMOOTH' ) then
 
-        read(val,*) psfsmooth_par
-        if( psfsmooth_par < 0 ) stop 'Error: PSF smoothing >= 0 unsatisfied.'
+        read(val,*) psfsmooth
+        if( psfsmooth < 0 ) stop 'Error: PSF smoothing >= 0 unsatisfied.'
 
      else if( key == 'PSFITER' ) then
 
@@ -317,9 +308,7 @@ contains
     character(len=FLEN_VALUE), dimension(ncols) :: ttype, tunit
     character(len=FLEN_VALUE) :: cunit
     real(REAL64) :: fwhm, t0, t1, rmod, resrms, psfchi2
-    real(REAL64) :: rmod0, rap, r995, psfsmooth, rel
-    real(REAL64), dimension(:), allocatable :: moderr
-    integer :: n, k, l, pass, status, nmod, nshape, it, niter, nvar, nres, nrad
+    integer :: n, k, l, pass, status, nmod, nshape, it, niter, nvar, nres
     logical :: shape_fit, localsky
     type(FrameType) :: fr0
     type(PsfType) :: psf0
@@ -337,11 +326,6 @@ contains
     resrms = -1
     psfchi2 = -1
     niter = 0
-    rap = -1
-    r995 = -1
-    nnorm = 0
-    nrad = 0
-    psfsmooth = -1
     nres = 0
     empirical = psfkind == 'EMPIRICAL'
     gauss_limit = .false.
@@ -542,24 +526,28 @@ contains
           ! far beyond 4 FWHM; the sky of PSF stars is fitted outside)
           if( psf%ptype == PSF_FILE ) psfrad = max(psfrad,real(nbox / zoom,REAL64))
        end if
+       psf%ntab = psf%zoom*ceiling(psfrad)
        nvar = psfvar
-       nrad = max(psfvarrad,0)
+       psf%npoly = npoly_of(nvar)
        psf%pxc = (frame%naxes(1) + 1) / 2.0_REAL64
        psf%pyc = (frame%naxes(2) + 1) / 2.0_REAL64
        psf%pxs = max(frame%naxes(1) / 2.0_REAL64,1.0_REAL64)
        psf%pys = max(frame%naxes(2) / 2.0_REAL64,1.0_REAL64)
-       ! the radial terms: the field radius from the field centre of PSF
-       ! files, normalised by the farthest corner
-       psf%prs = 1
-       do k = 0, 1
-          do l = 0, 1
-             psf%prs = max(psf%prs,hypot(1 + k*(frame%naxes(1) - 1) - psf%xcen, &
-                  1 + l*(frame%naxes(2) - 1) - psf%ycen))
-          end do
-       end do
-       call set_terms(nvar,nrad)
-       rmod0 = rmod
-       call setup_tables(nmod,rmod0)
+       allocate(psf%res(-psf%ntab:psf%ntab,-psf%ntab:psf%ntab,psf%npoly))
+       psf%res = 0
+       if( psf%ptype == PSF_FILE ) then
+          nmod = max(nbox,psf%ntab) / zoom + 1
+       else
+          ! the radius with 0.1% of the flux of the core outside
+          rmod = max(rmod,psfrad + 1)
+          if( psf%ptype == PSF_MOFFAT ) &
+               rmod = max(rmod,psf%width*sqrt(0.001_REAL64**(1/(1-psf%beta)) - 1))
+          if( psf%ptype == PSF_GAUSS ) &
+               rmod = max(rmod,psf%width*sqrt(2*log(1000.0_REAL64)))
+          nmod = min(nint(rmod) + 1,64)
+          nmod = max(nmod,ceiling(psfrad) + 1)
+          call psf%prepare(nmod)
+       end if
        psf%empirical = .true.
        call set_radii
     end if
@@ -609,89 +597,36 @@ contains
           status = 1
           goto 666
        end if
-       ! the radius of the tables by the growth curve of the PSF stars:
-       ! the light of 99.5% of the flux (the most extended PSF of the
-       ! field), the flux normalised in the aperture rap (2.5 times the
-       ! table radius of 4 FWHM, 15-40 pixels; just outside of the table
-       ! of a file or given by --psf-radius)
-       if( psfrad_par > 0 .or. psf%ptype == PSF_FILE ) then
-          rap = psfrad + max(3.0_REAL64,psfrad / 4)
-       else
-          rap = min(max(2.5_REAL64*psfrad,15.0_REAL64),40.0_REAL64)
-       end if
-       if( psfrad_par < 0 .and. psf%ptype /= PSF_FILE ) then
-          call growth_radius(rap,r995)
-          if( verbose ) write(error_unit,'(a,f0.2,a,f0.1,a)') &
-               ' Growth curve of PSF stars: 99.5% of the flux in ',r995, &
-               ' pix (aperture ',rap,' pix)'
-          if( r995 > psfrad + 0.5_REAL64 ) then
-             psfrad = min(r995,0.75_REAL64*rap)
-             call set_terms(nvar,nrad)
-             call setup_tables(nmod,rmod0)
-             do k = 1, nstars
-                stars(k)%modrad = nmod
-             end do
-             call set_radii
-             call rebuild_models
-             call select_psf_stars
-             if( npsfsel == 0 ) then
-                write(error_unit,*) 'Error: no star for the empirical PSF.'
-                status = 1
-                goto 666
-             end if
-          end if
-       end if
-
-       ! the correction of a field-dependent PSF file varies with the
-       ! field radius by default (its stamps are on rings), when there are
-       ! enough PSF stars (20)
-       if( psfvarrad < 0 .and. psf%ptype == PSF_FILE .and. npsfsel >= 20 ) then
-          if( size(psf%rcoo) > 1 ) then
-             nrad = 1
-             call set_terms(nvar,nrad)
-          end if
-       end if
-       k = nrad
-
-       ! enough stars for the variation (three per term)
-       do while( (nvar > 0 .or. nrad > 0) .and. npsfsel < 3*nterms(nvar,nrad) )
-          if( nvar > 0 ) then
-             nvar = nvar - 1
-          else
-             nrad = nrad - 1
-          end if
+       ! enough stars for the polynomial (three per term)
+       do while( nvar > 0 .and. npsfsel < 3*npoly_of(nvar) )
+          nvar = nvar - 1
        end do
-       if( nvar /= psfvar .or. nrad /= k ) then
-          write(error_unit,'(a,i0,a,i0,a,i0,a,i0,a,i0,a)') ' Warning: ',npsfsel, &
+       if( nvar /= psfvar ) then
+          write(error_unit,'(a,i0,a,i0,a,i0,a)') ' Warning: ',npsfsel, &
                ' PSF stars are too few for the variation of the order ',psfvar, &
-               ' (radial ',k,'), the order ',nvar,' (radial ',nrad,') used.'
-          call set_terms(nvar,nrad)
+               ', the order ',nvar,' used.'
+          psf%npoly = npoly_of(nvar)
+          deallocate(psf%res)
+          allocate(psf%res(-psf%ntab:psf%ntab,-psf%ntab:psf%ntab,psf%npoly))
+          psf%res = 0
        end if
-       if( verbose ) write(error_unit,'(a,i0,a,f0.2,a,i0,a,i0,a,i0)') &
+       if( verbose ) write(error_unit,'(a,i0,a,f0.2,a,i0,a,i0)') &
             ' Empirical PSF: ',npsfsel,' stars, table radius ',psfrad, &
-            ' pix, zoom ',psf%zoom,', variation order ',nvar,', radial ',nrad
+            ' pix, zoom ',psf%zoom,', variation order ',nvar
 
-       psfsmooth = psfsmooth_par
-       if( psfsmooth < 0 ) psfsmooth = 0.01_REAL64
        do it = 1, nbuild
           allocate(chi2(npsfsel))
-          call empirical_build(fr,psf,stars(psfsel(1:npsfsel)),psfrad,it > 1, &
-               psfsmooth_par < 0 .and. it == min(2,nbuild),it == nbuild, &
-               psfsmooth,chi2,resrms,niter)
+          call empirical_build(fr,psf,stars(psfsel(1:npsfsel)),psfrad, &
+               it > 1,psfsmooth,chi2,resrms,niter)
           psfchi2 = median(chi2)
-          if( verbose ) write(error_unit,'(a,i0,a,i0,a,f0.5,a,f0.3,a,i0,a,g0.3)') &
+          if( verbose ) write(error_unit,'(a,i0,a,i0,a,f0.5,a,f0.3,a,i0,a)') &
                ' PSF iteration ',it,': ',npsfsel,' stars, table rms ',resrms, &
-               ', median chi2 ',psfchi2,' (',niter,' CG iterations), smoothing ', &
-               psfsmooth
+               ', median chi2 ',psfchi2,' (',niter,' CG iterations)'
           ! (after the second build: the first one is not converged yet)
           if( it >= 2 .and. it < nbuild ) &
-               call reject_psf_stars(chi2,3*nterms(nvar,nrad))
+               call reject_psf_stars(chi2,3*npoly_of(nvar))
           deallocate(chi2)
           ! the models by the new PSF
-          call set_radii
-          call rebuild_models
-          ! the flux by the aperture of the PSF stars
-          call normalise_psf(rap)
           call set_radii
           call rebuild_models
           if( it < nbuild ) call run_pass(localsky)
@@ -717,19 +652,6 @@ contains
           call run_pass(localsky)
        end do
     end do
-
-    ! the uncertainty of the empirical PSF (model_error) is added to the
-    ! errors of the fluxes
-    allocate(moderr(nstars))
-    moderr = 0
-    if( empirical ) then
-       do k = 1, nstars
-          if( .not. (stars(k)%fluxerr > 0) .or. .not. stars(k)%modelled ) cycle
-          call model_error(fr,psf,stars(k),rel)
-          moderr(k) = rel*abs(stars(k)%flux)
-          stars(k)%fluxerr = hypot(stars(k)%fluxerr,moderr(k))
-       end do
-    end if
 
     ! a neighbour within the fitting radius
     do k = 1, nstars
@@ -810,18 +732,7 @@ contains
           hdr%core = 'MOFFAT'
        end if
        hdr%nvar = nvar
-       hdr%nvarrad = nrad
        hdr%npsfstar = npsfsel
-       hdr%psfsmooth = psfsmooth
-       hdr%smooth_cv = psfsmooth_par < 0
-       hdr%rap = rap
-       hdr%r995 = r995
-       hdr%nnorm = nnorm
-       if( allocated(psf%tcov) ) then
-          hdr%normflux = psf%tsum(1) / psf%zoom**2
-          hdr%normerr = sqrt(max(psf%tcov(1,1),0.0_REAL64))
-       end if
-       hdr%syserr = psf%syserr
        hdr%psfrad = psfrad
        hdr%resrms = resrms
        hdr%psfchi2 = psfchi2
@@ -829,13 +740,8 @@ contains
        hdr%psfsave = psfsave
     end if
 
-    if( empirical ) then
-       call fits_psfphot_save(filename,output,hdr,ttype,tunit,table,npix,flags, &
-            gid,gsz,status,moderr)
-    else
-       call fits_psfphot_save(filename,output,hdr,ttype,tunit,table,npix,flags, &
-            gid,gsz,status)
-    end if
+    call fits_psfphot_save(filename,output,hdr,ttype,tunit,table,npix,flags, &
+         gid,gsz,status)
 
     if( residual /= '' .and. status == 0 ) then
        if( nfiles > 1 ) then
@@ -851,7 +757,7 @@ contains
           write(error_unit,*) 'Warning: the empirical PSF is saved ', &
                'for the first file only.'
        else
-          call save_psf(nvar,nrad,nshape,status)
+          call save_psf(nvar,nshape,status)
        end if
     end if
 
@@ -1709,542 +1615,6 @@ contains
 
     end subroutine rebuild_models
 
-    pure integer function nterms(nvar,nrad)
-
-      ! the terms of the variation: the polynomial of the order nvar in
-      ! x, y and the powers 1..nrad of the field radius (the square is in
-      ! the polynomial of the order 2)
-
-      integer, intent(in) :: nvar, nrad
-      integer :: k
-
-      nterms = npoly_of(nvar) + count([(.not. (nvar >= 2 .and. k == 2), k = 1, nrad)])
-
-    end function nterms
-
-    subroutine set_terms(nvar,nrad)
-
-      ! the terms of the variation (see nterms), zero tables
-
-      integer, intent(in) :: nvar, nrad
-      integer :: k
-
-      psf%nxy = npoly_of(nvar)
-      if( allocated(psf%rpow) ) deallocate(psf%rpow)
-      psf%rpow = pack([(k, k = 1, nrad)],[(.not. (nvar >= 2 .and. k == 2), k = 1, nrad)])
-      psf%npoly = nterms(nvar,nrad)
-      if( allocated(psf%res) ) deallocate(psf%res)
-      if( psf%ntab > 0 ) then
-         allocate(psf%res(-psf%ntab:psf%ntab,-psf%ntab:psf%ntab,psf%npoly))
-         psf%res = 0
-      end if
-      if( allocated(psf%tsum) ) deallocate(psf%tsum)
-      allocate(psf%tsum(psf%npoly))
-      psf%tsum = 0
-      if( allocated(psf%tcov) ) deallocate(psf%tcov)
-      if( allocated(psf%resk) ) deallocate(psf%resk)
-      psf%syserr = 0
-
-    end subroutine set_terms
-
-    subroutine setup_tables(nmod,rmod0)
-
-      ! the tables of the radius psfrad (zero), the radius of the model
-      ! nmod (the analytic core sampled to it, rmod0 at least)
-
-      integer, intent(out) :: nmod
-      real(REAL64), intent(in) :: rmod0
-      real(REAL64) :: rmod
-
-      psf%ntab = psf%zoom*ceiling(psfrad)
-      if( allocated(psf%res) ) deallocate(psf%res)
-      allocate(psf%res(-psf%ntab:psf%ntab,-psf%ntab:psf%ntab,psf%npoly))
-      psf%res = 0
-      psf%tsum = 0
-      if( psf%ptype == PSF_FILE ) then
-         nmod = max(nbox,psf%ntab) / zoom + 1
-      else
-         ! the radius with 0.1% of the flux of the core outside
-         rmod = max(rmod0,psfrad + 1)
-         if( psf%ptype == PSF_MOFFAT ) &
-              rmod = max(rmod,psf%width*sqrt(0.001_REAL64**(1/(1-psf%beta)) - 1))
-         if( psf%ptype == PSF_GAUSS ) &
-              rmod = max(rmod,psf%width*sqrt(2*log(1000.0_REAL64)))
-         nmod = min(nint(rmod) + 1,64)
-         nmod = max(nmod,ceiling(psfrad) + 1)
-         call psf%prepare(nmod)
-      end if
-
-    end subroutine setup_tables
-
-    subroutine aperture_light(k,rap,rr,cum,tot,vtot,sky,skyerr,ok)
-
-      ! The light of the star k (the frame minus the other stars minus the
-      ! sky, the clipped mean in the ring rap + 1 .. rap + 1 + max(5,rap/4)
-      ! of the frame minus all stars) in the circles of the radii rr
-      ! (cum) and rap (tot, its variance vtot by the frame); ok is false
-      ! when the aperture is not whole (the edge, bad or saturated pixels).
-
-      integer, intent(in) :: k
-      real(REAL64), intent(in) :: rap
-      real(REAL64), dimension(:), intent(in) :: rr
-      real(REAL64), dimension(:), intent(out) :: cum
-      real(REAL64), intent(out) :: tot, vtot, sky, skyerr
-      logical, intent(out) :: ok
-
-      real(REAL64), dimension(:), allocatable :: s
-      logical, dimension(:), allocatable :: lit
-      real(REAL64) :: r, r2, d, sdev, v4
-      integer :: i, j, m, n, l, nu
-
-      ok = .false.
-      cum = 0
-      tot = 0
-      vtot = 0
-      sky = 0
-      skyerr = 0
-      r2 = rap + 1 + max(5.0_REAL64,rap / 4)
-      m = ceiling(r2) + 1
-      if( stars(k)%x - rap - 1 < 1 .or. stars(k)%y - rap - 1 < 1 .or. &
-           stars(k)%x + rap + 1 > frame%naxes(1) .or. &
-           stars(k)%y + rap + 1 > frame%naxes(2) ) return
-
-      ! the sky: the frame minus all stars in the ring, without the
-      ! pixels where the subtracted light is significant (as annulus_sky)
-      allocate(s((2*m+1)**2),lit((2*m+1)**2))
-      v4 = fr%variance(stars(k)%sky) / 4
-      n = 0
-      do j = nint(stars(k)%y) - m, nint(stars(k)%y) + m
-         do i = nint(stars(k)%x) - m, nint(stars(k)%x) + m
-            if( i < 1 .or. j < 1 .or. i > frame%naxes(1) .or. &
-                 j > frame%naxes(2) ) cycle
-            if( .not. fr%valid(i,j) ) cycle
-            r = hypot(i - stars(k)%x,j - stars(k)%y)
-            if( r > rap + 1 .and. r <= r2 ) then
-               n = n + 1
-               s(n) = fr%data(i,j) - fr%mstar(i,j)
-               lit(n) = fr%mstar(i,j) / max(fr%gain,epsilon(v4)) > v4
-            end if
-         end do
-      end do
-      if( n < 10 ) return
-      if( count(.not. lit(1:n)) >= 10 ) then
-         s(1:count(.not. lit(1:n))) = pack(s(1:n),.not. lit(1:n))
-         n = count(.not. lit(1:n))
-      end if
-      call sky_mean(s(1:n),fr%gain,fr%rn2,fr%bias,sky,skyerr,sdev,nu)
-
-      ! the star: the frame minus the other stars
-      if( stars(k)%modelled ) call add_model(fr,psf,stars(k),-1)
-      m = ceiling(rap) + 1
-      n = 0
-      ok = .true.
-      do j = nint(stars(k)%y) - m, nint(stars(k)%y) + m
-         do i = nint(stars(k)%x) - m, nint(stars(k)%x) + m
-            r = hypot(i - stars(k)%x,j - stars(k)%y)
-            if( r > rap ) cycle
-            if( .not. fr%valid(i,j) ) ok = .false.
-            n = n + 1
-            d = fr%data(i,j) - fr%mstar(i,j) - sky
-            tot = tot + d
-            vtot = vtot + fr%variance(fr%data(i,j))
-            do l = 1, size(rr)
-               if( r <= rr(l) ) cum(l) = cum(l) + d
-            end do
-         end do
-      end do
-      vtot = vtot + (n*skyerr)**2
-      if( stars(k)%modelled ) call add_model(fr,psf,stars(k),1)
-
-    end subroutine aperture_light
-
-    real(REAL64) function contamination(k,r)
-
-      ! the flux of the other stars (subtracted) in the aperture of the
-      ! star k with its sky ring (the radius r), relative to the flux of
-      ! the star; huge with a saturated star
-
-      integer, intent(in) :: k
-      real(REAL64), intent(in) :: r
-
-      real(REAL64) :: f, d
-      integer :: i, j, i0, j0, m, l
-
-      contamination = huge(f)
-      f = 0
-      m = ceiling((r + maxval(satrad,1,nstars > 0)) / cell) + 1
-      i0 = min(max(int(stars(k)%x / cell),0),ncx-1)
-      j0 = min(max(int(stars(k)%y / cell),0),ncy-1)
-      do j = max(j0 - m,0), min(j0 + m,ncy-1)
-         do i = max(i0 - m,0), min(i0 + m,ncx-1)
-            l = cell_head(1 + i + ncx*j)
-            do while( l > 0 )
-               if( l /= k ) then
-                  d = hypot(stars(l)%x - stars(k)%x,stars(l)%y - stars(k)%y)
-                  if( d < r + satrad(l) ) then
-                     if( satrad(l) > 0 ) return
-                     f = f + max(stars(l)%flux,0.0_REAL64)
-                  end if
-               end if
-               l = cell_next(l)
-            end do
-         end do
-      end do
-      if( stars(k)%flux > 0 ) contamination = f / stars(k)%flux
-
-    end function contamination
-
-    subroutine growth_radius(rap,r995)
-
-      ! The radius of 99.5% of the flux by the growth curves of the PSF
-      ! stars (aperture_light): the fraction of the light outside of the
-      ! radius r, 1 - S(r)/S(rap), is fitted as a linear function of the
-      ! field radius over the stars (weighted by the flux; a constant with
-      ! fewer than 10 stars), r995 is the smallest radius beyond which it
-      ! stays below 0.5% at the field radii of all the PSF stars (the PSF
-      ! is the most extended in the field). Zero without stars.
-
-      real(REAL64), intent(in) :: rap
-      real(REAL64), intent(out) :: r995
-
-      real(REAL64), parameter :: dr = 0.5_REAL64, frac = 0.005_REAL64
-      real(REAL64), dimension(:,:), allocatable :: cum
-      real(REAL64), dimension(:), allocatable :: tot, rho, rr, o, w
-      logical, dimension(:), allocatable :: use
-      real(REAL64) :: v, sky, skyerr, s0, s1, s2, t0, t1, det, a, b, omax
-      integer :: nr, k, l, j
-
-      r995 = 0
-      nr = ceiling(rap / dr)
-      allocate(rr(nr),cum(nr,npsfsel),tot(npsfsel),rho(npsfsel),use(npsfsel), &
-           o(npsfsel),w(npsfsel))
-      rr = [(dr*j, j = 1, nr)]
-      do l = 1, npsfsel
-         k = psfsel(l)
-         call aperture_light(k,rap,rr,cum(:,l),tot(l),v,sky,skyerr,use(l))
-         use(l) = use(l) .and. tot(l) > 3*sqrt(max(v,0.0_REAL64)) .and. &
-              contamination(k,rap + 1 + max(5.0_REAL64,rap / 4)) < 0.25_REAL64
-         rho(l) = hypot(stars(k)%x - psf%xcen,stars(k)%y - psf%ycen)
-      end do
-      if( count(use) == 0 ) return
-      o = 0
-      where( use )
-         w = tot
-      elsewhere
-         w = 0
-      end where
-      s0 = sum(w)
-      s1 = sum(w*rho)
-      s2 = sum(w*rho**2)
-      det = s0*s2 - s1**2
-      do j = nr, 1, -1
-         where( use ) o = 1 - cum(j,:) / tot
-         t0 = sum(w*o)
-         t1 = sum(w*o*rho)
-         if( count(use) >= 10 .and. det > 1e-6_REAL64*s0*s2 ) then
-            a = (s2*t0 - s1*t1) / det
-            b = (s0*t1 - s1*t0) / det
-         else
-            a = t0 / s0
-            b = 0
-         end if
-         omax = max(a + b*minval(rho,use),a + b*maxval(rho,use))
-         if( omax > frac ) then
-            r995 = rr(min(j + 1,nr))
-            return
-         end if
-      end do
-      r995 = rr(1)
-
-    end subroutine growth_radius
-
-    subroutine normalise_psf(rap)
-
-      ! The flux normalisation of the empirical PSF by the aperture rap.
-      ! The analytic core carries the light beyond the table in its
-      ! wings, which need not be those of the stars (a PSF with a halo):
-      ! the fluxes are then biased by the difference. For every PSF star,
-      ! the flux F fitted at its position by the PSF (the fixed sky) and
-      ! the total flux T, the light in the aperture (aperture_light) plus
-      ! the light of the base beyond it, give the change of the flux of
-      ! the tables d which makes F equal to T: the flux is added in the
-      ! shape of the base (empirical_setsum) and F changes by -F d r,
-      ! where r = sum(w p c) / sum(w p**2) is the response of the fit to
-      ! the added shape c (pixelised at the star), so d = (1 - T/F) / r.
-      ! The changes are fitted by the terms of the variation (the
-      ! weighted least squares, the variance of d by the pixels of
-      ! F - T, a systematic error added so that chi2 equals the degrees
-      ! of freedom, outliers clipped at 5 sigma), and the flux of the
-      ! tables is applied when significant (its chi2 above the quantile
-      ! of its degrees of freedom at the probability of 3 sigma of the
-      ! Normal distribution, 9 for one term; fully above 4 sigma). Repeated
-      ! until the change is below 0.1 sigma (four times at most). The
-      ! covariance of the flux of the tables and the systematic error
-      ! are the uncertainty of the model (model_error).
-
-      real(REAL64), intent(in) :: rap
-
-      ! the quantiles of chi2 of 1..10 degrees of freedom at the
-      ! probabilities of 3 and 4 sigma of the Normal distribution
-      real(REAL64), dimension(10), parameter :: qlo = [9.0_REAL64, 11.829_REAL64, &
-           14.156_REAL64, 16.251_REAL64, 18.205_REAL64, 20.062_REAL64, 21.846_REAL64, &
-           23.574_REAL64, 25.257_REAL64, 26.901_REAL64], qhi = [16.103_REAL64, &
-           19.442_REAL64, 22.174_REAL64, 24.619_REAL64, 26.887_REAL64, 29.032_REAL64, &
-           31.084_REAL64, 33.063_REAL64, 34.983_REAL64, 36.853_REAL64]
-      real(REAL64), dimension(:,:), allocatable :: pts, a, c, sub, p, pb, cbn, pc
-      real(REAL64), dimension(:), allocatable :: yl, vl, coef, snew, res, rr, cum, &
-           tot, skya, skyae, rl, fcon
-      logical, dimension(:), allocatable :: ok, okap
-      real(REAL64) :: vtot, f, f0, s2, sw, swc, vfa, t, sys2, chi2, lo, hi, q, fr0, &
-           r, w, cfit, resp
-      integer :: np, l, k, i, j, n, i0, j0, nsub, iter, it, dof, nok, nap, inner
-
-      np = psf%npoly
-      allocate(pts(np,npsfsel),yl(npsfsel),vl(npsfsel),ok(npsfsel),rr(1),cum(1), &
-           tot(npsfsel),skya(npsfsel),skyae(npsfsel),okap(npsfsel),rl(npsfsel), &
-           fcon(npsfsel))
-      allocate(a(np,np),c(np,np),coef(np),snew(np),res(npsfsel))
-      rr = psfrad
-
-      ! the light in the apertures (the PSF does not enter)
-      do l = 1, npsfsel
-         k = psfsel(l)
-         call psf%poly_terms(stars(k)%x,stars(k)%y,pts(:,l))
-         call aperture_light(k,rap,rr,cum,tot(l),vtot,skya(l),skyae(l),okap(l))
-         fcon(l) = contamination(k,rap + 1 + max(5.0_REAL64,rap / 4))
-         okap(l) = okap(l) .and. tot(l) > 0 .and. fcon(l) < 0.5_REAL64
-      end do
-      call empirical_fluxshape(psf,psfrad,cbn)
-
-      do inner = 1, 4
-
-         yl = 0
-         vl = 1
-         do l = 1, npsfsel
-            k = psfsel(l)
-            ok(l) = .false.
-            if( .not. okap(l) ) cycle
-            if( stars(k)%modelled ) call add_model(fr,psf,stars(k),-1)
-            n = ceiling(rap) + 1
-            i0 = nint(stars(k)%x)
-            j0 = nint(stars(k)%y)
-            allocate(p(-n:n,-n:n),pb(-n:n,-n:n),pc(-n:n,-n:n))
-            call psf%sampled(stars(k)%x,stars(k)%y,sub,nsub)
-            call psf_pixelize(sub,nsub,psf%zoom,i0 - stars(k)%x,j0 - stars(k)%y,n,p)
-            deallocate(sub)
-            call psf%sampled_base(stars(k)%x,stars(k)%y,sub,nsub)
-            call psf_pixelize(sub,nsub,psf%zoom,i0 - stars(k)%x,j0 - stars(k)%y,n,pb)
-            deallocate(sub)
-            call psf_pixelize(cbn,psf%ntab,psf%zoom,i0 - stars(k)%x,j0 - stars(k)%y,n,pc)
-            ! the flux at the fixed position by the fixed sky
-            f = max(stars(k)%flux,0.0_REAL64)
-            s2 = 0
-            swc = 0
-            do it = 1, 2
-               s2 = 0
-               sw = 0
-               swc = 0
-               do j = -n, n
-                  do i = -n, n
-                     if( hypot(i0 + i - stars(k)%x,j0 + j - stars(k)%y) > &
-                          stars(k)%fitrad ) cycle
-                     if( .not. fr%valid(i0+i,j0+j) ) cycle
-                     w = 1 / fr%variance(fr%mstar(i0+i,j0+j) + f*p(i,j) + stars(k)%sky)
-                     s2 = s2 + w*p(i,j)**2
-                     swc = swc + w*p(i,j)*pc(i,j)
-                     sw = sw + w*p(i,j)*(fr%data(i0+i,j0+j) - fr%mstar(i0+i,j0+j) - &
-                          stars(k)%sky)
-                  end do
-               end do
-               if( .not. (s2 > 0) ) exit
-               f = sw / s2
-            end do
-            ! the variance of F - T by the pixels (both linear in the data)
-            vfa = 0
-            cfit = 0
-            fr0 = 0
-            nap = 0
-            do j = -n, n
-               do i = -n, n
-                  r = hypot(i0 + i - stars(k)%x,j0 + j - stars(k)%y)
-                  w = 0
-                  if( r <= stars(k)%fitrad .and. s2 > 0 ) then
-                     w = p(i,j) / fr%variance(fr%mstar(i0+i,j0+j) + f*p(i,j) + &
-                          stars(k)%sky) / s2
-                     cfit = cfit + w
-                  end if
-                  if( r <= rap ) then
-                     w = w - 1
-                     fr0 = fr0 + pb(i,j)
-                     nap = nap + 1
-                  end if
-                  vfa = vfa + w**2*fr%variance(fr%mstar(i0+i,j0+j) + f*p(i,j) + &
-                       stars(k)%sky)
-               end do
-            end do
-            ! (and 1% of the light of the subtracted neighbours)
-            vfa = vfa + (nap*skyae(l))**2 + (cfit*max(stars(k)%skyerr,0.0_REAL64))**2 + &
-                 (0.01_REAL64*fcon(l)*f)**2
-            if( stars(k)%modelled ) call add_model(fr,psf,stars(k),1)
-            deallocate(p,pb,pc)
-            t = tot(l) + f*max(1 - fr0,0.0_REAL64)
-            if( .not. (t > 0 .and. s2 > 0 .and. f > 0 .and. swc > 0) ) cycle
-            resp = swc / s2
-            rl(l) = resp
-            yl(l) = (1 - t / f) / resp
-            vl(l) = vfa / (f*resp)**2
-            ok(l) = vl(l) > 0
-         end do
-
-         nok = count(ok)
-         nnorm = nok
-         if( nok < np + 3 ) then
-            if( verbose ) write(error_unit,'(a,i0,a)') ' PSF normalisation: ',nok, &
-                 ' stars, not done.'
-            return
-         end if
-
-         ! the weighted least squares with the systematic error
-         sys2 = 0
-         do iter = 1, 10
-            call wls(pts,yl,vl,ok,sys2,a,c,coef,res)
-            dof = count(ok) - np
-            chi2 = sum(res**2 / (vl + sys2),ok)
-            ! (the systematic error when chi2 exceeds its 99% quantile,
-            ! by the Wilson-Hilferty approximation)
-            if( dof > 0 ) then
-               q = dof*(1 - 2.0_REAL64/(9*dof) + 2.326_REAL64*sqrt(2.0_REAL64/(9*dof)))**3
-            else
-               q = huge(q)
-            end if
-            if( chi2 > q .or. (sys2 > 0 .and. chi2 > dof) ) then
-               lo = sys2
-               hi = max(maxval(res**2,ok),sys2)
-               do it = 1, 60
-                  q = (lo + hi) / 2
-                  if( sum(res**2 / (vl + q),ok) > dof ) then
-                     lo = q
-                  else
-                     hi = q
-                  end if
-               end do
-               sys2 = (lo + hi) / 2
-            end if
-            n = count(ok)
-            ok = ok .and. res**2 <= 25*(vl + sys2)
-            if( count(ok) == n .or. count(ok) < np + 3 ) exit
-         end do
-         call wls(pts,yl,vl,ok,sys2,a,c,coef,res)
-         nnorm = count(ok)
-
-         ! the flux of the tables, applied when significant
-         snew = psf%tsum + coef
-         q = dot_product(snew,matmul(a,snew))
-         k = min(np,size(qlo))
-         f0 = min(max((q - qlo(k)) / (qhi(k) - qlo(k)),0.0_REAL64),1.0_REAL64)
-         coef = f0*snew - psf%tsum
-         psf%tsum = f0*snew
-         if( allocated(psf%tcov) ) deallocate(psf%tcov)
-         allocate(psf%tcov(np,np))
-         ! the relative errors of fluxes: the response converts the sums
-         resp = median(pack(rl,ok))
-         ! (the covariance of the applied flux of the tables)
-         psf%tcov = (f0*resp)**2*c
-         psf%syserr = resp*sqrt(sys2)
-         call empirical_setsum(psf,psfrad)
-         if( verbose ) write(error_unit,'(a,i0,a,f0.4,a,f0.4,a,f0.1,a,f0.2,a,f0.4,a)') &
-              ' PSF normalisation: ',count(ok),' stars, flux of the table ', &
-              100*snew(1)/psf%zoom**2,' +- ',100*sqrt(c(1,1))/psf%zoom**2, &
-              ' % (chi2 ',q,', applied ',f0,'), systematic error ',100*psf%syserr,' %'
-         ! converged: the change below 0.1 sigma
-         if( all(coef**2 <= 0.01_REAL64*[(c(i,i), i = 1, np)]) ) exit
-         ! the models by the new PSF
-         call rebuild_models
-
-      end do
-
-    end subroutine normalise_psf
-
-    subroutine wls(pts,yl,vl,ok,sys2,a,c,coef,res)
-
-      ! the weighted least squares yl = pts' coef by the variances
-      ! vl + sys2 of the rows ok; a the normal matrix, c its inverse,
-      ! res the residuals of all rows
-
-      real(REAL64), dimension(:,:), intent(in) :: pts
-      real(REAL64), dimension(:), intent(in) :: yl, vl
-      logical, dimension(:), intent(in) :: ok
-      real(REAL64), intent(in) :: sys2
-      real(REAL64), dimension(:,:), intent(out) :: a, c
-      real(REAL64), dimension(:), intent(out) :: coef, res
-
-      real(REAL64), dimension(size(coef)) :: g
-      real(REAL64) :: w
-      integer :: l, i
-      logical :: okc
-
-      a = 0
-      g = 0
-      do l = 1, size(yl)
-         if( .not. ok(l) ) cycle
-         w = 1 / (vl(l) + sys2)
-         do i = 1, size(coef)
-            a(:,i) = a(:,i) + w*pts(:,l)*pts(i,l)
-         end do
-         g = g + w*pts(:,l)*yl(l)
-      end do
-      call invert_spd(a,c,okc)
-      if( .not. okc ) then
-         c = 0
-         coef = 0
-      else
-         coef = matmul(c,g)
-      end if
-      do l = 1, size(yl)
-         res(l) = yl(l) - dot_product(pts(:,l),coef)
-      end do
-
-    end subroutine wls
-
-    subroutine invert_spd(a,c,ok)
-
-      ! the inverse of a symmetric positive definite matrix (Cholesky)
-
-      real(REAL64), dimension(:,:), intent(in) :: a
-      real(REAL64), dimension(:,:), intent(out) :: c
-      logical, intent(out) :: ok
-
-      real(REAL64), dimension(size(a,1),size(a,1)) :: l
-      real(REAL64), dimension(size(a,1)) :: e, y
-      real(REAL64) :: s
-      integer :: n, i, j, k
-
-      n = size(a,1)
-      l = 0
-      ok = .false.
-      do j = 1, n
-         s = a(j,j) - sum(l(j,1:j-1)**2)
-         if( .not. (s > 0) ) return
-         l(j,j) = sqrt(s)
-         do i = j + 1, n
-            l(i,j) = (a(i,j) - sum(l(i,1:j-1)*l(j,1:j-1))) / l(j,j)
-         end do
-      end do
-      do k = 1, n
-         e = 0
-         e(k) = 1
-         do i = 1, n
-            y(i) = (e(i) - sum(l(i,1:i-1)*y(1:i-1))) / l(i,i)
-         end do
-         do i = n, 1, -1
-            y(i) = (y(i) - sum(l(i+1:n,i)*y(i+1:n))) / l(i,i)
-         end do
-         c(:,k) = y
-      end do
-      ok = .true.
-
-    end subroutine invert_spd
-
     subroutine select_psf_stars
 
       ! The stars of the empirical PSF: by the list, or the brightest
@@ -2832,19 +2202,18 @@ contains
 
     end subroutine append_stars
 
-    subroutine save_psf(nvar,nrad,nshape,status)
+    subroutine save_psf(nvar,nshape,status)
 
       ! The empirical PSF in the format of PSF files: the stamp at the
       ! centre (a constant PSF with an analytic core), or the PSFs
-      ! on rings covering the frame (2 rings for the order 0 or 1 and the
-      ! radial order 0 or 1, 12 rings otherwise; 16 angles for the order
-      ! 0 or 1, 32 for 2; plus the rings of the PSF file
+      ! on rings covering the frame (2 rings by 16 angles for the order 0
+      ! or 1, 12 rings by 32 angles for 2, plus the rings of the PSF file
       ! of the base inside of the frame); the radius of the field is the distance
       ! from the field centre (NAXIS/2 or --psf-centre) divided by the
       ! scale [pix/deg] (by WCS, --scale, or 1 when undefined: RADCOO is
       ! in pixels then).
 
-      integer, intent(in) :: nvar, nrad, nshape
+      integer, intent(in) :: nvar, nshape
       integer, intent(in out) :: status
 
       real(REAL64), dimension(:,:,:), allocatable :: st
@@ -2858,12 +2227,12 @@ contains
       na = 16
       if( .not. (scale > 0) ) then
          scale = 1
-         if( nvar > 0 .or. nrad > 0 .or. psf%ptype == PSF_FILE ) write(error_unit,*) &
+         if( nvar > 0 .or. psf%ptype == PSF_FILE ) write(error_unit,*) &
               'Warning: no scale (WCS) of the frame: RADCOO of the saved ', &
               'PSF in pixels (use it with --scale 1).'
       end if
 
-      if( nvar == 0 .and. nrad == 0 .and. psf%ptype /= PSF_FILE ) then
+      if( nvar == 0 .and. psf%ptype /= PSF_FILE ) then
          allocate(rr(0))
       else
          rmax = 0
@@ -2874,14 +2243,11 @@ contains
                rmax = max(rmax,hypot(x - psf%xcen,y - psf%ycen))
             end do
          end do
-         if( nvar <= 1 .and. nrad <= 1 ) then
-            nr = 2
-         else
-            nr = 12
-         end if
          if( nvar <= 1 ) then
+            nr = 2
             na = 16
          else
+            nr = 12
             na = 32
          end if
          rr = [(rmax*k/nr / scale, k = 1, nr)]

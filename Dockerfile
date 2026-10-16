@@ -69,9 +69,21 @@ RUN MUNIPACK_CAF_MPROC=1 OMPI_MCA_osc=^ucx \
 FROM ubuntu:24.04 AS runtime
 
 ARG DEBIAN_FRONTEND=noninteractive
+# Open MPI depends on UCX, which depends on the AMD GPU runtime (with LLVM,
+# 150 MB), and on the hwloc plugins (libxml2 with ICU, X11; 45 MB). Neither
+# is used (processes on one host, no GPU: UCX and hwloc load them as
+# optional plugins), so empty placeholder packages stand in for them.
+RUN for p in libamdhip64-5 libhwloc-plugins; do \
+        mkdir -p /tmp/placeholder/$p/DEBIAN \
+        && printf 'Package: %s\nVersion: 99\nArchitecture: all\nMaintainer: Munipack Docker build\nDescription: empty placeholder, not used by Munipack\n' $p \
+           > /tmp/placeholder/$p/DEBIAN/control \
+        && dpkg-deb --build /tmp/placeholder/$p /tmp/placeholder/$p.deb \
+        && dpkg -i /tmp/placeholder/$p.deb || exit 1; \
+    done \
+    && rm -rf /tmp/placeholder
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libcurl4t64 ca-certificates \
-        libcfitsio10t64 libwcs8 libminpack1 libgfortran5 libgomp1 \
+        libcfitsio10t64 libwcs8 libminpack1 libgfortran5 \
         libcaf-openmpi-3t64 openmpi-bin \
     && rm -rf /var/lib/apt/lists/*
 

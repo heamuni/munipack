@@ -25,7 +25,6 @@
 #include "vocatconf.h"
 #include <wx/wx.h>
 #include <wx/filename.h>
-#include <wx/tokenzr.h>
 
 
 MuniPhcal::MuniPhcal(wxEvtHandler *h, const MuniCmdLineParser& cmd):
@@ -95,73 +94,6 @@ MuniPhcal::MuniPhcal(wxEvtHandler *h, const MuniCmdLineParser& cmd):
 
     if( cmd.Found("tratab",&a) )
       Write("TRATABLE = '" + a + "'");
-
-    // the colour terms: the catalogue columns A,B of the colour A - B,
-    // optionally with the columns of their errors (A,B,errA,errB); the option
-    // is repeatable, every occurrence adds a colour (at most three)
-    long ncterm = 0;
-    for(wxCmdLineArgs::const_iterator arg = cmd.GetArguments().begin();
-	arg != cmd.GetArguments().end(); ++arg) {
-      if( arg->GetKind() == wxCMD_LINE_OPTION &&
-	  arg->GetLongName() == "color-term" ) {
-	long i;
-	a = arg->GetStrVal();
-	apstr(a,i,c);
-	if( ! (i == 2 || i == 4) )
-	  MuniFatalError("--color-term `%s': two columns A,B (the colour A - B), "
-			 "or four A,B,errA,errB.",a);
-	if( ++ncterm > 3 )
-	  MuniFatalError("At most three colour terms (--color-term).");
-	Write("COL_NCOLOR = %ld",i);
-	Write("COL_COLOR = " + c);
-      }
-    }
-
-    // the orders and the reference colours: one for all the colours,
-    // or one for every colour (a list in the order of --color-term)
-    if( cmd.Found("color-order",&a) ) {
-      wxStringTokenizer tok(a,",");
-      wxString l;
-      long i = 0;
-      while( tok.HasMoreTokens() ) {
-	wxString b = tok.GetNextToken();
-	if( ! (b.ToLong(&n) && (n == 1 || n == 2)) )
-	  MuniFatalError("--color-order `%s': 1 (linear) or 2 (quadratic), "
-			 "one for all the colours or one for every --color-term.",a);
-	l += wxString::Format(" %ld",n);
-	i++;
-      }
-      if( ! (i == 1 || i == ncterm) )
-	MuniFatalError("--color-order `%s': one value, or one for every "
-		       "--color-term (%ld).",a,ncterm);
-      if( i > 1 )
-	Write("COLOR_NORDER = %ld",i);
-      Write("COLOR_ORDER =" + l);
-    }
-
-    if( cmd.Found("color-ref",&a) ) {
-      wxStringTokenizer tok(a,",");
-      wxString l;
-      long i = 0;
-      while( tok.HasMoreTokens() ) {
-	wxString b = tok.GetNextToken();
-	if( b.Upper() == "MEAN" )
-	  l += " 1.7976931348623157e308";
-	else if( b.ToDouble(&x) )
-	  l += wxString::Format(" %.17g",x);
-	else
-	  MuniFatalError("Unknown --color-ref `%s' (mean, or a colour in mag; "
-			 "one for all the colours or one for every --color-term).",a);
-	i++;
-      }
-      if( ! (i == 1 || i == ncterm) )
-	MuniFatalError("--color-ref `%s': one value, or one for every "
-		       "--color-term (%ld).",a,ncterm);
-      if( i > 1 )
-	Write("COLOR_NREF = %ld",i);
-      if( ! (i == 1 && a.Upper() == "MEAN") )
-	Write("COLOR_REF =" + l);
-    }
 
     if( cmd.Found("photsys-instr",&a) )
       Write("PHOTSYS_INSTR = '"+a+"'");

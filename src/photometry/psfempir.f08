@@ -26,8 +26,7 @@
 !     psf(x,y) = base(x,y) + sum_t P_t(x,y) R_t,
 !
 !  where P_t are the terms of a polynomial of the order 0, 1, 2 in the
-!  field coordinates (DAOPHOT VARIABLE = 0, 1, 2) and the powers of the
-!  field radius (psffit, poly_terms).
+!  field coordinates (DAOPHOT VARIABLE = 0, 1, 2).
 !
 !  The tables are not built by depositing the residuals of stars on
 !  the grid, but by the weighted linear least squares with the exact
@@ -40,31 +39,24 @@
 !  the star. Every star samples the grid at its own phase; the solution
 !  combines all of them without a sub-pixel bias (nor the smoothing of
 !  an interpolation). The weights are the inverse variances of the
-!  model, outliers (cosmic rays, neighbours not subtracted) are clipped
+!  model (the Poisson term at least one electron, see below), outliers
+!  (cosmic rays, neighbours not subtracted) are clipped
 !  at 5 sigma. A sky offset of every star is fitted too, on a ring of
 !  pixels just outside of the tables (inside, a sky error would be a
-!  pedestal of the tables). A regularisation by the squared Laplacian,
-!  relative to the local diagonal of the normal matrix and chosen by
-!  the cross-validation over the stars, keeps the tables smooth where
-!  the stars sample the grid sparsely, and pulls them to zero at the
-!  edge of the table.
+!  pedestal of the tables). A light regularisation by the squared Laplacian keeps the
+!  tables smooth where the stars sample the grid sparsely, and pulls
+!  them to zero at the edge of the table.
 !
 !  The normal equations are solved by the conjugate gradients with
 !  the Jacobi preconditioner; the system is never formed.
 !
-!  The residual tables do not move the centroid and carry the flux
-!  tsum only: every table is corrected by a combination of the base at
-!  the field centre and its derivatives so that its sum is tsum and its
-!  first moments are zero. Without the normalisation (tsum = 0) the
-!  flux of the model is that of the base (the analytic core is
-!  normalised to the unit flux over the plane, the light beyond the
-!  table is in its wings); psfphot sets tsum by the aperture fluxes of
-!  the PSF stars (empirical_setsum). The centre of the PSF is the
-!  centroid of the base.
-!
-!  The tables built on subsets of the stars give the noise of the
-!  tables: the uncertainty of the fluxes by the PSF (psffit,
-!  model_error) and the shrinkage of a correction of a PSF file.
+!  The residual tables carry no flux and do not move the centroid:
+!  every table is corrected by a combination of the base at the field
+!  centre and its derivatives so that its sum and its first moments are
+!  zero. The flux of the model is that of the base (the analytic core
+!  is normalised to the unit flux over the plane, the light beyond the
+!  table is in its wings), and the centre of the PSF is the centroid
+!  of the base.
 !
 
 module psfempir
@@ -84,49 +76,42 @@ module psfempir
      real(REAL64), dimension(:,:), allocatable :: wx, wy, t, w
   end type EmpStar
 
-  public :: empirical_build, empirical_setsum, empirical_fluxshape
-
+  public :: empirical_build
 
 contains
 
-  subroutine empirical_build(frame,psf,stars,rt,clip,cv,final,smooth,chi2, &
-       resrms,niter)
+  subroutine empirical_build(frame,psf,stars,rt,clip,smooth,chi2,resrms,niter)
 
     ! Builds the residual tables psf%res on the stars (fitted, their
     ! models in frame%mstar when modelled), using the pixels in the
     ! radius rt [pix]. The current tables are the initial solution and,
-    ! with clip, the residuals by them clip outliers. The regularisation
-    ! smooth is chosen by the cross-validation with cv (and returned).
-    ! The final build keeps the tables of subsets of the stars (psf%resk)
-    ! for the uncertainty of the PSF. chi2 are the reduced chi2 of stars
-    ! by the new PSF, resrms is the rms of the constant table relative to
-    ! the peak of the base.
+    ! with clip, the residuals by them clip outliers. chi2 are the
+    ! reduced chi2 of stars by the new PSF, resrms is the rms of the
+    ! constant table relative to the peak of the base.
 
     type(FrameType), intent(in) :: frame
     type(PsfType), intent(in out) :: psf
     type(StarFit), dimension(:), intent(in) :: stars
-    real(REAL64), intent(in) :: rt
-    real(REAL64), intent(in out) :: smooth
-    logical, intent(in) :: clip, cv, final
+    real(REAL64), intent(in) :: rt, smooth
+    logical, intent(in) :: clip
     real(REAL64), dimension(:), intent(out) :: chi2
     real(REAL64), intent(out) :: resrms
     integer, intent(out) :: niter
 
     integer, parameter :: maxiter = 1000
     real(REAL64), parameter :: tol = 1e-4_REAL64
-    real(REAL64) :: ctol = tol
 
     type(EmpStar), dimension(:), allocatable :: es
-    real(REAL64), dimension(:,:,:), allocatable :: x, r, z, p, q, b, diag, lamw
+    real(REAL64), dimension(:,:,:), allocatable :: x, r, z, p, q, b, diag
     real(REAL64), dimension(:), allocatable :: xs, rs, zz, ps, qs, bs, ds, xsa
     real(REAL64), dimension(:,:,:,:), allocatable :: xk
     logical, dimension(:), allocatable :: inuse
     real(REAL64), dimension(:,:), allocatable :: sub, pold, pbase, reff, pm, cb, &
          supp
-    real(REAL64), dimension(:), allocatable :: eta, zs, tsum
+    real(REAL64), dimension(:), allocatable :: lam, eta, zs
     real(REAL64), dimension(3,3) :: cm
     real(REAL64), dimension(3) :: mom, coef
-    real(REAL64) :: rz, rznew, alpha, bnorm, rnorm, s, h, sig, rsky, sm
+    real(REAL64) :: rz, rznew, alpha, bnorm, rnorm, s, h, sig, rsky
     integer :: ns, nt, ntab, zoom, npoly, k, i, j, l, t, n, nsub, iter, i0, j0, nk
     logical :: ok
 
@@ -138,7 +123,15 @@ contains
     ! the support of the tables: the circle of the radius rt, the tables
     ! are zero outside (no data constrain them there)
     allocate(supp(-ntab:ntab,-ntab:ntab))
-    call support(ntab,zoom,rt,supp)
+    do j = -ntab, ntab
+       do i = -ntab, ntab
+          if( i**2 + j**2 <= (zoom*rt)**2 ) then
+             supp(i,j) = 1
+          else
+             supp(i,j) = 0
+          end if
+       end do
+    end do
 
     ! the data of stars: the pixels within the table radius and a ring
     ! outside of it, where the tables are zero: the ring fixes the sky of
@@ -190,14 +183,14 @@ contains
                s = frame%data(i0,j0) - frame%mstar(i0,j0) - st%sky
                if( abs(i) <= n .and. abs(j) <= n ) s = s + st%flux*pold(i,j)
                e%t(i,j) = s - st%flux*pbase(i,j)
-               ! the weights by the variance of the model, as the fits
-               ! (the floor of one electron in the Poisson term is not
-               ! needed with the regularisation relative to the local
-               ! diagonal: with the mean of the diagonal, the exact
-               ! variance of a sky of 0.4 e-/pixel gave the outer zone
-               ! more weight and the empirical PSF of Gaussian stars came
-               ! out 0.2% low in flux, BUGS P35)
-               e%w(i,j) = 1 / frame%variance(frame%mstar(i0,j0) + st%sky)
+               ! the weights with the Poisson term of one electron at
+               ! least (the variance of the fits has no floor): the
+               ! regularisation is relative to them, with the exact
+               ! variance of a sky of 0.4 e-/pixel the outer zone gained
+               ! weight and the empirical PSF of Gaussian stars came out
+               ! 0.2% low in flux (BUGS P35)
+               e%w(i,j) = 1 / (max(frame%mstar(i0,j0) + st%sky - frame%bias, &
+                    1 / frame%gain) / frame%gain + frame%rn2 + frame%qnoise)
             end do
          end do
          deallocate(pold,pbase)
@@ -232,41 +225,39 @@ contains
     allocate(b(-ntab:ntab,-ntab:ntab,npoly),diag(-ntab:ntab,-ntab:ntab,npoly), &
          r(-ntab:ntab,-ntab:ntab,npoly),z(-ntab:ntab,-ntab:ntab,npoly), &
          p(-ntab:ntab,-ntab:ntab,npoly),q(-ntab:ntab,-ntab:ntab,npoly), &
-         lamw(-ntab:ntab,-ntab:ntab,npoly), &
-         reff(-ntab:ntab,-ntab:ntab),pm(-nt:nt,-nt:nt),eta(npoly),tsum(npoly), &
+         reff(-ntab:ntab,-ntab:ntab),pm(-nt:nt,-nt:nt),lam(npoly),eta(npoly), &
          xs(ns),rs(ns),zz(ns),ps(ns),qs(ns),bs(ns),ds(ns),inuse(ns))
 
-    ! the flux of the tables (by the normalisation, zero without it)
-    tsum = 0
-    if( allocated(psf%tsum) ) then
-       if( size(psf%tsum) == npoly ) tsum = psf%tsum
-    end if
+    ! the tables by all stars
+    xs = 0
+    inuse = .true.
+    call cgsolve(x,xs,niter)
 
     ! the base at the field centre and its derivatives (the constraints)
     call psf%sampled_base(psf%pxc,psf%pyc,sub,nsub)
     allocate(cb(-ntab:ntab,-ntab:ntab),pold(-ntab:ntab,-ntab:ntab), &
          pbase(-ntab:ntab,-ntab:ntab))
-    call constraint_basis(ntab,sub,nsub,supp,cb,pold,pbase,cm)
-
-    ! the tables by all stars, the regularisation chosen by the
-    ! cross-validation
-    xs = 0
-    inuse = .true.
-    sm = smooth
-    if( cv ) call cv_smooth(x,xs)
-    call cgsolve(x,xs,niter)
+    cb = sub(-ntab:ntab,-ntab:ntab)
+    pold = 0
+    pbase = 0
+    pold(-ntab+1:ntab-1,:) = (cb(-ntab+2:ntab,:) - cb(-ntab:ntab-2,:)) / 2
+    pbase(:,-ntab+1:ntab-1) = (cb(:,-ntab+2:ntab) - cb(:,-ntab:ntab-2)) / 2
+    cb = supp*cb
+    pold = supp*pold
+    pbase = supp*pbase
+    call moments(cb,cm(:,1))
+    call moments(pold,cm(:,2))
+    call moments(pbase,cm(:,3))
     call project(x)
 
-    ! The tables by nk subsets of the stars (interleaved by brightness)
-    ! estimate the noise of the tables: the uncertainty of the fluxes by
-    ! the PSF (psf%resk, model_error), and the shrinkage of a correction of
-    ! a PSF file: in every radial zone and for every term, the table is
-    ! kept where it is significant and shrinks towards zero where it is
-    ! not (see shrink), so an exact base is not changed by the noise of
-    ! the stars.
+    ! The shrinkage (a correction of a PSF file): the tables by nk
+    ! subsets of the stars (interleaved by brightness) estimate the
+    ! noise of the tables; in every radial zone and for every term, the
+    ! table is kept where it is significant and shrinks towards zero
+    ! where it is not (see shrink), so an exact base is not changed by
+    ! the noise of the stars.
     nk = min(8,ns / 4)
-    if( allocated(psf%resk) ) deallocate(psf%resk)
-    if( nk >= 2 .and. (psf%ptype == PSF_FILE .or. final) ) then
+    if( psf%ptype == PSF_FILE .and. nk >= 2 ) then
        allocate(xk(-ntab:ntab,-ntab:ntab,npoly,nk),xsa(ns))
        do l = 1, nk
           xk(:,:,:,l) = x
@@ -276,16 +267,9 @@ contains
           call project(xk(:,:,:,l))
        end do
        inuse = .true.
-       if( psf%ptype == PSF_FILE ) then
-          call shrink(x,xk)
-          call project(x)
-          do l = 1, nk
-             call project(xk(:,:,:,l))
-          end do
-       end if
-       if( final ) call move_alloc(xk,psf%resk)
+       call shrink(x,xk)
+       call project(x)
     end if
-    smooth = sm
 
     h = maxval(cb)
     resrms = sqrt(sum(x(:,:,1)**2,supp > 0) / count(supp > 0)) / h
@@ -339,17 +323,12 @@ contains
       end do
       where( .not. inuse ) xs = 0
 
-      ! the regularisation relative to the local diagonal, the
-      ! information of every sample (smoothed over the neighbours): the
-      ! wing samples of bright stars carry orders of magnitude more
-      ! weight than those of the core, a regularisation relative to the
-      ! mean of the diagonal (as before) smoothed the core strongly
+      ! the regularisation relative to the mean of the diagonal
       do t = 1, npoly
          s = sum(diag(:,:,t),diag(:,:,t) > 0) / max(count(diag(:,:,t) > 0),1)
-         call box3(diag(:,:,t),lamw(:,:,t))
-         lamw(:,:,t) = sm*max(lamw(:,:,t),1e-6_REAL64*s)
+         lam(t) = smooth*s
          eta(t) = 1e-6_REAL64*s
-         diag(:,:,t) = diag(:,:,t) + 20*lamw(:,:,t) + eta(t)
+         diag(:,:,t) = diag(:,:,t) + 20*lam(t) + eta(t)
          b(:,:,t) = supp*b(:,:,t)
       end do
 
@@ -366,7 +345,7 @@ contains
       do iter = 1, maxiter
          niter = iter
          rnorm = sqrt(sum(r**2) + sum(rs**2))
-         if( .not. (rnorm > ctol*bnorm) ) exit
+         if( .not. (rnorm > tol*bnorm) ) exit
          call operator(p,ps,q,qs)
          s = sum(p*q) + sum(ps*qs)
          if( .not. (s > 0) ) exit
@@ -385,133 +364,31 @@ contains
 
     end subroutine cgsolve
 
-    subroutine cv_smooth(x,xs)
-
-      ! The regularisation by the K-fold cross-validation (K = 4): for a
-      ! value, the tables are built on the stars out of a fold and predict
-      ! the pixels of the stars of the fold (their sky offsets fitted); the
-      ! score is the sum of the squared normalised residuals of all folds.
-      ! The values are the decades 0.001 .. 10 (relative to the local
-      ! diagonal of the normal matrix); the search starts at 0.1 and walks
-      ! to the lower score until the minimum is bracketed (the score is
-      ! unimodal in practice). The solutions of the folds are less precise
-      ! (1e-3) than the final one. Too few stars keep sm.
-
-      real(REAL64), dimension(-ntab:,-ntab:,:), intent(in) :: x
-      real(REAL64), dimension(:), intent(in) :: xs
-
-      integer, parameter :: kf = 4, glo = -3, ghi = 1
-      real(REAL64), dimension(:,:,:), allocatable :: xc
-      real(REAL64), dimension(:), allocatable :: xsc
-      real(REAL64), dimension(glo:ghi) :: score
-      logical, dimension(glo:ghi) :: done
-      integer :: g, step
-
-      if( ns < 4*kf ) return
-      allocate(xc(-ntab:ntab,-ntab:ntab,npoly),xsc(ns))
-      done = .false.
-      ctol = 1e-3_REAL64
-      g = -1
-      call cv_eval(x,xs,xc,xsc,g,score,done)
-      call cv_eval(x,xs,xc,xsc,g + 1,score,done)
-      if( score(g + 1) < score(g) ) then
-         step = 1
-         g = g + 1
-      else
-         step = -1
-      end if
-      do
-         if( g + step < glo .or. g + step > ghi ) exit
-         call cv_eval(x,xs,xc,xsc,g + step,score,done)
-         if( .not. (score(g + step) < score(g)) ) exit
-         g = g + step
-      end do
-      ctol = tol
-      inuse = .true.
-      sm = 10.0_REAL64**g
-
-
-    end subroutine cv_smooth
-
-    subroutine cv_eval(x,xs,xc,xsc,g,score,done)
-
-      ! the score of the cross-validation of the regularisation 10**g
-
-      real(REAL64), dimension(-ntab:,-ntab:,:), intent(in) :: x
-      real(REAL64), dimension(:), intent(in) :: xs
-      real(REAL64), dimension(-ntab:,-ntab:,:), intent(in out) :: xc
-      real(REAL64), dimension(:), intent(in out) :: xsc
-      integer, intent(in) :: g
-      real(REAL64), dimension(-3:), intent(in out) :: score
-      logical, dimension(-3:), intent(in out) :: done
-      integer, parameter :: kf = 4
-      real(REAL64) :: sw, sk
-      integer :: f, k, it
-
-      if( done(g) ) return
-      sm = 10.0_REAL64**g
-      score(g) = 0
-      do f = 1, kf
-         xc = x
-         xsc = xs
-         inuse = [(mod(k - 1,kf) /= f - 1, k = 1, ns)]
-         call cgsolve(xc,xsc,it)
-         call project(xc)
-         do k = 1, ns
-            if( inuse(k) ) cycle
-            associate(e => es(k))
-              call combine(xc,e%pt,reff)
-              call forward(e,reff,pm)
-              pm = e%t - e%flux*pm
-              sw = sum(e%w)
-              sk = 0
-              if( sw > 0 ) sk = sum(e%w*pm) / sw
-              score(g) = score(g) + sum(e%w*(pm - sk)**2)
-            end associate
-         end do
-      end do
-      done(g) = .true.
-
-    end subroutine cv_eval
-
-    subroutine box3(v,a)
-
-      ! the mean of the 3x3 neighbourhood (inside of the table)
-
-      real(REAL64), dimension(-ntab:,-ntab:), intent(in) :: v
-      real(REAL64), dimension(-ntab:,-ntab:), intent(out) :: a
-      real(REAL64), dimension(-ntab:ntab,-ntab:ntab) :: c, u
-      integer :: i, j
-
-      u = v
-      c = 1
-      a = u
-      do j = -1, 1
-         do i = -1, 1
-            if( i == 0 .and. j == 0 ) cycle
-            a(max(-ntab,-ntab-i):min(ntab,ntab-i),max(-ntab,-ntab-j):min(ntab,ntab-j)) = &
-                 a(max(-ntab,-ntab-i):min(ntab,ntab-i),max(-ntab,-ntab-j):min(ntab,ntab-j)) + &
-                 u(max(-ntab,-ntab-i)+i:min(ntab,ntab-i)+i,max(-ntab,-ntab-j)+j:min(ntab,ntab-j)+j)
-            c(max(-ntab,-ntab-i):min(ntab,ntab-i),max(-ntab,-ntab-j):min(ntab,ntab-j)) = &
-                 c(max(-ntab,-ntab-i):min(ntab,ntab-i),max(-ntab,-ntab-j):min(ntab,ntab-j)) + 1
-         end do
-      end do
-      a = a / c
-
-    end subroutine box3
-
     subroutine project(x)
 
-      ! no shift, the flux of the tables tsum: the tables minus
-      ! a combination of the base at the field centre and its derivatives
-      ! have the sums tsum and zero first moments; the excess flux of the
-      ! constant term is the error of the fluxes of the stars it was built
-      ! by, so the tables are rescaled by it (the other terms by the same
-      ! factor)
+      ! no flux, no shift: the tables minus a combination of the base at
+      ! the field centre and its derivatives have zero sum and moments;
+      ! the model of the constant term is rescaled to the flux of the
+      ! base (and shifted), the other terms by the same factor
 
       real(REAL64), dimension(-ntab:,-ntab:,:), intent(in out) :: x
+      real(REAL64), dimension(3) :: mom, coef
+      real(REAL64) :: h
+      integer :: t
+      logical :: ok
 
-      call project_tables(ntab,x,tsum,supp,cb,pold,pbase,cm,sum(sub),.true.)
+      call moments(x(:,:,1),mom)
+      call solve3(cm,mom,coef,ok)
+      if( ok ) then
+         h = 1 / (1 + coef(1)*sum(cb) / sum(sub))
+      else
+         h = 1
+      end if
+      do t = 1, npoly
+         call moments(x(:,:,t),mom)
+         call solve3(cm,mom,coef,ok)
+         if( ok ) x(:,:,t) = h*(x(:,:,t) - coef(1)*cb - coef(2)*pold - coef(3)*pbase)
+      end do
 
     end subroutine project
 
@@ -519,35 +396,25 @@ contains
 
       ! The shrinkage of the tables by radial zones: in every zone, the
       ! mean (the coherent part, it carries the flux) and the fluctuation
-      ! about it are multiplied by a ramp of their power rho relative to
-      ! the variance estimated by the scatter of the tables of the nk
-      ! subsets: zero below the 90% quantile of Student's t of nk - 1
-      ! degrees of freedom (rho = 2.0 for nk = 8), one above the 97.5%
-      ! quantile (rho = 5.6), linear between; a zone without a significant
-      ! correction is zero, a significant one is kept as it is. The tables
-      ! of the subsets are shrunk by the same factors, so their scatter is
-      ! the noise of the shrunk tables.
+      ! about it are multiplied by min(1,max(0,(rho - 2)/2)), where rho
+      ! is their power relative to the variance estimated by the scatter
+      ! of the tables of the subsets: a zone without a significant
+      ! correction (below 1.4 sigma) is zero, a significant one (above
+      ! 2 sigma) is kept as it is.
 
       real(REAL64), dimension(-ntab:,-ntab:,:), intent(in out) :: x
-      real(REAL64), dimension(-ntab:,-ntab:,:,:), intent(in out) :: xk
+      real(REAL64), dimension(-ntab:,-ntab:,:,:), intent(in) :: xk
       real(REAL64), dimension(*), parameter :: edges = [0.0_REAL64, 1.0_REAL64, &
            1.5_REAL64, 2.0_REAL64, 3.0_REAL64, 4.0_REAL64, 6.0_REAL64, 8.0_REAL64, &
            11.0_REAL64, 15.0_REAL64, 21.0_REAL64, 30.0_REAL64, 1e9_REAL64]
-      ! Student's t quantiles 0.90 and 0.975 of 1..7 degrees of freedom
-      real(REAL64), dimension(7), parameter :: t90 = [3.078_REAL64, &
-           1.886_REAL64, 1.638_REAL64, 1.533_REAL64, 1.476_REAL64, 1.440_REAL64, &
-           1.415_REAL64], t975 = [12.706_REAL64, 4.303_REAL64, 3.182_REAL64, &
-           2.776_REAL64, 2.571_REAL64, 2.447_REAL64, 2.365_REAL64]
       logical, dimension(-ntab:ntab,-ntab:ntab) :: zone
       real(REAL64), dimension(-ntab:ntab,-ntab:ntab) :: rr, xbar, dev
       real(REAL64), dimension(size(xk,4)) :: mk
-      real(REAL64) :: mx, mbar, vm, vf, fm, ff, rlo, rhi
+      real(REAL64) :: mx, mbar, vm, vf, fm, ff
       real(REAL64), parameter :: fluxfloor = 5e-4_REAL64
       integer :: i, j, t, m, n, kk, nk
 
       nk = size(xk,4)
-      rlo = t90(min(nk - 1,7))**2
-      rhi = t975(min(nk - 1,7))**2
       do j = -ntab, ntab
          do i = -ntab, ntab
             rr(i,j) = hypot(real(i,REAL64),real(j,REAL64)) / zoom
@@ -566,7 +433,7 @@ contains
             mbar = sum(mk) / nk
             ! the variances of the mean of all stars
             vm = sum((mk - mbar)**2) / (nk*(nk - 1))
-            ! the systematic floor: 0.05% of the flux in the zone (the
+            ! the systematic floor: 0.1% of the flux in the zone (the
             ! background and the crowding of the frame are not known
             ! better, a smaller change of the profile is not trusted)
             vm = vm + (fluxfloor*zoom**2 / n)**2
@@ -576,25 +443,20 @@ contains
                vf = vf + sum(dev**2,zone)
             end do
             vf = vf / (nk*(nk - 1))
-            fm = ramp(mx**2,vm,rlo,rhi)
-            ff = ramp(sum((x(:,:,t) - mx)**2,zone),vf,rlo,rhi)
+            fm = ramp(mx**2,vm)
+            ff = ramp(sum((x(:,:,t) - mx)**2,zone),vf)
             where( zone ) x(:,:,t) = fm*mx + ff*(x(:,:,t) - mx)
-            do kk = 1, nk
-               where( zone ) xk(:,:,t,kk) = fm*mk(kk) + ff*(xk(:,:,t,kk) - mk(kk))
-            end do
          end do
       end do
 
     end subroutine shrink
 
-    real(REAL64) function ramp(power,noise,rlo,rhi)
+    real(REAL64) function ramp(power,noise)
 
-      ! zero for power/noise below rlo, one above rhi, linear between
-
-      real(REAL64), intent(in) :: power, noise, rlo, rhi
+      real(REAL64), intent(in) :: power, noise
 
       if( noise > 0 ) then
-         ramp = min(1.0_REAL64,max(0.0_REAL64,(power / noise - rlo) / (rhi - rlo)))
+         ramp = min(1.0_REAL64,max(0.0_REAL64,(power / noise - 2) / 2))
       else
          ramp = 1
       end if
@@ -648,9 +510,8 @@ contains
       end do
       do t = 1, npoly
          call laplace(v(:,:,t),lap)
-         lap = lamw(:,:,t)*lap
          call laplace(lap,g)
-         av(:,:,t) = supp*(av(:,:,t) + g + eta(t)*v(:,:,t))
+         av(:,:,t) = supp*(av(:,:,t) + lam(t)*g + eta(t)*v(:,:,t))
       end do
 
     end subroutine operator
@@ -739,209 +600,58 @@ contains
 
     end subroutine laplace
 
+    subroutine moments(v,mom)
+
+      ! the sum and the first moments of the table
+
+      real(REAL64), dimension(-ntab:,-ntab:), intent(in) :: v
+      real(REAL64), dimension(3), intent(out) :: mom
+      integer :: i
+
+      mom(1) = sum(v)
+      mom(2) = 0
+      mom(3) = 0
+      do i = -ntab, ntab
+         mom(2) = mom(2) + i*sum(v(i,:))
+         mom(3) = mom(3) + i*sum(v(:,i))
+      end do
+
+    end subroutine moments
+
+    subroutine solve3(a,b,x,ok)
+
+      ! a x = b by Gaussian elimination with pivoting
+
+      real(REAL64), dimension(3,3), intent(in) :: a
+      real(REAL64), dimension(3), intent(in) :: b
+      real(REAL64), dimension(3), intent(out) :: x
+      logical, intent(out) :: ok
+
+      real(REAL64), dimension(3,4) :: m
+      real(REAL64), dimension(4) :: row
+      integer :: i, k, l
+
+      m(:,1:3) = a
+      m(:,4) = b
+      ok = .false.
+      do k = 1, 3
+         l = k - 1 + maxloc(abs(m(k:3,k)),1)
+         if( .not. (abs(m(l,k)) > 0) ) return
+         row = m(k,:)
+         m(k,:) = m(l,:)
+         m(l,:) = row
+         do i = k + 1, 3
+            m(i,:) = m(i,:) - m(i,k) / m(k,k) * m(k,:)
+         end do
+      end do
+      do i = 3, 1, -1
+         x(i) = (m(i,4) - sum(m(i,i+1:3)*x(i+1:3))) / m(i,i)
+      end do
+      ok = .true.
+
+    end subroutine solve3
 
   end subroutine empirical_build
-
-
-  subroutine empirical_setsum(psf,rt)
-
-    ! The tables (and those of the subsets) projected to the sums
-    ! psf%tsum (the normalisation) with zero first moments, by the base
-    ! at the field centre in the radius rt [pix].
-
-    type(PsfType), intent(in out) :: psf
-    real(REAL64), intent(in) :: rt
-
-    real(REAL64), dimension(:,:), allocatable :: sub, cb, dbx, dby, supp
-    real(REAL64), dimension(3,3) :: cm
-    integer :: nsub, ntab, l
-
-    if( .not. allocated(psf%tsum) ) return
-    ntab = psf%ntab
-    allocate(supp(-ntab:ntab,-ntab:ntab),cb(-ntab:ntab,-ntab:ntab), &
-         dbx(-ntab:ntab,-ntab:ntab),dby(-ntab:ntab,-ntab:ntab))
-    call support(ntab,psf%zoom,rt,supp)
-    call psf%sampled_base(psf%pxc,psf%pyc,sub,nsub)
-    call constraint_basis(ntab,sub,nsub,supp,cb,dbx,dby,cm)
-    call project_tables(ntab,psf%res,psf%tsum,supp,cb,dbx,dby,cm,sum(sub),.false.)
-    if( allocated(psf%resk) ) then
-       do l = 1, size(psf%resk,4)
-          call project_tables(ntab,psf%resk(:,:,:,l),psf%tsum,supp,cb,dbx,dby,cm, &
-               sum(sub),.false.)
-       end do
-    end if
-
-  end subroutine empirical_setsum
-
-
-  subroutine empirical_fluxshape(psf,rt,cbn)
-
-    ! the shape in which empirical_setsum adds flux to the tables: the
-    ! base at the field centre in the radius rt [pix], unit sum
-
-    type(PsfType), intent(in) :: psf
-    real(REAL64), intent(in) :: rt
-    real(REAL64), dimension(:,:), allocatable, intent(out) :: cbn
-
-    real(REAL64), dimension(:,:), allocatable :: sub, supp
-    integer :: nsub, ntab
-
-    ntab = psf%ntab
-    allocate(supp(-ntab:ntab,-ntab:ntab),cbn(-ntab:ntab,-ntab:ntab))
-    call support(ntab,psf%zoom,rt,supp)
-    call psf%sampled_base(psf%pxc,psf%pyc,sub,nsub)
-    cbn = supp*sub(-ntab:ntab,-ntab:ntab)
-    cbn = cbn / sum(cbn)
-
-  end subroutine empirical_fluxshape
-
-
-  subroutine support(ntab,zoom,rt,supp)
-
-    ! the support of the tables: the circle of the radius rt [pix]
-
-    integer, intent(in) :: ntab, zoom
-    real(REAL64), intent(in) :: rt
-    real(REAL64), dimension(-ntab:,-ntab:), intent(out) :: supp
-    integer :: i, j
-
-    do j = -ntab, ntab
-       do i = -ntab, ntab
-          if( i**2 + j**2 <= (zoom*rt)**2 ) then
-             supp(i,j) = 1
-          else
-             supp(i,j) = 0
-          end if
-       end do
-    end do
-
-  end subroutine support
-
-
-  subroutine constraint_basis(ntab,sub,nsub,supp,cb,dbx,dby,cm)
-
-    ! the base sub at the field centre and its derivatives on the support
-    ! (the directions removed from the tables), their sums and moments cm
-
-    integer, intent(in) :: ntab, nsub
-    real(REAL64), dimension(-nsub:,-nsub:), intent(in) :: sub
-    real(REAL64), dimension(-ntab:,-ntab:), intent(in) :: supp
-    real(REAL64), dimension(-ntab:,-ntab:), intent(out) :: cb, dbx, dby
-    real(REAL64), dimension(3,3), intent(out) :: cm
-
-    cb = sub(-ntab:ntab,-ntab:ntab)
-    dbx = 0
-    dby = 0
-    dbx(-ntab+1:ntab-1,:) = (cb(-ntab+2:ntab,:) - cb(-ntab:ntab-2,:)) / 2
-    dby(:,-ntab+1:ntab-1) = (cb(:,-ntab+2:ntab) - cb(:,-ntab:ntab-2)) / 2
-    cb = supp*cb
-    dbx = supp*dbx
-    dby = supp*dby
-    call moments(ntab,cb,cm(:,1))
-    call moments(ntab,dbx,cm(:,2))
-    call moments(ntab,dby,cm(:,3))
-
-  end subroutine constraint_basis
-
-
-  subroutine project_tables(ntab,x,tsum,supp,cb,dbx,dby,cm,flux,rescale)
-
-    ! The tables minus a combination of the base cb and its derivatives
-    ! dbx, dby have the sums tsum and zero first moments (no flux beyond
-    ! the normalisation, no shift). With rescale, the excess flux of the
-    ! constant table (the error of the fluxes of the stars it was built
-    ! by; flux is the flux of the base) rescales all the tables.
-
-    integer, intent(in) :: ntab
-    real(REAL64), dimension(-ntab:,-ntab:,:), intent(in out) :: x
-    real(REAL64), dimension(:), intent(in) :: tsum
-    real(REAL64), dimension(-ntab:,-ntab:), intent(in) :: supp, cb, dbx, dby
-    real(REAL64), dimension(3,3), intent(in) :: cm
-    real(REAL64), intent(in) :: flux
-    logical, intent(in) :: rescale
-
-    real(REAL64), dimension(3) :: mom, coef
-    real(REAL64) :: h
-    integer :: t, pass
-    logical :: ok
-
-    h = 1
-    if( rescale ) then
-       call moments(ntab,x(:,:,1),mom)
-       mom(1) = mom(1) - tsum(1)
-       call solve3(cm,mom,coef,ok)
-       if( ok ) h = 1 / (1 + coef(1)*sum(cb) / flux)
-    end if
-    do pass = 1, 2
-       do t = 1, size(x,3)
-          call moments(ntab,x(:,:,t),mom)
-          mom(1) = mom(1) - tsum(t)
-          call solve3(cm,mom,coef,ok)
-          if( ok ) x(:,:,t) = h*(x(:,:,t) - coef(1)*cb - coef(2)*dbx - coef(3)*dby)
-       end do
-       ! the rescaled sums are restored
-       if( h == 1 ) exit
-       h = 1
-    end do
-    do t = 1, size(x,3)
-       x(:,:,t) = supp*x(:,:,t)
-    end do
-
-  end subroutine project_tables
-
-
-  subroutine moments(ntab,v,mom)
-
-    ! the sum and the first moments of the table
-
-    integer, intent(in) :: ntab
-    real(REAL64), dimension(-ntab:,-ntab:), intent(in) :: v
-    real(REAL64), dimension(3), intent(out) :: mom
-    integer :: i
-
-    mom(1) = sum(v)
-    mom(2) = 0
-    mom(3) = 0
-    do i = -ntab, ntab
-       mom(2) = mom(2) + i*sum(v(i,:))
-       mom(3) = mom(3) + i*sum(v(:,i))
-    end do
-
-  end subroutine moments
-
-
-  subroutine solve3(a,b,x,ok)
-
-    ! a x = b by Gaussian elimination with pivoting
-
-    real(REAL64), dimension(3,3), intent(in) :: a
-    real(REAL64), dimension(3), intent(in) :: b
-    real(REAL64), dimension(3), intent(out) :: x
-    logical, intent(out) :: ok
-
-    real(REAL64), dimension(3,4) :: m
-    real(REAL64), dimension(4) :: row
-    integer :: i, k, l
-
-    m(:,1:3) = a
-    m(:,4) = b
-    ok = .false.
-    do k = 1, 3
-       l = k - 1 + maxloc(abs(m(k:3,k)),1)
-       if( .not. (abs(m(l,k)) > 0) ) return
-       row = m(k,:)
-       m(k,:) = m(l,:)
-       m(l,:) = row
-       do i = k + 1, 3
-          m(i,:) = m(i,:) - m(i,k) / m(k,k) * m(k,:)
-       end do
-    end do
-    do i = 3, 1, -1
-       x(i) = (m(i,4) - sum(m(i,i+1:3)*x(i+1:3))) / m(i,i)
-    end do
-    ok = .true.
-
-  end subroutine solve3
 
 
   function median(x)

@@ -30,12 +30,6 @@
 #include <wx/tokenzr.h>
 #include <wx/filename.h>
 #include <thread>
-#include <fstream>
-#include <string>
-#include <algorithm>
-#ifdef __linux__
-#include <sched.h>
-#endif
 
 // by default, switch off the advance processing
 #define ADVANCE false
@@ -45,35 +39,6 @@
 
 MuniAction::MuniAction(wxEvtHandler *h, const wxString& c):
   MuniProcess(h,c), advanced(ADVANCE), pattern(PATTERN) {}
-
-// The CPUs available to this process: the CPUs it may run on (the affinity
-// mask, docker --cpuset-cpus) and the CPU quota of its control group
-// (docker --cpus: cgroup v2 cpu.max, v1 cpu.cfs_quota_us / cpu.cfs_period_us),
-// which the OpenMP runtime does not know.
-static int AvailableCPUs()
-{
-  int ncpu = std::max(1,int(std::thread::hardware_concurrency()));
-#ifdef __linux__
-  cpu_set_t set;
-  CPU_ZERO(&set);
-  if( sched_getaffinity(0,sizeof(set),&set) == 0 && CPU_COUNT(&set) > 0 )
-    ncpu = CPU_COUNT(&set);
-#endif
-  double quota = -1, period = -1;
-  std::ifstream v2("/sys/fs/cgroup/cpu.max");
-  std::string q;
-  if( v2 >> q >> period ) {
-    try { if( q != "max" ) quota = std::stod(q); } catch(...) { quota = -1; }
-  }
-  else {
-    std::ifstream fq("/sys/fs/cgroup/cpu/cpu.cfs_quota_us"),
-      fp("/sys/fs/cgroup/cpu/cpu.cfs_period_us");
-    if( !(fq >> quota && fp >> period) ) quota = -1;
-  }
-  if( quota > 0 && period > 0 )
-    ncpu = std::min(ncpu,std::max(1,int(quota/period + 0.5)));
-  return ncpu;
-}
 
 void MuniAction::SetCAF(const MuniCmdLineParser& cmd)
 {
@@ -110,15 +75,6 @@ void MuniAction::SetCAF(const MuniCmdLineParser& cmd)
 
   int maxproc = std::thread::hardware_concurrency();
   int nproc = std::max(1,std::min(std::max(1,maxproc),mproc));
-
-  // The threads of the OpenMP parts (the blind match of astrometry):
-  // OMP_NUM_THREADS when it is set, else the available CPUs (the quota of
-  // a container) divided among the processes.
-  if( ! wxGetEnv("OMP_NUM_THREADS",&a) || a.IsEmpty() ) {
-    wxString nt;
-    nt << std::max(1,AvailableCPUs() / nproc);
-    wxSetEnv("OMP_NUM_THREADS",nt);
-  }
 
   // One process runs the utility directly (built for a single process);
   // more processes run its parallel variant (MUNIPACK_CAF_SUFFIX, built

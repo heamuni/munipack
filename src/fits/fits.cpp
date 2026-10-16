@@ -176,24 +176,13 @@ int main()
 	  ret = header_print(filename,keywords,keylist);
 	else if( hmode == ID_MODE_REMOVE || hmode == ID_MODE_UPDATE ) {
 
-	  // filename may carry an extension specification (file.fits[1],
-	  // file.fits[NAME]); the output is the plain file name. Compare the
-	  // files without it: unlinking the output when it is the input file
-	  // itself deleted the frame before the copy.
-	  string base(filename), extspec;
-	  size_t br = filename.find('[');
-	  if( br != string::npos ) {
-	    base = filename.substr(0,br);
-	    extspec = filename.substr(br);
-	  }
-
 	  string name;
-	  if( filename == output || base == output )
+	  if( filename == output )
 	    name = filename;
 	  else {
 	    mfitsio_unlink(output);
-	    mfitsio_copy(base,output);
-	    name = output + extspec;
+	    mfitsio_copy(filename,output);
+	    name = output;
 	  }
 
 	  if( hmode == ID_MODE_REMOVE )

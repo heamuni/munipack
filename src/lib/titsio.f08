@@ -89,8 +89,6 @@ module titsio
   character(len=*), parameter :: FITS_KEY_CTPH = 'CTPH'
   character(len=*), parameter :: FITS_KEY_CTPHERR = 'CTPHERR'
   character(len=*), parameter :: FITS_KEY_PHSYSERR = 'PHSYSERR'
-  character(len=*), parameter :: FITS_KEY_PHSYSERE = 'PHSYSERE'
-  character(len=*), parameter :: FITS_KEY_PHSYSNST = 'PHSYSNST'
   character(len=*), parameter :: FITS_KEY_APCORTYP = 'APCORTYP'
   character(len=*), parameter :: FITS_KEY_APCORR = 'APCORR'
   character(len=*), parameter :: FITS_KEY_CSPACE = 'CSPACE'
