@@ -46,7 +46,8 @@ module sfits
      logical :: status
   end type qFITS
 
-  private :: readfits, qfits_init, qfits_deallocate, qfits_setph
+  private :: readfits, qfits_init, qfits_deallocate, qfits_setph, colkeys, &
+       colcomments
 
 contains
 
@@ -54,12 +55,16 @@ contains
 
   subroutine writecal(filenames,outputs,keys,advanced,phsystable, &
        filters,catid,photsys,area,init_area,saper,tra,ctph,dctph,quantities,phres,&
-       verbose,syserr,apcorr)
+       verbose,syserr,apcorr,ctm)
 
     ! syserr (optional) are the systematic errors [mag] of the calibration
     ! of the frames (by ctph), added in quadrature to the errors of all
     ! objects; apcorr (optional) is the constant aperture correction
-    ! (for the header only, ctph includes it)
+    ! (for the header only, ctph includes it); ctm (optional) the colour
+    ! term (colterm): COLT_CAT applies the colour term by the catalogue
+    ! colour of every star (the stars without it by the mean correction
+    ! of the calibration stars), COLT_TRA the magnitude transformation by
+    ! the colours of the calibrated magnitudes (tra is the identity then)
 
     use phsysfits
     use oakleaf
@@ -67,6 +72,7 @@ contains
     use calibre
     use fotran
     use mfits
+    use colterm
 
     real, parameter :: pi = 3.14159
 
@@ -81,6 +87,7 @@ contains
     logical, intent(in) :: init_area, advanced, verbose
     real(dbl), dimension(:), intent(in), optional :: syserr
     real(dbl), intent(in), optional :: apcorr
+    type(colour_term), intent(in), optional :: ctm
 
     real(dbl), parameter :: nullval = 0
     integer, parameter :: dim2 = 2
@@ -99,6 +106,14 @@ contains
     integer, allocatable, dimension(:) :: order
     integer :: i,j,k,n,status,nrows_max, width, height, nq, ncat, nfiles, nrows, npht
     real(dbl) :: rsky,rskydev,k0,r,lref
+    ! the colour term: the colours of the stars, their errors (< 0 undefined),
+    ! the source of the colour (1 catalogue, 0 the mean colour of
+    ! the calibration stars, 2 the calibrated magnitudes)
+    real(dbl), dimension(:,:), allocatable :: scol,sdcol
+    integer, dimension(:,:), allocatable :: csrc
+    integer, dimension(:), allocatable :: cidx
+    real(dbl) :: g,dg,f
+    logical :: lcol
 
     nfiles = size(filenames)
     nq = size(quantities)
@@ -229,6 +244,34 @@ contains
     end do
     deallocate(ras,decs)
 
+    ! the colours of the stars by the catalogue (the positions on
+    ! the first frame)
+    lcol = .false.
+    if( present(ctm) ) lcol = ctm%model /= COLT_NONE
+    if( lcol ) then
+       allocate(scol(ncat,nfiles),sdcol(ncat,nfiles),csrc(ncat,nfiles))
+       scol = 0
+       sdcol = -1
+       csrc = 0
+       if( ctm%model == COLT_CAT ) then
+          allocate(cidx(ncat))
+          call cooid(fitses(1)%ra,fitses(1)%dec,ctm%ra,ctm%dec,ctm%tol,cidx)
+          do i = 1, ncat
+             k = cidx(i)
+             if( k > 0 ) then
+                if( ctm%dcol(k) >= 0 ) then
+                   scol(i,:) = ctm%col(k)
+                   sdcol(i,:) = ctm%dcol(k)
+                   csrc(i,:) = 1
+                end if
+             end if
+          end do
+          deallocate(cidx)
+          if( verbose ) write(*,'(a,i0,a,i0,a)') ' Colour term: ',count(csrc(:,1) == 1), &
+               ' of ',ncat,' stars with a catalogue colour.'
+       end if
+    end if
+
 
     allocate(ph(ncat,nfiles),dph(ncat,nfiles),phsky(ncat,nfiles), &
          dphsky(ncat,nfiles))
@@ -311,22 +354,52 @@ contains
              dph(i,:) = -1
           end where
 
+          ! the colour term by the colour of the star: the photons
+          ! ctph exp(g) ct, the error of the calibration at the colour
+          ! (CTPH included) and of the colour
+          if( lcol ) then
+             if( ph(i,1) > 0 ) then
+                call colour_corr(ctm,1,scol(i,1),sdcol(i,1),g,dg)
+                f = exp(g)
+                ph(i,1) = ctph(1)*f*ct(i,1)
+                dph(i,1) = sqrt((ctph(1)*f*dct(i,1))**2 + (ph(i,1)*dg)**2 &
+                     + (srel(1)*ph(i,1))**2)
+             end if
+          end if
+
 !          write(*,*) sqrt(abs(ph(i,:))),sqrt(dphsky(i,:)**2*nsky(1)**2), &
           !               sqrt(dphsky(i,:)**2*pi*nsky(1)**2)
        else
           ! the errors of the counts and of the calibration as for one frame
-          where( ct(i,:) > 0 .and. dct(i,:) > 0 )
-             dct(i,:) = sqrt(ctph**2*dct(i,:)**2 + ct(i,:)**2*dctph**2) / xctph
-          elsewhere
-             dct(i,:) = -1
-          end where
-          ct(i,:) = ctph * ct(i,:) / xctph
+          if( lcol .and. ctm%model == COLT_CAT ) then
+             ! the colour term of every filter by the catalogue colour
+             do n = 1, nfiles
+                call colour_corr(ctm,n,scol(i,n),sdcol(i,n),g,dg)
+                f = exp(g)
+                if( ct(i,n) > 0 .and. dct(i,n) > 0 ) then
+                   dct(i,n) = sqrt((ctph(n)*f*dct(i,n))**2 + &
+                        (ctph(n)*f*ct(i,n)*dg)**2) / xctph(n)
+                else
+                   dct(i,n) = -1
+                end if
+                ct(i,n) = ctph(n) * f * ct(i,n) / xctph(n)
+             end do
+          else
+             where( ct(i,:) > 0 .and. dct(i,:) > 0 )
+                dct(i,:) = sqrt(ctph**2*dct(i,:)**2 + ct(i,:)**2*dctph**2) / xctph
+             elsewhere
+                dct(i,:) = -1
+             end where
+             ct(i,:) = ctph * ct(i,:) / xctph
+          end if
           sky(i,:) = ctph * sky(i,:) / xctph
           dsky(i,:) = ctph * dsky(i,:) / xctph
           call fotra(tra,pairs,ct(i,:),dct(i,:),phr(i,:),dphr(i,:))
           call fotra(tra,pairs,sky(i,:),dsky(i,:),phsky(i,:),dphsky(i,:))
           where( phr(i,:) > 0 )
              dphr(i,:) = sqrt(dphr(i,:)**2 + (srel*phr(i,:))**2)
+          end where
+          where( phr(i,:) > 0 )
              ph(i,:) = phr(i,:) * xctph
              dph(i,:) = dphr(i,:) * xctph !! correct !!!
           elsewhere
@@ -391,9 +464,25 @@ contains
 
     end do
 
+    ! the stars without a colour: the mean colour of the calibration stars
+    ! and its scatter (as applied by colour_corr)
+    if( lcol ) then
+       do n = 1, nfiles
+          where( csrc(:,n) == 0 )
+             scol(:,n) = ctm%cmean(n)
+             sdcol(:,n) = ctm%cstd(n)
+          end where
+       end do
+    end if
+
     do n = 1,size(fitses)
        i = order(n)
-       if( present(phres) ) then
+       if( lcol ) then
+          call savefits(filenames(i),outputs(i),fitses(n),advanced, &
+               photsys,phsyscal,area,init_area,catid,quantities, &
+               ctph(n),dctph(n),status,k0,r,lref,srel(n),apc,phres(n), &
+               ctm,n,scol(:,n),sdcol(:,n),csrc(:,n))
+       else if( present(phres) ) then
           call savefits(filenames(i),outputs(i),fitses(n),advanced, &
                photsys,phsyscal,area,init_area,catid,quantities, &
                ctph(n),dctph(n),status,k0,r,lref,srel(n),apc,phres(n))
@@ -404,6 +493,7 @@ contains
        end if
        call qfits_deallocate(fitses(n))
     end do
+    if( lcol ) deallocate(scol,sdcol,csrc)
 
     deallocate(ct,dct,sky,dsky,ph,dph,mag,dmag,phr,dphr, &
          phsky,dphsky,pairs,order)
@@ -696,11 +786,16 @@ contains
 
   subroutine savefits(filename,output,fits,advanced,photsys,phsyscal,&
        area,init_area,catid, qlabels,ctph, dctph, status, k0, r, lref, &
-       srel, apcorr, phres)
+       srel, apcorr, phres, ctm, nband, scol, sdcol, csrc)
+
+    ! ctm (optional): the colour term of the band nband, the colours
+    ! of the stars scol, their errors sdcol and sources csrc (columns
+    ! COLOR, COLORERR, COLORSRC are added to the table)
 
     use phsysfits
     use photoconv
     use calibre
+    use colterm
 
     character(len=*), intent(in) :: filename,output,photsys,catid
     character(len=*), dimension(:), intent(in) :: qlabels
@@ -710,6 +805,10 @@ contains
     logical, intent(in) :: init_area, advanced
     type(photores), intent(in), optional :: phres
     integer, intent(in out) :: status
+    type(colour_term), intent(in), optional :: ctm
+    integer, intent(in), optional :: nband
+    real(dbl), dimension(:), intent(in), optional :: scol, sdcol
+    integer, dimension(:), intent(in), optional :: csrc
 
     integer, parameter :: group = 1, extver = 0
     character(len=*), parameter :: bunit = units(3)
@@ -786,6 +885,7 @@ contains
 
     ! prepare HDU with photometry
     ncols = 6 + 2*nq
+    if( present(ctm) ) ncols = ncols + 3
     allocate(ttype(ncols),tform(ncols),tunit(ncols))
 
     tform = '1D'
@@ -802,6 +902,14 @@ contains
        call quantity(qlabels(n),tunit(i))
        tunit(i+1) = tunit(i)
     end do
+    if( present(ctm) ) then
+       i = 6 + 2*nq
+       ttype(i+1:i+3) = [ character(len=FLEN_VALUE) :: 'COLOR', 'COLORERR', &
+            'COLORSRC' ]
+       tunit(i+1:i+2) = 'mag'
+       tunit(i+3) = ''
+       tform(i+3) = '1J'
+    end if
 
     call fits_insert_btbl(fitscal,ncols,ttype,tform,tunit,PHOTOEXTNAME,status)
     call fits_update_key(fitscal,FITS_KEY_JD,fits%jd,-18, &
@@ -820,6 +928,7 @@ contains
     call fits_update_key(fitscal,FITS_KEY_CTPHERR,dctph,1,'std. error of CTPH ',status)
     call fits_update_key(fitscal,FITS_KEY_PHSYSERR,1.0857362047581294_dbl*srel,-5, &
          '[mag] systematic error added to errors',status)
+    if( present(ctm) ) call colkeys(fitscal,ctm,nband,status)
     if( fits%apee ) then
        call fits_update_key(fitscal,FITS_KEY_APCORTYP,'EE', &
             'aperture correction: APEE (enclosed energy)',status)
@@ -884,6 +993,7 @@ contains
        call fits_write_comment(fitscal, &
             "Counts divided by the enclosed energy of the aperture (APEE)",status)
     end if
+    if( present(ctm) ) call colcomments(fitscal,ctm,nband,status)
 
     if( present(phres) ) then
 
@@ -924,6 +1034,12 @@ contains
           call fits_write_col(fitscal,m,frow,q(i:l,n),status)
           call fits_write_col(fitscal,m+1,frow,dq(i:l,n),status)
        end do
+       if( present(ctm) ) then
+          m = 2*nq + 7
+          call fits_write_col(fitscal,m,frow,scol(i:l),status)
+          call fits_write_col(fitscal,m+1,frow,sdcol(i:l),status)
+          call fits_write_col(fitscal,m+2,frow,csrc(i:l),status)
+       end if
     end do
 
     deallocate(ttype,tform,tunit,q,dq)
@@ -977,6 +1093,96 @@ contains
     call fits_report_error(error_unit,status)
 
   end subroutine savefits
+
+
+  subroutine colkeys(fitscal,ctm,n,status)
+
+    ! the keywords of the colour term of the band n
+
+    use colterm
+
+    type(fitsfiles), intent(in out) :: fitscal
+    type(colour_term), intent(in) :: ctm
+    integer, intent(in) :: n
+    integer, intent(in out) :: status
+
+    character(len=FLEN_VALUE) :: c
+
+    c = trim(ctm%cola(n))//'-'//trim(ctm%colb(n))
+    if( ctm%model == COLT_CAT ) then
+       call fits_update_key(fitscal,'COLTMODE','CATALOGUE', &
+            'colour term fitted by the catalogue colour',status)
+    else
+       call fits_update_key(fitscal,'COLTMODE','TRANSFORM', &
+            'colour term of the transformation (tratab)',status)
+    end if
+    call fits_update_key(fitscal,'COLTERM',c, &
+         'colour index c of the colour term',status)
+    call fits_update_key(fitscal,'COLTREF',ctm%cref(n),-6, &
+         '[mag] reference colour: CTPH of c = COLTREF',status)
+    call fits_update_key(fitscal,'COLTK1',-magln*ctm%beta(1,n),-6, &
+         '[mag/mag] k1 of (c - COLTREF)',status)
+    call fits_update_key(fitscal,'COLTK1E',magln*sqrt(max(ctm%cov(2,2,n),0.0_dbl)),&
+         -2,'[mag/mag] std. error of COLTK1',status)
+    if( ctm%order(n) >= 2 ) then
+       call fits_update_key(fitscal,'COLTK2',-magln*ctm%beta(2,n),-6, &
+            '[mag/mag2] k2 of (c - COLTREF)**2',status)
+       call fits_update_key(fitscal,'COLTK2E', &
+            magln*sqrt(max(ctm%cov(3,3,n),0.0_dbl)),-2, &
+            '[mag/mag2] std. error of COLTK2',status)
+    end if
+    if( ctm%model == COLT_CAT ) then
+       call fits_update_key(fitscal,'COLTCOV', &
+            -ctm%cov(1,2,n)/sqrt(max(ctm%cov(1,1,n)*ctm%cov(2,2,n), &
+            tiny(1.0_dbl))),-4,'correlation of CTPH and COLTK1',status)
+       call fits_update_key(fitscal,'COLTMEAN',ctm%cmean(n),-5, &
+            '[mag] mean colour of the calibration stars',status)
+       call fits_update_key(fitscal,'COLTSTD',ctm%cstd(n),-4, &
+            '[mag] std. deviation of their colours',status)
+       call fits_update_key(fitscal,'COLTNSTA',ctm%nstars(n), &
+            'calibration stars with a colour',status)
+    end if
+
+  end subroutine colkeys
+
+
+  subroutine colcomments(fitscal,ctm,n,status)
+
+    use colterm
+
+    type(fitsfiles), intent(in out) :: fitscal
+    type(colour_term), intent(in) :: ctm
+    integer, intent(in) :: n
+    integer, intent(in out) :: status
+
+    character(len=FLEN_CARD) :: buf
+
+    write(buf,'(a,f0.4,a)') "Colour term: m_cat - m_inst = ZP + k1*(c - ", &
+         ctm%cref(n),")"
+    if( ctm%order(n) >= 2 ) buf = trim(buf) // " + k2*(c - ref)**2"
+    call fits_write_comment(fitscal,buf,status)
+    write(buf,'(3a,f0.5,a,f0.5)') "  c = ",trim(ctm%cola(n))//'-'// &
+         trim(ctm%colb(n)),", k1 = ",-magln*ctm%beta(1,n)," +- ", &
+         magln*sqrt(max(ctm%cov(2,2,n),0.0_dbl))
+    if( ctm%order(n) >= 2 ) then
+       write(buf,'(a,a,f0.5,a,f0.5)') trim(buf),", k2 = ",-magln*ctm%beta(2,n), &
+            " +- ",magln*sqrt(max(ctm%cov(3,3,n),0.0_dbl))
+    end if
+    call fits_write_comment(fitscal,buf,status)
+    if( ctm%model == COLT_CAT ) then
+       call fits_write_comment(fitscal,"  applied by the catalogue colour (COLORSRC = 1);", &
+            status)
+       call fits_write_comment(fitscal,"  the stars without it get the mean correction", &
+            status)
+       call fits_write_comment(fitscal,"  of the calibration stars, error by its scatter (0).",&
+            status)
+    else
+       call fits_write_comment(fitscal,"  applied by the colours of the standard magnitudes", &
+            status)
+       call fits_write_comment(fitscal,"  solved from all filters (COLORSRC = 2).",status)
+    end if
+
+  end subroutine colcomments
 
 
   subroutine tra_frame(tra,pairs,ctph,xcts,xpht)
