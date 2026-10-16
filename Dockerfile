@@ -71,7 +71,7 @@ FROM ubuntu:24.04 AS runtime
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libcurl4t64 ca-certificates \
-        libcfitsio10t64 libwcs8 libminpack1 libgfortran5 \
+        libcfitsio10t64 libwcs8 libminpack1 libgfortran5 libgomp1 \
         libcaf-openmpi-3t64 openmpi-bin \
     && rm -rf /var/lib/apt/lists/*
 

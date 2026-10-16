@@ -74,20 +74,27 @@ module matcher
   real(REAL64), parameter :: xsig = 2.0 ! Normal distribution limit at 95%
   real(REAL64), parameter :: rsig = 3.8 ! Rayleigh distribution limit at 95%
 
+  ! the parallel match of the chunk pairs (astromatch): the first chunk
+  ! pair which succeeded, the matches of the later ones are abandoned
+  integer, public :: matchfound = huge(1)
+
   public :: match, triangle
 
 contains
 
   subroutine match(x1,y1,f1,index1,x2,y2,f2,index2,minmatch,maxmatch,sigma1,sigma2, &
        flxmin,flxmax,fluxtest,id1,id2,luckymatch,verbose,status,scale0,scaletol, &
-       ntrial)
+       ntrial,ichunk)
 
     ! scale0 (optional, > 0) is an expected scale (the frame units per
     ! the reference units: pix/deg) known within the relative tolerance
     ! scaletol: the starting pairs of the sequences whose ratio of
     ! lengths is far from it are skipped (the scale prior);
     ! ntrial (optional) is the number of the starting pairs tried
-    ! (the transformations tested, for the significance of the match)
+    ! (the transformations tested, for the significance of the match);
+    ! ichunk (optional) is the index of the chunk pair of the parallel
+    ! match: it stops (without a match) when a chunk pair before it
+    ! has succeeded (matchfound)
 
     implicit none
 
@@ -117,8 +124,9 @@ contains
     logical, intent(out) :: status
     real(REAL64), intent(in), optional :: scale0, scaletol
     real(REAL64), intent(out), optional :: ntrial
+    integer, intent(in), optional :: ichunk
 
-    integer :: i1,i2,j1,j2,ns,ntot,n1,n2
+    integer :: i1,i2,j1,j2,ns,ntot,n1,n2,jfound
     real(REAL64) :: r,d1,d2,s0,stol,sabs,ntried
     type(sequences) :: seq
     type(dataseq) :: ref, lst
@@ -275,6 +283,16 @@ contains
 !!$!                           stop
 !!$                         end block
 !!$                      end if
+
+                      ! a chunk pair before this one has the match
+                      if( present(ichunk) ) then
+                         !$omp atomic read
+                         jfound = matchfound
+                         if( jfound < ichunk ) then
+                            seq%nseq = 0
+                            goto 666
+                         end if
+                      end if
 
                       ! start of recursive search
                       ntried = ntried + 1
