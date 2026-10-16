@@ -1299,7 +1299,7 @@ contains
           call fits_update_key(fitscal,'COLTDILU',ctm%eivst(n) > 0, &
                'corrected for the errors of the colours',status)
           call fits_update_key(fitscal,'COLTCAP',ctm%eivh(n),-4, &
-               'fraction of the dilution corrected (1 full)',status)
+               'fraction of the correction applied (1 full)',status)
           call fits_update_key(fitscal,'COLTLAM',ctm%lam(1,n),-4, &
                'reliability ratio of c: var(true)/var(obs)',status)
        end if
@@ -1458,13 +1458,18 @@ contains
               "colours, capped: a",status)
          call fits_write_comment(fitscal,"  combination of the terms (the square of a " // &
               "colour, correlated",status)
-         call fits_write_comment(fitscal,"  colours) hardly wider than its errors; " // &
-              "the dilution corrected",status)
-         call fits_write_comment(fitscal,"  by the fraction COLTCAP only.",status)
+         call fits_write_comment(fitscal,"  colours) hardly wider than its errors " // &
+              "for so few stars;",status)
+         call fits_write_comment(fitscal,"  corrected by the fraction COLTCAP only.",status)
       else if( ctm%eivst(n) == 3 ) then
          call fits_write_comment(fitscal,"  Corrected for the errors of the catalogue " // &
               "colours; the fit did",status)
          call fits_write_comment(fitscal,"  not converge (uncertain beyond its errors).",status)
+      else if( ctm%eivst(n) == -1 ) then
+         call fits_write_comment(fitscal,"  Not corrected for the errors of the " // &
+              "catalogue colours: too",status)
+         call fits_write_comment(fitscal,"  few stars (the corrected moments too " // &
+              "noisy).",status)
       else if( ctm%errcorr ) then
          call fits_write_comment(fitscal,"  Not corrected for the errors of the " // &
               "catalogue colours (the", status)

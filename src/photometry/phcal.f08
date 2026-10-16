@@ -505,7 +505,9 @@ contains
              dccol(:,j) = -1
           end where
           if( ncolor(j) == 4 ) then
-             where( dccol(:,j) >= 0 .and. cdmag(:,1) < 9 .and. cdmag(:,2) < 9 )
+             ! a negative error (a -9999 sentinel) is undefined, as one >= 9
+             where( dccol(:,j) >= 0 .and. cdmag(:,1) >= 0 .and. cdmag(:,1) < 9 .and. &
+                  cdmag(:,2) >= 0 .and. cdmag(:,2) < 9 )
                 dccol(:,j) = sqrt(cdmag(:,1)**2 + cdmag(:,2)**2)
                 cerr(:,1,j) = cdmag(:,1)
                 cerr(:,2,j) = cdmag(:,2)
@@ -858,7 +860,8 @@ contains
                       where( dccl(:,n,j) >= 0 )
                          ccy(:,n,j) = ccy(:,n,j) + d * cerr(1:ncat,k,j)**2 / magln
                       end where
-                      if( any(dccl(:,n,j) >= 0 .and. dmag(1:ncat,n) < 9 .and. &
+                      if( any(dccl(:,n,j) > 0 .and. dmag(1:ncat,n) >= 0 .and. &
+                           dmag(1:ncat,n) < 9 .and. &
                            abs(dmag(1:ncat,n) - cerr(1:ncat,k,j)) > &
                            1e-3_dbl + 0.1_dbl*cerr(1:ncat,k,j)) ) &
                            write(error_unit,*) 'Warning: the errors of `', &
@@ -872,7 +875,8 @@ contains
              ia = ctm%ia(n)
              ib = ctm%ib(n)
              ccl(:,n,1) = mag(1:ncat,ia) - mag(1:ncat,ib)
-             where( dmag(1:ncat,ia) < 9 .and. dmag(1:ncat,ib) < 9 )
+             where( dmag(1:ncat,ia) >= 0 .and. dmag(1:ncat,ia) < 9 .and. &
+                  dmag(1:ncat,ib) >= 0 .and. dmag(1:ncat,ib) < 9 )
                 dccl(:,n,1) = sqrt(dmag(1:ncat,ia)**2 + dmag(1:ncat,ib)**2)
              elsewhere
                 dccl(:,n,1) = 0
@@ -880,7 +884,8 @@ contains
              d = 0
              if( ia == n ) d = d - 1
              if( ib == n ) d = d + 1
-             where( dmag(1:ncat,ia) < 9 .and. dmag(1:ncat,ib) < 9 )
+             where( dmag(1:ncat,ia) >= 0 .and. dmag(1:ncat,ia) < 9 .and. &
+                  dmag(1:ncat,ib) >= 0 .and. dmag(1:ncat,ib) < 9 )
                 ccy(:,n,1) = d * dmag(1:ncat,n)**2 / magln
              end where
           end if

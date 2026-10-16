@@ -177,8 +177,12 @@ module exscatter
   real(dbl), parameter :: ffew = 0.1_dbl, sfew = 0.1_dbl
 
   ! the correction for the errors of the colours (wls): the corrected
-  ! variance of every combination of the terms at least lammin of
-  ! the observed one (the cap), the quadratic terms corrected (eivquad)
+  ! variance of every combination of the terms at least min(lammin,
+  ! 2 sqrt(2/neff)) of the observed one (the cap: neff the effective number
+  ! of the stars, two standard errors of a variance; the cap guards
+  ! against the heavy tail of few stars and vanishes as neff grows, so
+  ! the correction stays consistent), the quadratic terms corrected
+  ! (eivquad); no correction of the fits of few stars (n - p + 1 < nfew)
   real(dbl), parameter :: lammin = 0.5_dbl
   logical, parameter :: eivquad = .true.
 
@@ -438,7 +442,7 @@ contains
     integer, dimension(pmax) :: cind, cpow
     real(dbl) :: vb, vbmin, smax, f, f2, s2, l1, emin, e2med, lmax, s2w, hcap
     integer :: n, p, nc, j, k, eivst
-    logical :: few, eiv, haserr, nocc, emfail
+    logical :: few, eiv, haserr, nocc, emfail, eivfew, ef1
 
     beta = 0
     cov = 0
@@ -520,6 +524,14 @@ contains
     eiv = .false.
     if( present(errcorr) ) eiv = errcorr .and. any(cpow(2:p) == 1) .and. &
          (nc > 1 .or. haserr)
+    ! few stars (n - p + 1 < nfew): not corrected (eivst = -1), the fit as
+    ! with errcorr false. The corrected moments of so few stars are too
+    ! noisy: in the Monte Carlo of real SDSS stars at N = 10 the correction
+    ! scattered k 1.0-1.4x (one colour), 2-4x (two colours) and the zero
+    ! point of the order 2 by up to 0.4-10 mag, while the bias it removes
+    ! is below the scatter
+    eivfew = eiv .and. haserr .and. n - p + 1 < nfew
+    if( eivfew ) eiv = .false.
 
     q = 1
     th = 0
@@ -539,6 +551,7 @@ contains
        if( present(dbeta0) ) dbeta0 = 1 / sqrt(sum(w))
        if( present(member) ) member = merge(1.0_dbl,0.0_dbl,mask)
        if( present(lambda) ) lambda = lamc(1:nc)
+       if( eivfew ) eivst = -1
        if( present(eivstat) ) eivstat = eivst
        if( present(eivh) ) eivh = hcap
        return
@@ -582,15 +595,23 @@ contains
        th2 = th
        s2 = sigma
        f = ffew
+       emfail = .false.
        call emloop(th,sigma,f)
+       ef1 = emfail
        l1 = mixlike(th,sigma,f) - (sigma/(sfew*bmag))**2/2
        q = 1
+       emfail = .false.
        call remlfit(th2,s2)
+       ! (the start of the second mode: its convergence not reported)
+       emfail = .false.
        f2 = ffew
        call emloop(th2,s2,f2)
        if( mixlike(th2,s2,f2) - (s2/(sfew*bmag))**2/2 >= l1 ) then
           th = th2
           sigma = s2
+       else
+          ! the status of the mode taken
+          emfail = ef1
        end if
        vb = max(bmag**2,9*(e2med + sigma**2))
     else
@@ -609,6 +630,7 @@ contains
     ! EM not converged with the correction (a cycle of the corrected
     ! M-step even when damped): reported
     if( emfail .and. eivst > 0 ) eivst = 3
+    if( eivfew ) eivst = -1
     if( present(lambda) ) lambda = lamc(1:nc)
     if( present(eivstat) ) eivstat = eivst
     if( present(eivh) ) eivh = hcap
@@ -948,12 +970,6 @@ contains
             gp = 0
          end if
          e2 = e0**2 + gp**2*ex2(:,1) - 2*gp*cc(:,1)
-         if( p >= 2 ) then
-            gp = th(2)
-         else
-            gp = 0
-         end if
-         e2c = e0**2 + gp**2*ex2(:,1) - 2*gp*cc(:,1)
       else
          gpm = 0
          do k = 2, p
@@ -970,26 +986,71 @@ contains
                e2 = e2 + 2*gpm(:,j)*gpm(:,k)*cxx(:,j,k)
             end do
          end do
-         gpm = 0
-         do k = 2, p
-            if( cpow(k) == 1 ) gpm(:,cind(k)) = gpm(:,cind(k)) + th(k)
-         end do
-         e2c = e0**2
-         do j = 1, nc
-            e2c = e2c + gpm(:,j)**2*ex2(:,j) - 2*gpm(:,j)*cc(:,j)
-            do k = j + 1, nc
-               e2c = e2c + 2*gpm(:,j)*gpm(:,k)*cxx(:,j,k)
-            end do
-         end do
       end if
+      call effvarc(th)
       e2c = max(e2c,0.01_dbl*e0**2)
-      ! e2c: by the linear terms only (the slope at the reference colour),
-      ! independent of the observed colour (the weights of the corrected
-      ! moments of wls, the order 2)
       ! the covariance cannot make the variance smaller than the parts
       ! independent of the catalogue magnitude (a numerical guard)
       e2 = max(e2,0.01_dbl*e0**2)
     end subroutine effvar
+
+    subroutine effvarc(th)
+      ! e2c, the variance of the residual by the errors of all the columns
+      ! of X (the weights of the corrected moments of wls, the order 2):
+      ! the error of a column x_a**2 is 2 xi_a u_a + u_a**2 - s_aa, its
+      ! (co)variances 4 E[xi_a xi_b] s_ab + 2 s_ab**2 and 2 E[xi_b] s_ab
+      ! with u_a, by the moments of the true colours over the stars
+      ! (m1, m2) in place of the colour of the star, so that the weight
+      ! does not depend on the error of its colour (by the observed colour
+      ! it biased the zero point, +0.008, coverage 0.15). By the linear
+      ! terms only, a star of a huge quoted error (SDSS: e_g up to 8 mag)
+      ! kept its weight when k1 ~ 0 and its s**2 dominated E of the square
+      ! (the cap tripped, kq rms 1.4x, the zero point 1.2x the uncorrected
+      ! one at N = 300). For the linear terms only the same as e2
+      ! by the slope th(2:p).
+      real(dbl), dimension(:), intent(in) :: th
+      real(dbl), dimension(ncolmax) :: m1
+      real(dbl), dimension(ncolmax,ncolmax) :: m2
+      real(dbl), dimension(n) :: sab, c
+      integer :: a, b, k, l
+      do a = 1, nc
+         m1(a) = sum(xc(:,a)) / n
+         do b = 1, nc
+            if( a == b ) then
+               m2(a,a) = max(sum(xc(:,a)**2 - ex2(:,a)) / n, 0.0_dbl)
+            else
+               m2(a,b) = sum(xc(:,a)*xc(:,b) - cxx(:,a,b)) / n
+            end if
+         end do
+      end do
+      e2c = e0**2
+      do k = 2, p
+         a = cind(k)
+         if( cpow(k) == 1 ) then
+            e2c = e2c - 2*th(k)*cc(:,a)
+         else
+            e2c = e2c - 4*th(k)*m1(a)*cc(:,a)
+         end if
+         do l = 2, p
+            b = cind(l)
+            if( a == b ) then
+               sab = ex2(:,a)
+            else
+               sab = cxx(:,a,b)
+            end if
+            if( cpow(k) == 1 .and. cpow(l) == 1 ) then
+               c = sab
+            else if( cpow(k) == 1 ) then
+               c = 2*m1(b)*sab
+            else if( cpow(l) == 1 ) then
+               c = 2*m1(a)*sab
+            else
+               c = 4*m2(a,b)*sab + 2*sab**2
+            end if
+            e2c = e2c + th(k)*th(l)*c
+         end do
+      end do
+    end subroutine effvarc
 
     subroutine estep(th,sigma,f)
       real(dbl), dimension(:), intent(in) :: th
@@ -1015,9 +1076,9 @@ contains
       ! of the colours correlated with y (the colour contains the catalogue
       ! magnitude of the calibration) bias them too. The moments are
       ! corrected by the expected contribution of the errors (Fuller 1987,
-      ! Measurement Error Models, 2.2): X'WX - h E, X'Wy - ec - h ed, E, ed
+      ! Measurement Error Models, 2.2): X'WX - h E, X'Wy - h (ec + ed), E, ed
       ! the dilution, ec the covariances of y and the colours (errmom),
-      ! subtracted in full (an additive bias, not a dilution); ainv the
+      ! h = 1 unless capped (below); ainv the
       ! covariance of the corrected estimate, A**-1 M A**-1, M = X'WX +
       ! sum w**2 a a', a = c - S beta the covariance of the errors of
       ! the colours (their linear terms) and of the residual (Fuller 1987,
@@ -1027,16 +1088,19 @@ contains
       ! the observed one about their weighted mean) are computed whenever
       ! the errors are given. The correction is capped (h < 1, eivst = 2) so
       ! that the corrected variance of every combination of the terms is at
-      ! least lammin = 0.5 of the observed one (the dilution corrected at
-      ! most by a factor of 2): when the errors are comparable to the range
-      ! of the colours, the full correction (1/lambda) has a heavy tail
-      ! (a small difference of two noisy moments), and a nearly singular
-      ! matrix (the linear and quadratic terms, two correlated colours) has
-      ! the same in the worst combination of the terms. With the quadratic
-      ! terms the weights of the moments are by the slope of the linear
-      ! terms (e2c, the slope at the reference colour): by the slope at
-      ! the observed colour they depend on its error, which biased the zero
-      ! point (+0.008, coverage 0.15)
+      ! least lam = min(lammin, 2 sqrt(2/neff)) of the observed one (at most
+      ! a factor of 2 for few stars, vanishing as neff grows) and X'WX + h E
+      ! positive definite (a negative E of overstated errors): when
+      ! the errors are comparable to the range of the colours, the full
+      ! correction (1/lambda) has a heavy tail (a small difference of two
+      ! noisy moments), and a nearly singular matrix (the linear and
+      ! quadratic terms, two correlated colours) has the same in the worst
+      ! combination of the terms; a fixed cap left a fixed part of
+      ! the dilution, inconsistent (pulls growing as sqrt(n)). With
+      ! the quadratic terms the weights of the moments are by e2c (effvarc,
+      ! independent of the observed colour of the star: by it the zero
+      ! point was biased, +0.008, coverage 0.15), their covariance by
+      ! the variance of the residual e2
       real(dbl), dimension(:), intent(in) :: w
       real(dbl), dimension(:), intent(out) :: th
       real(dbl), dimension(:,:), intent(out) :: ainv
@@ -1044,7 +1108,7 @@ contains
       real(dbl), dimension(pmax) :: b, bc, eb, ebd
       real(dbl), dimension(n) :: wq
       real(dbl), dimension(n,pmax) :: d
-      real(dbl) :: sw, h, ha, hb
+      real(dbl) :: sw, h, ha, hb, lam
       integer :: i, j, l, iter
       th = 0
       ainv = 0
@@ -1081,13 +1145,15 @@ contains
       eivst = 0
       hcap = 0
       h = 1
-      if( .not. eivok(am,em,1.0_dbl) ) then
+      ! the cap by the effective number of the stars (of the weights)
+      lam = min(lammin, 2*sqrt(2*sum(wq**2)/sum(wq)**2))
+      if( .not. eivok(am,em,1.0_dbl,lam) ) then
          ! the largest h of the correction within the cap, by bisection
          ha = 0
          hb = 1
          do iter = 1, 50
             h = (ha + hb) / 2
-            if( eivok(am,em,h) ) then
+            if( eivok(am,em,h,lam) ) then
                ha = h
             else
                hb = h
@@ -1097,13 +1163,30 @@ contains
          if( .not. (h > 0) ) return
       end if
       ac(1:p,1:p) = am(1:p,1:p) - h*em(1:p,1:p)
-      bc(1:p) = b(1:p) - (eb(1:p) - ebd(1:p)) - h*ebd(1:p)
+      ! the whole error term of X'Wy by h, as X'WX: with the cap scaling
+      ! only the dilution (ebd), the covariance of y and the colours
+      ! subtracted in full went through the nearly singular (X'WX - h E)**-1
+      ! (two colours sharing a noisy band, 30 stars: k rms 0.30/0.73 against
+      ! 0.16/0.40; one colour sharing its noisy band, lambda 0.41, 30-100
+      ! stars: k1 rms 0.45 against 0.19). The fixed term this leaves when
+      ! capped vanishes with the cap as neff grows.
+      bc(1:p) = b(1:p) - h*eb(1:p)
       call syminv(ac,p,ai)
       if( .not. (ai(1,1) > 0) ) return
       th(1:p) = matmul(ai(1:p,1:p),bc(1:p))
       ! the covariance with the term of the errors of the colours and
       ! of the residual (the linear terms)
       mid = am
+      if( any(cpow(2:p) == 2) .and. haserr ) then
+         ! the order 2: 1/wq (by e2c) is not the variance of the residual
+         ! (e2 + sigma**2, by the slope at the colour of the star); without
+         ! this the errors of k1, k2 were 0.4-0.85 of their scatter
+         do i = 1, p
+            do j = 1, p
+               mid(i,j) = sum(wq**2*(e2 + s2w)*xm(:,i)*xm(:,j))
+            end do
+         end do
+      end if
       if( haserr ) then
          ! d(:,i) = E[u_i r], u_i the error of the column i (u of a colour,
          ! 2 xi u + u**2 - s**2 of its square, xi by the observed colour),
@@ -1159,17 +1242,26 @@ contains
       end if
     end function dcov
 
-    logical function eivok(am,em,h)
-      ! the correction by h within the cap: X'WX - h E at least lammin
-      ! X'WX, v'(X'WX - h E)v >= lammin v'(X'WX)v for every v, i.e.
-      ! (1 - lammin) X'WX - h E positive definite (the reliability ratio
-      ! of every combination of the terms at least lammin; for one linear
-      ! term, lambda >= lammin)
+    logical function eivok(am,em,h,lam)
+      ! the correction by h within the cap: X'WX - h E at least lam
+      ! X'WX, v'(X'WX - h E)v >= lam v'(X'WX)v for every v, i.e.
+      ! (1 - lam) X'WX - h E positive definite (the reliability ratio
+      ! of every combination of the terms at least lam; for one linear
+      ! term, lambda >= lam); and at most twice X'WX, X'WX + h E positive
+      ! definite: E is positive semidefinite in expectation, its negative
+      ! part (quoted errors far above the scatter of the colours, as a
+      ! -9999 or 8 mag error, in the error moment of a square
+      ! 6 x**2 s - 3 s**2) inflated X'WX without bound, k2 forced to zero
+      ! with a vanishing error
       real(dbl), dimension(:,:), intent(in) :: am, em
-      real(dbl), intent(in) :: h
+      real(dbl), intent(in) :: h, lam
       real(dbl), dimension(pmax,pmax) :: a1, a2
       a1 = 0
-      a1(1:p,1:p) = (1 - lammin)*am(1:p,1:p) - h*em(1:p,1:p)
+      a1(1:p,1:p) = (1 - lam)*am(1:p,1:p) - h*em(1:p,1:p)
+      call syminv(a1,p,a2)
+      eivok = a2(1,1) > 0
+      if( .not. eivok ) return
+      a1(1:p,1:p) = am(1:p,1:p) + h*em(1:p,1:p)
       call syminv(a1,p,a2)
       eivok = a2(1,1) > 0
     end function eivok

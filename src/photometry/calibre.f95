@@ -496,8 +496,12 @@ contains
             write(error_unit,'(a,i0,a,f0.3,a)') 'Warning: the correction of the ' // &
             'colour terms for the errors of the colours capped (band ',n, &
             '): a combination of the terms (the square of a colour, ' // &
-            'correlated colours) hardly wider than its errors, the dilution ' // &
-            'corrected by the fraction ',ctm%eivh(n),' (COLTCAP).'
+            'correlated colours) hardly wider than its errors for so few ' // &
+            'stars, corrected by the fraction ',ctm%eivh(n),' (COLTCAP).'
+       if( ctm%model == COLT_CAT .and. ctm%eivst(n) == -1 ) &
+            write(error_unit,'(a,i0,a)') 'Warning: the colour terms not ' // &
+            'corrected for the errors of the colours (band ',n, &
+            '): too few stars (COLTDILU F, COLTLAM reported).'
        if( ctm%model == COLT_CAT .and. ctm%eivst(n) == 3 ) &
             write(error_unit,'(a,i0,a)') 'Warning: the fit of the colour terms ' // &
             'corrected for the errors of the colours did not converge (band ',n, &
@@ -588,6 +592,9 @@ contains
              else if( ctm%eivst(n) == 3 ) then
                 write(*,'(a)',advance='no') &
                      '  corrected for the errors of the colours, not converged'
+             else if( ctm%eivst(n) == -1 ) then
+                write(*,'(a)',advance='no') &
+                     '  not corrected for the errors of the colours (too few stars)'
              else
                 write(*,'(a)',advance='no') '  not corrected for the errors of the colours'
              end if

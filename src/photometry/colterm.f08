@@ -135,7 +135,7 @@ module colterm
      ! the correction (n): 0 not applied, 1 applied, 2 applied with the cap
      ! (the corrected moments of a combination of the terms below lammin
      ! of exscatter.f08), 3 applied, the fit not converged; the fraction of
-     ! the correction of the dilution applied (n; 1 full, < 1 capped)
+     ! the correction applied (n; 1 full, < 1 capped)
      logical :: errcorr = .true.
      logical, dimension(:), allocatable :: colerr
      real(dbl), dimension(:,:), allocatable :: lam
