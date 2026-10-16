@@ -430,7 +430,16 @@ powers by their unbiased estimates for Gaussian errors,
 3σ⁴, and the products with <i>y</i>), for one colour and for several
 (<a href="#colterm2">below</a>; the covariances of colours sharing
 a band included). The errors of the coefficients are those of
-the corrected estimate (larger by about 1/<i>λ</i>).
+the corrected estimate (larger by about 1/<i>λ</i>). The covariance of
+the catalogue magnitude of the calibration and a colour containing it,
+−σ<sub>A</sub>² (A − B against A) or +σ<sub>B</sub>² (against B), is by
+the error column of that band in <samp>--color-term</samp>, the one of
+the correction of the colour; when <samp>--col-magerr</samp> gives other
+errors for the same column, a warning (with the magnitude error of 0.002
+and the colour error of 0.3 for the same <i>g</i>, the covariance was left
+out: <i>k</i> −0.38 for −0.30; now −0.300). The calibration band may be
+either of the two (<i>u</i> − <i>g</i> against <i>u</i> or against
+<i>g</i>).
 </p>
 <p>
 <b>The assumption.</b> The correction is right for a catalogue measured
@@ -524,7 +533,13 @@ all the stars is not in the catalogue colours but in the faint stars
 of the frames, detected and measured near the limit; two colours on them
 against the exact catalogue are −0.78, +0.32 for −0.86, +0.37), the rms of
 (<i>k</i> − <i>k</i><sub>true</sub>)/σ<sub><i>k</i></sub> 1.13 → 0.94;
-the order 2 −0.633 → −0.657.
+the order 2 −0.633 → −0.657. The band of the calibration in the colour
+and noisy (calibrated against <i>g</i> with <i>u</i> − <i>g</i>, the errors
+of <i>g</i> 0.3 mag in both, all the SDSS stars): the bias of <i>k</i>
+−0.05…−0.22 (coverage 0.00–0.30, 30 and more stars) → +0.003…+0.08
+(100 stars +0.003…+0.012 without outliers, up to +0.04 with 5%),
+coverage 0.60–0.69; with
+the errors of <i>g</i> as they are −0.005…+0.005 → ±0.001.
 </p>
 
 <h4 id="colterm2">Several colours</h4>
