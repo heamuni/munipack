@@ -64,13 +64,14 @@ contains
 
 
   subroutine wcsmatch(type,alpha,delta,rflux,xpix,ypix,flux,acen,dcen,xcen,ycen, &
-       scale,rot,refl,frame,maxoff,maxrot,maxscale,bin,i1,i2,ntrial,status,verbose, &
+       scale,rot,refl,frame,maxoff0,maxrot,maxscale,bin,i1,i2,ntrial,status,verbose, &
        reflboth)
 
     ! The match guided by an approximate calibration (the WCS in the header
     ! of the frame, or the pointing and the scale): the centre acen,dcen [deg]
     ! at the pixel xcen,ycen, the scale [pix/deg], the rotation rot [deg],
-    ! the reflection refl, known within the offset maxoff [pix], the rotation
+    ! the reflection refl, known within the offset maxoff0 [pix; at most
+    ! the diagonal of the frame: beyond, the pointing is unknown], the rotation
     ! maxrot [deg] and the relative scale maxscale. The catalogue stars
     ! predicted on the frame by the calibration are rotated and scaled on
     ! a grid covering the tolerances; for every node, the differences of the
@@ -97,7 +98,7 @@ contains
     character(len=*), intent(in) :: type
     real(REAL64), dimension(:), intent(in) :: alpha,delta,rflux,xpix,ypix,flux
     real(REAL64), intent(in) :: acen,dcen,xcen,ycen,scale,rot,refl, &
-         maxoff,maxrot,maxscale,bin
+         maxoff0,maxrot,maxscale,bin
     integer, dimension(:), intent(in) :: frame
     integer, dimension(:), allocatable, intent(out) :: i1,i2
     real(REAL64), intent(out) :: ntrial
@@ -122,7 +123,7 @@ contains
     type(AstrometryGeometry) :: tg
     real(REAL64) :: hw, hh, rmax, margin, drot, dscl, r, s, c, sn, d, &
          cell, tol, xoff, yoff, smin, rcat, ratio, lmin, dth, dt, hrot, hoff, &
-         prot, pscl, pxoff, pyoff, qrot, qscl, qxoff, qyoff, pr, brefl
+         prot, pscl, pxoff, pyoff, qrot, qscl, qxoff, qyoff, pr, brefl, maxoff
     integer :: ncat, nfr, nd, nc, nb, nrot, nscl, i, j, k, l, m, ip, np, &
          best, pbest, qbest, npair, nh, nch, ncand, ic, nr
     integer(INT64) :: t0, t1, t2, trate
@@ -152,6 +153,7 @@ contains
     hw = max(xcen - 0.5_REAL64, frame(1) + 0.5_REAL64 - xcen)
     hh = max(ycen - 0.5_REAL64, frame(2) + 0.5_REAL64 - ycen)
     rmax = hypot(hw,hh)
+    maxoff = min(maxoff0, 2*rmax)
 
     ! the brightest frame stars, the catalogue by brightness
     nd = min(nfr,maxvote)
@@ -272,7 +274,7 @@ contains
                ' Any rotation (reflection ',nint(pr),'): ',nh,' frame stars, ',nch, &
                ' catalogue stars in pairs of ',lmin,' pix at least, cells ', &
                rad*dth,' deg, ',dt,' pix within ',maxoff,' pix; the pairs ', &
-               real(t1-t0)/trate,' s, the votes ',real(t2-t1)/trate,' s.'
+               real(t1-t0,REAL64)/trate,' s, the votes ',real(t2-t1,REAL64)/trate,' s.'
 
        end if
 
