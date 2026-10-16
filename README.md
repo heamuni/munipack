@@ -42,7 +42,7 @@ The [quick start](docs/quickstart.md) walks through the same steps on a simulate
 
 ## More information
 
-- [docs/](docs/): the user guide, with a page for every action. Build it as described in [docs/README.md](docs/README.md).
+- [Documentation](https://heamuni.github.io/munipack/): the user guide, tutorials and a page for every action (sources in [docs/](docs/); to build it locally see [docs/README.md](docs/README.md)).
 - [tests/README.md](tests/README.md): what the tests check.
 - [BUGS.md](BUGS.md): the bugs that were fixed, and the open issues.
 - [docs/development.md](docs/development.md): the repository layout and the CI, for developers.
