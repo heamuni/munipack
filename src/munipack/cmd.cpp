@@ -316,6 +316,18 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
 	      wxCMD_LINE_VAL_DOUBLE);
     AddOption("","dcen","center of FOV in Declination [deg]",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","scale","scale [pix/deg]",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","scale-tol","relative tolerance of the scale (--scale or "
+	      "the WCS of the frame) for the match, default 0.05 (0: free)",
+	      wxCMD_LINE_VAL_DOUBLE);
+    AddSwitch("","scale-free","match with any scale (as --scale-tol 0)");
+    AddSwitch("","blind","ignore the WCS of the frames: no WCS-guided "
+	      "match, no scale prior by the WCS");
+    AddOption("","wcs-offset","tolerance of the offset of the WCS of the frames "
+	      "[pix], default 10% of the frame (100 at least)",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","wcs-rot","tolerance of the rotation of the WCS of the frames "
+	      "[deg], default 3",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","wcs-scale","relative tolerance of the scale of the WCS of the "
+	      "frames, default 0.03",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","angle","rotation angle [deg], clockwise positive",
 	      wxCMD_LINE_VAL_DOUBLE);
     AddSwitch("","reflex","set reflection");
@@ -326,13 +338,14 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption("","sig","errors of centroids on frame [pix]",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","sigcat","coordinate errors of cat/ref [deg]",
 	      wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","flxmin","minimum of relative fluxes, default=0.8",
+    AddOption("","flxmin","minimum of relative fluxes, default=0.63 (-0.5 mag)",
 	      wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","flxmax","maximum of relative fluxes, default=1.3",
+    AddOption("","flxmax","maximum of relative fluxes, default=1.58 (+0.5 mag)",
 	      wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","minmatch","minimal length of match sequence",
+    AddOption("","minmatch","minimal length of match sequence "
+	      "(default 5, at least 5: a solution needs five stars)",
 	      wxCMD_LINE_VAL_NUMBER);
-    AddOption("","maxmatch","maximal length of match sequence",
+    AddOption("","maxmatch","stars in the chunks of the match, default 42",
 	      wxCMD_LINE_VAL_NUMBER);
     AddOption("","maxstars","total number of astrometry stars",
 	      wxCMD_LINE_VAL_NUMBER);
