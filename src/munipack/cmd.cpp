@@ -320,6 +320,14 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
 	      "the WCS of the frame) for the match, default 0.05 (0: free)",
 	      wxCMD_LINE_VAL_DOUBLE);
     AddSwitch("","scale-free","match with any scale (as --scale-tol 0)");
+    AddSwitch("","blind","ignore the WCS of the frames: no WCS-guided "
+	      "match, no scale prior by the WCS");
+    AddOption("","wcs-offset","tolerance of the offset of the WCS of the frames "
+	      "[pix], default 10% of the frame (100 at least)",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","wcs-rot","tolerance of the rotation of the WCS of the frames "
+	      "[deg], default 3",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","wcs-scale","relative tolerance of the scale of the WCS of the "
+	      "frames, default 0.03",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","angle","rotation angle [deg], clockwise positive",
 	      wxCMD_LINE_VAL_DOUBLE);
     AddSwitch("","reflex","set reflection");

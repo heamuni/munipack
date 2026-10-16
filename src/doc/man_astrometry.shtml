@@ -129,6 +129,39 @@ Lets we denote the reference star coordinates as the catalogue and
 coordinates of detected stars as the frame.
 </p>
 
+<h3 id="wcsguided">WCS-guided match</h3>
+
+<p>
+When the frame has an astrometry calibration in its header (a WCS
+with CD or CDELT and PC: one by the telescope, a previous run, or an
+approximate one by hand) the match mode first uses it (unless
+<samp>--blind</samp> is given): the catalogue stars are predicted on
+the frame by the calibration, the predictions are rotated and scaled
+on a grid within <samp>--wcs-rot</samp> (3° by default) and
+<samp>--wcs-scale</samp> (±3%), and for every node of the grid the
+differences of the positions of the 60 brightest frame stars and of the
+brightest catalogue stars near the frame vote for the offset (in bins of
+4 × <samp>--sig</samp> pixels, within <samp>--wcs-offset</samp>, by default
+10% of the larger side of the frame and 100 pixels at least). The node and
+the offset of the most votes give the transformation, the nearest stars by
+it are the match, and the solution is fitted and tested (the
+<a href="#significance">significance</a>, with the trials of the vote: the nodes
+and the bins) as any other. When it fails, the blind match below
+follows (with the <a href="#scaleprior">scale prior</a> by the header).
+The keyword ASTRMETH of the header records the method of the solution:
+<samp>WCS</samp> (WCS-guided), <samp>BLIND</samp>, <samp>CROSS</samp>
+or <samp>SEQUENCE</samp>.
+</p>
+<p>
+QUVIK-like simulated frames (512² to 4096², 0.756″/pixel, M67, M35,
+the field at RA 180°, Dec 0° and a dark cloud) with the WCS in the header
+moved by 30–100 pixels, rotated by 1–3° and scaled by 1–3%: all solved by
+the WCS-guided match (the same solutions as by the blind match),
+in a few hundredths of a second on frames up to 2048², 0.5 s on 4096².
+</p>
+
+<h3>Blind match</h3>
+
 <p>
 The following algorithm is used for matching:
 </p>
@@ -284,7 +317,12 @@ On output, the WCS calibration in the header of primary FITS is created
   <dt><samp>-m, --mode [=mode]</samp></dt><dd>Mode of calibration:
     <ul>
       <li><samp>match</samp> (default),</li>
-      <li><samp>cross</samp></li>
+      <li><samp>cross</samp>: by an approximate calibration, given by
+          <samp>--scale, --angle, --reflex</samp> (and <samp>--rcen,
+          --dcen</samp>) or by the WCS in the header of the frame, known
+          within the tolerances of the <a href="#wcsguided">WCS-guided
+          match</a> (it was the nearest stars within 5 pixels); when the
+          vote fails, the nearest stars within 5 × <samp>--sig</samp></li>
       <li><samp>sequence</samp></li>
       <li><samp>manual</samp></li>
     </ul>
@@ -386,6 +424,17 @@ value on 7 or more. Upper limit is given by <samp>--maxmatch</samp>.</dd>
     the tolerance is rejected. Zero (or a negative value) matches with any
     scale, as before. Without <samp>--scale</samp> and without a calibration
     in the header the scale is always free.</dd>
+<dt><samp>--blind</samp></dt><dd>Ignore the astrometry calibration in the
+    headers of the frames: no <a href="#wcsguided">WCS-guided match</a> and
+    no scale prior by it (the blind match of versions before 0.6.2+hg1653
+    (patched), with the scale prior of <samp>--scale</samp> if given).</dd>
+<dt><samp>--wcs-offset pix</samp></dt><dd>The tolerance of the offset of the WCS
+    in the header [pix] for the WCS-guided match and the cross mode; by default
+    10% of the larger side of the frame, 100 pixels at least.</dd>
+<dt><samp>--wcs-rot deg</samp></dt><dd>The tolerance of the rotation of the WCS
+    [deg], default 3.</dd>
+<dt><samp>--wcs-scale x</samp></dt><dd>The relative tolerance of the scale of the
+    WCS, default 0.03.</dd>
 <dt><samp>--scale-free</samp></dt><dd>Match with any scale, an alias for
     <samp>--scale-tol 0</samp>: use it when the scale in the headers
     of the frames is wrong (by more than the tolerance).</dd>

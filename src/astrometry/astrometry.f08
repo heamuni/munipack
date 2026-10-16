@@ -64,6 +64,11 @@ program astrometry
   ! the scale prior: the relative tolerance of the scale given by --scale,
   ! or by the astrometry calibration of a frame, for the match (0 = free)
   real(REAL64) :: scaletol = 0.05_REAL64
+  ! the match guided by the WCS in the header of a frame (--blind disables
+  ! it), its tolerances: the offset [pix] (0: 10% of the frame, 100 pix
+  ! at least), the rotation [deg], the relative scale
+  logical :: wcsguide = .true.
+  real(REAL64) :: wcsoffset = 0, wcsrot = 3, wcsscale = 0.03
   ! copies of --scale, --angle, --reflex for the frames
   real(REAL64) :: user_scale, user_angle, user_refl
   real(REAL64) :: sig2 = 1.0, sig1 = 1.0/3600.0, xsig = 5
@@ -177,6 +182,22 @@ program astrometry
         else if( key == 'SCALETOL' ) then
 
            read(val,*) scaletol
+
+        else if( key == 'WCSGUIDE' ) then
+
+           read(val,*) wcsguide
+
+        else if( key == 'WCSOFFSET' ) then
+
+           read(val,*) wcsoffset
+
+        else if( key == 'WCSROT' ) then
+
+           read(val,*) wcsrot
+
+        else if( key == 'WCSSCALE' ) then
+
+           read(val,*) wcsscale
 
         else if( key == 'SIG' ) then
 
@@ -322,6 +343,10 @@ program astrometry
   user_angle = angle
   user_refl = refl
   call co_broadcast(scaletol,1)
+  call co_broadcast(wcsguide,1)
+  call co_broadcast(wcsoffset,1)
+  call co_broadcast(wcsrot,1)
+  call co_broadcast(wcsscale,1)
   ! the solution needs five stars, the sequence as well (the front end
   ! rejects smaller values)
   if( minmatch < astrominstars ) stop 'Error: --minmatch must be five at least.'
@@ -539,6 +564,9 @@ contains
     ! for the next frames)
     real(REAL64) :: scale, angle, refl, scale0, ntrial
     integer, dimension(2) :: naxes
+    ! the method of the solution (ASTRMETH): WCS, BLIND, CROSS, SEQUENCE
+    character(len=8) :: method
+    logical :: wcspass
     integer :: n,nmin,nskip,nattempt
     logical :: matched = .false., reliable, zwcs
     real(REAL64), dimension(2) :: crval0
@@ -586,7 +614,7 @@ contains
     if( scaletol > 0 .and. mode == 'MATCH' .and. rel == '' ) then
        if( fscale ) then
           scale0 = user_scale
-       else if( zwcs ) then
+       else if( zwcs .and. wcsguide ) then
           scale0 = zscale
        end if
        if( verbose .and. scale0 > 0 ) write(error_unit,'(a,f0.2,a,f0.1,a)') &
@@ -609,11 +637,38 @@ contains
     nattempt = 0
     ntrial = 0
     crval0 = crval
+    ! the first attempt is guided by the WCS of the frame (if any),
+    ! the blind match follows when it fails
+    wcspass = mode == 'MATCH' .and. wcsguide .and. zwcs .and. rel == ''
 55  continue
     nattempt = nattempt + 1
 
-    if( mode == 'MATCH' ) then
+    if( mode == 'MATCH' .and. wcspass ) then
 
+       method = 'WCS'
+       wcspass = .false.
+       block
+         use nearmatch
+         real(REAL64) :: wtrial
+         if( verbose ) write(error_unit,'(a,f0.1,a,f0.2,a,f0.1,a,f0.1,a,f0.1,a)') &
+              ' WCS-guided match by the header: scale ',zscale,' [pix/deg] rotation ', &
+              zangle,' [deg], within ',wcsoff(naxes),' pix, ',wcsrot,' deg, ',100*wcsscale,'%.'
+         call wcsmatch(pcode,rec,dec,rflux,x,y,flux,zcrval(1),zcrval(2), &
+              zcrpix(1),zcrpix(2),zscale,zangle,zrefl,naxes,wcsoff(naxes),wcsrot, &
+              wcsscale,max(2.0_REAL64,4*sig2),id1,id2,wtrial,matched,verbose)
+         ntrial = ntrial + wtrial
+       end block
+       if( .not. matched ) then
+          if( verbose ) write(error_unit,'(a)') &
+               ' The WCS-guided match failed, the blind match follows.'
+          goto 55
+       end if
+       ! the centre by the header for the fit
+       if( .not. fcrval ) crval = zcrval
+
+    else if( mode == 'MATCH' ) then
+
+       method = 'BLIND'
        if( plog ) then
           write(*,'(a)') "=ASTROMATCH> Start"
           call uvhisto(x,y)
@@ -627,6 +682,7 @@ contains
 
     else if( mode == 'SEQUENCE' ) then
 
+       method = 'SEQUENCE'
        block
          integer :: iostat1, iostat2
          allocate(id1(nseq),id2(nseq))
@@ -666,13 +722,28 @@ contains
             end if
          end if
 
-         ! the cross-match tolerance [deg], xsig*sig2 [pix]
-         tol = xsig*sig2 / xscale
-         if( verbose ) write(error_unit,'(a,2f13.7,a,2f9.2,a,f0.3,a,f0.3,a,f3.0,a,f0.2,a)') &
+         ! the approximate calibration is known within the tolerances
+         ! of the WCS-guided match (--wcs-offset, --wcs-rot, --wcs-scale);
+         ! when it fails, the nearest stars within xsig*sig2 [pix]
+         method = 'CROSS'
+         if( verbose ) write(error_unit,'(a,2f13.7,a,2f9.2,a,f0.3,a,f0.3,a,f3.0,a,f0.1,a,f0.1,a,f0.1,a)') &
               ' Cross-match by crval=',crval,' crpix=',crpix,' scale=',xscale, &
-              ' [pix/deg] angle=',xangle,' refl=',xrefl,' tolerance=',tol*xscale,' [pix]'
-         call listmatch(pcode,rec,dec,x,y,crval(1),crval(2),crpix(1),crpix(2), &
-              xscale,xangle,xrefl,tol,id1,id2,matched)
+              ' [pix/deg] angle=',xangle,' refl=',xrefl,' within ',wcsoff(naxes),' pix, ', &
+              wcsrot,' deg, ',100*wcsscale,'%'
+         block
+           real(REAL64) :: wtrial
+           call wcsmatch(pcode,rec,dec,rflux,x,y,flux,crval(1),crval(2), &
+                crpix(1),crpix(2),xscale,xangle,xrefl,naxes,wcsoff(naxes),wcsrot, &
+                wcsscale,max(2.0_REAL64,4*sig2),id1,id2,wtrial,matched,verbose)
+           ntrial = ntrial + wtrial
+         end block
+         if( .not. matched ) then
+            tol = xsig*sig2 / xscale
+            if( verbose ) write(error_unit,'(a,f0.2,a)') &
+                 ' Cross-match of the nearest stars within ',tol*xscale,' [pix]'
+            call listmatch(pcode,rec,dec,x,y,crval(1),crval(2),crpix(1),crpix(2), &
+                 xscale,xangle,xrefl,tol,id1,id2,matched)
+         end if
        end block
     else
        write(error_unit,*) 'astrometry: unspecified match method.'
@@ -697,6 +768,7 @@ contains
 
        if( .not. reliable .and. mode == 'MATCH' .and. nattempt < maxattempt ) then
           ! try a next match, nskip is the chunk pair of the rejected one
+          ! (the blind match after the WCS-guided one)
           crval = crval0
           if( verbose ) write(error_unit,'(a,i0,a)') &
                ' The solution is rejected, trying the next match (attempt #',nattempt+1,').'
@@ -752,7 +824,7 @@ contains
           write(com(3),'(a)') "Projection: "//trim(ptype)
           write(com(4),'(a,i0)') "Match sequence length = ",size(id1)
           write(com(5),'(a,i0)') "Objects used = ",size(i1)
-          write(com(6),'(a)') "Fitting method: "//trim(fit)
+          write(com(6),'(a)') "Fitting method: "//trim(fit)//", match: "//trim(method)
           if( aunits == 'arcsec' .or. aunits == 'arcmin' .or. &
                aunits == 'deg' .or. aunits == 'mas' .or. aunits == 'uas') then
              if( aunits == 'uas' ) then
@@ -834,6 +906,8 @@ contains
 
              call wcsupdate(fits,ptype,crval,scale,angle,crpix,refl, &
                   pv,rms,rframe,epoch,com,status)
+             call fits_update_key(fits,'ASTRMETH',method, &
+                  'astrometry match: WCS-guided, BLIND, CROSS, SEQUENCE',status)
 
              call wcs_delete_report(fits,status)
              if( report ) then
@@ -876,6 +950,21 @@ contains
     if( plog ) write(*,'(a)') "=ASTROMETRY> Finish"
 
   end subroutine calibrate
+
+
+  real(REAL64) function wcsoff(naxes)
+
+    ! the tolerance of the offset of the WCS-guided match [pix]
+
+    integer, dimension(:), intent(in) :: naxes
+
+    if( wcsoffset > 0 ) then
+       wcsoff = wcsoffset
+    else
+       wcsoff = max(100.0_REAL64, 0.1_REAL64*maxval(naxes))
+    end if
+
+  end function wcsoff
 
 
   subroutine mancal(filename, output, success)
@@ -1044,6 +1133,14 @@ contains
     write(*,*) '  Number stars for lucky matching: ',luckymatch
     write(*,'(a,f0.3,a)') '   Relative tolerance of the scale prior: ',scaletol, &
          ' (--scale or the WCS of the frame, 0: free)'
+    write(*,*) '  Match guided by the WCS of frames: ',wcsguide
+    if( wcsoffset > 0 ) then
+       write(*,'(a,f0.1,a)') '   Tolerance of the offset (WCS-guided): ',wcsoffset,' pix'
+    else
+       write(*,'(a)') '   Tolerance of the offset (WCS-guided): 10% of the frame, 100 pix at least'
+    end if
+    write(*,'(a,f0.1,a,f0.1,a)') '   Tolerances of the rotation, scale (WCS-guided): ', &
+         wcsrot,' deg, ',100*wcsscale,'%'
 
     write(*,*) '  Check fluxes: ',fluxtest
     write(*,*) '  Check RMS:    ',rmscheck

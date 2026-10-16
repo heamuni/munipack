@@ -563,10 +563,10 @@ contains
     integer, intent(in out) :: status
     integer :: i, j, nbegin, nend
     character(len=FLEN_CARD) :: card
-    character(len=7), dimension(16) :: keys = [ &
+    character(len=8), dimension(17) :: keys = [ character(len=8) :: &
          'CTYPE1 ', 'CTYPE2 ','CRVAL1 ','CRVAL2 ','CRDER1 ','CRDER2 ', &
          'CRPIX1 ', 'CRPIX2 ','CUNIT1 ','CUNIT2 ','CD1_1  ','CD1_2  ', &
-         'CD2_1  ', 'CD2_2  ','RADESYS','JEPOCH ' ]
+         'CD2_1  ', 'CD2_2  ','RADESYS','JEPOCH ','ASTRMETH' ]
     character(len=FLEN_KEYWORD) :: pvkey
 
     call fits_write_errmark

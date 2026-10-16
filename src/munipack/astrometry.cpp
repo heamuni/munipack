@@ -103,6 +103,18 @@ MuniAstrometry::MuniAstrometry(wxEvtHandler *h, const MuniCmdLineParser& cmd):
     if( cmd.Found("scale-free") )
       Write("SCALETOL = 0");
 
+    if( cmd.Found("blind") )
+      Write("WCSGUIDE = F");
+
+    if( cmd.Found("wcs-offset",&x) )
+      Write("WCSOFFSET = %e",x);
+
+    if( cmd.Found("wcs-rot",&x) )
+      Write("WCSROT = %e",x);
+
+    if( cmd.Found("wcs-scale",&x) )
+      Write("WCSSCALE = %e",x);
+
     if( cmd.Found("reflex") )
       Write("REFLEX = T");
 
