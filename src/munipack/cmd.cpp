@@ -316,6 +316,25 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
 	      wxCMD_LINE_VAL_DOUBLE);
     AddOption("","dcen","center of FOV in Declination [deg]",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","scale","scale [pix/deg]",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","scale-tol","relative tolerance of the scale (--scale or "
+	      "the WCS of the frame) for the match, default 0.05 (0: free)",
+	      wxCMD_LINE_VAL_DOUBLE);
+    AddSwitch("","scale-free","match with any scale (as --scale-tol 0)");
+    AddSwitch("","blind","ignore the WCS of the frames and the pointing: no "
+	      "guided match, no scale prior by the WCS");
+    AddOption("","wcs-offset","tolerance of the offset of the WCS of the frames "
+	      "(or of --rcen, --dcen) [pix, or with units: 30arcsec, 2arcmin, "
+	      "0.1deg, 20%], default 10% of the frame (100 pix at least)");
+    AddOption("","wcs-rot","tolerance of the rotation of the WCS of the frames "
+	      "(or of --angle) [deg], default 3, 180: any (--roll-unknown)",
+	      wxCMD_LINE_VAL_DOUBLE);
+    AddSwitch("","roll-unknown","the rotation of the frames unknown: the guided "
+	      "match by the pointing and the scale tries any rotation at once");
+    AddSwitch("","roll-known","the rotation of the frames (the WCS or --angle) "
+	      "known within --wcs-rot: no guided match of any rotation");
+    AddSwitch("","reflex-unknown","the guided match tries both reflections");
+    AddOption("","wcs-scale","relative tolerance of the scale of the WCS of the "
+	      "frames, default 0.03",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","angle","rotation angle [deg], clockwise positive",
 	      wxCMD_LINE_VAL_DOUBLE);
     AddSwitch("","reflex","set reflection");
@@ -326,13 +345,14 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption("","sig","errors of centroids on frame [pix]",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","sigcat","coordinate errors of cat/ref [deg]",
 	      wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","flxmin","minimum of relative fluxes, default=0.8",
+    AddOption("","flxmin","minimum of relative fluxes, default=0.63 (-0.5 mag)",
 	      wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","flxmax","maximum of relative fluxes, default=1.3",
+    AddOption("","flxmax","maximum of relative fluxes, default=1.58 (+0.5 mag)",
 	      wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","minmatch","minimal length of match sequence",
+    AddOption("","minmatch","minimal length of match sequence "
+	      "(default 5, at least 5: a solution needs five stars)",
 	      wxCMD_LINE_VAL_NUMBER);
-    AddOption("","maxmatch","maximal length of match sequence",
+    AddOption("","maxmatch","stars in the chunks of the match, default 42",
 	      wxCMD_LINE_VAL_NUMBER);
     AddOption("","maxstars","total number of astrometry stars",
 	      wxCMD_LINE_VAL_NUMBER);
@@ -423,7 +443,17 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddUsageText("Usage: munipack "+action+" [options] file(s)[,results(s)]");
     AddUsageText("* Growth-curve photometry");
 
-    AddOption("th","threshold","threshold in sigmas above background",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","var","order of the spatial variation of the growth "
+	      "curve 0, 1, 2 (default: 2, raised while significant)",
+	      wxCMD_LINE_VAL_NUMBER);
+    AddSwitch("","radial","the variation by the distance from the field "
+	      "centre (default: x,y)");
+    AddOption("","centre","x,y field centre for --radial [pix] "
+	      "(default: NAXIS/2)");
+    AddSwitch("","legacy","the growth-curve fit of the versions before "
+	      "0.6.2+hg1653 (patched)");
+    AddOption("th","threshold","--legacy: the stars of the curve brighter "
+	      "than threshold times the sky in the aperture",wxCMD_LINE_VAL_DOUBLE);
     COMMON_OPTIONS_MULTIPLE
     AddParam("file(s)[,results(s)]",wxCMD_LINE_VAL_STRING,wxCMD_LINE_PARAM_MULTIPLE);
   }
@@ -440,16 +470,18 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption("","psf-zoom","EMPIRICAL: samples per pixel "
 	      "(default: 4 for FWHM < 5 pix, else 2)",wxCMD_LINE_VAL_NUMBER);
     AddOption("","psf-radius","EMPIRICAL: radius of the residual table [pix] "
-	      "(default: 4*FWHM)",wxCMD_LINE_VAL_DOUBLE);
+	      "(default: 99.5% of the flux, at least 4*FWHM)",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","psf-var","EMPIRICAL: order of the spatial variation "
 	      "0, 1, 2 (default: 0)",wxCMD_LINE_VAL_NUMBER);
+    AddOption("","psf-var-radial","EMPIRICAL: order of the variation by "
+	      "the field radius 0-3 (default: 0)",wxCMD_LINE_VAL_NUMBER);
     AddOption("","psf-stars","EMPIRICAL: maximum of PSF stars (default: 100)",
 	      wxCMD_LINE_VAL_NUMBER);
     AddOption("","psf-list","EMPIRICAL: PSF stars by a list (x y per line, "
 	      "or a FITS table with X, Y)");
     AddOption("","psf-save","EMPIRICAL: save the PSF to a PSF file");
     AddOption("","psf-smooth","EMPIRICAL: regularisation of the residual "
-	      "table (default: 0.01)",wxCMD_LINE_VAL_DOUBLE);
+	      "table (default: by cross-validation)",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","fwhm","FWHM [pix] of analytic PSF (default: fitted)",
 	      wxCMD_LINE_VAL_DOUBLE);
     AddOption("","beta","Moffat exponent (default: fitted)",
@@ -665,6 +697,15 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption(wxEmptyString,"col-dec","Declination column");
     AddOption(wxEmptyString,"col-mag","magnitude column(s)");
     AddOption(wxEmptyString,"col-magerr","magnitude std. error column(s)");
+    AddOption("","color-term","colour term by the catalogue colour A-B: "
+	      "columns A,B[,errA,errB]; repeat for more colours (up to 3)");
+    AddOption("","color-order","order of the colour term: 1 (default) or 2; "
+	      "a list for every --color-term");
+    AddOption("","color-ref","reference colour of the colour term [mag]: "
+	      "mean (of the calibration stars, default) or a value; "
+	      "a list for every --color-term");
+    AddOption("","color-err-correct","correct the colour terms for the errors "
+	      "of the catalogue colours (errA,errB): yes (default) or no");
     AddOption("","photsys-ref","reference photometry system (catalogue)");
     AddOption("","photsys-instr","instrumental photometry system (frames)");
     AddOption(wxEmptyString,"area","area of input aperture [m2]",wxCMD_LINE_VAL_DOUBLE);
@@ -697,6 +738,10 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption(wxEmptyString,"col-dec","Declination column");
     AddOption(wxEmptyString,"col-mag","magnitude column(s), order of -f");
     AddOption(wxEmptyString,"col-magerr","magnitude std. error column(s)");
+    AddOption("","model","mag (colour terms of magnitudes, default) or "
+	      "flux (linear mixing of photon rates)");
+    AddOption("","color-order","order of the colour terms of the mag model: "
+	      "1 (default) or 2",wxCMD_LINE_VAL_NUMBER);
     AddOption("","photsys-ref","reference photometry system (catalogue)");
     AddOption("","photsys-instr","instrumental photometry system "
 	      "(default: PHOTSYS of the frames)");

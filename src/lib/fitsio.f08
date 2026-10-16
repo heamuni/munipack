@@ -87,7 +87,7 @@ module fitsio
 
   interface fits_update_key
      module procedure fits_update_key_str, fits_update_key_lng, &
-          fits_update_key_flt, fits_update_key_dbl
+          fits_update_key_flt, fits_update_key_dbl, fits_update_key_log
   end interface fits_update_key
 
   interface fits_read_col
@@ -727,6 +727,25 @@ contains
     status = ffukyj(fitsfile%fptr,k,n,c,stat)
 
   end subroutine fits_update_key_lng
+
+  subroutine fits_update_key_log(fitsfile,keyname,val,com,status)
+
+    type(fitsfiles), intent(in) :: fitsfile
+    character(len=*), intent(in) :: keyname
+    logical, intent(in) :: val
+    character(len=*), intent(in) :: com
+    integer, intent(in out) :: status
+
+    character(kind=C_CHAR), dimension(FLEN_CARD) :: c,k
+    integer(kind=C_INT) :: stat, l
+
+    stat = status
+    l = merge(1,0,val)
+    call cchar(keyname,k)
+    call cchar(com,c)
+    status = ffukyl(fitsfile%fptr,k,l,c,stat)
+
+  end subroutine fits_update_key_log
 
   subroutine fits_update_key_flt(fitsfile,keyname,val,decimals,com,status)
 

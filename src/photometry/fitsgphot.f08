@@ -31,10 +31,20 @@ module fitsgphot
 contains
 
   subroutine fits_gphot_read(filename,hwhm,sep,raper,xcens,ycens, &
-    sky,skyerr,skycorr,skyerrcorr,apcts,apcts_err,status)
+    sky,skyerr,skycorr,skyerrcorr,apcts,apcts_err,status, &
+    ring,ecc,fwhm,naxes,errgain)
+
+    ! ring: the sky annulus, ecc: the eccentricity of the apertures,
+    ! fwhm: FWHM of FIND (-1 when unknown), naxes: the frame size,
+    ! errgain: the gain of the photon noise in APCOUNTERR (APERRGN,
+    ! -1 when unknown)
 
     character(len=*), intent(in) :: filename
     real, intent(out) :: hwhm, sep
+    real, dimension(2), intent(out) :: ring
+    real, intent(out) :: ecc, fwhm
+    integer, dimension(2), intent(out) :: naxes
+    real(rp), intent(out) :: errgain
     real, dimension(:), allocatable, intent(out) :: raper, xcens,ycens, &
          sky,skyerr,skycorr,skyerrcorr
     real, dimension(:,:), allocatable, intent(out) :: apcts,apcts_err
@@ -55,6 +65,25 @@ contains
        return
     end if
 
+    ! the frame size
+    naxes = 0
+    call fits_read_key(fits,'NAXIS1',naxes(1),status)
+    call fits_read_key(fits,'NAXIS2',naxes(2),status)
+    if( status == FITS_KEYWORD_NOT_FOUND ) then
+       naxes = 0
+       status = 0
+    end if
+
+    ! FWHM of the detection (the scale of the selection of the stars
+    ! of the growth curve)
+    fwhm = -1
+    call fits_movnam_hdu(fits,FITS_BINARY_TBL,FINDEXTNAME,extver,status)
+    if( status == 0 ) then
+       call fits_read_key(fits,FITS_KEY_FWHM,fwhm,status)
+       if( status == FITS_KEYWORD_NOT_FOUND ) fwhm = -1
+    end if
+    status = 0
+
     call fits_movnam_hdu(fits,FITS_BINARY_TBL,APEREXTNAME,extver,status)
     if( status == FITS_BAD_HDU_NUM ) then
        write(error_unit,*) "Error: ",trim(APEREXTNAME)// &
@@ -67,6 +96,20 @@ contains
     call fits_read_key(fits,FITS_KEY_NAPER,naper,status)
     call fits_read_key(fits,FITS_KEY_HWHM,hwhm,status)
     call fits_read_key(fits,trim(FITS_KEY_ANNULUS)//'2',sep,status)
+    call fits_read_key(fits,trim(FITS_KEY_ANNULUS)//'1',ring(1),status)
+    ring(2) = sep
+    if( status /= 0 ) goto 666
+    call fits_read_key(fits,FITS_KEY_ECCENTRICITY,ecc,status)
+    if( status == FITS_KEYWORD_NOT_FOUND ) then
+       ecc = 0
+       status = 0
+    end if
+    ! the gain of the errors (aphot since BUGS P34), else unknown
+    call fits_read_key(fits,'APERRGN',errgain,status)
+    if( status == FITS_KEYWORD_NOT_FOUND ) then
+       errgain = -1
+       status = 0
+    end if
 
     allocate(xcens(nrows),ycens(nrows),sky(nrows),skyerr(nrows), &
          skycorr(nrows),skyerrcorr(nrows),apcts(nrows,naper), &
@@ -114,9 +157,10 @@ contains
 
   subroutine fits_find_save(filename,output,ghwhm,rflux90, &
        raper, xcens, ycens, sky,skyerr, gcount,gcount_err, growflag, &
-       curve, curve_err, prof, status)
+       curve, curve_err, prof, status, method)
 
     character(len=*), intent(in) :: filename, output
+    character(len=*), intent(in), optional :: method
     real, intent(in) :: ghwhm,rflux90
     real, dimension(:), intent(in) :: raper, xcens, ycens, sky,skyerr
     real(rp), dimension(:), intent(in) :: gcount,gcount_err
@@ -179,6 +223,9 @@ contains
          '[pix] half width at half of maximum',status)
     call fits_write_key(fits,FITS_KEY_RF90,rflux90,-4, &
          '[pix] radius contains 90% of flux',status)
+    if( present(method) ) &
+         call fits_write_key(fits,'GROWMETH',method, &
+         'growth curve: EE (enclosed energy), LEGACY (fit)',status)
 
     write(com,'(a,i0)') 'Count of stars used for curve construction: ', &
          count(growflag == 1)

@@ -262,6 +262,14 @@ module cfitsio
        integer(kind=C_INT), intent(in out) :: status
      end function ffukyj
 
+     integer(kind=C_INT) function ffukyl(fptr,keyname,val,com,status) bind(c)
+       use, intrinsic :: iso_c_binding
+       type(c_ptr), value, intent(in) :: fptr
+       character(kind=C_CHAR), dimension(*), intent(in) :: keyname, com
+       integer(kind=C_INT), value, intent(in) :: val
+       integer(kind=C_INT), intent(in out) :: status
+     end function ffukyl
+
      integer(kind=C_INT) function ffukye(fptr,keyname,numval,decimals,com,status) &
           bind(c)
        use, intrinsic :: iso_c_binding

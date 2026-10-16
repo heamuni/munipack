@@ -73,10 +73,22 @@ module psffit
      ! the residual tables res(-ntab:ntab,-ntab:ntab,npoly) sampled with
      ! the same zoom, the terms of the polynomial in the normalised field
      ! coordinates (x - pxc)/pxs, (y - pyc)/pys: 1, x, y, x**2, x*y, y**2
+     ! (nxy terms), followed by the powers rpow of the field radius from
+     ! the field centre xcen, ycen (the convention of PSF files)
+     ! normalised by prs
      logical :: empirical = .false.
-     integer :: ntab = 0, npoly = 1
+     integer :: ntab = 0, npoly = 1, nxy = 1
      real(REAL64), dimension(:,:,:), allocatable :: res
-     real(REAL64) :: pxc = 0, pyc = 0, pxs = 1, pys = 1
+     real(REAL64) :: pxc = 0, pyc = 0, pxs = 1, pys = 1, prs = 1
+     integer, dimension(:), allocatable :: rpow
+     ! the sums of the tables (the flux of the tables, set by the
+     ! normalisation to a large aperture), its covariance; the tables by
+     ! subsets of the PSF stars resk(:,:,:,nk) (the uncertainty of the
+     ! model), a systematic relative error of fluxes by the PSF
+     real(REAL64), dimension(:), allocatable :: tsum
+     real(REAL64), dimension(:,:), allocatable :: tcov
+     real(REAL64), dimension(:,:,:,:), allocatable :: resk
+     real(REAL64) :: syserr = 0
    contains
      procedure :: sampled, sampled_base, prepare, fwhm, poly_terms
   end type PsfType
@@ -102,7 +114,7 @@ module psffit
      logical :: modelled = .false.
   end type StarFit
 
-  public :: fit_star, fit_group, add_model, fit_shape, linear_flux
+  public :: fit_star, fit_group, add_model, fit_shape, linear_flux, model_error
 
 contains
 
@@ -194,19 +206,26 @@ contains
     real(REAL64), intent(in) :: x,y
     real(REAL64), dimension(:), intent(out) :: pt
 
-    real(REAL64) :: u, v
+    real(REAL64) :: u, v, r
+    integer :: i
 
     u = (x - this%pxc) / this%pxs
     v = (y - this%pyc) / this%pys
     pt(1) = 1
-    if( size(pt) >= 3 ) then
+    if( this%nxy >= 3 ) then
        pt(2) = u
        pt(3) = v
     end if
-    if( size(pt) >= 6 ) then
+    if( this%nxy >= 6 ) then
        pt(4) = u**2
        pt(5) = u*v
        pt(6) = v**2
+    end if
+    if( allocated(this%rpow) ) then
+       r = hypot(x - this%xcen,y - this%ycen) / this%prs
+       do i = 1, size(this%rpow)
+          pt(this%nxy+i) = r**this%rpow(i)
+       end do
     end if
 
   end subroutine poly_terms
@@ -340,6 +359,87 @@ contains
     star%sky = s
 
   end subroutine linear_flux
+
+
+  subroutine model_error(frame,psf,star,relerr,relsplit)
+
+    ! The relative error of the flux of the star by the uncertainty of
+    ! the empirical PSF. The tables built on the subsets of the PSF stars
+    ! give the variance of the tables: the flux by the table of a subset,
+    ! linearised at the fitted flux and position,
+    !
+    !    dF/F = - sum(w p d) / sum(w p**2),
+    !
+    ! where d is the difference of the table of the subset from that of
+    ! all stars pixelised at the star, p the PSF and w the weights of the
+    ! fitting pixels, scatters by the subsets; the variance of their mean
+    ! is the variance of the flux by the noise of the tables (relsplit).
+    ! The variance of the normalisation (the sums of the tables, by the
+    ! aperture fluxes of the PSF stars) and the systematic error of the
+    ! PSF (the excess scatter of the aperture fluxes) are added.
+
+    type(FrameType), intent(in) :: frame
+    type(PsfType), intent(in) :: psf
+    type(StarFit), intent(in) :: star
+    real(REAL64), intent(out) :: relerr
+    real(REAL64), intent(out), optional :: relsplit
+
+    real(REAL64), dimension(:,:), allocatable :: sub, p, d, dp
+    real(REAL64), dimension(:), allocatable :: pt, df, w
+    integer, dimension(:), allocatable :: ii, jj
+    real(REAL64) :: s2, v, vs
+    integer :: nsub, n, npix, i0, j0, k, l, t, nk, nt
+
+    relerr = 0
+    vs = 0
+    if( present(relsplit) ) relsplit = 0
+    if( .not. psf%empirical ) return
+
+    allocate(pt(psf%npoly))
+    call psf%poly_terms(star%x,star%y,pt)
+    v = 0
+    if( allocated(psf%tcov) ) v = max(dot_product(pt,matmul(psf%tcov,pt)),0.0_REAL64)
+    v = v + psf%syserr**2
+
+    nk = 0
+    if( allocated(psf%resk) ) nk = size(psf%resk,4)
+    if( nk >= 2 ) then
+       call pixel_set(frame,star,ii,jj,npix,n)
+       if( npix > 0 ) then
+          i0 = nint(star%x)
+          j0 = nint(star%y)
+          call psf%sampled(star%x,star%y,sub,nsub)
+          allocate(p(-n:n,-n:n),dp(-n:n,-n:n),w(npix),df(nk))
+          call psf_pixelize(sub,nsub,psf%zoom,i0 - star%x,j0 - star%y,n,p)
+          do k = 1, npix
+             w(k) = 1 / frame%variance(frame%mstar(ii(k),jj(k)) + star%sky)
+          end do
+          s2 = 0
+          do k = 1, npix
+             s2 = s2 + w(k)*p(ii(k)-i0,jj(k)-j0)**2
+          end do
+          nt = psf%ntab
+          allocate(d(-nt:nt,-nt:nt))
+          do l = 1, nk
+             d = 0
+             do t = 1, psf%npoly
+                d = d + pt(t)*(psf%resk(:,:,t,l) - psf%res(:,:,t))
+             end do
+             call psf_pixelize(d,nt,psf%zoom,i0 - star%x,j0 - star%y,n,dp)
+             df(l) = 0
+             do k = 1, npix
+                df(l) = df(l) - w(k)*p(ii(k)-i0,jj(k)-j0)*dp(ii(k)-i0,jj(k)-j0)
+             end do
+             if( s2 > 0 ) df(l) = df(l) / s2
+          end do
+          vs = sum((df - sum(df) / nk)**2) / (nk*(nk - 1))
+       end if
+    end if
+
+    relerr = sqrt(v + vs)
+    if( present(relsplit) ) relsplit = sqrt(vs)
+
+  end subroutine model_error
 
 
   subroutine pixel_set(frame,star,ii,jj,npix,n)

@@ -86,6 +86,19 @@
 !       errors were 8-10 times too large and no variation was significant.
 !     - The error of EE of a star is the error of the polynomial at its
 !       position (the covariance) and the excess scatter.
+!     - The errors of a prediction (desc%predict, gphot, where EE of
+!       every star sets its total flux and the aperture of it): with
+!       few or faint stars, the variation of EE over the field is not
+!       significant and the model of the lower order (and the scatter
+!       of the fitted stars) underestimates the error of EE of the
+!       other stars (by 2-3 times on the 2048**2 frames with the
+!       field-dependent PSF dpsf.fits, 30 stars). The variance of the
+!       model and the excess scatter are inflated by lambda >= 1, by
+!       which the residuals of the stars predicted without them (leave
+!       one out) scatter as their errors say (the median of their
+!       squares, EELAMk); the stars outside of the range of the fitted
+!       ones add the difference of the extrapolated model and its value
+!       at the border. aphot (desc%predict false) is unchanged.
 !
 
 module aperture_ee
@@ -115,6 +128,11 @@ module aperture_ee
      logical :: platok = .false.
      real(dbl), dimension(:), allocatable :: sigma
      integer, dimension(:), allocatable :: korder
+     ! the errors of EE as the errors of a prediction (gphot, see
+     ! apee_auto): the inflation of the model variance by the
+     ! leave-one-out residuals of every aperture (lambda)
+     logical :: predict = .false.
+     real(dbl), dimension(:), allocatable :: lambda
   end type EEDescr
 
   ! the isolation of stars for the growth curve [FWHM], their plateau
@@ -195,12 +213,13 @@ contains
 
 
   subroutine apee_auto(desc,xcens,ycens,apcts,apcts_err,sky_err,raper,ring, &
-       ecc,fwhm,naxes,verbose,ee,eeerr,ok)
+       ecc,fwhm,naxes,verbose,ee,eeerr,ok,used)
 
     ! EE of all stars by the growth curves of the bright isolated ones,
     ! the requested order of the spatial variation is desc%ordreq;
     ! sky_err is the error of the mean sky of the stars, ecc the
-    ! eccentricity of the apertures (their areas)
+    ! eccentricity of the apertures (their areas); used (optional)
+    ! marks the stars of the growth curve (gphot)
 
     use exscatter
 
@@ -212,11 +231,13 @@ contains
     logical, intent(in) :: verbose
     real(dbl), dimension(:,:), intent(out) :: ee, eeerr
     logical, intent(out) :: ok
+    logical, dimension(:), intent(out), optional :: used
 
     real(dbl), dimension(:,:), allocatable :: cts, var
     real(dbl), dimension(:), allocatable :: dnn, snr, g, tot, f, s, &
          res, w, xs, ys, cfit, xa, ya, area
-    real(dbl), dimension(:,:), allocatable :: cov, vee
+    real(dbl), dimension(:,:), allocatable :: cov, vee, cov0
+    real(dbl), dimension(:), allocatable :: xr, yr
     integer, dimension(:), allocatable :: idx, plat
     logical, dimension(:), allocatable :: cand, sel, keep, prev
     real(dbl) :: xc, yc, hx, hy, sig, psig, gmax, chi2
@@ -229,9 +250,11 @@ contains
     nap = size(raper)
     ee = -1
     eeerr = -1
-    allocate(desc%sigma(nap),desc%korder(nap))
+    if( present(used) ) used = .false.
+    allocate(desc%sigma(nap),desc%korder(nap),desc%lambda(nap))
     desc%sigma = -1
     desc%korder = -1
+    desc%lambda = -1
     desc%order = -1
     desc%nstars = 0
     if( nst < 3 .or. .not. (fwhm > 0) ) then
@@ -415,6 +438,7 @@ contains
     end if
     desc%nstars = nsel
     idx = pack([(l, l = 1, nst)],sel)
+    if( present(used) ) used = sel
 
     ! the total flux: the mean of the plateau apertures, the variances
     ! of EE of the stars in all apertures (the nested apertures)
@@ -446,6 +470,8 @@ contains
     ys = ya(idx)
     ! the model is not extrapolated: the stars outside of the range
     ! of the fitted ones get the values at its border
+    xr = xa
+    yr = ya
     xa = min(max(xa,minval(xs)),maxval(xs))
     ya = min(max(ya,minval(ys)),maxval(ys))
 
@@ -462,7 +488,7 @@ contains
     npar = nterms(order)
 
     allocate(f(nsel),s(nsel),res(nsel),w(nsel),keep(nsel),cfit(npar), &
-         cov(npar,npar),prev(nsel))
+         cov(npar,npar),prev(nsel),cov0(npar,npar))
     do k = 1, nap
        f = cts(idx,k) / tot
        s = sqrt(vee(:,k))
@@ -518,16 +544,36 @@ contains
        if( .not. fitok ) cycle
        res = f - polyval(mo,xs,ys,cfit(1:nl))
        chi2 = sum(w*res**2)
+       cov0(1:nl,1:nl) = cov(1:nl,1:nl)
        if( count(keep) > nl ) &
             cov(1:nl,1:nl) = cov(1:nl,1:nl) * max(1.0_dbl,chi2/(count(keep)-nl))
        desc%sigma(k) = sig
        desc%korder(k) = ko
 
        ee(:,k) = polyval(mo,xa,ya,cfit(1:nl))
-       do l = 1, nst
-          eeerr(l,k) = sqrt(max(polyvar(mo,xa(l),ya(l),cov(1:nl,1:nl)), &
-               0.0_dbl) + sig**2)
-       end do
+       if( desc%predict ) then
+          call loo_lambda(mo,nl,desc%lambda(k))
+          ! the error of the prediction (at least that of the model),
+          ! the model of the stars outside of the range of the fitted
+          ! ones unknown by the difference of its extrapolation and
+          ! the border value
+          block
+            real(dbl), dimension(nst) :: ex
+            real(dbl) :: v0, v
+            ex = polyval(mo,xr,yr,cfit(1:nl)) - ee(:,k)
+            do l = 1, nst
+               v0 = max(polyvar(mo,xa(l),ya(l),cov0(1:nl,1:nl)),0.0_dbl)
+               v = max(polyvar(mo,xa(l),ya(l),cov(1:nl,1:nl)),0.0_dbl)
+               eeerr(l,k) = sqrt(max(desc%lambda(k)*(v0 + sig**2),v + sig**2) &
+                    + ex(l)**2)
+            end do
+          end block
+       else
+          do l = 1, nst
+             eeerr(l,k) = sqrt(max(polyvar(mo,xa(l),ya(l),cov(1:nl,1:nl)), &
+                  0.0_dbl) + sig**2)
+          end do
+       end if
 
        if( verbose ) write(error_unit,'(a,i0,a,f0.2,a,f0.4,a,i0,a,f0.4,a,i0,a,i0)') &
             ' Aperture correction: aperture ',k,' (',raper(k),' pix): EE(centre) = ', &
@@ -543,6 +589,59 @@ contains
          desc%platbe,' ADU/pix, sky bias ',desc%skybias,' ADU/pix.'
 
   contains
+
+    subroutine loo_lambda(mo,nl,lam)
+
+      ! The inflation lam >= 1 of the variance of the model (its
+      ! covariance and the excess scatter) such that the residuals of
+      ! the stars predicted without them, r/(1 - h) of the fitted ones
+      ! (h the leverage) and r of the clipped ones, scatter as their
+      ! errors say, s**2 + lam (var + sig**2), by the median of their
+      ! squares (robust to a few outliers: the light of neighbours). A
+      ! model which does not describe the variation of EE (too few or
+      ! too faint stars to find it) predicts EE of other stars worse
+      ! than its covariance and the scatter of the fitted stars say.
+
+      integer, intent(in) :: mo, nl
+      real(dbl), intent(out) :: lam
+
+      real(dbl), dimension(size(f)) :: r, q
+      logical, dimension(size(f)) :: valid
+      real(dbl), dimension(nl) :: t
+      real(dbl) :: lo, hi, mid, h
+      integer :: i, ib
+
+      lam = 1
+      valid = s > 0
+      if( count(valid) < nl + 2 ) return
+      r = f - polyval(mo,xs,ys,cfit(1:nl))
+      do i = 1, size(f)
+         call terms(mo,xs(i),ys(i),t)
+         q(i) = max(dot_product(t,matmul(cov0(1:nl,1:nl),t)),0.0_dbl)
+         if( keep(i) ) then
+            h = min(q(i) / (s(i)**2 + sig**2),0.99_dbl)
+            r(i) = r(i) / (1 - h)
+            q(i) = q(i) / (1 - h)
+         end if
+      end do
+      if( zmed(1.0_dbl,r,s,q,sig,valid) <= 1 ) return
+      lo = 1
+      hi = 2
+      do while( zmed(hi,r,s,q,sig,valid) > 1 .and. hi < 1e12_dbl )
+         lo = hi
+         hi = 4*hi
+      end do
+      do ib = 1, 60
+         mid = sqrt(lo*hi)
+         if( zmed(mid,r,s,q,sig,valid) > 1 ) then
+            lo = mid
+         else
+            hi = mid
+         end if
+      end do
+      lam = hi
+
+    end subroutine loo_lambda
 
     subroutine plateau_slope(k1,k2,z,b,eb)
 
@@ -768,6 +867,21 @@ contains
   end subroutine apee_auto
 
 
+  real(dbl) function zmed(lam,r,s,q,sig,use)
+
+    ! the median of the squares of the residuals r in their errors,
+    ! s**2 + lam (q + sig**2), of the residuals use, relative to that
+    ! of the Normal distribution
+
+    real(dbl), intent(in) :: lam, sig
+    real(dbl), dimension(:), intent(in) :: r, s, q
+    logical, dimension(:), intent(in) :: use
+
+    zmed = median(pack(r**2 / (s**2 + lam*(q + sig**2)),use)) / 0.45494_dbl
+
+  end function zmed
+
+
   real(dbl) function chi2crit(n)
 
     ! the 99.9% quantile of the chi2 distribution of n degrees of freedom
@@ -969,15 +1083,17 @@ contains
   end subroutine sortd
 
 
-  subroutine apee_header(filename,desc,status)
+  subroutine apee_header(filename,desc,status,extname)
 
-    ! the description of EE to the header of APERPHOT
+    ! the description of EE to the header of APERPHOT (or of the
+    ! extension extname: GROWPHOT of gphot)
 
     use titsio
 
     character(len=*), intent(in) :: filename
     type(EEDescr), intent(in) :: desc
     integer, intent(in out) :: status
+    character(len=*), intent(in), optional :: extname
 
     type(fitsfiles) :: fits
     character(len=FLEN_KEYWORD) :: key
@@ -988,7 +1104,11 @@ contains
 
     call fits_open_file(fits,filename,FITS_READWRITE,status)
     if( status /= 0 ) return
-    call fits_movnam_hdu(fits,FITS_BINARY_TBL,APEREXTNAME,0,status)
+    if( present(extname) ) then
+       call fits_movnam_hdu(fits,FITS_BINARY_TBL,extname,0,status)
+    else
+       call fits_movnam_hdu(fits,FITS_BINARY_TBL,APEREXTNAME,0,status)
+    end if
 
     call fits_update_key(fits,'EESOURCE',desc%source, &
          'enclosed energy APEE by: PSF or AUTO (frame stars)',status)
@@ -1067,6 +1187,11 @@ contains
           call fits_make_keyn('EESIG',k,key,status)
           call fits_update_key(fits,key,desc%sigma(k),-3, &
                'scatter of EE of stars over the model',status)
+          if( desc%predict ) then
+             call fits_make_keyn('EELAM',k,key,status)
+             call fits_update_key(fits,key,desc%lambda(k),-3, &
+                  'EE variance inflation by leave-one-out',status)
+          end if
        end do
     end if
 

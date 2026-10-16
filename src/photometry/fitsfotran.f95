@@ -26,7 +26,11 @@ module fits_fotran
 
   integer, parameter, private :: dbl = selected_real_kind(15)
 
-  private :: idcol
+  ! the model of the transformation: FLUX (the forward matrix of photon
+  ! rates, assumed when the keyword is missing) or MAG (colour terms)
+  character(len=*), parameter, private :: FITS_KEY_TRAMODEL = 'TRAMODEL'
+
+  private :: idcol, trahead, tradatatab
 
 contains
 
@@ -117,6 +121,128 @@ contains
   end subroutine traload
 
 
+  subroutine tramodel(nametable,model,status)
+
+    ! The model of the transformation table: TRAMODEL of the primary
+    ! header, FLUX (the linear mixing of photons, the forward matrix;
+    ! the tables without the keyword) or MAG (the colour terms of
+    ! the magnitudes)
+
+    character(len=*), intent(in) :: nametable
+    character(len=*), intent(out) :: model
+    integer, intent(out) :: status
+
+    type(fitsfiles) :: fits
+
+    status = 0
+    model = 'FLUX'
+    call fits_open_file(fits,nametable,FITS_READONLY,status)
+    if( status /= 0 ) then
+       write(error_unit,*) &
+            'Error: failed to read a table in the file `',trim(nametable),"'."
+       return
+    end if
+    call fits_read_key(fits,FITS_KEY_TRAMODEL,model,status)
+    if( status == FITS_KEYWORD_NOT_FOUND ) then
+       model = 'FLUX'
+       status = 0
+    end if
+    call fits_close_file(fits,status)
+    call fits_report_error(error_unit,status)
+    if( .not. (model == 'FLUX' .or. model == 'MAG') ) then
+       write(error_unit,*) "Error: unknown model of the transformation `", &
+            trim(model),"'."
+       status = 1
+    end if
+
+  end subroutine tramodel
+
+
+  subroutine traload_mag(nametable,photosys_ref,photosys_instr,filters, &
+       cola,colb,cref,zp,dzp,k1,dk1,k2,dk2,status)
+
+    ! The magnitude transformation (TRAMODEL = 'MAG'): for every filter
+    ! m_std - m_inst = ZP + K1 (c - CREF) + K2 (c - CREF)**2,
+    ! c = m_std(COLOR_A) - m_std(COLOR_B)
+
+    character(len=*), intent(in) :: nametable
+    character(len=*), intent(out) :: photosys_ref,photosys_instr
+    character(len=FLEN_VALUE), dimension(:), allocatable, intent(out) :: &
+         filters, cola, colb
+    real(dbl), dimension(:), allocatable, intent(out) :: cref,zp,dzp,k1,dk1,k2,dk2
+    integer, intent(out) :: status
+
+    character(len=FLEN_KEYWORD) :: key
+    integer, parameter :: frow = 1, extver = 0
+    real(dbl), parameter :: nullval = 0.0_dbl
+    character(len=FLEN_VALUE), dimension(3) :: scols
+    character(len=FLEN_VALUE), dimension(7) :: dcols
+    integer :: nrows, i, col
+    logical :: anyf
+    type(fitsfiles) :: fits
+
+    status = 0
+    call fits_open_file(fits,nametable,FITS_READONLY,status)
+    if( status /= 0 ) then
+       write(error_unit,*) &
+            'Error: failed to read a table in the file `',trim(nametable),"'."
+       return
+    end if
+
+    call fits_make_keyn(FITS_KEY_PHOTSYS,1,key,status)
+    call fits_read_key(fits,key,photosys_instr,status)
+    call fits_make_keyn(FITS_KEY_PHOTSYS,2,key,status)
+    call fits_read_key(fits,key,photosys_ref,status)
+
+    call fits_movnam_hdu(fits,FITS_BINARY_TBL,trim(FTHDUNAME)//'_MAG',extver,status)
+    call fits_get_num_rows(fits,nrows,status)
+    if( status /= 0 ) goto 666
+
+    allocate(filters(nrows),cola(nrows),colb(nrows),cref(nrows),zp(nrows), &
+         dzp(nrows),k1(nrows),dk1(nrows),k2(nrows),dk2(nrows))
+
+    scols = [ character(len=FLEN_VALUE) :: 'FILTER', 'COLOR_A', 'COLOR_B' ]
+    dcols = [ character(len=FLEN_VALUE) :: 'CREF', 'ZP', 'ZPERR', 'K1', &
+         'K1ERR', 'K2', 'K2ERR' ]
+    do i = 1, size(scols)
+       call fits_get_colnum(fits,.true.,scols(i),col,status)
+       select case(i)
+       case(1)
+          call fits_read_col(fits,col,frow,'',filters,anyf,status)
+       case(2)
+          call fits_read_col(fits,col,frow,'',cola,anyf,status)
+       case(3)
+          call fits_read_col(fits,col,frow,'',colb,anyf,status)
+       end select
+    end do
+    do i = 1, size(dcols)
+       call fits_get_colnum(fits,.true.,dcols(i),col,status)
+       select case(i)
+       case(1)
+          call fits_read_col(fits,col,frow,nullval,cref,anyf,status)
+       case(2)
+          call fits_read_col(fits,col,frow,nullval,zp,anyf,status)
+       case(3)
+          call fits_read_col(fits,col,frow,nullval,dzp,anyf,status)
+       case(4)
+          call fits_read_col(fits,col,frow,nullval,k1,anyf,status)
+       case(5)
+          call fits_read_col(fits,col,frow,nullval,dk1,anyf,status)
+       case(6)
+          call fits_read_col(fits,col,frow,nullval,k2,anyf,status)
+       case(7)
+          call fits_read_col(fits,col,frow,nullval,dk2,anyf,status)
+       end select
+    end do
+
+666 continue
+
+    call fits_close_file(fits,status)
+    call fits_report_error(error_unit,status)
+
+  end subroutine traload_mag
+
+
   subroutine trawrite(output,photosys_ref,photosys_instr,filters_ref, &
        filters_instr,ra,dec,ci0,ph,dph,cts,dcts, &
        tr,trerr,tr1,tr1err,filenames,airmass,ctph,extin)
@@ -133,62 +259,15 @@ contains
     integer, parameter :: frow = 1
     character(len=FLEN_VALUE), dimension(:), allocatable :: ttype, tform,tunit
     character(len=FLEN_VALUE) :: extname
-    character(len=FLEN_KEYWORD) :: key
-    character(len=FLEN_CARD) :: buf,a
-    real(dbl) :: x
-    integer :: n,nrows,ncols, nbands,status
+    integer :: n,nrows,ncols,status
     type(fitsfiles) :: fits
 
     status = 0
-    if( fits_file_exist(output) ) call fits_file_delete(output)
-    call fits_create_file(fits,output,status)
-    call fits_insert_image(fits,8,0,[0],status)
-    call fits_write_comment(fits,'Photometry system conversion table.',status)
-    call fits_write_key(fits,FITS_KEY_CREATOR,FITS_VALUE_CREATOR,FITS_COM_CREATOR,status)
-    call fits_write_comment(fits,MUNIPACK_VERSION,status)
-    call fits_write_comment(fits,'Description: http://munipack.physics.muni.cz/dataform_phfotran.html',status)
-
-    call fits_make_keyn(FITS_KEY_PHOTSYS,1,key,status)
-    call fits_write_key(fits,key,photosys_instr,'instrumental photometry system',status)
-
-    call fits_make_keyn(FITS_KEY_PHOTSYS,2,key,status)
-    call fits_write_key(fits,key,photosys_ref,'reference photometry system (standard)',status)
-
-    if( present(airmass) ) then
-       x = sum(airmass)/size(airmass)
-       call fits_write_key(fits,FITS_KEY_AIRMASS,x,-6,'average air-mass',status)
-    end if
+    call trahead(fits,output,'FLUX',photosys_ref,photosys_instr,filters_instr, &
+         status,filenames,airmass,ctph,extin)
 
     ! mean colour index
     call fits_write_key(fits,'REFCI',ci0,-6,'reference colour index',status)
-
-    if( present(filenames) ) then
-       call fits_write_comment(fits,'Photometry transformation has been derived by processing..',status)
-       call fits_write_comment(fits,' filename, filter, airmass, ctph, extinction:',status)
-       do n = 1,size(filenames)
-          if( size(airmass) > 0 ) then
-             write(buf,'(f8.5)') airmass(n)
-          else
-             buf = "-"
-          end if
-          if( size(ctph) > 0 ) then
-             write(a,'(1p,g0.5)') ctph(n)
-          else
-             a = "-"
-          end if
-          buf = trim(buf) // " " // trim(a)
-          if( size(extin) > 0 ) then
-             write(a,'(1p,g0.5)') extin(n)
-          else
-             a = "-"
-          end if
-          buf = trim(buf) // " " // trim(a)
-          call fits_write_comment(fits,"'"//trim(filenames(n))//"' '"//  &
-               trim(filters_instr(n))//"' "//trim(buf),status)
-       end do
-       call fits_write_comment(fits,'All elements are normalized for both unit area and time.',status)
-    end if
-
 
     ! extension - FOTRAN
     nrows = size(tr,1)
@@ -226,8 +305,167 @@ contains
 
     deallocate(ttype,tform,tunit)
 
+    call tradatatab(fits,filters_ref,filters_instr,ra,dec,ph,dph,cts,dcts,status)
 
-    ! data info extension
+    call fits_close_file(fits,status)
+    call fits_report_error(error_unit,status)
+
+  end subroutine trawrite
+
+
+  subroutine trawrite_mag(output,photosys_ref,photosys_instr,filters_ref, &
+       filters_instr,cola,colb,cref,zp,dzp,k1,dk1,k2,dk2,sys,nstars,rms, &
+       ra,dec,ph,dph,cts,dcts,filenames,airmass,ctph,extin)
+
+    ! the magnitude transformation (TRAMODEL = 'MAG', see traload_mag);
+    ! sys the systematic errors, nstars the stars, rms the scatter of
+    ! the residuals [mag] of the filters
+
+    character(len=*), intent(in) :: output, photosys_ref, photosys_instr
+    character(len=*), dimension(:), intent(in) :: filters_ref, filters_instr, &
+         cola, colb
+    character(len=*), dimension(:), intent(in), optional :: filenames
+    real(dbl), dimension(:), intent(in) :: cref,zp,dzp,k1,dk1,k2,dk2,sys,rms
+    integer, dimension(:), intent(in) :: nstars
+    real(dbl), dimension(:), intent(in) :: ra,dec
+    real(dbl), dimension(:), intent(in), optional :: airmass,ctph,extin
+    real(dbl), dimension(:,:), intent(in) :: ph,dph,cts,dcts
+
+    integer, parameter :: frow = 1, ncols = 13
+    character(len=FLEN_VALUE), dimension(ncols) :: ttype, tform,tunit
+    integer :: nrows,status
+    type(fitsfiles) :: fits
+
+    status = 0
+    call trahead(fits,output,'MAG',photosys_ref,photosys_instr,filters_instr, &
+         status,filenames,airmass,ctph,extin)
+
+    nrows = size(filters_ref)
+    ttype = [ character(len=FLEN_VALUE) :: 'FILTER', 'COLOR_A', 'COLOR_B', &
+         'CREF', 'ZP', 'ZPERR', 'K1', 'K1ERR', 'K2', 'K2ERR', 'SYSERR', &
+         'RMS', 'NSTARS' ]
+    tform = '1D'
+    tform(1:3) = '16A'
+    tform(13) = '1J'
+    tunit = 'mag'
+    tunit(1:3) = ''
+    tunit(9:10) = 'mag/mag**2'
+    tunit(7:8) = 'mag/mag'
+    tunit(13) = ''
+    call fits_insert_btbl(fits,nrows,ttype,tform,tunit,trim(FTHDUNAME)//'_MAG',status)
+    call fits_write_comment(fits,'Magnitude transformation of every filter:',status)
+    call fits_write_comment(fits,' m_std - m_inst = ZP + K1*(c - CREF) + K2*(c - CREF)**2,',status)
+    call fits_write_comment(fits,' c = m_std(COLOR_A) - m_std(COLOR_B), m_inst = -2.5 log10(counts/s/m2).',status)
+    call fits_write_col(fits,1,frow,filters_ref,status)
+    call fits_write_col(fits,2,frow,cola,status)
+    call fits_write_col(fits,3,frow,colb,status)
+    call fits_write_col(fits,4,frow,cref,status)
+    call fits_write_col(fits,5,frow,zp,status)
+    call fits_write_col(fits,6,frow,dzp,status)
+    call fits_write_col(fits,7,frow,k1,status)
+    call fits_write_col(fits,8,frow,dk1,status)
+    call fits_write_col(fits,9,frow,k2,status)
+    call fits_write_col(fits,10,frow,dk2,status)
+    call fits_write_col(fits,11,frow,sys,status)
+    call fits_write_col(fits,12,frow,rms,status)
+    call fits_write_col(fits,13,frow,nstars,status)
+
+    call tradatatab(fits,filters_ref,filters_instr,ra,dec,ph,dph,cts,dcts,status)
+
+    call fits_close_file(fits,status)
+    call fits_report_error(error_unit,status)
+
+  end subroutine trawrite_mag
+
+
+  subroutine trahead(fits,output,model,photosys_ref,photosys_instr, &
+       filters_instr,status,filenames,airmass,ctph,extin)
+
+    ! the primary HDU of a transformation table
+
+    type(fitsfiles), intent(out) :: fits
+    character(len=*), intent(in) :: output, model, photosys_ref, photosys_instr
+    character(len=*), dimension(:), intent(in) :: filters_instr
+    integer, intent(in out) :: status
+    character(len=*), dimension(:), intent(in), optional :: filenames
+    real(dbl), dimension(:), intent(in), optional :: airmass,ctph,extin
+
+    character(len=FLEN_KEYWORD) :: key
+    character(len=FLEN_CARD) :: buf,a
+    real(dbl) :: x
+    integer :: n
+
+    if( fits_file_exist(output) ) call fits_file_delete(output)
+    call fits_create_file(fits,output,status)
+    call fits_insert_image(fits,8,0,[0],status)
+    call fits_write_comment(fits,'Photometry system conversion table.',status)
+    call fits_write_key(fits,FITS_KEY_CREATOR,FITS_VALUE_CREATOR,FITS_COM_CREATOR,status)
+    call fits_write_comment(fits,MUNIPACK_VERSION,status)
+    call fits_write_comment(fits,'Description: http://munipack.physics.muni.cz/dataform_phfotran.html',status)
+
+    call fits_make_keyn(FITS_KEY_PHOTSYS,1,key,status)
+    call fits_write_key(fits,key,photosys_instr,'instrumental photometry system',status)
+
+    call fits_make_keyn(FITS_KEY_PHOTSYS,2,key,status)
+    call fits_write_key(fits,key,photosys_ref,'reference photometry system (standard)',status)
+
+    if( model == 'MAG' ) then
+       call fits_write_key(fits,FITS_KEY_TRAMODEL,model, &
+            'transformation: colour terms of magnitudes',status)
+    else
+       call fits_write_key(fits,FITS_KEY_TRAMODEL,model, &
+            'transformation: linear mixing of photon rates',status)
+    end if
+
+    if( present(airmass) ) then
+       x = sum(airmass)/size(airmass)
+       call fits_write_key(fits,FITS_KEY_AIRMASS,x,-6,'average air-mass',status)
+    end if
+
+    if( present(filenames) ) then
+       call fits_write_comment(fits,'Photometry transformation has been derived by processing..',status)
+       call fits_write_comment(fits,' filename, filter, airmass, ctph, extinction:',status)
+       do n = 1,size(filenames)
+          if( size(airmass) > 0 ) then
+             write(buf,'(f8.5)') airmass(n)
+          else
+             buf = "-"
+          end if
+          if( size(ctph) > 0 ) then
+             write(a,'(1p,g0.5)') ctph(n)
+          else
+             a = "-"
+          end if
+          buf = trim(buf) // " " // trim(a)
+          if( size(extin) > 0 ) then
+             write(a,'(1p,g0.5)') extin(n)
+          else
+             a = "-"
+          end if
+          buf = trim(buf) // " " // trim(a)
+          call fits_write_comment(fits,"'"//trim(filenames(n))//"' '"//  &
+               trim(filters_instr(n))//"' "//trim(buf),status)
+       end do
+       call fits_write_comment(fits,'All elements are normalized for both unit area and time.',status)
+    end if
+
+  end subroutine trahead
+
+
+  subroutine tradatatab(fits,filters_ref,filters_instr,ra,dec,ph,dph,cts,dcts,status)
+
+    ! the data of the fit (read by tradata)
+
+    type(fitsfiles), intent(in out) :: fits
+    character(len=*), dimension(:), intent(in) :: filters_ref, filters_instr
+    real(dbl), dimension(:), intent(in) :: ra,dec
+    real(dbl), dimension(:,:), intent(in) :: ph,dph,cts,dcts
+    integer, intent(in out) :: status
+
+    integer, parameter :: frow = 1
+    character(len=FLEN_VALUE), dimension(:), allocatable :: ttype, tform,tunit
+    integer :: n,nrows,ncols,nbands
+
     nrows = size(ra)
     nbands = size(ph,2)
     ncols = (2*2)*nbands + 2
@@ -262,10 +500,7 @@ contains
 
     deallocate(ttype,tform,tunit)
 
-    call fits_close_file(fits,status)
-    call fits_report_error(error_unit,status)
-
-  end subroutine trawrite
+  end subroutine tradatatab
 
   subroutine tradata(nametable,ra,dec,ph,dph,cts,dcts)
 

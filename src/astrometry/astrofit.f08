@@ -25,13 +25,29 @@ module astrofitting
   implicit none
   private
 
+  ! the minimum of stars for a solution: four parameters
+  ! (the scale, the rotation and the centre) and their errors
+  integer, parameter, public :: astrominstars = 5
+  ! the minimum of stars for the fit weighted by the errors of centroids
+  integer, parameter :: minweight = 10
+
   public :: astrofit
 
 contains
 
   subroutine astrofit(fit,ptype,pcode,a,d,x,y,sig,xsig,xcen,ycen, &
        acen,dacen,dcen,ddcen,sc,dsc,refl,rms,rot,drot,pv,ares,dres, &
-       id1_init,id2_init,id1_final,id2_final,rmscheck,verbose,plog,reliable)
+       id1_init,id2_init,id1_final,id2_final,rmscheck,verbose,plog,reliable, &
+       scale0,scaletol,frame,ntrial,perr)
+
+    ! scale0, scaletol (optional): the expected scale [pix/deg] and its
+    ! relative tolerance; a solution with a scale out of the tolerance is rejected;
+    ! frame (optional): the size of the frame [pix] (NAXIS1, NAXIS2),
+    ! ntrial (optional, 1 by default): the number of the transformations
+    ! tried by the match (the starting pairs of the sequences), both for
+    ! the test of the significance of the solution; perr (optional):
+    ! the errors of the centroids of the frame stars [pix], the final fit
+    ! is weighted by them (with the excess scatter of the solution)
 
     use robfit
     use deform
@@ -49,6 +65,10 @@ contains
     real(REAL64), dimension(:), allocatable, intent(out) :: ares, dres
     integer, dimension(:), intent(in) :: id1_init,id2_init
     integer, dimension(:), allocatable, intent(out) :: id1_final,id2_final
+    real(REAL64), intent(in), optional :: scale0, scaletol
+    integer, dimension(:), intent(in), optional :: frame
+    real(REAL64), intent(in), optional :: ntrial
+    real(REAL64), dimension(:), intent(in), optional :: perr
 
     real(REAL64), dimension(:), allocatable :: alpha,delta,xstar,ystar
     integer, dimension(:), allocatable :: id1, id2
@@ -67,9 +87,12 @@ contains
     if( size(x) /= size(y) ) &
          stop 'Astrofit: xstar and ystar sizes does not corresponds.'
 
-    ! check stars > 1
-    if( .not. (size(id1_init) > 1) ) then
+    ! a solution requires five stars at least
+    if( size(id1_init) < astrominstars ) then
+       write(error_unit,'(a,i0,a,i0,a)') 'Warning: too few matched stars (', &
+            size(id1_init),'), at least ',astrominstars,' are required.'
        rms = huge(rms)
+       allocate(id1_final(0),id2_final(0))
        return
     end if
 
@@ -102,9 +125,13 @@ contains
 
     ! estimate preliminary solution based on a small set of matched stars
     s = rms
-    call robmin(pcode,'ROBUST',alpha,delta,refl,xstar,ystar,s,&
+    call robmin(pcode,fitmethod,alpha,delta,refl,xstar,ystar,s,&
          acen,dacen,dcen,ddcen,sc,dsc,rot,drot,rms,verbose,reliable)
-    if( .not. reliable ) return
+    if( .not. reliable ) then
+       allocate(id1_final(0),id2_final(0))
+       return
+    end if
+    if( .not. scale_prior() ) return
 
     ! select such much stars as possible for final fit
     deallocate(alpha,delta,xstar,ystar)
@@ -117,32 +144,7 @@ contains
          write(error_unit,'(a,f0.2)') '# Cross match limit for stars [pix]: ',dlim*sc
     call listmatch(pcode,a,d,x,y,acen,dcen,xcen,ycen,sc,rot,refl,dlim,id1,id2,status)
     n = size(id1)
-    if( .not. n > 1 ) then
-       reliable = .false.
-       return
-    end if
 
-    ! The number of cross-matched stars must be significantly larger
-    ! than the number of chance coincidences (a false match gives
-    ! a few stars only, comparable with the chance).
-    if( rmscheck ) then
-       block
-         real(REAL64) :: lambda, pval
-         real(REAL64), parameter :: pmax = 1e-6
-         call chance(pcode,a,d,x,y,acen,dcen,xcen,ycen,sc,rot,refl,dlim*sc, &
-              n,lambda,pval)
-         if( verbose ) write(error_unit,'(a,i0,a,f0.2,a,es8.1)') &
-              '# cross-matched stars: ',n,', expected by chance: ',lambda, &
-              ', probability by chance: ',pval
-         if( pval > pmax ) then
-            if( verbose ) write(error_unit,'(a)') &
-                 '# the match is not significant against chance coincidences, rejected.'
-            reliable = .false.
-            allocate(id1_final(0),id2_final(0))
-            return
-         end if
-       end block
-    end if
     if( size(id1) /= size(id2) ) stop 'Error in astrofit(): unconformed sequences.'
     allocate(alpha(n),delta(n),xstar(n),ystar(n))
     alpha = a(id1)
@@ -161,18 +163,27 @@ contains
             ' as the statistical scale is zero.'
     end if
 
-    if( n > 5 ) then
+    if( n >= astrominstars ) then
 
        call robmin(pcode,fitmethod,alpha,delta,refl,xstar,ystar,s,&
             acen,dacen,dcen,ddcen,sc,dsc,rot,drot,rms,verbose,reliable)
-       if( .not. reliable ) return
+       if( .not. reliable ) then
+          allocate(id1_final(0),id2_final(0))
+          return
+       end if
+
+       ! the fit weighted by the errors of the centroids
+       if( present(perr) .and. n >= minweight ) call weighted
 
        if( ptype == 'TPV' ) then
 
           if( fitmethod == 'ROBUST' .and. n > size(pv) + 1 ) then
 
              call tpvstaged
-             if( .not. reliable ) return
+             if( .not. reliable ) then
+                allocate(id1_final(0),id2_final(0))
+                return
+             end if
           else if( fitmethod == 'ROBUST' ) then
              if( verbose ) write(error_unit,*) &
                   'Warning in astrofit(): too few stars for deformations.'
@@ -190,12 +201,19 @@ contains
 
        if(plog) write(*,'(a,en12.3,en13.3,f8.1,2f14.5)') &
             "=RFIT> ",rms,sc,rot,acen,dcen
+       if( .not. scale_prior() ) return
+       if( rmscheck ) then
+          if( .not. significant() ) return
+       end if
 
     else
 
-       write(error_unit,*) &
-            "Warning in astrofit: low-precision solution having a few points only."
-       reliable = n > 2
+       ! (there was a 'low-precision solution' marked reliable here,
+       ! without residuals: the caller crashed on them)
+       write(error_unit,'(a,i0,a,i0,a)') 'Warning: too few stars cross-matched by the solution (', &
+            n,'), at least ',astrominstars,' are required: the solution is unreliable.'
+       reliable = .false.
+       allocate(id1_final(0),id2_final(0))
        return
 
     end if
@@ -262,6 +280,141 @@ contains
     deallocate(id1,id2)
 
   contains
+
+    subroutine weighted
+
+      ! The fit weighted by the errors of the centroids of the frame stars.
+      ! The variance of a residual (per axis) is modelled as k^2 (e^2 + q):
+      ! e by the S/N of the star (perr), k the scale of these errors,
+      ! q the excess (the errors of the catalogue, of the centroids of
+      ! bright stars: the pixel phase, unmodelled distortions); q is
+      ! the maximum of the likelihood of the residuals of the unweighted
+      ! solution (k profiled out), over the stars within 5 times their
+      ! scatter. The weights 1/sqrt(e^2 + q) are normalised by their mean
+      ! square (the scale of the fit is still in pixels). The unweighted
+      ! solution is kept when the weighted fit fails.
+
+      use oakleaf, only: median
+
+      integer, parameter :: nq = 80
+      type(AstroWCS) :: twcs
+      real(REAL64), dimension(n) :: xc, yc, r2, e2, w
+      logical, dimension(n) :: inl
+      real(REAL64) :: q, qbest, f, fbest, e2med, k2
+      real(REAL64), dimension(10) :: keep
+      logical :: rel
+      integer :: m, iq
+
+      call twcs % init(pcode,[acen,dcen],[xcen,ycen],sc,rot,refl)
+      call twcs % cel2pix(alpha,delta,xc,yc)
+      r2 = (xc - (xstar + xcen))**2 + (yc - (ystar + ycen))**2
+      e2 = perr(id2)**2
+      inl = r2 < (5*rms*sc)**2
+      m = count(inl)
+      if( .not. (m >= minweight .and. all(e2 > 0)) ) return
+
+      ! the profile likelihood of q on a logarithmic grid (and q = 0):
+      ! -log L = m + sum(log(e2 + q)) + m log(k2), k2 = sum(r2/(e2+q))/(2m)
+      e2med = median(pack(e2,inl))
+      qbest = 0
+      fbest = huge(fbest)
+      do iq = 0, nq
+         if( iq == 0 ) then
+            q = 0
+         else
+            q = e2med * 10.0_REAL64**(-3 + 5*real(iq - 1,REAL64)/(nq - 1))
+         end if
+         f = sum(log(e2 + q), inl) + m*log(sum(r2/(e2 + q), inl) / (2*m))
+         if( f < fbest ) then
+            fbest = f
+            qbest = q
+         end if
+      end do
+      k2 = sum(r2/(e2 + qbest), inl) / (2*m)
+      w = 1 / (e2 + qbest)
+      w = sqrt(w / (sum(w) / n))
+
+      keep = [acen,dacen,dcen,ddcen,sc,dsc,rot,drot,rms,s]
+      call robmin(pcode,fitmethod,alpha,delta,refl,xstar,ystar,s,&
+           acen,dacen,dcen,ddcen,sc,dsc,rot,drot,rms,verbose,rel,w)
+      if( verbose ) write(error_unit,'(a,i0,a,f0.3,a,f0.3,a,f0.3,a,f0.3,a,l1)') &
+           '# weighted fit: ',m,' stars, centroid errors (median) ',sqrt(e2med), &
+           ' pix x ',sqrt(k2),', excess ',sqrt(k2*qbest),' pix, rms ',rms*sc, &
+           ' pix, ok ',rel
+      if( .not. rel ) then
+         acen = keep(1); dacen = keep(2); dcen = keep(3); ddcen = keep(4)
+         sc = keep(5); dsc = keep(6); rot = keep(7); drot = keep(8)
+         rms = keep(9); s = keep(10)
+      end if
+
+    end subroutine weighted
+
+    logical function significant()
+
+      ! The number of the cross-matched stars must be significantly larger
+      ! than the number of chance coincidences of the frame stars with
+      ! the catalogue (a false match gives a few stars only, comparable
+      ! with the chance). The test counts the stars whose residuals of the
+      ! solution are within rtest = 3 times their scatter, at least --sig,
+      ! at most the limit of the cross-match. Two stars fix the solution
+      ! (they match by construction), the others are tested against the
+      ! Poisson distribution of chance coincidences by the density of the
+      ! catalogue stars in the overlap of the catalogue and the frame;
+      ! the probability is multiplied by the number of transformations
+      ! tried by the match (trials, the Bonferroni correction).
+
+      real(REAL64), parameter :: pmax = 1e-3
+      integer, parameter :: nfix = 2
+      type(AstroWCS) :: twcs
+      real(REAL64), dimension(n) :: xc, yc
+      real(REAL64) :: lambda, pval, rtest, trials
+      integer :: nt
+
+      if( ptype == 'TPV' ) then
+         call twcs % init(ptype,[acen,dcen],[xcen,ycen],sc,rot,refl,pv)
+      else
+         call twcs % init(ptype,[acen,dcen],[xcen,ycen],sc,rot,refl)
+      end if
+      call twcs % cel2pix(alpha,delta,xc,yc)
+      rtest = min(dlim*sc,max(3*rms*sc,sig))
+      nt = count(hypot(xc - (xstar + xcen),yc - (ystar + ycen)) < rtest)
+
+      trials = 1
+      if( present(ntrial) ) trials = max(ntrial,1.0_REAL64)
+      call chance(pcode,a,d,x,y,acen,dcen,xcen,ycen,sc,rot,refl,rtest, &
+           nt,nfix,trials,lambda,pval,frame)
+      significant = pval <= pmax
+      if( verbose ) write(error_unit,'(a,i0,a,f0.2,a,i0,a,es9.2e3,a,es9.2e3,a,es9.2e3,a,l1)') &
+           '# significance: ',nt,' stars within ',rtest,' pix (',nfix, &
+           ' fix the solution), expected by chance: ',lambda,', trials: ', &
+           trials,', probability by chance: ',pval,', significant: ',significant
+      if( .not. significant ) then
+         if( verbose ) write(error_unit,'(a)') &
+              '# the match is not significant against chance coincidences, rejected.'
+         reliable = .false.
+         allocate(id1_final(0),id2_final(0))
+      end if
+
+    end function significant
+
+    logical function scale_prior()
+
+      ! the scale of the solution against the scale prior (if any),
+      ! a solution out of the tolerance is rejected
+
+      scale_prior = .true.
+      if( .not. (present(scale0) .and. present(scaletol)) ) return
+      if( .not. (scale0 > 0 .and. scaletol > 0) ) return
+      scale_prior = abs(sc / scale0 - 1) <= scaletol
+      if( .not. scale_prior ) then
+         if( verbose ) write(error_unit,'(a,f0.1,a,f0.1,a,f0.1,a)') &
+              '# the scale of the solution ',sc,' [pix/deg] is out of the expected ', &
+              scale0,' +- ',100*scaletol,'%, rejected.'
+         reliable = .false.
+         if( .not. allocated(id1_final) ) allocate(id1_final(0),id2_final(0))
+      end if
+
+    end function scale_prior
 
     subroutine tpvstaged
 
@@ -331,28 +484,33 @@ contains
   end subroutine astrofit
 
   subroutine chance(type,a,d,x,y,acen,dcen,xcen,ycen,sc,rot,refl,r, &
-       n,lambda,pval)
+       n,nfix,ntrial,lambda,pval,frame)
 
     ! The expected number lambda of chance coincidences of frame stars
     ! (x,y) with catalogue stars (a,d) within the radius r [pix],
-    ! and the Poisson probability pval to get n or more such coincidences.
-    ! The stars are supposed to be distributed uniformly
-    ! over the area covered by frame stars.
+    ! and the probability pval to get n or more such coincidences
+    ! (Poisson), nfix of them fixing the transformation (they are not
+    ! tested), multiplied by the number of trials (the transformations
+    ! tried). The stars are supposed to be distributed uniformly over
+    ! the overlap of the catalogue (its bounding box) and the frame
+    ! (frame = NAXIS1, NAXIS2; the bounding box of the frame stars
+    ! when it is not given).
 
     use astrotrafo
 
     character(len=*), intent(in) :: type
     real(REAL64), dimension(:), intent(in) :: a,d,x,y
-    real(REAL64), intent(in) :: acen,dcen,xcen,ycen,sc,rot,refl,r
-    integer, intent(in) :: n
+    real(REAL64), intent(in) :: acen,dcen,xcen,ycen,sc,rot,refl,r,ntrial
+    integer, intent(in) :: n, nfix
     real(REAL64), intent(out) :: lambda, pval
+    integer, dimension(:), intent(in), optional :: frame
 
     real(REAL64), parameter :: pi = 3.14159265358979323846_REAL64
     real(REAL64), dimension(size(a)) :: u,v,xc,yc
     real(REAL64) :: xmin,xmax,ymin,ymax,area,p,t
     type(AstrometryProjection) :: tp
     type(AstrometryGeometry) :: tg
-    integer :: ncat,k
+    integer :: ncat,nfr,k,m
 
     call tp % init(type,acen,dcen)
     call tp % proj(a,d,u,v)
@@ -361,37 +519,49 @@ contains
     xc = xc + xcen
     yc = yc + ycen
 
-    xmin = minval(x)
-    xmax = maxval(x)
-    ymin = minval(y)
-    ymax = maxval(y)
-    area = (xmax - xmin)*(ymax - ymin)
-    ncat = count(xmin <= xc .and. xc <= xmax .and. ymin <= yc .and. yc <= ymax)
-
-    if( .not. (area > 0) ) then
-       lambda = 0
-       pval = 0
-       return
+    ! the overlap of the catalogue and the frame
+    if( present(frame) ) then
+       xmin = 0.5_REAL64
+       xmax = frame(1) + 0.5_REAL64
+       ymin = 0.5_REAL64
+       ymax = frame(2) + 0.5_REAL64
+    else
+       xmin = minval(x)
+       xmax = maxval(x)
+       ymin = minval(y)
+       ymax = maxval(y)
     end if
+    xmin = max(xmin,minval(xc))
+    xmax = min(xmax,maxval(xc))
+    ymin = max(ymin,minval(yc))
+    ymax = min(ymax,maxval(yc))
+    area = (xmax - xmin)*(ymax - ymin)
+    lambda = 0
+    pval = 1
+    if( .not. (area > 0) ) return
+
+    ncat = count(xmin <= xc .and. xc <= xmax .and. ymin <= yc .and. yc <= ymax)
+    nfr = count(xmin <= x .and. x <= xmax .and. ymin <= y .and. y <= ymax)
 
     ! probability of a chance coincidence for a frame star
-    p = min(ncat*pi*r**2 / area, 1.0_REAL64)
-    lambda = size(x)*p
+    p = min(max(ncat - nfix,0)*pi*r**2 / area, 1.0_REAL64)
+    lambda = max(nfr - nfix,0)*p
+    m = n - nfix
 
-    ! the upper tail of Poisson distribution, P(N >= n)
-    if( n <= lambda ) then
+    ! the upper tail of Poisson distribution, P(N >= m)
+    if( m <= 0 .or. m <= lambda ) then
        pval = 1
     else if( lambda > 0 ) then
        pval = 0
-       do k = n, n + 1000
+       do k = m, m + 1000
           t = exp(k*log(lambda) - lambda - log_gamma(k + 1.0_REAL64))
           pval = pval + t
           if( t < epsilon(t)*pval ) exit
        end do
-       pval = min(pval,1.0_REAL64)
     else
        pval = 0
     end if
+    pval = min(ntrial*pval,1.0_REAL64)
 
   end subroutine chance
 

@@ -93,8 +93,23 @@ Astrometry transformation is computed by using of robust algorithms.
 
 <p>
   Parameter --maxmatch slices the catalogue on parts with similar
-  magnitudes (magnitudes in certain range). This is due to sorting
-  of both catalpogue and frame by magnitudes.
+  magnitudes (magnitudes in certain range): both the catalogue and the
+  frame are sorted by brightness (the catalogue by <samp>--col-mag</samp>,
+  the frame by the counts of the first aperture of APERPHOT; the tables
+  can be in any order), the brightest <samp>--maxstars</samp> (250) of each are
+  used, in chunks of <samp>--maxmatch</samp> (42) stars: the chunks of
+  the frame (three at most) are matched against the chunks of
+  the catalogue. Versions before 0.6.2+hg1653 (patched) took the first
+  rows of the tables as they were: the catalogue in the order of the file
+  (a cone search not sorted by magnitude gave the first 250 rows of the cone,
+  often few of them on a small frame), the frame in the order of the
+  detection. The catalogue is read whole: when the pointing of a frame is
+  known (its WCS, or <samp>--rcen, --dcen</samp> with a scale), its match
+  takes the brightest <samp>--maxstars</samp> of the catalogue stars near the
+  frame (within the half-diagonal of the frame with 10% and the tolerance of
+  the offset <samp>--wcs-offset</samp>), so a cone much larger than the
+  frame can be used (versions before took the brightest 250 of the whole
+  cone, few of them on the frame).
   </p>
 
 <p>
@@ -102,8 +117,7 @@ Astrometry transformation is computed by using of robust algorithms.
   which is supposet to by complete (sucesfull match). For sparse
   fileds, the defaults are usually satisfactyory, but very dense
   fields like SMC, LMC needs increase this parameters. Munipack
-  sets the default of 5. If the mean surface density exceeds
-  the limit (?), the parameter is increased. The small values
+  sets the default of 5, which is also the minimum. The small values
   on crowded fiedls can produce false match (because probability
   of miss-match is getting appreciable).
   </p>
@@ -129,6 +143,115 @@ Astrometry transformation is computed by using of robust algorithms.
 Lets we denote the reference star coordinates as the catalogue and
 coordinates of detected stars as the frame.
 </p>
+
+<h3 id="wcsguided">Guided match (the WCS or the pointing)</h3>
+
+<p>
+When the frame has an astrometry calibration in its header (a WCS
+with CD or CDELT and PC: one by the telescope, a previous run, or an
+approximate one by hand), or when its pointing is given by
+<samp>--rcen, --dcen</samp> (the centre of the frame, or
+<samp>--xcen, --ycen</samp>) with the scale by <samp>--scale</samp>
+or by the WCS, the match mode first uses it (unless
+<samp>--blind</samp> is given); the rotation is that of the WCS or of
+<samp>--angle</samp>, the reflection that of the WCS or of <samp>--reflex</samp>.
+When the rotation is known (the WCS, <samp>--angle</samp>),
+the catalogue stars are predicted on
+the frame by the calibration, the predictions are rotated and scaled
+on a grid within <samp>--wcs-rot</samp> (3° by default) and
+<samp>--wcs-scale</samp> (±3%), and for every node of the grid the
+differences of the positions of the 60 brightest frame stars and of the
+brightest catalogue stars near the frame vote for the offset (in bins of
+4 × <samp>--sig</samp> pixels, within <samp>--wcs-offset</samp>, by default
+10% of the larger side of the frame and 100 pixels at least). The node and
+the offset of the most votes give the transformation, the nearest stars by
+it are the match, and the solution is fitted and tested (the
+<a href="#significance">significance</a>, with the trials of the vote: the nodes
+and the bins) as any other (ASTRMETH = <samp>WCS</samp>).
+</p>
+<p id="roll">
+When the rotation (the roll) is unknown, or wrong: without a WCS and
+<samp>--angle</samp>, with <samp>--roll-unknown</samp> (or
+<samp>--wcs-rot 180</samp>), or when the match within <samp>--wcs-rot</samp>
+fails, any rotation is tried (ASTRMETH = <samp>POINTING</samp>). The grid of
+the whole circle would need thousands of nodes (the step moves the stars at
+the edge of the frame by a bin: 0.08° on 4096², 4550 rotations, times the
+scales), so the candidates are found first by the pairs of stars, which do
+not depend on the rotation and the offset: every pair of the 30 brightest
+frame stars (15% of the frame long at least) and every pair of the brightest
+catalogue stars within the circle of the frame, the scale and the offset of
+the same length (within <samp>--wcs-scale</samp> and the bin) give the
+rotation (both orientations) and the offset (by the midpoints), which vote
+in the cells of 0.5–4° and 16–25 pixels; the true pairs vote for one cell
+(n(n−1)/2 pairs of n common stars), the others are spread over the circle.
+The eight windows (2 × 2 × 2 cells) of the most votes are the candidates;
+the vote above is done around each of them (its window, the scales), the
+most votes give the transformation, the nearest stars the match. The
+significance counts the trials of the whole search (the circle at the
+step of the grid, the scales, the offsets: 2·10<sup>7</sup> on 768², 9·10<sup>9</sup>
+on 4096² with the default offset), so the frames of five or six stars need
+the offset not much larger than it is. <samp>--reflex-unknown</samp> tries
+both reflections (the trials doubled). The order of the guided match is:
+the rotation known within <samp>--wcs-rot</samp> (when the WCS or
+<samp>--angle</samp> gives it; not with <samp>--roll-unknown</samp>), any
+rotation (not with <samp>--roll-known</samp>), then the blind match below
+(with the <a href="#scaleprior">scale prior</a> by the header or
+<samp>--scale</samp>): first of the catalogue stars near the frame by the
+pointing (within the half-diagonal of the frame with 10% and the tolerance
+of the offset), then of the brightest of all catalogue stars.
+The keyword ASTRMETH of the header records the method of the solution:
+<samp>WCS</samp> (guided, the rotation known), <samp>POINTING</samp>
+(guided, any rotation), <samp>BLIND</samp>, <samp>CROSS</samp>
+or <samp>SEQUENCE</samp>.
+</p>
+<p>
+QUVIK-like simulated frames (512² to 4096², 0.756″/pixel, M67, M35,
+the field at RA 180°, Dec 0° and a dark cloud) with the WCS in the header
+moved by 30–100 pixels, rotated by 1–3° and scaled by 1–3%: all solved by
+the WCS-guided match (the same solutions as by the blind match),
+in a few hundredths of a second on frames up to 2048², 0.5 s on 4096².
+</p>
+<p>
+QUVIK-like frames of any roll (768² to 4096², random rolls, the same
+fields; 32 frames, 26 of five stars and more): the header (or <samp>--rcen, --dcen, --scale</samp>)
+moved by 10″–5′, rotated by a random angle, scaled by 1–2%,
+the catalogue of the believed footprint with 10% and the offset on each
+side: all frames of five stars and more but one (6 stars on the frame, 20 in
+the catalogue: also not solved by the blind match) solved; the offsets
+within the default tolerance by the guided match of any rotation, the others
+by the blind match near the frame; the median times by one thread 0.03 s (768²), 0.04 s (1024²), 0.1 s (2048²), 0.17–0.26 s (4096²), the any-rotation pass 0.001–0.09 s of them, the errors of the solutions against the truth 0.03–0.08 pixels rms (median), as by the blind match. The true field moved by 15–50% of
+the frame (the catalogue padded by the shift and 10%) with
+<samp>--wcs-offset</samp> by the shift: 80 of 84 frames by the guided match (a frame of six stars shifted by 50% is rejected as not significant, by the trials of the larger search, 2·10<sup>10</sup>; with the default offset the blind match solves it), 0.04–1.4 s. Against the catalogues of other
+fields at the same place, with <samp>--roll-unknown --reflex-unknown
+--wcs-offset 55%</samp>: none of 96 accepted (none of 96 by the default search either).
+</p>
+
+<h4 id="quvik">Recommended settings: the pointing and the scale known, the roll unknown</h4>
+<p>
+For a frame whose pointing is known to tens of arcseconds (minutes at worst),
+whose scale is known to 1–2%, and whose rotation is unknown (QUVIK-like):
+</p>
+<pre>
+munipack astrometry -c cone.fits --rcen RA --dcen DEC --scale 4761.9 \
+     [--wcs-offset 3arcmin] [--wcs-scale 0.02] frame.fits
+</pre>
+<p>
+(or the approximate WCS in the header, any rotation in it, without
+<samp>--rcen, --dcen</samp>). The rotation is unknown without a WCS and
+<samp>--angle</samp>; with a WCS of a rotation that may be wrong,
+<samp>--roll-unknown</samp> skips the useless pass of the rotation within 3°
+(0.1 s on 4096²). Set <samp>--wcs-offset</samp> to the uncertainty of the
+pointing (with units: <samp>90arcsec</samp>, <samp>3arcmin</samp>,
+<samp>20%</samp> of the frame; by default 10% of the frame, 100 pixels at
+least: 76″ at 0.756″/pixel; at most the diagonal of the frame); a pointing
+beyond it is still solved by the blind match of the catalogue stars near the
+frame. A catalogue cone larger than the frame
+is fine (its stars near the pointing are used). Use
+<samp>--reflex-unknown</samp> only when the reflection (the parity of the
+instrument) is not known: <samp>--reflex</samp> sets it.
+</p>
+
+<h3>Blind match</h3>
 
 <p>
 The following algorithm is used for matching:
@@ -191,6 +314,18 @@ The first sequence, which is successful found, stops matching. When
 all possible twines. In this case, the sequence with the best
 parameters is used. The full scan can take a lot of time.
 </li>
+<li id="threads">
+The pairs of the chunks of the frame and of the catalogue are matched by
+parallel threads (OpenMP): the match is that of the first pair of chunks
+in their order which succeeds, the pairs after it are abandoned, so the
+solution is the same for any number of threads (with the same trials for
+the significance). The number of threads is <samp>OMP_NUM_THREADS</samp>;
+by default the CPUs available to the process (its affinity and the CPU quota
+of its control group: <samp>docker run --cpus 2</samp> gives 2 threads, the
+OpenMP runtime alone would take all cores of the host) divided by the parallel
+processes (<samp>--mproc</samp>); <samp>--verbose</samp> prints it. The blind match without a solution, or
+with it in a later chunk, is faster: a wrong sky of a dense 2048² frame without a scale prior takes 54 s by one thread, 28, 15 and 9–11 s by 2, 4 and 8 threads; the 30 full cones without a WCS 29 s in all, 20, 18 and 15.5 s.
+</li>
 </ul>
 
 <p>
@@ -204,7 +339,14 @@ The known sequence of stars can be used to determine astrometry transformation:
 </p>
 <ul>
 <li>The coordinates of catalogue stars are corrected for its proper motion
-    (only when <samp>--col-pm-ra, --col-pm-dec</samp>) is set</li>
+    to the epoch of the frame (DATE-OBS) from the epoch of the catalogue
+    (the keyword JEPOCH of the table, or the columns <samp>--col-epoch-ra,
+    --col-epoch-dec</samp>). The proper motion in RA is the arc on the sky,
+    μ<sub>α</sub> cos δ (pmRA of UCAC4, UCAC5, Gaia, SDSS in VizieR);
+    the change of RA is pmRA / cos δ (versions before 0.6.2+hg1653 (patched)
+    added pmRA to RA: wrong by the factor 1/cos δ, 2 at Dec 60°).
+    When the catalogue has proper motions but no epoch, they are ignored with
+    a warning (on the standard error output and a COMMENT in the header).</li>
 <li>Initial estimation of parameters is computed by minimising of absolute
     deviations.</li>
 <li>The corresponding stars in catalogue and frame are found by searching
@@ -212,13 +354,61 @@ The known sequence of stars can be used to determine astrometry transformation:
     is performed.</li>
 <li>The transformation is determined with all possibles stars by the robust
     minimisation.</li>
+<li>The final fit (TAN, ten stars and more) is weighted by the errors of the
+    centroids: the error of a star is estimated by its S/N in the first
+    aperture of APERPHOT and the width of the PSF (HWHM of APERPHOT or FWHM
+    of FIND), with an excess scatter (the errors of the catalogue, of the
+    centroids of bright stars) by the maximum likelihood of the residuals;
+    the weights apply within the robust function. QUVIK-like frames (36
+    solutions of 10–220 stars): the rms error of the solution over the frame
+    against the truth 0.099 → 0.055 pixels (median), the maximal error
+    0.17 → 0.10 pixels, better in 22 frames, worse in 2. The TPV deformation
+    (<samp>-p TPV</samp>) is fitted without the weights.</li>
 </ul>
 
+<h3 id="significance">Significance of the solution</h3>
+
 <p>
-The matching needs at least of tree stars (to construct of a triangle. The
-astrometry algorithm needs at least 5 stars (for 4 parameters) but
-has lower-count alternative with minimum of two stars. Generally,
-the astrometry has recommended minimum of 7 stars, but ideal is over 20.
+A match can be false: on a dense field, or against a catalogue of another
+part of the sky, a sequence of five or more stars that fulfils all the tests
+is found by chance (the search tries millions of pairs of stars). The
+solution is therefore tested against chance coincidences: the stars whose
+residuals are within <i>r</i> = 3 × the scatter of the fit (at least
+<samp>--sig</samp>, at most the limit of the cross-match) are counted;
+two of them fix the transformation and match by construction, the others
+are compared with the Poisson distribution of the coincidences of the frame
+stars with the catalogue stars, whose density is that in the overlap of the
+catalogue and the frame. The probability is multiplied by the number of
+the transformations tried by the match (the starting pairs of the
+sequences: the trials) and the solution is accepted when it is below 10<sup>−3</sup>.
+The <samp>--verbose</samp> output shows the numbers (significance). The test
+is disabled by <samp>--disable-rms-check</samp>.
+</p>
+<p>
+On QUVIK-like simulated frames (512² to 2048², 5 to 430 stars) against
+catalogues of other parts of the sky (88 runs) the test rejected all the
+false solutions (the previous test, which counted all cross-matched stars
+including the matched sequence, without the trials, by the density in the
+bounding box of the frame stars, accepted 4 of them, with scales of
+13–18″/pixel for the true 0.76″/pixel); the probability of the true
+solutions was below 10<sup>−9</sup>, also with five or six stars.
+</p>
+
+<p>
+<b>The calibration needs at least five matched stars</b>: the solution has
+four parameters (the scale, the rotation and the centre) and their errors
+(the match sequence is five stars at least, <samp>--minmatch</samp> smaller
+than five is rejected). A frame with fewer stars on it (or in the catalogue)
+fails with the error <i>too few stars</i>, and a solution which cross-matches
+fewer than five stars is unreliable; the other frames of the same run are
+processed (the exit status is 1 when any frame fails). There is no
+solution from fewer stars (versions before 0.6.2+hg1653 (patched) documented
+an alternative with two stars, which did not work: it stopped, or crashed
+on the residuals of a 'low-precision solution', the whole run with it).
+Generally, the astrometry has recommended minimum of 7 stars, but ideal is
+over 20, and sparse frames (5–10 stars) need a catalogue restricted to
+the field of view (and the <a href="#significance">significance test</a>
+needs a few stars beyond the two fixing the solution).
 Any modern (like Munipack default UCAC5) catalogue has more reference
 objects on medium crowded fields.
 </p>
@@ -247,7 +437,13 @@ On output, the WCS calibration in the header of primary FITS is created
   <dt><samp>-m, --mode [=mode]</samp></dt><dd>Mode of calibration:
     <ul>
       <li><samp>match</samp> (default),</li>
-      <li><samp>cross</samp></li>
+      <li><samp>cross</samp>: by an approximate calibration, given by
+          <samp>--scale, --angle, --reflex</samp> (and <samp>--rcen,
+          --dcen</samp>) or by the WCS in the header of the frame, known
+          within the tolerances of the <a href="#wcsguided">WCS-guided
+          match</a> (it was the nearest stars within 5 pixels; any rotation
+          with <samp>--roll-unknown</samp>); when the
+          vote fails, the nearest stars within 5 × <samp>--sig</samp></li>
       <li><samp>sequence</samp></li>
       <li><samp>manual</samp></li>
     </ul>
@@ -287,9 +483,13 @@ On output, the WCS calibration in the header of primary FITS is created
   </dd>
 <dt><samp>--xcen xxx.y</samp></dt><dd>centre of projection on chip [pix] (default: width/2)</dd>
 <dt><samp>--ycen xxx.y</samp></dt><dd>centre of projection on chip [pix] (default: height/2)</dd>
-<dt><samp>--rcen ddd.ddd</samp></dt><dd>centre of projection in Right Ascension [deg]</dd>
-<dt><samp>--dcen ddd.ddd</samp></dt><dd>centre of projection in Declination [deg]</dd>
-<dt><samp>--scale ssss.s</samp></dt><dd>scale [deg/pix]</dd>
+<dt><samp>--rcen ddd.ddd</samp></dt><dd>centre of projection in Right Ascension [deg];
+  in the match mode with a scale (<samp>--scale</samp> or the WCS),
+  the pointing of the <a href="#wcsguided">guided match</a></dd>
+<dt><samp>--dcen ddd.ddd</samp></dt><dd>centre of projection in Declination [deg]
+  (the pointing as well)</dd>
+<dt><samp>--scale ssss.s</samp></dt><dd>scale [pix/deg]; in the match mode,
+  the expected scale (<a href="#scaleprior">the scale prior</a>)</dd>
 <dt><samp>--angle aa.aaa</samp></dt><dd>angle of rotation [deg], clockwise positive</dd>
 <dt><samp>--reflex</samp></dt><dd>set whatever the frame is reflected</dd>
 <dt><samp>--radesys</samp></dt><dd>the reference coordinate frame (default: ICRS)</dd>
@@ -319,15 +519,18 @@ On output, the WCS calibration in the header of primary FITS is created
     range 0.8 -- 1.3 is enough, but for different filters the default 0.5 -- 2 should
 by prefered.</dd>
 <dt><samp>--minmatch n</samp></dt><dd>Sets count of objects in match sequence.
-Default is 5. Crowded fields will require increase the value on 7 or more. The extremely
-sparse fields with a few stars only will enough 3-5. To use match algorithm minimal
-length is 3. Upper limit is given by <samp>--maxmatch</samp>.</dd>
+Default is 5, which is also the minimum (a solution needs five stars; smaller
+values are rejected with an error). Crowded fields will require increase the
+value on 7 or more. Upper limit is given by <samp>--maxmatch</samp>.</dd>
 <dt><samp>--maxmatch n</samp></dt><dd>Set maximum count of objects
-    in match sequence.
+    in match sequence: the number of stars in the chunks of the frame and the
+    catalogue which are matched against each other.
     The default is 42 or count of objects in catalogue or in frame.
     There is no upper limit, but values over hundredth are probably unusable.
     The recommended value for crowded field is 30 - 50.</dd>
-<dt><samp>--maxstar n</samp></dt><dd>Set maximum count of objects for matching.
+<dt><samp>--maxstars n</samp></dt><dd>Set maximum count of objects for matching:
+    the brightest stars of the catalogue (near the frame by its pointing, when
+    known) and of the frame.
     The default is 250 or count of objects in catalogue or in frame.
     There is no upper limit, but values over hundredth are probably unusable.
     </dd>
@@ -337,6 +540,51 @@ length is 3. Upper limit is given by <samp>--maxmatch</samp>.</dd>
     and <samp>--luckymatch 3</samp> indicates good match when result
     has at least 8 successful matches. The default value is 3.
 </dd>
+<dt id="scaleprior"><samp>--scale-tol x</samp></dt><dd>The scale prior:
+    the relative tolerance of the expected scale, the default is 0.05 (±5%).
+    The expected scale is given by <samp>--scale</samp> [pix/deg], or by the
+    astrometry calibration (CD or CDELT) in the header of the frame. The match
+    then skips the pairs of stars whose lengths on the frame and in the
+    catalogue do not agree with the scale (within the tolerance and the errors
+    of their positions), which makes the matching tens of times faster and
+    removes the false matches by a wrong scale; a solution with a scale out of
+    the tolerance is rejected. Zero (or a negative value) matches with any
+    scale, as before. Without <samp>--scale</samp> and without a calibration
+    in the header the scale is always free.</dd>
+<dt><samp>--blind</samp></dt><dd>Ignore the astrometry calibration in the
+    headers of the frames and the pointing: no <a href="#wcsguided">guided
+    match</a> and no scale prior by the header (the blind match of versions
+    before 0.6.2+hg1653 (patched), with the scale prior of <samp>--scale</samp>
+    if given).</dd>
+<dt><samp>--wcs-offset x[units]</samp></dt><dd>The tolerance of the offset of
+    the WCS in the header, or of the pointing <samp>--rcen, --dcen</samp>, for the
+    guided match and the cross mode: pixels, or with units: <samp>arcsec</samp>
+    (<samp>"</samp>), <samp>arcmin</samp> (<samp>'</samp>), <samp>deg</samp>,
+    <samp>%</samp> (of the larger side of the frame), e.g.
+    <samp>--wcs-offset 2arcmin</samp>; by default 10% of the larger side of
+    the frame, 100 pixels at least; at most the diagonal of the frame for the
+    vote (the catalogue stars near the frame for the blind match are selected
+    by the whole tolerance).</dd>
+<dt><samp>--wcs-rot deg</samp></dt><dd>The tolerance of the rotation of the WCS
+    (or of <samp>--angle</samp>) [deg], default 3; 180 and more: any rotation,
+    as <samp>--roll-unknown</samp>.</dd>
+<dt><samp>--wcs-scale x</samp></dt><dd>The relative tolerance of the scale of the
+    WCS (or of <samp>--scale</samp>) for the guided match, default 0.03.</dd>
+<dt><samp>--roll-unknown</samp></dt><dd>The rotation of the frames is unknown:
+    the guided match tries <a href="#roll">any rotation</a> at once (without the
+    pass within <samp>--wcs-rot</samp> of the rotation of the WCS or
+    <samp>--angle</samp>). Without a WCS and <samp>--angle</samp>, the rotation is
+    unknown by default.</dd>
+<dt><samp>--roll-known</samp></dt><dd>The rotation of the WCS (or of
+    <samp>--angle</samp>, 0 without them) is known within <samp>--wcs-rot</samp>:
+    no guided match of any rotation (the blind match follows when it fails, as
+    in versions before).</dd>
+<dt><samp>--reflex-unknown</samp></dt><dd>The reflection of the frames is
+    unknown: the guided match tries both (the reflection of the WCS or of
+    <samp>--reflex</samp>, and the other one).</dd>
+<dt><samp>--scale-free</samp></dt><dd>Match with any scale, an alias for
+    <samp>--scale-tol 0</samp>: use it when the scale in the headers
+    of the frames is wrong (by more than the tolerance).</dd>
 <dt><samp>--disable-lucky-match</samp></dt><dd>
     Finish at first success match when <samp>--minmatch</samp>
     is reached. Alias for <samp>--luckymatch 0</samp>
@@ -347,8 +595,10 @@ for checking. This switch disables flux check completely. A possibility
 of mismatching will increase, especially on crowded fields.
 </dd>
 <dt><samp>--disable-rms-check</samp></dt><dd>Normally, RMS (in pixels) is smaller that
-xsig*dig (in pixels) for successful fit and one is on condition for the calibration. This
-option disables the test and must be used very carefully. Useful in cases when
+xsig*dig (in pixels) for successful fit and one is on condition for the calibration,
+and the solution must be <a href="#significance">significant</a> against chance
+coincidences. This
+option disables the tests and must be used very carefully. Useful in cases when
 statistical errors are insignificant to  systematical ones (due to an improper
 projection).</dd>
 </dl>
@@ -450,9 +700,11 @@ munipack cone -c UCAC5 -o 0716cat.fits -r 0.1 -- 110.25 71.34
 UCAC5 is the recommended astrometric catalogue (default). We must provide
 coordinates of centre of frame (use coordinates of assumed object)
 and the cone radius (else a catalogue default will be used).
-Note parameter -s (sort by a column). The sorting requires
-knowledge of catalogue structure but strongly affects speed and
-success rate of matching.
+Note parameter -s (sort by a column). The astrometry sorts the catalogue
+by the magnitude column itself (<samp>--col-mag</samp>), so the sorting
+of the cone search is not needed any more; a cone restricted to the field
+of view of the frame (with a margin of about 10%) speeds up the matching
+and makes it more reliable.
 </p>
 
 
@@ -494,7 +746,7 @@ no any checks.
 <tr><td>--dcen</td><td>Declination of centre of the projection <i>δ</i><sub>c</sub> (CRVAL2)<sup><a href="#tw">[b]</a></sup></td><td>degrees</td></tr>
 <tr><td>--xcen</td><td>Reference point on a chip <i>x</i><sub>c</sub> (CRPIX1)<sup><a href="#tw">[b]</a></sup></td><td>pixels</td></tr>
 <tr><td>--ycen</td><td>Reference point on a chip <i>y</i><sub>c</sub> (CRPIX2)<sup><a href="#tw">[b]</a></sup></td><td>pixels</td></tr>
-<tr><td>--scale</td><td>Scale of projection <i>c</i></td><td>degrees/pixel</td></tr>
+<tr><td>--scale</td><td>Scale of projection <i>c</i></td><td>pixels/degree</td></tr>
 <tr><td>--angle</td><td>Angle of rotation around centre <i>φ</i></td><td>degrees</td></tr>
 <tr><td>--reflex</td><td>Reflected frame</td><td>degrees</td></tr>
 <tr><td><samp>file</samp></td><td>a file to calibrate<sup><a href="#fl">[c]</a></sup></td><td></td></tr>
@@ -571,7 +823,7 @@ sorted by magnitude designed as 'f.mag'. You must known catalogue structure
 before
 use of -s (simply get catalogue without -s option, look for structure and
 than use -s with the given magnitude column label).
-Sorting significantly increase speed and probability of matching.
+The astrometry sorts the catalogue by <samp>--col-mag</samp> itself.
 </p>
 
 <h3>Invoking of Matching</h3>
@@ -624,7 +876,7 @@ Parameters -c, -r and -R are exclusive mutual.
 <sup><a href="#nm">[†]</a></sup>
 Parameters --minmatch and --maxmatch affects both speed (larger is slower)
 and chance of matching (lower is worse). The recommended values
-for --minmatch are 5 - 10 (default is 5) and --maxmatch 20 - 200 (default 33).
+for --minmatch are 5 - 10 (default and minimum 5) and --maxmatch 20 - 200 (default 42).
 </p>
 </div>
 
@@ -656,10 +908,9 @@ parameters for both matching and fitting algorithms.
 In doubts, check ones:
 </p>
 <ul>
-<li>The sorting of the table with astrometric stars.
-Stars would be sorted from the most brighter to faintness ones
-(parameter -s of the cone search,
-tables of detected objects are sorted by default)</li>
+<li>The magnitude column of the catalogue (<samp>--col-mag</samp>):
+both the catalogue and the detected stars are sorted by brightness
+internally, the brightest of them are matched.</li>
 <li>The search region is overlapping of the field of view of
 matched pictures.</li>
 <li>Try
