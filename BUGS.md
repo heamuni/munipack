@@ -297,7 +297,7 @@ New header keywords: `DARKCUR`, `RDNOISE`, `BIASLEV`, `ARTSEED`. The verificatio
 - The blind match without a solution and without a scale prior still takes up to 55 s (a wrong sky of a dense 2048² frame): `--scale` cuts it to 2.5 s.
 - The TPV deformation is fitted without the weights of S27; the errors of the centroids are estimated from the S/N of the first aperture (FIND has no position errors).
 - The default centre of the projection is the median of the catalogue RA, Dec: wrong for a catalogue across RA 0°/360°.
-- (not astrometry) `munipack fits --update --key K --val V 'file.fits[1]'` fails to open the extension and the file disappears (found while writing t_astrometry_wcs, which avoids it).
+- ~~(not astrometry) `munipack fits --update ... 'file.fits[1]'` deleted the file~~ — fixed as S28.
 
 **Refactoring and dead code**
 - `photoconv.f08`, about a third unused: `squantity`, `ctrate`, `ct2ph`, `cts2flux0`, `ph2fllux`, `ph2mag`, `x2mag`, `fnu2abmag`, `flam2stmag`, `mag2ph` (which also has a hard-coded 5-element array), `mag2ph3`, `ph2mag3`, and `flux2flam`, `flam2flux`, `ph2flam`, `flam2plux`, `tridig`, which only those call.
