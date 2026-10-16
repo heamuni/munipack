@@ -610,8 +610,9 @@ contains
     real(REAL64), dimension(2) :: gcrval, gcrpix
     real(REAL64) :: gscale, grot, grefl
     logical :: gok, gtrust, rotpass, rollpass
-    ! the catalogue stars near the centre by the WCS of the frame
-    integer, allocatable, dimension(:) :: inear
+    ! the catalogue stars of a match (isub): the brightest --maxstars near
+    ! the frame by its pointing (inear), or of all (itop)
+    integer, allocatable, dimension(:) :: inear, itop, isub
     integer :: n,nmin,nskip,nattempt
     logical :: matched = .false., reliable, zwcs
     real(REAL64), dimension(2) :: crval0
@@ -733,9 +734,12 @@ contains
        rotpass = gok .and. (roll == 'KNOWN' .or. (roll == 'AUTO' .and. gtrust))
        rollpass = gok .and. roll /= 'KNOWN'
     end if
-    ! when they fail, the blind match takes the catalogue stars near the
-    ! frame by the pointing (within the half-diagonal of the frame with 10%
-    ! and the tolerance of the offset) first, all of them when it fails
+    ! The catalogue (sorted by brightness) is read whole: a match takes
+    ! the brightest --maxstars of the stars near the frame by its pointing
+    ! (within the half-diagonal of the frame with 10% and the tolerance
+    ! of the offset): the guided match, the blind match first; the blind
+    ! match of the brightest --maxstars of all stars follows when they fail.
+    itop = [(n, n = 1, min(size(rec),maxstars))]
     nearpass = .false.
     if( gok ) then
        block
@@ -747,9 +751,12 @@ contains
          r = rad*acos(min(1.0_REAL64,sin(dec/rad)*sin(gcrval(2)/rad) + &
               cos(dec/rad)*cos(gcrval(2)/rad)*cos((rec - gcrval(1))/rad)))
          inear = pack([(k, k = 1, size(rec))], r < rlim)
-         nearpass = size(inear) >= astrominstars .and. size(inear) < size(rec)
+         inear = inear(1:min(size(inear),maxstars))
+         nearpass = size(inear) >= astrominstars
+         if( nearpass .and. size(inear) == size(itop) ) nearpass = any(inear /= itop)
        end block
     end if
+    isub = itop
 55  continue
     nattempt = nattempt + 1
 
@@ -773,7 +780,8 @@ contains
               ' Guided match by the pointing',gcrval,' [deg], scale ',gscale, &
               ' [pix/deg], rotation ',grot,' [deg], within ',wcsoff(naxes,gscale),' pix, ', &
               mrot,' deg, ',100*wcsscale,'%, both reflections: ',reflboth,'.'
-         call wcsmatch(pcode,rec,dec,rflux,x,y,flux,gcrval(1),gcrval(2), &
+         isub = inear
+         call wcsmatch(pcode,rec(isub),dec(isub),rflux(isub),x,y,flux,gcrval(1),gcrval(2), &
               gcrpix(1),gcrpix(2),gscale,grot,grefl,naxes,wcsoff(naxes,gscale),mrot, &
               wcsscale,max(2.0_REAL64,4*sig2),id1,id2,wtrial,matched,verbose,reflboth)
          ntrial = ntrial + wtrial
@@ -804,13 +812,12 @@ contains
           if( verbose ) write(error_unit,'(a,i0,a)') ' The blind match of ', &
                size(inear),' catalogue stars near the frame by its pointing.'
           crval = gcrval
-          call astromatch(minmatch,maxmatch,pcode,rec(inear),dec(inear),rflux(inear), &
+          isub = inear
+          call astromatch(minmatch,maxmatch,pcode,rec(isub),dec(isub),rflux(isub), &
                x,y,flux,crval(1),crval(2),crpix(1),crpix(2), &
                id1,id2,sig1,sig2,flxmin,flxmax,fluxtest,&
                luckymatch,verbose,matched,nskip,scale0,scaletol,ntrial)
-          if( matched ) then
-             id1 = inear(id1)
-          else
+          if( .not. matched ) then
              ! all catalogue stars
              if( verbose ) write(error_unit,'(a)') &
                   ' The blind match of all catalogue stars follows.'
@@ -820,7 +827,8 @@ contains
              goto 55
           end if
        else
-          call astromatch(minmatch,maxmatch,pcode,rec,dec,rflux,x,y,flux, &
+          isub = itop
+          call astromatch(minmatch,maxmatch,pcode,rec(isub),dec(isub),rflux(isub),x,y,flux, &
                crval(1),crval(2),crpix(1),crpix(2), &
                id1,id2,sig1,sig2,flxmin,flxmax,fluxtest,&
                luckymatch,verbose,matched,nskip,scale0,scaletol,ntrial)
@@ -882,7 +890,8 @@ contains
                 ' Cross-match by crval=',crval,' crpix=',crpix,' scale=',xscale, &
                 ' [pix/deg] angle=',xangle,' refl=',xrefl,' within ',wcsoff(naxes,xscale),' pix, ', &
                 mrot,' deg, ',100*wcsscale,'%'
-           call wcsmatch(pcode,rec,dec,rflux,x,y,flux,crval(1),crval(2), &
+           isub = itop
+           call wcsmatch(pcode,rec(isub),dec(isub),rflux(isub),x,y,flux,crval(1),crval(2), &
                 crpix(1),crpix(2),xscale,xangle,xrefl,naxes,wcsoff(naxes,xscale),mrot, &
                 wcsscale,max(2.0_REAL64,4*sig2),id1,id2,wtrial,matched,verbose,reflboth)
            ntrial = ntrial + wtrial
@@ -891,7 +900,7 @@ contains
             tol = xsig*sig2 / xscale
             if( verbose ) write(error_unit,'(a,f0.2,a)') &
                  ' Cross-match of the nearest stars within ',tol*xscale,' [pix]'
-            call listmatch(pcode,rec,dec,x,y,crval(1),crval(2),crpix(1),crpix(2), &
+            call listmatch(pcode,rec(isub),dec(isub),x,y,crval(1),crval(2),crpix(1),crpix(2), &
                  xscale,xangle,xrefl,tol,id1,id2,matched)
          end if
        end block
@@ -911,10 +920,13 @@ contains
 
        if( plog ) write(*,'(a)') "=ASTROFIT> Start"
  !          if( verbose ) write(*,'(a)') "=> Fitting ..."
-       call astrofit(fit,ptype,pcode,rec,dec,x,y,sig2,xsig, &
+       call astrofit(fit,ptype,pcode,rec(isub),dec(isub),x,y,sig2,xsig, &
             crpix(1),crpix(2),crval(1),dcrval(1),crval(2),dcrval(2),&
             scale,dscale,refl,rms,angle,dangle,pv,ares,dres,id1,id2,i1,i2, &
             rmscheck,verbose,plog,reliable,scale0,scaletol,naxes,ntrial,perr)
+       ! the indices of the catalogue
+       id1 = isub(id1)
+       if( allocated(i1) ) i1 = isub(i1)
 
        if( .not. reliable .and. mode == 'MATCH' .and. nattempt < maxattempt ) then
           ! try a next match, nskip is the chunk pair of the rejected one
@@ -1275,15 +1287,18 @@ contains
     real(REAL64), intent(out) :: repoch
     real(REAL64), dimension(:), intent(out) :: xcrval,xcrpix
 
+    ! all stars (sorted by brightness), the brightest --maxstars near
+    ! a frame are selected for its match
     call readtable(cat,col_ra,col_dec,col_pmra,col_pmdec,col_mag,col_epra, &
-         col_epdec,maxstars,alpha,delta,pmalpha,pmdelta,epalpha,epdelta,rflux, &
+         col_epdec,huge(maxstars),alpha,delta,pmalpha,pmdelta,epalpha,epdelta,rflux, &
          rframe,idcat,repoch,verbose,status,catpmlost)
     if( status /= 0 ) stop "Failed to open the catalogue file."
     if( size(alpha) < 1 ) stop "Error: no valid stars in the catalogue."
 
-    ! a default centre of projection, --rcen, --dcen takes precedence
-    xcrval(1) = median(alpha)
-    xcrval(2) = median(delta)
+    ! a default centre of projection (of the brightest --maxstars),
+    ! --rcen, --dcen takes precedence
+    xcrval(1) = median(alpha(1:min(size(alpha),maxstars)))
+    xcrval(2) = median(delta(1:min(size(alpha),maxstars)))
     xcrpix = 0
 
   end subroutine read_cat
