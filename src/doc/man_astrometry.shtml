@@ -103,7 +103,13 @@ Astrometry transformation is computed by using of robust algorithms.
   rows of the tables as they were: the catalogue in the order of the file
   (a cone search not sorted by magnitude gave the first 250 rows of the cone,
   often few of them on a small frame), the frame in the order of the
-  detection.
+  detection. The catalogue is read whole: when the pointing of a frame is
+  known (its WCS, or <samp>--rcen, --dcen</samp> with a scale), its match
+  takes the brightest <samp>--maxstars</samp> of the catalogue stars near the
+  frame (within the half-diagonal of the frame with 10% and the tolerance of
+  the offset <samp>--wcs-offset</samp>), so a cone much larger than the
+  frame can be used (versions before took the brightest 250 of the whole
+  cone, few of them on the frame).
   </p>
 
 <p>
@@ -138,13 +144,19 @@ Lets we denote the reference star coordinates as the catalogue and
 coordinates of detected stars as the frame.
 </p>
 
-<h3 id="wcsguided">WCS-guided match</h3>
+<h3 id="wcsguided">Guided match (the WCS or the pointing)</h3>
 
 <p>
 When the frame has an astrometry calibration in its header (a WCS
 with CD or CDELT and PC: one by the telescope, a previous run, or an
-approximate one by hand) the match mode first uses it (unless
-<samp>--blind</samp> is given): the catalogue stars are predicted on
+approximate one by hand), or when its pointing is given by
+<samp>--rcen, --dcen</samp> (the centre of the frame, or
+<samp>--xcen, --ycen</samp>) with the scale by <samp>--scale</samp>
+or by the WCS, the match mode first uses it (unless
+<samp>--blind</samp> is given); the rotation is that of the WCS or of
+<samp>--angle</samp>, the reflection that of the WCS or of <samp>--reflex</samp>.
+When the rotation is known (the WCS, <samp>--angle</samp>),
+the catalogue stars are predicted on
 the frame by the calibration, the predictions are rotated and scaled
 on a grid within <samp>--wcs-rot</samp> (3° by default) and
 <samp>--wcs-scale</samp> (±3%), and for every node of the grid the
@@ -155,18 +167,41 @@ brightest catalogue stars near the frame vote for the offset (in bins of
 the offset of the most votes give the transformation, the nearest stars by
 it are the match, and the solution is fitted and tested (the
 <a href="#significance">significance</a>, with the trials of the vote: the nodes
-and the bins) as any other. When it fails, the blind match below
-follows (with the <a href="#scaleprior">scale prior</a> by the header):
-first of the catalogue stars near the frame by the header (within the
-half-diagonal of the frame with 10% and the tolerance of the offset),
-then of all catalogue stars. The blind match of a frame with a header
-rotated by 30° and moved by 300 pixels (beyond the tolerances) against
-the full cone of 0.61° solved 25 of 30 QUVIK-like frames (all with five
-stars and more), as against the cone restricted to the frame; the blind
-match of all stars of the cone solves only 14 of them (the brightest 250
-stars of the cone, few of them on the frame).
+and the bins) as any other (ASTRMETH = <samp>WCS</samp>).
+</p>
+<p id="roll">
+When the rotation (the roll) is unknown, or wrong: without a WCS and
+<samp>--angle</samp>, with <samp>--roll-unknown</samp> (or
+<samp>--wcs-rot 180</samp>), or when the match within <samp>--wcs-rot</samp>
+fails, any rotation is tried (ASTRMETH = <samp>POINTING</samp>). The grid of
+the whole circle would need thousands of nodes (the step moves the stars at
+the edge of the frame by a bin: 0.08° on 4096², 4550 rotations, times the
+scales), so the candidates are found first by the pairs of stars, which do
+not depend on the rotation and the offset: every pair of the 30 brightest
+frame stars (15% of the frame long at least) and every pair of the brightest
+catalogue stars within the circle of the frame, the scale and the offset of
+the same length (within <samp>--wcs-scale</samp> and the bin) give the
+rotation (both orientations) and the offset (by the midpoints), which vote
+in the cells of 0.5–4° and 16–25 pixels; the true pairs vote for one cell
+(n(n−1)/2 pairs of n common stars), the others are spread over the circle.
+The eight windows (2 × 2 × 2 cells) of the most votes are the candidates;
+the vote above is done around each of them (its window, the scales), the
+most votes give the transformation, the nearest stars the match. The
+significance counts the trials of the whole search (the circle at the
+step of the grid, the scales, the offsets: 2·10<sup>7</sup> on 768², 9·10<sup>9</sup>
+on 4096² with the default offset), so the frames of five or six stars need
+the offset not much larger than it is. <samp>--reflex-unknown</samp> tries
+both reflections (the trials doubled). The order of the guided match is:
+the rotation known within <samp>--wcs-rot</samp> (when the WCS or
+<samp>--angle</samp> gives it; not with <samp>--roll-unknown</samp>), any
+rotation (not with <samp>--roll-known</samp>), then the blind match below
+(with the <a href="#scaleprior">scale prior</a> by the header or
+<samp>--scale</samp>): first of the catalogue stars near the frame by the
+pointing (within the half-diagonal of the frame with 10% and the tolerance
+of the offset), then of the brightest of all catalogue stars.
 The keyword ASTRMETH of the header records the method of the solution:
-<samp>WCS</samp> (WCS-guided), <samp>BLIND</samp>, <samp>CROSS</samp>
+<samp>WCS</samp> (guided, the rotation known), <samp>POINTING</samp>
+(guided, any rotation), <samp>BLIND</samp>, <samp>CROSS</samp>
 or <samp>SEQUENCE</samp>.
 </p>
 <p>
@@ -175,6 +210,45 @@ the field at RA 180°, Dec 0° and a dark cloud) with the WCS in the header
 moved by 30–100 pixels, rotated by 1–3° and scaled by 1–3%: all solved by
 the WCS-guided match (the same solutions as by the blind match),
 in a few hundredths of a second on frames up to 2048², 0.5 s on 4096².
+</p>
+<p>
+QUVIK-like frames of any roll (768² to 4096², random rolls, the same
+fields; 32 frames, 26 of five stars and more): the header (or <samp>--rcen, --dcen, --scale</samp>)
+moved by 10″–5′, rotated by a random angle, scaled by 1–2%,
+the catalogue of the believed footprint with 10% and the offset on each
+side: all frames of five stars and more but one (6 stars on the frame, 20 in
+the catalogue: also not solved by the blind match) solved; the offsets
+within the default tolerance by the guided match of any rotation, the others
+by the blind match near the frame; the median times by one thread 0.03 s (768²), 0.04 s (1024²), 0.1 s (2048²), 0.17–0.26 s (4096²), the any-rotation pass 0.001–0.09 s of them, the errors of the solutions against the truth 0.03–0.08 pixels rms (median), as by the blind match. The true field moved by 15–50% of
+the frame (the catalogue padded by the shift and 10%) with
+<samp>--wcs-offset</samp> by the shift: 80 of 84 frames by the guided match (a frame of six stars shifted by 50% is rejected as not significant, by the trials of the larger search, 2·10<sup>10</sup>; with the default offset the blind match solves it), 0.04–1.4 s. Against the catalogues of other
+fields at the same place, with <samp>--roll-unknown --reflex-unknown
+--wcs-offset 55%</samp>: none of 96 accepted (none of 96 by the default search either).
+</p>
+
+<h4 id="quvik">Recommended settings: the pointing and the scale known, the roll unknown</h4>
+<p>
+For a frame whose pointing is known to tens of arcseconds (minutes at worst),
+whose scale is known to 1–2%, and whose rotation is unknown (QUVIK-like):
+</p>
+<pre>
+munipack astrometry -c cone.fits --rcen RA --dcen DEC --scale 4761.9 \
+     [--wcs-offset 3arcmin] [--wcs-scale 0.02] frame.fits
+</pre>
+<p>
+(or the approximate WCS in the header, any rotation in it, without
+<samp>--rcen, --dcen</samp>). The rotation is unknown without a WCS and
+<samp>--angle</samp>; with a WCS of a rotation that may be wrong,
+<samp>--roll-unknown</samp> skips the useless pass of the rotation within 3°
+(0.1 s on 4096²). Set <samp>--wcs-offset</samp> to the uncertainty of the
+pointing (with units: <samp>90arcsec</samp>, <samp>3arcmin</samp>,
+<samp>20%</samp> of the frame; by default 10% of the frame, 100 pixels at
+least: 76″ at 0.756″/pixel; at most the diagonal of the frame); a pointing
+beyond it is still solved by the blind match of the catalogue stars near the
+frame. A catalogue cone larger than the frame
+is fine (its stars near the pointing are used). Use
+<samp>--reflex-unknown</samp> only when the reflection (the parity of the
+instrument) is not known: <samp>--reflex</samp> sets it.
 </p>
 
 <h3>Blind match</h3>
@@ -239,6 +313,18 @@ The first sequence, which is successful found, stops matching. When
 <samp>--full-match</samp> is used, it is scan throughout
 all possible twines. In this case, the sequence with the best
 parameters is used. The full scan can take a lot of time.
+</li>
+<li id="threads">
+The pairs of the chunks of the frame and of the catalogue are matched by
+parallel threads (OpenMP): the match is that of the first pair of chunks
+in their order which succeeds, the pairs after it are abandoned, so the
+solution is the same for any number of threads (with the same trials for
+the significance). The number of threads is <samp>OMP_NUM_THREADS</samp>;
+by default the CPUs available to the process (its affinity and the CPU quota
+of its control group: <samp>docker run --cpus 2</samp> gives 2 threads, the
+OpenMP runtime alone would take all cores of the host) divided by the parallel
+processes (<samp>--mproc</samp>); <samp>--verbose</samp> prints it. The blind match without a solution, or
+with it in a later chunk, is faster: a wrong sky of a dense 2048² frame without a scale prior takes 54 s by one thread, 28, 15 and 9–11 s by 2, 4 and 8 threads; the 30 full cones without a WCS 29 s in all, 20, 18 and 15.5 s.
 </li>
 </ul>
 
@@ -355,7 +441,8 @@ On output, the WCS calibration in the header of primary FITS is created
           <samp>--scale, --angle, --reflex</samp> (and <samp>--rcen,
           --dcen</samp>) or by the WCS in the header of the frame, known
           within the tolerances of the <a href="#wcsguided">WCS-guided
-          match</a> (it was the nearest stars within 5 pixels); when the
+          match</a> (it was the nearest stars within 5 pixels; any rotation
+          with <samp>--roll-unknown</samp>); when the
           vote fails, the nearest stars within 5 × <samp>--sig</samp></li>
       <li><samp>sequence</samp></li>
       <li><samp>manual</samp></li>
@@ -396,8 +483,11 @@ On output, the WCS calibration in the header of primary FITS is created
   </dd>
 <dt><samp>--xcen xxx.y</samp></dt><dd>centre of projection on chip [pix] (default: width/2)</dd>
 <dt><samp>--ycen xxx.y</samp></dt><dd>centre of projection on chip [pix] (default: height/2)</dd>
-<dt><samp>--rcen ddd.ddd</samp></dt><dd>centre of projection in Right Ascension [deg]</dd>
-<dt><samp>--dcen ddd.ddd</samp></dt><dd>centre of projection in Declination [deg]</dd>
+<dt><samp>--rcen ddd.ddd</samp></dt><dd>centre of projection in Right Ascension [deg];
+  in the match mode with a scale (<samp>--scale</samp> or the WCS),
+  the pointing of the <a href="#wcsguided">guided match</a></dd>
+<dt><samp>--dcen ddd.ddd</samp></dt><dd>centre of projection in Declination [deg]
+  (the pointing as well)</dd>
 <dt><samp>--scale ssss.s</samp></dt><dd>scale [pix/deg]; in the match mode,
   the expected scale (<a href="#scaleprior">the scale prior</a>)</dd>
 <dt><samp>--angle aa.aaa</samp></dt><dd>angle of rotation [deg], clockwise positive</dd>
@@ -439,7 +529,8 @@ value on 7 or more. Upper limit is given by <samp>--maxmatch</samp>.</dd>
     There is no upper limit, but values over hundredth are probably unusable.
     The recommended value for crowded field is 30 - 50.</dd>
 <dt><samp>--maxstars n</samp></dt><dd>Set maximum count of objects for matching:
-    the brightest stars of the catalogue and of the frame.
+    the brightest stars of the catalogue (near the frame by its pointing, when
+    known) and of the frame.
     The default is 250 or count of objects in catalogue or in frame.
     There is no upper limit, but values over hundredth are probably unusable.
     </dd>
@@ -461,16 +552,36 @@ value on 7 or more. Upper limit is given by <samp>--maxmatch</samp>.</dd>
     scale, as before. Without <samp>--scale</samp> and without a calibration
     in the header the scale is always free.</dd>
 <dt><samp>--blind</samp></dt><dd>Ignore the astrometry calibration in the
-    headers of the frames: no <a href="#wcsguided">WCS-guided match</a> and
-    no scale prior by it (the blind match of versions before 0.6.2+hg1653
-    (patched), with the scale prior of <samp>--scale</samp> if given).</dd>
-<dt><samp>--wcs-offset pix</samp></dt><dd>The tolerance of the offset of the WCS
-    in the header [pix] for the WCS-guided match and the cross mode; by default
-    10% of the larger side of the frame, 100 pixels at least.</dd>
+    headers of the frames and the pointing: no <a href="#wcsguided">guided
+    match</a> and no scale prior by the header (the blind match of versions
+    before 0.6.2+hg1653 (patched), with the scale prior of <samp>--scale</samp>
+    if given).</dd>
+<dt><samp>--wcs-offset x[units]</samp></dt><dd>The tolerance of the offset of
+    the WCS in the header, or of the pointing <samp>--rcen, --dcen</samp>, for the
+    guided match and the cross mode: pixels, or with units: <samp>arcsec</samp>
+    (<samp>"</samp>), <samp>arcmin</samp> (<samp>'</samp>), <samp>deg</samp>,
+    <samp>%</samp> (of the larger side of the frame), e.g.
+    <samp>--wcs-offset 2arcmin</samp>; by default 10% of the larger side of
+    the frame, 100 pixels at least; at most the diagonal of the frame for the
+    vote (the catalogue stars near the frame for the blind match are selected
+    by the whole tolerance).</dd>
 <dt><samp>--wcs-rot deg</samp></dt><dd>The tolerance of the rotation of the WCS
-    [deg], default 3.</dd>
+    (or of <samp>--angle</samp>) [deg], default 3; 180 and more: any rotation,
+    as <samp>--roll-unknown</samp>.</dd>
 <dt><samp>--wcs-scale x</samp></dt><dd>The relative tolerance of the scale of the
-    WCS, default 0.03.</dd>
+    WCS (or of <samp>--scale</samp>) for the guided match, default 0.03.</dd>
+<dt><samp>--roll-unknown</samp></dt><dd>The rotation of the frames is unknown:
+    the guided match tries <a href="#roll">any rotation</a> at once (without the
+    pass within <samp>--wcs-rot</samp> of the rotation of the WCS or
+    <samp>--angle</samp>). Without a WCS and <samp>--angle</samp>, the rotation is
+    unknown by default.</dd>
+<dt><samp>--roll-known</samp></dt><dd>The rotation of the WCS (or of
+    <samp>--angle</samp>, 0 without them) is known within <samp>--wcs-rot</samp>:
+    no guided match of any rotation (the blind match follows when it fails, as
+    in versions before).</dd>
+<dt><samp>--reflex-unknown</samp></dt><dd>The reflection of the frames is
+    unknown: the guided match tries both (the reflection of the WCS or of
+    <samp>--reflex</samp>, and the other one).</dd>
 <dt><samp>--scale-free</samp></dt><dd>Match with any scale, an alias for
     <samp>--scale-tol 0</samp>: use it when the scale in the headers
     of the frames is wrong (by more than the tolerance).</dd>
