@@ -122,6 +122,11 @@ further processing.
 <tr><td>PHSYSERR</td><td>systematic error of the calibration, added
     in quadrature to the errors of all objects (0 when none,
     see <a href="man_phcal.html">phcal --syserr</a>)<td>mag</td></tr>
+<tr><td>PHSYSERE</td><td>the upper error of an estimated PHSYSERR (68%,
+    by the profile of its likelihood; the upper limit when PHSYSERR = 0;
+    missing when it cannot be determined, or for a fixed --syserr)<td>mag</td></tr>
+<tr><td>PHSYSNST</td><td>the number of the calibration stars of
+    an estimated PHSYSERR (fewer than 10: a warning in the COMMENT lines)<td></td></tr>
 <tr><td>APCORTYP</td><td>aperture correction: EE (the counts divided by
     the enclosed energy APEE<i>i</i> of the aperture, the total flux),
     CONST (the constant APCORR), NONE (the aperture flux)<td></td></tr>

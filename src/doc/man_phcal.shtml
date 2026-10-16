@@ -156,22 +156,72 @@ least 9 (median <i>e<sub>i</sub></i>² + σ²) and (0.1 mag)²).
 Outliers have a negligible weight in both <i>t</i> and σ and no star
 is clipped, so the stars in the tails of the distribution keep their
 weight. CTPHERR is the error of the weighted mean. With
-<samp>--verbose</samp>, σ, <i>f</i> and <i>t</i> are printed.
+<samp>--verbose</samp>, σ, its interval, the number of stars, <i>f</i>
+and <i>t</i> are printed.
+</p>
+
+<p id="fewstars">
+<b>Few stars.</b> The fraction and the width of the outliers cannot be
+estimated from a few stars, and their likelihood has two modes: a star
+deviating from the others is either an outlier or a part of the
+systematic scatter. EM from the robust start takes the first, so with
+3–7 stars σ was 15–25% low. Below 8 stars (8 + the number of the colour
+coefficients with <samp>--color-term</samp>), <i>f</i> is fixed at 0.1
+and <i>B</i> at 1 mag, EM runs from the robust start and from all stars
+as calibration stars (the plain restricted likelihood), and the mode of
+the larger posterior is taken: the restricted likelihood of the mixture
+with a weak prior of σ (half-normal, 0.1 mag: a systematic scatter of
+0.2 mag is unlikely, an outlier of 0.4 mag is not). σ² is then unbiased
+(the mean of σ is still low by the square root of a few degrees of
+freedom, as for any estimate), stars far from the others are still found
+as outliers, while a star a few σ off cannot be told from the scatter of
+3–7 stars. With 8 and more stars the results are those of the adaptive
+mixture (bit-identical to the previous version).
+</p>
+
+<p id="syserre">
+<b>The uncertainty of σ.</b> With few stars any σ is very uncertain
+(its square has the relative error √(2/(<i>N</i> − 1)), ±70% for 5 stars).
+The 68% interval is given by the profile of the restricted likelihood of
+the calibration stars (the values of σ where it decreases by ½ from its
+maximum); for σ = 0 its upper end is an upper limit. The header gets
+PHSYSERE, the upper error of PHSYSERR (the upper limit when PHSYSERR = 0),
+PHSYSNST, the number of the stars, and the interval as a COMMENT line.
+With fewer than 10 stars a warning is printed and written to the header.
 </p>
 
 <p>
-Monte Carlo (stars with errors 0.005–0.08 mag, 1000 sets per case):
+<b>Sparse fields.</b> When the frames have few calibration stars (QUVIK
+UV frames: 2–8 stars of SDSS <i>u</i> on 512²–1024² frames), PHSYSERR of
+a single frame is little more than a guess. Determine the systematic
+error from many frames of the same instrument and setup (for example the
+mean of PHSYSERR² over the frames, each estimate of σ² being unbiased, or
+the frames calibrated together) and pass the value
+(<samp>--syserr 0.02</samp>): it is applied as given and the outliers are
+treated by the robust ratio.
+</p>
+
+<p>
+Monte Carlo (stars with errors 0.005–0.08 mag, 2000 sets per case):
 with 30 and 100 stars, σ = 0.01, 0.03, 0.06 mag is recovered within
 1–6% with up to 10% of outliers at 0.3–3 mag; with 10 stars the mean
 estimate is 7–18% low, the root mean square within 5% (the square root
-of an unbiased variance is low), with 5 stars 20–25% low (one deviating
-star of five is often taken for an outlier rather than for a systematic
-scatter); without a systematic error the mean is 1–4 mmag (the median 0).
-Outliers do not move the ratio: with 10 stars and 5% of outliers the
-scatter of the zero point is 3.6 mmag and σ 0.002 mag for a true 0
-(the previous estimator, a robust ratio followed by the excess scatter
-of the residuals clipped at 3σ: 63 mmag and 0.007 mag), with 10% of
-outliers and σ = 0.01 mag 6 mmag and 0.008 mag (179 mmag, 0.053 mag).
+of an unbiased variance is low). Without outliers, σ = 0.06 mag, the mean
+and the root mean square of the estimate are 0.048 and 0.060 mag for
+3 stars, 0.052 and 0.059 for 5, 0.055 and 0.059 for 7 stars (before the
+treatment of few stars 0.038 and 0.054, 0.045 and 0.054, 0.050 and 0.057);
+without a systematic error the mean is 1–7 mmag (the median 0). The 68%
+interval contains the true σ in 64–72% of the sets for 3–7 stars and
+σ = 0.03–0.06 mag, in 59–70% for 10–100 stars, and in 86–91% for σ = 0
+(an upper limit). Outliers do not move the ratio: with 10 stars and 5%
+of outliers the scatter of the zero point is 3.6 mmag and σ 0.002 mag
+for a true 0 (the previous estimator, a robust ratio followed by the
+excess scatter of the residuals clipped at 3σ: 63 mmag and 0.007 mag),
+with 10% of outliers and σ = 0.01 mag 6 mmag and 0.008 mag (179 mmag,
+0.053 mag); with 5 stars and 5% of outliers, σ = 0.01 mag, 28 mmag (a set
+with an outlier of a few σ among 5 stars cannot be corrected). CTPHERR
+does not include the uncertainty of σ: with 3–7 stars and σ ≥ 0.03 mag it
+contains the true zero point in 54–63% of the sets (68% expected).
 </p>
 
 <p>
@@ -218,7 +268,9 @@ star includes the error of its colour propagated by the slope,
 (d<i>g</i>/d<i>c</i>)² σ<sub>c</sub>², and its covariance with the
 catalogue magnitude of the calibration when the band is one of A, B
 (the colour B − V has the error of V). A fixed <samp>--syserr</samp>
-fixes σ. The stars without a colour in the catalogue are not used.
+fixes σ. With few stars (<a href="#fewstars">above</a>; below 9 stars for
+a linear term, 10 for a quadratic one) the outlier model is fixed and the mode of the likelihood chosen in
+the same way. The stars without a colour in the catalogue are not used.
 </p>
 <p>
 The colour term multiplies the photons, <i>ph</i> = CTPH

@@ -133,7 +133,11 @@ phfotran</a> with the same filters (see
     correction) it is the size of the unmodelled variation.
     A <i>value</i> ≥ 0 is applied as given (CTPH by the robust mean
     with the errors increased by it), <samp>0</samp> switches it off
-    (the errors of older versions). The value is saved as PHSYSERR.
+    (the errors of older versions). The value is saved as PHSYSERR;
+    an estimated value also its upper error PHSYSERE (the upper limit
+    when it is zero) and the number of its stars PHSYSNST. With fewer
+    than 10 stars the estimate is uncertain (a warning): for sparse
+    fields, give a fixed value determined from many frames.
   </dd>
 
 <dt><samp>--advanced</samp></dt><dd>Advanced format. Additional extensions

@@ -409,13 +409,13 @@ contains
          exptime, areas, tol, aper, sys, cra, cdec, ccol, dccol, &
          tcref, tzp, tdzp, tk1, tdk1, tk2, tdk2
     real(dbl), allocatable, dimension(:,:) :: tr,tr1,trerr,tr1err,refph,drefph,&
-         cts,dcts,dn,ddn,ra,dec,mag,dmag,cmag,cdmag,magx,dmagx,ccl,dccl,ccy
+         cts,dcts,dn,ddn,ra,dec,mag,dmag,cmag,cdmag,magx,dmagx,ccl,dccl,ccy,sysint
     real(dbl) :: q, d
     type(type_phsys) :: phsyscal
     type(photores), dimension(:), allocatable :: phres
     type(colour_term) :: ctm
     integer, dimension(:,:), allocatable :: pairs
-    integer, dimension(:), allocatable :: forder, perm
+    integer, dimension(:), allocatable :: forder, perm, nsys
     integer :: status,nfiles,ncat,i,nf,ia,ib
 
     if( photsys_ref == '' ) &
@@ -731,7 +731,8 @@ contains
 !       end do
 !    end if
 
-    allocate(phres(nfiles),ctph(nfiles),dctph(nfiles),sys(nfiles))
+    allocate(phres(nfiles),ctph(nfiles),dctph(nfiles),sys(nfiles), &
+         sysint(2,nfiles),nsys(nfiles))
     do n = 1, nfiles
        call photores_init(phres(n),ncat)
        phres(n)%ra = refra(1:ncat)
@@ -775,15 +776,17 @@ contains
           end if
        end do
        call calibr_colour(refph,drefph,cts(1:ncat,:),dcts(1:ncat,:),ccl,dccl, &
-            ccy,ctm,ctph,dctph,phres,verbose,syserr,sys)
+            ccy,ctm,ctph,dctph,phres,verbose,syserr,sys,sysint,nsys)
        deallocate(ccl,dccl,ccy)
     else if( nfiles == 1 ) then
        call calibr(refph,drefph,cts(1:ncat,:),dcts(1:ncat,:),ctph,dctph, &
-            phres,verbose,syserr,sys)
+            phres,verbose,syserr,sys,sysint,nsys)
     else
        call caliber(pairs,filters,tr,tr1,refph,drefph, &
-            cts(1:ncat,:),dcts(1:ncat,:),ctph,dctph,phres,verbose,syserr,sys)
+            cts(1:ncat,:),dcts(1:ncat,:),ctph,dctph,phres,verbose,syserr,sys, &
+            sysint,nsys)
     end if
+    call syscheck(filters,sys,sysint,nsys)
 
     ! apperture correction
     ctph = apcorr * ctph
@@ -813,11 +816,11 @@ contains
     if( ctm%model /= COLT_NONE ) then
        call writecal(filename,output,keys,advanced,phsystable,filters, &
             catid,photsys_ref,area,init_area,saper,tr1,ctph,dctph,qlabels,phres, &
-            verbose,sys,apcorr,ctm)
+            verbose,sys,apcorr,ctm,sysint=sysint,nsys=nsys)
     else
        call writecal(filename,output,keys,advanced,phsystable,filters, &
             catid,photsys_ref,area,init_area,saper,tr1,ctph,dctph,qlabels,phres, &
-            verbose,sys,apcorr)
+            verbose,sys,apcorr,sysint=sysint,nsys=nsys)
     end if
 
     do i = 1,size(phres)
@@ -829,9 +832,49 @@ contains
 
     deallocate(refra,refdec,refph,drefph,filter_frames,exptime,areas,aper, &
          tol,tr,tr1,trerr,tr1err,cts,dcts,dn,ddn,ra,dec,mag,dmag,ctph,dctph,sys, &
+         sysint,nsys, &
          colmag)
 
   end subroutine calibrate
+
+  subroutine syscheck(filters,sys,sysint,nsys)
+
+    ! The systematic error estimated from few stars is uncertain: a warning
+    ! (the header gets it as a comment). A fixed --syserr: nsys = -1
+    ! (no interval, no number of stars in the header).
+
+    use calibre, only: nsyswarn
+
+    character(len=*), dimension(:), intent(in) :: filters
+    real(dbl), dimension(:), intent(in) :: sys
+    real(dbl), dimension(:,:), intent(in) :: sysint
+    integer, dimension(:), intent(in out) :: nsys
+
+    integer :: i
+
+    if( syserr >= 0 ) then
+       nsys = -1
+       return
+    end if
+
+    do i = 1, size(nsys)
+       if( nsys(i) < nsyswarn ) then
+          if( sysint(2,i) >= 0 ) then
+             write(error_unit,'(3a,i0,a,f6.4,a,f6.4,a,f6.4,a)',advance='no') &
+                  ' Warning: the systematic error of `',trim(filters(i)), &
+                  "' is estimated from ",nsys(i),' stars only: ',sys(i), &
+                  ' mag (68% interval ',sysint(1,i),' .. ',sysint(2,i),' mag)'
+          else
+             write(error_unit,'(3a,i0,a,f6.4,a)',advance='no') &
+                  ' Warning: the systematic error of `',trim(filters(i)), &
+                  "' cannot be determined from ",nsys(i),' stars (',sys(i),' mag)'
+          end if
+          write(error_unit,'(a)') &
+               '; consider a fixed --syserr determined from many frames.'
+       end if
+    end do
+
+  end subroutine syscheck
 
   subroutine relmagph(mag,dmag,ph,dph)
 
@@ -863,7 +906,8 @@ contains
     real(dbl), allocatable, dimension(:) :: refra, refdec, ctph,dctph, &
          exptime, areas, tol, aper, sys
     real(dbl), allocatable, dimension(:,:) :: refph,drefph, &
-         cts,dcts,ra,dec
+         cts,dcts,ra,dec,sysint
+    integer, allocatable, dimension(:) :: nsys
     real(dbl), dimension(1,1), parameter :: tratab = real(1.0,dbl)
     type(photores), dimension(:), allocatable :: phres
     type(type_phsys) :: phsyscal
@@ -979,7 +1023,8 @@ contains
 !       dcts(1:ncat,n) = dcts(1:ncat,n) / sqrt(q)
 !    end do
 
-    allocate(phres(nfiles),ctph(nfiles),dctph(nfiles),sys(nfiles))
+    allocate(phres(nfiles),ctph(nfiles),dctph(nfiles),sys(nfiles), &
+         sysint(2,nfiles),nsys(nfiles))
     do n = 1, nfiles
        call photores_init(phres(n),ncat)
        phres(n)%ra = refra(1:ncat)
@@ -990,7 +1035,8 @@ contains
 !    write(*,*) cts(1:ncat,:)
 
     call calibr(refph(1:ncat,:),drefph(1:ncat,:),cts(1:ncat,:),dcts(1:ncat,:),&
-         ctph,dctph,phres,verbose,syserr,sys)
+         ctph,dctph,phres,verbose,syserr,sys,sysint,nsys)
+    call syscheck(filters_fram,sys,sysint,nsys)
 
     ! pull back of original rates
 !    q = reftime * refarea
@@ -1022,10 +1068,10 @@ contains
 
     call writecal(filename,output,keys,advanced,phsystable, &
          filters_fram,catid,photsys_ref,area,init_area,saper,tratab, &
-         ctph,dctph,qlabels,phres,verbose,sys,apcorr)
+         ctph,dctph,qlabels,phres,verbose,sys,apcorr,sysint=sysint,nsys=nsys)
 
     deallocate(refra,refdec,refph,drefph,filter_ref,filters_fram,exptime, &
-         areas,tol,cts,dcts,ra,dec,ctph,dctph,sys)
+         areas,tol,cts,dcts,ra,dec,ctph,dctph,sys,sysint,nsys)
 
     do i = 1,size(phres)
        call photores_destroy(phres(i))

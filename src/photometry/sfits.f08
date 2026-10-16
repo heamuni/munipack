@@ -55,7 +55,7 @@ contains
 
   subroutine writecal(filenames,outputs,keys,advanced,phsystable, &
        filters,catid,photsys,area,init_area,saper,tra,ctph,dctph,quantities,phres,&
-       verbose,syserr,apcorr,ctm)
+       verbose,syserr,apcorr,ctm,sysint,nsys)
 
     ! syserr (optional) are the systematic errors [mag] of the calibration
     ! of the frames (by ctph), added in quadrature to the errors of all
@@ -64,7 +64,10 @@ contains
     ! term (colterm): COLT_CAT applies the colour term by the catalogue
     ! colour of every star (the stars without it by the mean correction
     ! of the calibration stars), COLT_TRA the magnitude transformation by
-    ! the colours of the calibrated magnitudes (tra is the identity then)
+    ! the colours of the calibrated magnitudes (tra is the identity then);
+    ! sysint (optional) the intervals of the estimated systematic errors
+    ! [mag] and nsys the numbers of their stars (header keys PHSYSERE,
+    ! PHSYSNST; nsys < 0 for a fixed systematic error, no keys)
 
     use phsysfits
     use oakleaf
@@ -88,6 +91,8 @@ contains
     real(dbl), dimension(:), intent(in), optional :: syserr
     real(dbl), intent(in), optional :: apcorr
     type(colour_term), intent(in), optional :: ctm
+    real(dbl), dimension(:,:), intent(in), optional :: sysint
+    integer, dimension(:), intent(in), optional :: nsys
 
     real(dbl), parameter :: nullval = 0
     integer, parameter :: dim2 = 2
@@ -115,6 +120,8 @@ contains
     real(dbl), dimension(size(ctph)) :: m0,dm0,mm,dmm,cc,dcc
     real(dbl), dimension(1) :: x1,dx1,y1,dy1
     real(dbl) :: g,dg,f
+    real(dbl), dimension(2,size(ctph)) :: sint
+    integer, dimension(size(ctph)) :: nst
     logical :: lcol
 
     nfiles = size(filenames)
@@ -126,6 +133,10 @@ contains
     if( present(syserr) ) srel = max(syserr,0.0_dbl) / 1.0857362047581294_dbl
     apc = 1
     if( present(apcorr) ) apc = apcorr
+    sint = -1
+    nst = -1
+    if( present(sysint) ) sint = sysint
+    if( present(nsys) ) nst = nsys
 
     status = 0
     allocate(fitses(nfiles))
@@ -515,15 +526,17 @@ contains
           call savefits(filenames(i),outputs(i),fitses(n),advanced, &
                photsys,phsyscal,area,init_area,catid,quantities, &
                ctph(n),dctph(n),status,k0,r,lref,srel(n),apc,phres(n), &
-               ctm,n,scol(:,n),sdcol(:,n),csrc(:,n))
+               ctm,n,scol(:,n),sdcol(:,n),csrc(:,n),sysint=sint(:,n),nsys=nst(n))
        else if( present(phres) ) then
           call savefits(filenames(i),outputs(i),fitses(n),advanced, &
                photsys,phsyscal,area,init_area,catid,quantities, &
-               ctph(n),dctph(n),status,k0,r,lref,srel(n),apc,phres(n))
+               ctph(n),dctph(n),status,k0,r,lref,srel(n),apc,phres(n), &
+               sysint=sint(:,n),nsys=nst(n))
        else
           call savefits(filenames(i),outputs(i),fitses(n),advanced, &
                photsys,phsyscal,area,init_area,catid,quantities, &
-               ctph(n),dctph(n),status,k0,r,lref,srel(n),apc)
+               ctph(n),dctph(n),status,k0,r,lref,srel(n),apc, &
+               sysint=sint(:,n),nsys=nst(n))
        end if
        call qfits_deallocate(fitses(n))
     end do
@@ -820,11 +833,13 @@ contains
 
   subroutine savefits(filename,output,fits,advanced,photsys,phsyscal,&
        area,init_area,catid, qlabels,ctph, dctph, status, k0, r, lref, &
-       srel, apcorr, phres, ctm, nband, scol, sdcol, csrc)
+       srel, apcorr, phres, ctm, nband, scol, sdcol, csrc, sysint, nsys)
 
     ! ctm (optional): the colour term of the band nband, the colours
     ! of the stars scol, their errors sdcol and sources csrc (columns
-    ! COLOR, COLORERR, COLORSRC are added to the table)
+    ! COLOR, COLORERR, COLORSRC are added to the table); sysint, nsys
+    ! (optional): the interval [mag] of the estimated systematic error
+    ! and the number of its stars (nsys < 0: a fixed value, no keys)
 
     use phsysfits
     use photoconv
@@ -843,6 +858,8 @@ contains
     integer, intent(in), optional :: nband
     real(dbl), dimension(:), intent(in), optional :: scol, sdcol
     integer, dimension(:), intent(in), optional :: csrc
+    real(dbl), dimension(2), intent(in), optional :: sysint
+    integer, intent(in), optional :: nsys
 
     integer, parameter :: group = 1, extver = 0
     character(len=*), parameter :: bunit = units(3)
@@ -853,6 +870,7 @@ contains
     real(dbl) :: photflam,photzpt,photplam,photbw
     integer :: n, m, i, l, width, height, hdutype, nq, nrows, ncols, chdu, nhdu, &
          srows, frow
+    logical :: lsys
     type(fitsfiles) :: fitsfile, fitscal
 
     width = fits%naxes(1)
@@ -962,6 +980,16 @@ contains
     call fits_update_key(fitscal,FITS_KEY_CTPHERR,dctph,1,'std. error of CTPH ',status)
     call fits_update_key(fitscal,FITS_KEY_PHSYSERR,1.0857362047581294_dbl*srel,-5, &
          '[mag] systematic error added to errors',status)
+    lsys = .false.
+    if( present(nsys) .and. present(sysint) ) lsys = nsys >= 0
+    if( lsys ) then
+       if( sysint(2) >= 0 ) &
+            call fits_update_key(fitscal,FITS_KEY_PHSYSERE, &
+            max(sysint(2) - 1.0857362047581294_dbl*srel,0.0_dbl),-5, &
+            '[mag] upper error of PHSYSERR (68%, limit if 0)',status)
+       call fits_update_key(fitscal,FITS_KEY_PHSYSNST,nsys, &
+            'calibration stars of PHSYSERR',status)
+    end if
     if( present(ctm) ) call colkeys(fitscal,ctm,nband,status)
     if( fits%apee ) then
        call fits_update_key(fitscal,FITS_KEY_APCORTYP,'EE', &
@@ -1023,6 +1051,27 @@ contains
     write(buf,'(a,f7.5,a)') "Systematic error = ",1.0857362047581294_dbl*srel, &
          " mag (added in quadrature)"
     call fits_write_comment(fitscal,buf,status)
+    if( lsys ) then
+       if( sysint(2) >= 0 ) then
+          write(buf,'(a,f7.5,a,f8.5,a,i0,a)') "Systematic error 68% interval = ", &
+               sysint(1)," .. ",sysint(2)," mag (",nsys," stars)"
+       else
+          write(buf,'(a,i0,a)') "Systematic error interval not determined (",nsys, &
+               " stars)"
+       end if
+       call fits_write_comment(fitscal,buf,status)
+       if( nsys < nsyswarn ) then
+          if( sysint(2) >= 0 ) then
+             write(buf,'(a,i0,a)') "Warning: the systematic error from ",nsys, &
+                  " stars only is uncertain;"
+          else
+             write(buf,'(a)') "Warning: too few stars for the systematic error;"
+          end if
+          call fits_write_comment(fitscal,buf,status)
+          call fits_write_comment(fitscal, &
+               "  a fixed --syserr determined from many frames is preferable.",status)
+       end if
+    end if
     if( fits%apee ) then
        call fits_write_comment(fitscal, &
             "Counts divided by the enclosed energy of the aperture (APEE)",status)
