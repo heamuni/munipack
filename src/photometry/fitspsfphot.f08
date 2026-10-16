@@ -39,6 +39,7 @@ module fitspsfphot
   character(len=*), parameter :: FITS_COL_PSFFLAG = 'FLAG'
   character(len=*), parameter :: FITS_COL_GROUP = 'GROUP'
   character(len=*), parameter :: FITS_COL_GSIZE = 'GSIZE'
+  character(len=*), parameter :: FITS_COL_PSFMODERR = 'PSFMODERR'
 
   type :: PsfFrame
      real(REAL64), dimension(:,:), allocatable :: data
@@ -78,8 +79,10 @@ module fitspsfphot
      ! stars, the iterations of the build
      character(len=FLEN_VALUE) :: core = ''
      character(len=FLEN_FILENAME) :: psfsave = ''
-     integer :: nvar = 0, npsfstar = 0, nbuild = 0
-     real(REAL64) :: psfrad = -1, resrms = -1, psfchi2 = -1
+     integer :: nvar = 0, nvarrad = 0, npsfstar = 0, nbuild = 0, nnorm = 0
+     real(REAL64) :: psfrad = -1, resrms = -1, psfchi2 = -1, psfsmooth = -1, &
+          rap = -1, r995 = -1, normflux = 0, normerr = -1, syserr = 0
+     logical :: smooth_cv = .false.
      ! grouping (the link distance in FWHM, 0 off), the residual detection
      real(REAL64) :: group = 0
      integer :: ngroups = 0, maxgroup = 0, resdetect = 0, nresid = 0
@@ -312,10 +315,11 @@ contains
 
 
   subroutine fits_psfphot_save(filename,output,hdr,ttype,tunit,table,npix, &
-       flags,group,gsize,status)
+       flags,group,gsize,status,moderr)
 
     ! The table columns are real: X, Y, XERR, YERR, PSFCOUNT, PSFCOUNTERR,
-    ! SKY, SKYERR, CHI2, SHARP, ROUND, and integer: NPIX, FLAG, GROUP, GSIZE
+    ! SKY, SKYERR, CHI2, SHARP, ROUND, and integer: NPIX, FLAG, GROUP, GSIZE;
+    ! the real PSFMODERR follows with moderr (the empirical PSF)
 
     character(len=*), intent(in) :: filename, output
     type(PsfHeader), intent(in) :: hdr
@@ -323,10 +327,11 @@ contains
     real(REAL64), dimension(:,:), intent(in) :: table
     integer, dimension(:), intent(in) :: flags, npix, group, gsize
     integer, intent(in out) :: status
+    real(REAL64), dimension(:), intent(in), optional :: moderr
 
     type(fitsfiles) :: fits
     integer, parameter :: extver = 0
-    character(len=FLEN_VALUE), dimension(:), allocatable :: tform
+    character(len=FLEN_VALUE), dimension(:), allocatable :: tform, ttyp, tun
     character(len=FLEN_COMMENT) :: com
     integer :: hdutype, i, nrows, ncols
 
@@ -361,8 +366,15 @@ contains
     allocate(tform(ncols))
     tform = '1D'
     tform(ncols-3:ncols) = '1J'
+    ttyp = ttype
+    tun = tunit
+    if( present(moderr) ) then
+       tform = [character(len=FLEN_VALUE) :: tform, '1D']
+       ttyp = [character(len=FLEN_VALUE) :: ttyp, FITS_COL_PSFMODERR]
+       tun = [character(len=FLEN_VALUE) :: tun, tunit(6)]
+    end if
     nrows = size(table,1)
-    call fits_insert_btbl(fits,nrows,ttype,tform,tunit,PSFEXTNAME,status)
+    call fits_insert_btbl(fits,nrows,ttyp,tform,tun,PSFEXTNAME,status)
 
     call fits_write_key(fits,FITS_KEY_PSFTYPE,hdr%psftype, &
          'PSF: GAUSS, MOFFAT, FILE or EMPIRICAL',status)
@@ -383,6 +395,8 @@ contains
             'base of empirical PSF: GAUSS, MOFFAT, FILE',status)
        call fits_write_key(fits,'PSFVAR',hdr%nvar, &
             'order of the spatial variation of PSF',status)
+       call fits_write_key(fits,'PSFVARR',hdr%nvarrad, &
+            'order of the radial variation of PSF',status)
        call fits_write_key(fits,'PSFNSTAR',hdr%npsfstar, &
             'stars used to build the PSF',status)
        call fits_write_key(fits,'PSFRAD',hdr%psfrad,-4, &
@@ -393,6 +407,26 @@ contains
             'median reduced chi2 of PSF stars',status)
        call fits_write_key(fits,'PSFITER',hdr%nbuild, &
             'iterations of the PSF build',status)
+       if( hdr%smooth_cv ) then
+          com = 'regularisation of tables (cross-validated)'
+       else
+          com = 'regularisation of tables'
+       end if
+       call fits_write_key(fits,'PSFSMOOT',hdr%psfsmooth,-4,com,status)
+       if( hdr%r995 > 0 ) call fits_write_key(fits,'PSFR995',hdr%r995,-4, &
+            '[pix] radius of 99.5% of flux (growth curve)',status)
+       call fits_write_key(fits,'PSFNAPER',hdr%rap,-4, &
+            '[pix] aperture of the flux normalisation',status)
+       call fits_write_key(fits,'PSFNORMN',hdr%nnorm, &
+            'stars of the flux normalisation',status)
+       if( hdr%normerr >= 0 ) then
+          call fits_write_key(fits,'PSFNORM',hdr%normflux,-6, &
+               'flux of tables at field centre (normalisation)',status)
+          call fits_write_key(fits,'PSFNORME',hdr%normerr,-6, &
+               'error of PSFNORM',status)
+       end if
+       call fits_write_key(fits,'PSFSYSER',hdr%syserr,-6, &
+            'relative systematic error of PSF fluxes',status)
        if( hdr%psfsave /= '' ) call fits_write_key(fits,'PSFSAVED', &
             shortname(hdr%psfsave),'the empirical PSF saved to',status)
     end if
@@ -475,6 +509,10 @@ contains
          '(0 fitted alone), GSIZE: its size.',status)
     call fits_write_comment(fits,'SHARP: relative residual in the core ' // &
          '(>0 sharper than PSF), ROUND: ellipticity data - model.',status)
+    if( present(moderr) ) then
+       call fits_write_comment(fits,'PSFMODERR: the error of PSFCOUNT by ' // &
+            'the empirical PSF (included in PSFCOUNTERR).',status)
+    end if
 
     if( nrows > 0 ) then
        do i = 1, ncols - 4
@@ -484,6 +522,7 @@ contains
        call fits_write_col(fits,ncols-2,1,flags,status)
        call fits_write_col(fits,ncols-1,1,group,status)
        call fits_write_col(fits,ncols,1,gsize,status)
+       if( present(moderr) ) call fits_write_col(fits,ncols+1,1,moderr,status)
     end if
 
 666 continue
