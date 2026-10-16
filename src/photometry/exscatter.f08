@@ -293,7 +293,7 @@ contains
 
 
   subroutine mixture_fit(y,e,x,ex,cxy,order,fixsig,beta,cov,sigma,fout,member, &
-       bmin,sigint,nfit,errcorr,lambda,eivstat)
+       bmin,sigint,nfit,errcorr,lambda,eivstat,eivh)
 
     ! The polynomial y = beta(0) + beta(1) x + beta(2) x**2
     ! (beta(order+1:) = 0) with the excess scatter sigma by the likelihood
@@ -310,7 +310,9 @@ contains
     ! the correction for the errors of x (see wls), lambda (optional)
     ! the reliability ratio of x (1 without the errors), eivstat
     ! (optional) 0 when the correction is not applied, 1 applied, 2
-    ! applied with the cap (see wls). A value is used when e > 0, ex >= 0
+    ! applied with the cap (see wls), 3 applied, but the EM did not
+    ! converge, eivh (optional) the fraction h of the correction of
+    ! the dilution (1 full, 0 none). A value is used when e > 0, ex >= 0
     ! and y, x finite.
 
     real(dbl), dimension(:), intent(in) :: y, e, x, ex, cxy
@@ -326,6 +328,7 @@ contains
     logical, intent(in), optional :: errcorr
     real(dbl), intent(out), optional :: lambda
     integer, intent(out), optional :: eivstat
+    real(dbl), intent(out), optional :: eivh
 
     real(dbl), dimension(size(y),1,1) :: xx0
     real(dbl), dimension(1) :: lam
@@ -336,14 +339,14 @@ contains
     if( present(errcorr) ) ec = errcorr
     call mixfit(y,e,reshape(x,[size(x),1]),reshape(ex,[size(ex),1]),xx0, &
          reshape(cxy,[size(cxy),1]),[order],fixsig,beta,cov,sigma,fout,member, &
-         bmin,sigint,nfit,errcorr=ec,lambda=lam,eivstat=eivstat)
+         bmin,sigint,nfit,errcorr=ec,lambda=lam,eivstat=eivstat,eivh=eivh)
     if( present(lambda) ) lambda = lam(1)
 
   end subroutine mixture_fit
 
 
   subroutine mixture_fit_multi(y,e,x,ex,exx,cxy,order,fixsig,beta,cov,sigma, &
-       fout,member,bmin,sigint,nfit,errcorr,lambda,eivstat)
+       fout,member,bmin,sigint,nfit,errcorr,lambda,eivstat,eivh)
 
     ! The polynomial of several colours (at most ncolmax),
     !
@@ -375,6 +378,7 @@ contains
     logical, intent(in), optional :: errcorr
     real(dbl), dimension(:), intent(out), optional :: lambda
     integer, intent(out), optional :: eivstat
+    real(dbl), intent(out), optional :: eivh
 
     real(dbl), dimension(size(x,2)) :: lam
     logical :: ec
@@ -383,14 +387,14 @@ contains
     ec = .false.
     if( present(errcorr) ) ec = errcorr
     call mixfit(y,e,x,ex,exx,cxy,order,fixsig,beta,cov,sigma,fout,member, &
-         bmin,sigint,nfit,errcorr=ec,lambda=lam,eivstat=eivstat)
+         bmin,sigint,nfit,errcorr=ec,lambda=lam,eivstat=eivstat,eivh=eivh)
     if( present(lambda) ) lambda = lam
 
   end subroutine mixture_fit_multi
 
 
   subroutine mixfit(y,e,x,ex,exx,cxy,order,fixsig,beta,cov,sigma,fout,member, &
-       bmin,sigint,nfit,dbeta0,errcorr,lambda,eivstat)
+       bmin,sigint,nfit,dbeta0,errcorr,lambda,eivstat,eivh)
 
     ! The implementation of mixture_fit, mixture_fit_multi and
     ! mixture_mean; dbeta0 (optional) is the error of beta(0). For
@@ -418,12 +422,13 @@ contains
     logical, intent(in), optional :: errcorr
     real(dbl), dimension(:), intent(out), optional :: lambda
     integer, intent(out), optional :: eivstat
+    real(dbl), intent(out), optional :: eivh
 
     real(dbl), parameter :: q50 = 0.6744897501960817_dbl
     real(dbl), parameter :: fmax = 0.5_dbl, tol = 1e-10_dbl
     ! 1 mag in the natural logarithm of flux
     real(dbl), parameter :: bmag = 0.4_dbl*2.302585092994046_dbl
-    real(dbl), dimension(:), allocatable :: yy, e0, xx, e2, r, q, v, w
+    real(dbl), dimension(:), allocatable :: yy, e0, xx, e2, e2c, r, q, v, w
     real(dbl), dimension(:,:), allocatable :: xm, xc, ex2, cc
     real(dbl), dimension(:,:,:), allocatable :: cxx
     logical, dimension(size(y)) :: mask
@@ -431,9 +436,9 @@ contains
     real(dbl), dimension(pmax,pmax) :: ainv
     real(dbl), dimension(ncolmax) :: xs, lamc
     integer, dimension(pmax) :: cind, cpow
-    real(dbl) :: vb, vbmin, smax, f, f2, s2, l1, emin, e2med, lmax
+    real(dbl) :: vb, vbmin, smax, f, f2, s2, l1, emin, e2med, lmax, s2w, hcap
     integer :: n, p, nc, j, k, eivst
-    logical :: few, eiv, haserr
+    logical :: few, eiv, haserr, nocc, emfail
 
     beta = 0
     cov = 0
@@ -441,11 +446,16 @@ contains
     fout = 0
     lamc = 1
     eivst = 0
+    hcap = 0
+    s2w = 0
+    nocc = .false.
+    emfail = .false.
     if( present(member) ) member = 0
     if( present(dbeta0) ) dbeta0 = 0
     if( present(sigint) ) sigint = -1
     if( present(lambda) ) lambda = 1
     if( present(eivstat) ) eivstat = 0
+    if( present(eivh) ) eivh = 0
 
     nc = size(x,2)
     mask = e > 0 .and. abs(y) < huge(y)
@@ -463,12 +473,13 @@ contains
        xc(:,j) = pack(x(:,j),mask)
        ex2(:,j) = pack(ex(:,j),mask)**2
        cc(:,j) = pack(cxy(:,j),mask)
+       ! symmetric by construction (a guard)
        do k = 1, nc
-          cxx(:,j,k) = pack(exx(:,j,k),mask)
+          cxx(:,j,k) = pack((exx(:,j,k) + exx(:,k,j))/2,mask)
        end do
     end do
     xx = xc(:,1)
-    allocate(e2(n),r(n),q(n),v(n),w(n))
+    allocate(e2(n),e2c(n),r(n),q(n),v(n),w(n))
 
     ! the columns of the design matrix: the order is limited by the stars
     ! and by the range of the colours (a colour of a single value has no
@@ -515,6 +526,7 @@ contains
 
     if( n < p + 1 .or. (fixsig >= 0 .and. n < p + 2) ) then
        ! too few stars for the scatter and outliers: the weighted fit
+       s2w = sigma**2
        call effvar(th)
        v = e2 + sigma**2
        w = 1 / v
@@ -528,6 +540,7 @@ contains
        if( present(member) ) member = merge(1.0_dbl,0.0_dbl,mask)
        if( present(lambda) ) lambda = lamc(1:nc)
        if( present(eivstat) ) eivstat = eivst
+       if( present(eivh) ) eivh = hcap
        return
     end if
 
@@ -589,11 +602,16 @@ contains
     call estep(th,sigma,fout)
     w = q / (e2 + sigma**2)
     if( .not. (sum(w) > 0) ) w = 1 / (e2 + sigma**2)
+    s2w = sigma**2
     call wls(w,th1,ainv)
     call layout(th,ainv)
     if( present(dbeta0) ) dbeta0 = 1 / sqrt(sum(w))
+    ! EM not converged with the correction (a cycle of the corrected
+    ! M-step even when damped): reported
+    if( emfail .and. eivst > 0 ) eivst = 3
     if( present(lambda) ) lambda = lamc(1:nc)
     if( present(eivstat) ) eivstat = eivst
+    if( present(eivh) ) eivh = hcap
     ! the uncertainty of the estimated sigma in the errors of beta
     if( fixsig < 0 ) call smallsample(th)
     ! the fraction of outliers found
@@ -684,12 +702,14 @@ contains
       ! of the outliers fixed for few stars
       real(dbl), dimension(:), intent(in out) :: th
       real(dbl), intent(in out) :: sigma, f
-      real(dbl), dimension(pmax) :: th1
-      real(dbl) :: sig1, f1, sq
+      real(dbl), dimension(pmax) :: th1, dth
+      real(dbl) :: sig1, f1, sq, dsig
       integer :: iter, k
       logical :: conv
 
       if( few ) vb = max(bmag**2,9*(e2med + sigma**2))
+      dth = 0
+      dsig = 0
 
       do iter = 1, 1000
 
@@ -701,6 +721,7 @@ contains
          v = e2 + sigma**2
          w = q/v + (1 - q)/(v + vb)
          th1 = th
+         s2w = sigma**2
          call wls(w,th1,ainv)
          r = yy - matmul(xm(:,1:p),th1(1:p))
          smax = 10*maxval(abs(r)) + tiny(smax)
@@ -726,11 +747,22 @@ contains
          do k = 1, p
             conv = conv .and. abs(th1(k) - th(k))*colsc(k) <= tol*emin
          end do
+         ! the corrected M-step is not a maximisation of the likelihood
+         ! (the weights, the cap and the effective variance by the slope
+         ! feed back): a cycle of two states in capped fits of the order 2;
+         ! the steps damped after 50 iterations
+         if( eiv .and. iter > 50 .and. .not. conv ) then
+            th1(1:p) = (th(1:p) + th1(1:p)) / 2
+            sig1 = (sigma + sig1) / 2
+         end if
+         dth = th1 - th
+         dsig = sig1 - sigma
          th = th1
          sigma = sig1
          f = f1
          if( conv ) exit
       end do
+      if( eiv .and. .not. conv ) call emcheck(dth,dsig,sigma)
 
     end subroutine emloop
 
@@ -739,15 +771,18 @@ contains
       ! the stars (q = 1, no outliers), iterated from th, sigma
       real(dbl), dimension(:), intent(in out) :: th
       real(dbl), intent(in out) :: sigma
-      real(dbl), dimension(pmax) :: th1
-      real(dbl) :: sig1
+      real(dbl), dimension(pmax) :: th1, dth
+      real(dbl) :: sig1, dsig
       integer :: iter, k
       logical :: conv
+      dth = 0
+      dsig = 0
       do iter = 1, 1000
          call effvar(th)
          v = e2 + sigma**2
          w = q / v
          th1 = th
+         s2w = sigma**2
          call wls(w,th1,ainv)
          r = yy - matmul(xm(:,1:p),th1(1:p))
          smax = 10*maxval(abs(r)) + tiny(smax)
@@ -760,11 +795,31 @@ contains
          do k = 1, p
             conv = conv .and. abs(th1(k) - th(k))*colsc(k) <= tol*emin
          end do
+         if( eiv .and. iter > 50 .and. .not. conv ) then
+            th1(1:p) = (th(1:p) + th1(1:p)) / 2
+            sig1 = (sigma + sig1) / 2
+         end if
+         dth = th1 - th
+         dsig = sig1 - sigma
          th = th1
          sigma = sig1
          if( conv ) exit
       end do
+      if( eiv .and. .not. conv ) call emcheck(dth,dsig,sigma)
     end subroutine remlfit
+
+    subroutine emcheck(dth,dsig,sigma)
+      ! EM not converged: a failure when the last step dth, dsig (of
+      ! the damped iteration) is not small against the errors (a cycle),
+      ! not a slow approach (the fraction of outliers to zero)
+      real(dbl), dimension(:), intent(in) :: dth
+      real(dbl), intent(in) :: dsig, sigma
+      integer :: k
+      do k = 1, p
+         if( abs(dth(k)) > 0.01_dbl*sqrt(max(ainv(k,k),0.0_dbl)) ) emfail = .true.
+      end do
+      if( abs(dsig) > 0.01_dbl*max(sigma,0.1_dbl*emin) ) emfail = .true.
+    end subroutine emcheck
 
     real(dbl) function mixlike(th,s,f)
       ! the restricted log-likelihood of the mixture (q by the E-step):
@@ -837,11 +892,16 @@ contains
       ! the restricted log-likelihood of the calibration stars,
       ! -1/2 (sum q ln v + ln det X'UX + sum u r**2), u = q/v, v = e2 + s**2,
       ! r the residuals of the weighted fit at s
+      ! (the fit corrected for the errors of the colours, as of sigma:
+      ! the plain fit, attenuated, has smaller residuals than its
+      ! effective variances say, the profile shifted to zero)
       real(dbl), intent(in) :: s
       real(dbl), dimension(n) :: vs, u, rs
       real(dbl), dimension(pmax,pmax) :: am, ai
       real(dbl), dimension(pmax) :: b, t
-      integer :: i, j
+      real(dbl), dimension(ncolmax) :: lsave
+      real(dbl) :: ssave, hsave
+      integer :: i, j, esave
       vs = e2 + s**2
       u = q / vs
       am = 0
@@ -852,9 +912,22 @@ contains
             am(i,j) = sum(u*xm(:,i)*xm(:,j))
          end do
       end do
-      call syminv(am,p,ai)
-      t = 0
-      t(1:p) = matmul(ai(1:p,1:p),b(1:p))
+      if( eiv ) then
+         lsave = lamc
+         esave = eivst
+         ssave = s2w
+         hsave = hcap
+         s2w = s**2
+         call wls(u,t,ai)
+         lamc = lsave
+         eivst = esave
+         s2w = ssave
+         hcap = hsave
+      else
+         call syminv(am,p,ai)
+         t = 0
+         t(1:p) = matmul(ai(1:p,1:p),b(1:p))
+      end if
       rs = yy - matmul(xm(:,1:p),t(1:p))
       remlike = -(sum(q*log(vs)) + logdet(am,p) + sum(u*rs**2)) / 2
     end function remlike
@@ -875,6 +948,12 @@ contains
             gp = 0
          end if
          e2 = e0**2 + gp**2*ex2(:,1) - 2*gp*cc(:,1)
+         if( p >= 2 ) then
+            gp = th(2)
+         else
+            gp = 0
+         end if
+         e2c = e0**2 + gp**2*ex2(:,1) - 2*gp*cc(:,1)
       else
          gpm = 0
          do k = 2, p
@@ -891,7 +970,22 @@ contains
                e2 = e2 + 2*gpm(:,j)*gpm(:,k)*cxx(:,j,k)
             end do
          end do
+         gpm = 0
+         do k = 2, p
+            if( cpow(k) == 1 ) gpm(:,cind(k)) = gpm(:,cind(k)) + th(k)
+         end do
+         e2c = e0**2
+         do j = 1, nc
+            e2c = e2c + gpm(:,j)**2*ex2(:,j) - 2*gpm(:,j)*cc(:,j)
+            do k = j + 1, nc
+               e2c = e2c + 2*gpm(:,j)*gpm(:,k)*cxx(:,j,k)
+            end do
+         end do
       end if
+      e2c = max(e2c,0.01_dbl*e0**2)
+      ! e2c: by the linear terms only (the slope at the reference colour),
+      ! independent of the observed colour (the weights of the corrected
+      ! moments of wls, the order 2)
       ! the covariance cannot make the variance smaller than the parts
       ! independent of the catalogue magnitude (a numerical guard)
       e2 = max(e2,0.01_dbl*e0**2)
@@ -921,26 +1015,37 @@ contains
       ! of the colours correlated with y (the colour contains the catalogue
       ! magnitude of the calibration) bias them too. The moments are
       ! corrected by the expected contribution of the errors (Fuller 1987,
-      ! Measurement Error Models, 2.2): X'WX - h E, X'Wy - h e, E and e
-      ! (errmom) the expected parts of the errors, ainv the covariance of
-      ! the corrected estimate, A**-1 X'WX A**-1. The reliability ratios of
-      ! the colours (lamc, the variance of the true colours over the observed
-      ! one about their weighted mean) are computed whenever the errors are
-      ! given. The correction is capped (h < 1, eivst = 2) so that
-      ! the corrected variance of every combination of the terms is at
-      ! least lammin = 0.5 of the observed one (the correction at most
-      ! a factor of 2): when the errors are comparable to the range of
-      ! the colours, the full correction (1/lambda) has a heavy tail (a small
-      ! difference of two noisy moments), and a nearly singular matrix
-      ! (the linear and quadratic terms, two correlated colours) has
-      ! the same in the worst combination of the terms.
+      ! Measurement Error Models, 2.2): X'WX - h E, X'Wy - ec - h ed, E, ed
+      ! the dilution, ec the covariances of y and the colours (errmom),
+      ! subtracted in full (an additive bias, not a dilution); ainv the
+      ! covariance of the corrected estimate, A**-1 M A**-1, M = X'WX +
+      ! sum w**2 a a', a = c - S beta the covariance of the errors of
+      ! the colours (their linear terms) and of the residual (Fuller 1987,
+      ! 2.2: the variance of x r includes it; without it the errors of k
+      ! were 0.85-0.9 of the scatter for lambda 0.6-0.8). The reliability
+      ! ratios of the colours (lamc, the variance of the true colours over
+      ! the observed one about their weighted mean) are computed whenever
+      ! the errors are given. The correction is capped (h < 1, eivst = 2) so
+      ! that the corrected variance of every combination of the terms is at
+      ! least lammin = 0.5 of the observed one (the dilution corrected at
+      ! most by a factor of 2): when the errors are comparable to the range
+      ! of the colours, the full correction (1/lambda) has a heavy tail
+      ! (a small difference of two noisy moments), and a nearly singular
+      ! matrix (the linear and quadratic terms, two correlated colours) has
+      ! the same in the worst combination of the terms. With the quadratic
+      ! terms the weights of the moments are by the slope of the linear
+      ! terms (e2c, the slope at the reference colour): by the slope at
+      ! the observed colour they depend on its error, which biased the zero
+      ! point (+0.008, coverage 0.15)
       real(dbl), dimension(:), intent(in) :: w
       real(dbl), dimension(:), intent(out) :: th
       real(dbl), dimension(:,:), intent(out) :: ainv
-      real(dbl), dimension(pmax,pmax) :: am, ac, ai, em
-      real(dbl), dimension(pmax) :: b, bc, eb
+      real(dbl), dimension(pmax,pmax) :: am, ac, ai, em, mid
+      real(dbl), dimension(pmax) :: b, bc, eb, ebd
+      real(dbl), dimension(n) :: wq
+      real(dbl), dimension(n,pmax) :: d
       real(dbl) :: sw, h, ha, hb
-      integer :: i, j, iter
+      integer :: i, j, l, iter
       th = 0
       ainv = 0
       if( p == 1 ) then
@@ -949,19 +1054,24 @@ contains
          ainv(1,1) = 1 / sw
          return
       end if
+      if( eiv .and. haserr .and. any(cpow(2:p) == 2) ) then
+         wq = w * (e2 + s2w) / (e2c + s2w)
+      else
+         wq = w
+      end if
       am = 0
       b = 0
       do i = 1, p
-         b(i) = sum(w*xm(:,i)*yy)
+         b(i) = sum(wq*xm(:,i)*yy)
          do j = 1, p
-            am(i,j) = sum(w*xm(:,i)*xm(:,j))
+            am(i,j) = sum(wq*xm(:,i)*xm(:,j))
          end do
       end do
       call syminv(am,p,ainv)
       th(1:p) = matmul(ainv(1:p,1:p),b(1:p))
       if( .not. (eiv .or. haserr) ) return
 
-      call errmom(w,em,eb)
+      call errmom(wq,em,eb,ebd)
       ! the reliability ratios of the colours (their linear terms)
       do i = 2, p
          if( cpow(i) == 1 ) lamc(cind(i)) = reliab(am,em,1.0_dbl,i)
@@ -969,6 +1079,7 @@ contains
       if( .not. eiv ) return
 
       eivst = 0
+      hcap = 0
       h = 1
       if( .not. eivok(am,em,1.0_dbl) ) then
          ! the largest h of the correction within the cap, by bisection
@@ -986,13 +1097,67 @@ contains
          if( .not. (h > 0) ) return
       end if
       ac(1:p,1:p) = am(1:p,1:p) - h*em(1:p,1:p)
-      bc(1:p) = b(1:p) - h*eb(1:p)
+      bc(1:p) = b(1:p) - (eb(1:p) - ebd(1:p)) - h*ebd(1:p)
       call syminv(ac,p,ai)
       if( .not. (ai(1,1) > 0) ) return
       th(1:p) = matmul(ai(1:p,1:p),bc(1:p))
-      ainv(1:p,1:p) = matmul(ai(1:p,1:p),matmul(am(1:p,1:p),ai(1:p,1:p)))
+      ! the covariance with the term of the errors of the colours and
+      ! of the residual (the linear terms)
+      mid = am
+      if( haserr ) then
+         ! d(:,i) = E[u_i r], u_i the error of the column i (u of a colour,
+         ! 2 xi u + u**2 - s**2 of its square, xi by the observed colour),
+         ! r the residual (for Gaussian errors)
+         d = 0
+         do i = 2, p
+            do l = 2, p
+               d(:,i) = d(:,i) - dcov(i,l)*th(l)
+            end do
+            if( cpow(i) == 1 ) then
+               d(:,i) = d(:,i) + cc(:,cind(i))
+            else
+               d(:,i) = d(:,i) + 2*xc(:,cind(i))*cc(:,cind(i))
+            end if
+         end do
+         do i = 2, p
+            do j = 2, p
+               mid(i,j) = mid(i,j) + sum(wq**2*d(:,i)*d(:,j))
+            end do
+         end do
+      end if
+      ainv(1:p,1:p) = matmul(ai(1:p,1:p),matmul(mid(1:p,1:p),ai(1:p,1:p)))
+      hcap = h
       eivst = merge(1,2,h == 1)
+      ! several colours without the errors: nothing corrected
+      if( .not. haserr ) then
+         eivst = 0
+         hcap = 0
+      end if
     end subroutine wls
+
+    function dcov(i,l) result(c)
+      ! the covariance of the errors of the columns i, l of X (the colours
+      ! and their squares, Gaussian errors, xi by the observed colours)
+      integer, intent(in) :: i, l
+      real(dbl), dimension(n) :: c, sab
+      integer :: a, b
+      a = cind(i)
+      b = cind(l)
+      if( a == b ) then
+         sab = ex2(:,a)
+      else
+         sab = cxx(:,a,b)
+      end if
+      if( cpow(i) == 1 .and. cpow(l) == 1 ) then
+         c = sab
+      else if( cpow(i) == 1 ) then
+         c = 2*xc(:,b)*sab
+      else if( cpow(l) == 1 ) then
+         c = 2*xc(:,a)*sab
+      else
+         c = 4*xc(:,a)*xc(:,b)*sab + 2*sab**2
+      end if
+    end function dcov
 
     logical function eivok(am,em,h)
       ! the correction by h within the cap: X'WX - h E at least lammin
@@ -1025,7 +1190,7 @@ contains
       end if
     end function reliab
 
-    subroutine errmom(w,em,eb)
+    subroutine errmom(w,em,eb,ebd)
       ! the expected parts of the errors of the colours in the moments of
       ! wls, E[X'WX] = Xi'W Xi + E, E[X'Wy] = Xi'W eta + e (Xi, eta
       ! the true values): the linear terms by the covariances of the colours
@@ -1033,14 +1198,17 @@ contains
       ! the quadratic polynomials (eivquad) by the unbiased estimates of
       ! the products of the true colours for the Gaussian errors (the sums
       ! over the pairings of the factors, unbiased); without the errors
-      ! of the colours all zero
+      ! of the colours all zero. ebd is the part of eb of the dilution
+      ! (of the quadratic terms, y var(c); eb - ebd the covariances of y
+      ! and the colours)
       real(dbl), dimension(:), intent(in) :: w
       real(dbl), dimension(:,:), intent(out) :: em
-      real(dbl), dimension(:), intent(out) :: eb
+      real(dbl), dimension(:), intent(out) :: eb, ebd
       integer, dimension(5) :: fl
       integer :: i, j, ni, nj
       em = 0
       eb = 0
+      ebd = 0
       if( .not. haserr ) return
       do i = 2, p
          if( cpow(i) /= 1 ) cycle
@@ -1066,6 +1234,9 @@ contains
          if( cpow(i) == 2 ) then
             fl(ni+1) = 0
             eb(i) = sum(w*ecorr(fl(1:ni+1)))
+            nocc = .true.
+            ebd(i) = sum(w*ecorr(fl(1:ni+1)))
+            nocc = .false.
          end if
       end do
     end subroutine errmom
@@ -1083,10 +1254,13 @@ contains
     end subroutine factors
 
     function serr(a,b) result(s)
-      ! the covariance of the errors of the factors a, b (0 is y)
+      ! the covariance of the errors of the factors a, b (0 is y; nocc:
+      ! without the covariances of y and the colours)
       integer, intent(in) :: a, b
       real(dbl), dimension(n) :: s
       if( a == 0 .and. b == 0 ) then
+         s = 0
+      else if( nocc .and. (a == 0 .or. b == 0) ) then
          s = 0
       else if( a == 0 ) then
          s = cc(:,b)
