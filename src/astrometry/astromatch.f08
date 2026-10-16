@@ -116,6 +116,7 @@ contains
 
     nthreads = 1
     !$ nthreads = omp_get_max_threads()
+    if( verbose ) write(error_unit,'(a,i0,a)') " The chunk pairs by ",nthreads," thread(s)."
     if( nthreads > 1 ) goto 50
 
     ! the stars are processed in chunks k..k+n2 (l..l+n1) of maxmatch
