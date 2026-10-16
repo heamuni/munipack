@@ -1,17 +1,17 @@
-# aphot — aperture photometry
+# aphot
 
 `aphot` measures the brightness of stars by summing their light in circular
 apertures and subtracting the sky, which it measures in a ring around each
-star. It works on the stars that [`find`](find.md) detected, so run `find`
-first.
+star.
 
-The results go into a new `APERPHOT` table in the same FITS file. This table
-is what [`phcal`](phcal.md) calibrates, and it is also used by
-[`gphot`](gphot.md) and [`psfphot`](psfphot.md). Optionally, `aphot` can also
-work out the aperture corrections, so that `phcal` calibrates the total flux
-of each star rather than just the part inside the aperture.
+It works on the stars that {doc}`find` detected, so run `find` first. The
+results go into a new `APERPHOT` table in the same FITS file. This table is
+what {doc}`phcal` calibrates, and it is also used by {doc}`gphot` and
+{doc}`psfphot`. Optionally, `aphot` can also work out the aperture
+corrections, so that `phcal` calibrates the total flux of each star rather
+than just the part inside the aperture.
 
-## Synopsis
+## Usage
 
 ```bash
 munipack aphot [options] file(s)
@@ -37,7 +37,7 @@ Use `-t dir` to write the result to another directory instead.
 
 | Option | Default | Description |
 |---|---|---|
-| `--psf-file file` | — | Use a field-dependent PSF file (the same format as `artificial` and `psfphot`); implies `--psf FILE`. |
+| `--psf-file file` | — | Use a field-dependent PSF file ({ref}`format <psf-format>` as for `artificial` and `psfphot`); implies `--psf FILE`. |
 | `--psf type` | — | Use a `GAUSS` or `MOFFAT` PSF, or `FILE` together with `--psf-file`. |
 | `--fwhm pix` | from `find` | FWHM of the Gaussian or Moffat PSF. |
 | `--beta b` | 2.5 | Moffat exponent. |
@@ -79,8 +79,8 @@ warning is printed.
 
 **Invalid apertures** are marked with −1. This happens when an aperture runs
 off the frame, contains saturated or bad pixels, has negative counts, or is
-noticeably contaminated by a brighter neighbour. That way faint stars next to bright
-ones do not spoil the calibration.
+noticeably contaminated by a brighter neighbour. That way faint stars next
+to bright ones do not spoil the calibration.
 
 **Aperture corrections** are written only when you ask for them. For each
 aperture, they give the fraction of the star's light that falls inside it
@@ -142,7 +142,7 @@ munipack aphot --apertures 1,1.5,2,3,4,5,7,9,12,15,20,23,26.4,30.4,35,40 \
 ## Notes
 
 - `phcal` uses the aperture corrections automatically when they are present
-  (`phcal --apcorr none` ignores them). If [`gphot`](gphot.md) has added a
+  (`phcal --apcorr none` ignores them). If {doc}`gphot` has added a
   `GROWPHOT` table, `phcal` calibrates that by default instead
   (`phcal --photometry aper` selects the apertures).
 - `--coo` cannot be combined with the aperture-correction options, and

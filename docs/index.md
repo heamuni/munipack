@@ -17,23 +17,38 @@ New here? Start with {doc}`install` and then the {doc}`quickstart`.
 
 ## What you can do
 
-- **Calibrate frames** – make master bias, dark and flat frames and apply
-  them (`bias`, `dark`, `flat`, `phcorr`): {doc}`reference/preprocessing`.
-- **Find stars** (`find`): {doc}`reference/find`.
-- **Measure brightness** – aperture (`aphot`, {doc}`reference/aphot`), PSF
-  (`psfphot`, {doc}`reference/psfphot`) or growth-curve (`gphot`,
-  {doc}`reference/gphot`) photometry.
-- **Calibrate positions** – match stars to a catalogue and fit the WCS
-  (`astrometry`): {doc}`reference/astrometry`.
-- **Calibrate magnitudes** – zero point, colour terms, physical fluxes and
-  instrument transformations (`phcal`, `phfotran`): {doc}`reference/phcal`.
-- **Stack and colour** – combine frames into stacks, mosaics or colour images
-  (`kombine`, `colouring`): {doc}`reference/kombine`.
-- **Simulate frames** – make realistic test frames from a catalogue
-  (`artificial`): {doc}`reference/artificial`.
+- **Calibrate frames** – make master frames with {doc}`routines/bias`,
+  {doc}`routines/dark` and {doc}`routines/flat`, and apply them with
+  {doc}`routines/phcorr`.
+- **Find stars** with {doc}`routines/find`.
+- **Measure brightness** – aperture ({doc}`routines/aphot`), PSF
+  ({doc}`routines/psfphot`) or growth-curve ({doc}`routines/gphot`)
+  photometry.
+- **Calibrate positions** – match stars to a catalogue and fit the WCS with
+  {doc}`routines/astrometry`.
+- **Calibrate magnitudes** – zero point, colour terms and physical fluxes with
+  {doc}`routines/phcal`; instrument transformations with
+  {doc}`routines/phfotran`.
+- **Stack and colour** – stacks and mosaics with {doc}`routines/kombine`,
+  colour images with {doc}`routines/colouring`.
+- **Simulate frames** – realistic test frames from a catalogue with
+  {doc}`routines/artificial`.
+- **Use catalogues** – download ({doc}`routines/cone`), resolve names
+  ({doc}`routines/sesame`), convert ({doc}`routines/votable`) and
+  cross-match ({doc}`routines/cross`).
+- **Handle files** – inspect and edit FITS files ({doc}`routines/fits`) and
+  make light curves ({doc}`routines/timeseries`).
 
-The catalogue tools (`cone`, `sesame`, `votable`, `cross`) and the utilities
-(`fits`, `timeseries`) are listed in the {doc}`reference/index`.
+## Routines
+
+Every routine is run as `munipack <routine> [options] file(s)`, and each has
+its own page in the sidebar. For the option list on your own machine, run
+`munipack <routine> --help`.
+
+`munipack` on its own takes three options: `--version` prints the version and
+licence, `-h`/`--help` lists the routines, and `--verbose` makes the routine
+report its progress. A routine exits with status 0 on success and 1 on an
+error, with the reason printed to stderr, so it is easy to use in scripts.
 
 ```{toctree}
 :caption: Getting started
@@ -52,10 +67,29 @@ validation
 ```
 
 ```{toctree}
-:caption: Reference
-:maxdepth: 2
+:caption: Routines
+:maxdepth: 1
 
-reference/index
+bias <routines/bias>
+dark <routines/dark>
+flat <routines/flat>
+phcorr <routines/phcorr>
+find <routines/find>
+aphot <routines/aphot>
+gphot <routines/gphot>
+psfphot <routines/psfphot>
+astrometry <routines/astrometry>
+phcal <routines/phcal>
+phfotran <routines/phfotran>
+kombine <routines/kombine>
+colouring <routines/colouring>
+artificial <routines/artificial>
+cone <routines/cone>
+sesame <routines/sesame>
+votable <routines/votable>
+cross <routines/cross>
+fits <routines/fits>
+timeseries <routines/timeseries>
 ```
 
 ```{toctree}

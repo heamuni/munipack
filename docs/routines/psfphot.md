@@ -1,21 +1,22 @@
 # psfphot
 
 `psfphot` measures stars by fitting a model of the point spread function (PSF)
-to each one. Use it instead of aperture photometry when the field is crowded
-or when you want the best precision on faint stars. Close neighbours are fitted
-together, so blended stars get sensible fluxes.
+to each one.
 
-The stars come from [`find`](find.md), and the results go into a new `PSFPHOT`
-table in the same file. The measured flux, `PSFCOUNT`, is the total flux of the
-star, so [`phcal`](phcal.md) can calibrate it with `--photometry psf`.
+Use it instead of aperture photometry when the field is crowded or when you
+want the best precision on faint stars. Close neighbours are fitted together,
+so blended stars get sensible fluxes. The stars come from {doc}`find`, and the
+results go into a new `PSFPHOT` table in the same file. The measured flux,
+`PSFCOUNT`, is the total flux of the star, so {doc}`phcal` can calibrate it
+with `--photometry psf`.
 
-## Synopsis
+## Usage
 
 ```bash
 munipack psfphot [options] file(s)
 ```
 
-Run [`find`](find.md) first. Running [`aphot`](aphot.md) as well is recommended,
+Run {doc}`find` first. Running {doc}`aphot` as well is recommended,
 because `psfphot` takes the sky annulus and the starting sky from it; without
 it, a default annulus just outside the fitting radius is used. The gain, read
 noise and saturation level are read from the FITS header (`GAIN`, `READNS` or
@@ -27,8 +28,8 @@ noise and saturation level are read from the FITS header (`GAIN`, `READNS` or
   the Moffat β) is fitted on bright, isolated stars unless you give it. Add
   `--elliptic` for stars that are not round.
 - **`FILE`**: a PSF file that can change over the field, in the same format
-  that [`artificial`](artificial.md) `--psf-file` reads. This is the natural
-  choice when you have a model of your optics.
+  that {doc}`artificial` `--psf-file` reads (see {ref}`psf-files`). This is
+  the natural choice when you have a model of your optics.
 - **`EMPIRICAL`**: the PSF is built from the stars of the frame itself, as an
   analytic core plus a table of corrections. It can vary over the field
   (`--psf-var`, `--psf-var-radial`). If you also give `--psf-file`, the file is

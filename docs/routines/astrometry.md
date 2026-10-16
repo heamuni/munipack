@@ -1,7 +1,8 @@
-# astrometry — astrometric calibration
+# astrometry
 
-`astrometry` finds the WCS of a frame, so that every pixel gets a sky
-position. It pairs the stars detected on the frame with a reference
+`astrometry` finds the WCS of a frame, so that every pixel gets a sky position.
+
+It pairs the stars detected on the frame with a reference
 catalogue (or an already calibrated frame), fits a projection to those
 pairs, and writes the result into the primary header. The image data are
 not changed.
@@ -10,7 +11,7 @@ If the header already has a rough WCS, or you know where the telescope
 pointed, the match uses that and is fast. Otherwise it searches blindly.
 Each solution is checked against chance coincidences before it is saved.
 
-## Synopsis
+## Usage
 
 ```bash
 munipack astrometry [options] file(s)
@@ -22,10 +23,10 @@ name as one quoted argument, or write into a directory with `-t`. A list of
 files can be read with `@list.txt`, or from standard input with `-`. If one
 frame fails, the others are still processed and the exit status is 1.
 
-**Before you start**, run [`find`](find.md) (required) and
-[`aphot`](aphot.md) (strongly recommended) on the frame, and get a reference catalogue, for example with
-[`cone`](catalogues.md). `astrometry` uses the photometry to pick the
-brightest stars and to weight the fit. There is no default catalogue, so a
+**Before you start**, run {doc}`find` (required) and
+{doc}`aphot` (strongly recommended) on the frame, and get a reference
+catalogue, for example with {doc}`cone`. `astrometry` uses the photometry
+to pick the brightest stars and to weight the fit. There is no default catalogue, so a
 reference (`-c`, `-r` or `-R`) is always needed, except in `manual` mode.
 
 ## Modes
@@ -125,28 +126,6 @@ These tune how far the header WCS or your pointing may be off.
 | `--verbose` | off | Print details of the match and the fit. |
 | `-h`, `--help` | — | Show help and exit. |
 
-## Tips
-
-**Catalogue size.** If the pointing is known, a cone larger than the frame
-is fine, since only stars near the frame are used. For a blind match, make
-the cone just a bit larger than the field of view (radius about 0.8 × the
-frame side for a square frame).
-
-**Magnitudes.** Choose a catalogue magnitude range that matches the stars
-that are well exposed but not saturated on your frame, using
-`cone --magmin/--magmax` or a FITSIO filter.
-
-**Crowded fields and few stars.** At least five stars must be paired; seven
-or more is safer, so raise `--minmatch` to 7 on crowded fields. With few stars, a tight `--wcs-offset` helps, because a smaller
-search is less likely to be fooled by chance alignments.
-
-**Distortion.** `-p TPV` fits a polynomial distortion on top of the
-gnomonic projection. It needs plenty of stars: with 25 matched stars or
-fewer it falls back to `TAN` with a warning.
-
-**Speed.** The blind match runs in parallel threads; set the number with
-`OMP_NUM_THREADS`.
-
 ## Output
 
 The WCS is written to the primary header (`CTYPE`, `CRVAL`, `CRPIX`, `CD`,
@@ -182,6 +161,29 @@ munipack astrometry -m manual --rcen 30 --dcen 60 --xcen 300 --ycen 300 \
     --scale 3600 --angle 20 frame.fits
 munipack astrometry --remove frame.fits
 ```
+
+## Notes
+
+**Catalogue size.** If the pointing is known, a cone larger than the frame
+is fine, since only stars near the frame are used. For a blind match, make
+the cone just a bit larger than the field of view (radius about 0.8 × the
+frame side for a square frame).
+
+**Magnitudes.** Choose a catalogue magnitude range that matches the stars
+that are well exposed but not saturated on your frame, using
+`cone --magmin/--magmax` or a FITSIO filter.
+
+**Crowded fields and few stars.** At least five stars must be paired; seven
+or more is safer, so raise `--minmatch` to 7 on crowded fields. With few
+stars, a tight `--wcs-offset` helps, because a smaller search is less
+likely to be fooled by chance alignments.
+
+**Distortion.** `-p TPV` fits a polynomial distortion on top of the
+gnomonic projection. It needs plenty of stars: with 25 matched stars or
+fewer it falls back to `TAN` with a warning.
+
+**Speed.** The blind match runs in parallel threads; set the number with
+`OMP_NUM_THREADS`.
 
 ```{note}
 In `manual` mode, always give `--xcen` and `--ycen`. Without them the

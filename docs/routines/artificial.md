@@ -1,15 +1,16 @@
-# artificial — simulated frames
+# artificial
 
-`artificial` makes realistic synthetic images of the sky. Use it to test a
-reduction pipeline, or to see how an observing effect behaves when you know the
-true answer. Stars (from a catalogue or a random field), galaxies, a variable
-star and the sky are seen through a model telescope, PSF and detector, with
-noise, cosmic rays and, optionally, the atmosphere.
+`artificial` makes realistic synthetic images of the sky.
+
+Use it to test a reduction pipeline, or to see how an observing effect behaves
+when you know the true answer. Stars (from a catalogue or a random field),
+galaxies, a variable star and the sky are seen through a model telescope, PSF
+and detector, with noise, cosmic rays and, optionally, the atmosphere.
 
 Every frame carries a WCS, the PSF it was rendered with, and a table of the
 true star positions and fluxes, so you can compare your results with the truth.
 
-## Synopsis
+## Usage
 
 ```bash
 munipack artificial [options]
@@ -140,6 +141,13 @@ A variable star is added when you give one of `--lc-model`, `--lc-table` or
 | `--verbose` | off | Print parameters and progress. |
 | `-h`, `--help` | — | Show help. |
 
+## Output
+
+Each file holds the image (in ADU) and two extensions: `PSF`, the PSF used
+(not written with `--psf-file`), and `CATALOGUE`, the true `X`, `Y` and `COUNT`
+(electrons, before the gain) of every star, with the variable first. The header records the
+exposure, the detector settings, the WCS and, with `--atmosphere`, the airmass.
+
 ## Examples
 
 A reproducible random field on a 16-bit CCD-like detector:
@@ -170,13 +178,6 @@ munipack artificial --lc-model Algol --lc-mag 12 --lc-per 2.867 \
     --atmosphere --long 16.6 --lat 49.2 --date 2023-02-24 --time 20:00:00 \
     --count 36 --timestep 300 --mask 'algol_??.fits'
 ```
-
-## Output
-
-Each file holds the image (in ADU) and two extensions: `PSF`, the PSF used
-(not written with `--psf-file`), and `CATALOGUE`, the true `X`, `Y` and `COUNT`
-(electrons, before the gain) of every star, with the variable first. The header records the
-exposure, the detector settings, the WCS and, with `--atmosphere`, the airmass.
 
 (psf-files)=
 ## PSF files

@@ -1,34 +1,33 @@
-# kombine, colouring — stacking, mosaics and colour frames
+# kombine
 
-## kombine
+`kombine` combines astrometrically calibrated frames into one image: a deep
+stack of a series, a mosaic of several fields, or one frame resampled onto a
+new grid.
 
-`kombine` combines astrometrically calibrated frames into one image. Use it
-for a deep stack of a series, a mosaic of several fields, or to resample a
-frame onto a new grid. Each frame is reprojected through its own WCS onto the
-output grid and the frames are averaged pixel by pixel.
+Each frame is reprojected through its own WCS onto the output grid and the
+frames are averaged pixel by pixel. By default the average is a mean clipped
+by the noise model of the frames, so cosmic rays, hot pixels and satellite
+trails are rejected. The stored image is N × the mean of N frames, which for
+equal exposures is simply their sum. The background of each frame is
+subtracted first.
 
-By default the average is a mean clipped by the noise model of the frames, so
-cosmic rays, hot pixels and satellite trails are rejected. The stored image is
-N × the mean of N frames, which for equal exposures is simply their sum. The
-background of each frame is subtracted first.
-
-### Synopsis
+## Usage
 
 ```bash
 munipack kombine [options] file(s)
 ```
 
-The inputs must be 2-D frames with a WCS, for example from
-[`astrometry`](astrometry.md). Frames without one are skipped with an error
-message and the rest are still combined. If you want to do photometry on the
-result, calibrate the inputs with `phcorr` first.
+The inputs must be 2-D frames with a WCS, for example from {doc}`astrometry`.
+Frames without one are skipped with an error message and the rest are still
+combined. If you want to do photometry on the result, calibrate the inputs
+with {doc}`phcorr` first.
 
-### Options
+## Options
 
 Any grid parameter you leave out is taken from the first input frame. Options
 listed as a pair work only when both are given.
 
-#### Output grid
+### Output grid
 
 | Option | Argument | Default | Description |
 |---|---|---|---|
@@ -40,14 +39,14 @@ listed as a pair work only when both are given.
 | `--angle` | real [deg] | first frame's rotation | Position angle; `0` puts north up. |
 | `--reflex` | `yes` \| `no` | first frame's | Mirror the output or not. |
 
-#### Moving targets
+### Moving targets
 
 | Option | Argument | Default | Description |
 |---|---|---|---|
 | `--pm-ra`, `--pm-dec` | real [deg/day] | 0, 0 | Motion of the target, so that it stays sharp and the stars trail. Give both. |
 | `--pm-jdref` | real [JD] | mid-exposure of the first frame | Time at which the target position is taken. |
 
-#### Resampling and averaging
+### Resampling and averaging
 
 | Option | Argument | Default | Description |
 |---|---|---|---|
@@ -57,7 +56,7 @@ listed as a pair work only when both are given.
 | `--arith` | — | off | Plain exposure-weighted mean: no rejection, much less memory. |
 | `--hampel` | — | off | The older Hampel robust mean, for reproducing old results. |
 
-#### Output and general
+### Output and general
 
 | Option | Argument | Default | Description |
 |---|---|---|---|
@@ -72,7 +71,7 @@ output often do not fit, and `kombine` then stops without writing anything.
 ```
 
 (kombine-resampling)=
-### Resampling
+## Resampling
 
 - `near` (the default) is the fastest and keeps output pixels independent,
   but undersampled frames may look a little blocky.
@@ -89,7 +88,7 @@ the same, while star fluxes change with the pixel area. Halving the scale
 (2″ pixels instead of 1″) makes star fluxes four times smaller. Use
 `--flux-conserve` when you need total fluxes for photometry.
 
-### Output
+## Output
 
 One FITS file with three HDUs:
 
@@ -101,7 +100,7 @@ One FITS file with three HDUs:
 - **MAXDEV**: the largest deviation of each pixel's values from the mean, in
   units of σ; handy for spotting outliers. Not written with `--arith`.
 
-### Examples
+## Examples
 
 Stack a series onto the grid of the first frame:
 
@@ -124,7 +123,7 @@ Follow a comet moving 0.4°/day in RA and −0.01°/day in Dec:
 munipack kombine --pm-ra 0.4 --pm-dec -0.01 -o comet.fits comet_*.fits
 ```
 
-### Notes
+## Notes
 
 - The default and `--hampel` keep every reprojected frame in memory (about
   400 MB for 100 frames of 1000 × 1000 pixels). For very large sets of frames
@@ -137,69 +136,5 @@ munipack kombine --pm-ra 0.4 --pm-dec -0.01 -o comet.fits comet_*.fits
 - To find the scale of a frame, read its CD matrix
   (`munipack fits -K CD1_1,CD1_2 frame.fits`); the scale in pix/deg is
   1/√(CD1_1² + CD1_2²).
-
-## colouring
-
-`colouring` makes a colour image from frames taken through standard filters,
-typically Johnson B, V and R. It transforms them into a colour space such as
-CIE 1931 XYZ, so the result approximates natural colours. The output is a
-3-D FITS cube with one plane per band.
-
-All bands must be on the same pixel grid. Resample them with `kombine` first,
-using the same `--rcen`, `--dcen`, `--width`, `--height`, `--scale`, `--angle`
-and `--reflex` for each band.
-
-### Synopsis
-
-```bash
-munipack colouring [options] files
-```
-
-List the frames from short to long wavelength (B, V, R).
-
-For correct colours the bands need a white balance. Calibrated frames, or
-ctph values given with `-q`, give absolute intensities. Otherwise give
-weights (`-w`), a white spot or a white star; without any of them
-`colouring` warns that the colours are not balanced.
-
-### Options
-
-Lists are comma-separated, with one item per input file (use semicolons if
-your locale uses a decimal comma).
-
-| Option | Argument | Default | Description |
-|---|---|---|---|
-| `-c`, `--cspace-input` | name | guessed from FILTER | Input colour space, e.g. `'Johnson BVR'`. |
-| `--cspace-output` | name | `'CIE 1931 XYZ'` | Output colour space. |
-| `--list` | — | — | List the available colour-space transformations and exit. |
-| `--ctable` | file | installed `ctable.dat` | Colour-transformation definitions. |
-| `--phsystab` | file | installed `photosystems.fits` | Photometric systems table. |
-| `-w`, `--weights` | `w1,w2,…` | — | Weights of the bands. |
-| `-q`, `--ctphs` | `ctph1,ctph2,…` | from calibrated frames | ctph of each band, for calibrated output. |
-| `-b`, `--backs` | `b1,b2,…` | estimated | Background level of each band. |
-| `--disable-back` | — | off | Do not estimate or subtract backgrounds. |
-| `--white-spot` | `x,y` [pix] | — | Centre of a region that should come out white. |
-| `--white-star` | `x,y` [pix] | — | Centre of a star taken as white (B − V = 0). |
-| `--white-radius` | real [pix] | 7 | Radius of the white spot or star. |
-| `-o`, `--output` | file | `colour.fits` | Output file (overwritten if it exists). |
-| `-B`, `--bitpix` | `-32`, `32`, `16`, `8` | `-32` | Data type of the output. |
-| `--verbose` | — | off | Print the guessed colour space and progress. |
-| `-h`, `--help` | — | — | Show the help and exit. |
-
-The input colour space is guessed only for three frames with FILTER exactly
-`B`, `V`, `R` (or `X`, `Y`, `Z`); other sets need `-c`.
-
-### Examples
-
-Turn B, V, R frames on a common grid into a colour image:
-
-```bash
-munipack colouring -o m27.fits m27_B.fits m27_V.fits m27_R.fits
-```
-
-Balance uncalibrated frames on a white star at pixel (512, 488):
-
-```bash
-munipack colouring --white-star 512,488 --white-radius 5 -o m27.fits \
-    m27_B.fits m27_V.fits m27_R.fits
-```
+- To make a colour image, resample each band with `kombine` onto the same
+  grid and pass the results to {doc}`colouring`.

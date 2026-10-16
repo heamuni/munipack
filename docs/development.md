@@ -58,9 +58,10 @@ mark on the commit or pull request. How the runner is set up is in
 
 ## Updating the documentation
 
-The reference pages follow `munipack <action> --help`. When you change an
-option, update the help text in the source and the reference page together;
-if the behaviour changes, also add a note to BUGS.md and {doc}`changes`.
+The routine pages in `docs/routines/` follow `munipack <action> --help`. When
+you change an option, update the help text in the source and the routine page
+together; if the behaviour changes, also add a note to BUGS.md and
+{doc}`changes`.
 
 ## Licence
 

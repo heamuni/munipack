@@ -117,4 +117,4 @@ Any FITS reader works too, such as TOPCAT or `astropy.io.fits`. Re-running an ac
 
 - [Concepts](concepts.md): files and extensions, units, errors and the PSF file format.
 - [Accuracy and validation](validation.md): what accuracy to expect from each method.
-- The reference pages list every option: [artificial](reference/artificial.md), [find](reference/find.md), [aphot](reference/aphot.md), [psfphot](reference/psfphot.md), [gphot](reference/gphot.md), [astrometry](reference/astrometry.md), [phcal](reference/phcal.md), [catalogues](reference/catalogues.md), [preprocessing](reference/preprocessing.md), [kombine](reference/kombine.md), [utilities](reference/utilities.md).
+- Each routine has its own page with every option, for example [artificial](routines/artificial.md), [find](routines/find.md), [aphot](routines/aphot.md), [psfphot](routines/psfphot.md), [gphot](routines/gphot.md), [astrometry](routines/astrometry.md), [phcal](routines/phcal.md), [cone](routines/cone.md), [phcorr](routines/phcorr.md), [kombine](routines/kombine.md), [fits](routines/fits.md); the full list is in the sidebar under Routines.

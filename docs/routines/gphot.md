@@ -1,24 +1,25 @@
-# gphot — growth-curve photometry
+# gphot
 
-`gphot` measures the total flux of every star in a frame. It builds a growth
-curve (the fraction of a star's light inside each aperture) from the bright,
-isolated stars, then uses it to estimate the total flux of all stars.
+`gphot` measures the total flux of every star in a frame from a growth curve.
 
-Use it when you want accurate total fluxes across a wide range of brightness.
-Faint stars get small, low-noise apertures and bright stars get large ones,
-all corrected to the same total. `phcal` then calibrates the result; it
-picks these fluxes by default when the frame has them (`--photometry grow`).
+The growth curve (the fraction of a star's light inside each aperture) is
+built from the bright, isolated stars and then used to estimate the total
+flux of all stars. Faint stars get small, low-noise apertures and bright
+stars get large ones, all corrected to the same total, so the fluxes stay
+accurate across a wide range of brightness. {doc}`phcal` then calibrates the
+result; it picks these fluxes by default when the frame has them
+(`--photometry grow`).
 
-## Synopsis
+## Usage
 
 ```bash
 munipack gphot [options] file(s)
 ```
 
-Run `find` and `aphot` first. `aphot` should use many apertures, from about
-1 FWHM out to several FWHM, all inside the sky ring, so the curve can reach
-its plateau. `gphot` needs at least 3 bright isolated stars and stops with
-an error if it finds fewer.
+Run {doc}`find` and {doc}`aphot` first. `aphot` should use many apertures,
+from about 1 FWHM out to several FWHM, all inside the sky ring, so the curve
+can reach its plateau. `gphot` needs at least 3 bright isolated stars and
+stops with an error if it finds fewer.
 
 By default the input file is updated in place. Use `-t` to write into another
 directory, or give input and output as one quoted argument separated by a
@@ -55,18 +56,11 @@ work.
 
 - **`GROWPHOT`**, one row per star: position `X`, `Y`, `SKY`, `SKYERR`, the
   total flux `GCOUNT` [ADU] with its error `GCOUNTERR`, and `GROWFLAG`
-  (1 for stars used to build the curve, 0 otherwise). Stars without a valid flux have
-  `GCOUNT = GCOUNTERR = -1`. The header records the curve's `HWHM`, the
-  90%-flux radius `RADFLX90`, and `EE*` keys describing the fit.
+  (1 for stars used to build the curve, 0 otherwise). Stars without a valid
+  flux have `GCOUNT = GCOUNTERR = -1`. The header records the curve's `HWHM`,
+  the 90%-flux radius `RADFLX90`, and `EE*` keys describing the fit.
 - **`GROWCURVE`**, one row per aperture: radius `R`, the growth curve
   `GROWCURVE` with its error, and the radial profile `RADIALPROFILE`.
-
-```{note}
-GCOUNT is the flux inside the largest (plateau) apertures, not an
-extrapolation to infinity. Light in faint, extended PSF wings is missed, but
-it is the same fraction for every star, so the photometric calibration
-absorbs it.
-```
 
 ## Examples
 
@@ -95,3 +89,11 @@ A constant growth curve, written to a new file, with the fit printed:
 ```bash
 munipack gphot --var 0 --verbose 'frame.fits frame_grow.fits'
 ```
+
+## Notes
+
+- `GCOUNT` is the flux inside the largest (plateau) apertures, not an
+  extrapolation to infinity. Light in faint, extended PSF wings is missed,
+  but it is the same fraction for every star, so the photometric calibration
+  absorbs it.
+- {doc}`psfphot` is the other way to get total fluxes.
