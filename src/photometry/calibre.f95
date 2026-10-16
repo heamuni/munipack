@@ -282,6 +282,7 @@ contains
     ! the calibration stars and their scatter.
 
     use colterm
+    use exscatter
 
     real(dbl), dimension(:,:), intent(in) :: pht,dpht,cts,dcts,col,dcol,cyc
     type(colour_term), intent(in out) :: ctm

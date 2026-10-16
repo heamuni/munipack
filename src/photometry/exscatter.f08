@@ -61,6 +61,16 @@
 !  the inliers keep their weight), and sigma is zero when the inliers do
 !  not scatter more than their errors.
 !
+!  The routine mixture_fit is the same likelihood for a polynomial,
+!  y = beta(0) + beta(1) x + beta(2) x**2 (of the order 0, 1, 2; the colour
+!  terms of the calibration, colterm.f08): the mean is replaced by
+!  the weighted least squares with the weights q/v + (1-q)/(v + B**2),
+!  the leverage by h(i) = u(i) x(i)' (X' U X)**(-1) x(i), the start of
+!  the slope by the median of the slopes of pairs (Theil-Sen). The error
+!  of x(i), ex(i), enters by the effective variance, e(i)**2 + g'**2 ex**2
+!  - 2 g' cov(y,x) (g' the slope of the polynomial at x(i)). The covariance
+!  of beta is (X' U X)**(-1). mixture_mean is mixture_fit of the order 0.
+!
 
 module exscatter
 
@@ -71,7 +81,7 @@ module exscatter
 
   integer, parameter, private :: dbl = REAL64
 
-  public :: excess_scatter, mixture_mean
+  public :: excess_scatter, mixture_mean, mixture_fit
 
 contains
 
@@ -165,35 +175,123 @@ contains
     real(dbl), dimension(:), intent(out), optional :: member
     real(dbl), intent(in), optional :: bmin
 
+    real(dbl), dimension(size(y)) :: x0
+    real(dbl), dimension(0:2) :: beta
+    real(dbl), dimension(3,3) :: cov
+
+    x0 = 0
+    call mixfit(y,err,x0,x0,x0,0,-1.0_dbl,beta,cov,sigma,fout,member,bmin,dmu)
+    mu = beta(0)
+
+  end subroutine mixture_mean
+
+
+  subroutine mixture_fit(y,e,x,ex,cxy,order,fixsig,beta,cov,sigma,fout,member,bmin)
+
+    ! The polynomial y = beta(0) + beta(1) x + beta(2) x**2
+    ! (beta(order+1:) = 0) with the excess scatter sigma by the likelihood
+    ! of a mixture (see above). y = ln(ph/ct), e its error, x the colour
+    ! minus a reference (centred for the numerics), ex the error of
+    ! the colour, cxy the covariance of y and x, fixsig < 0: sigma by
+    ! the restricted likelihood, >= 0: sigma fixed at the value; cov
+    ! the covariance of beta, fout the fraction of outliers, member
+    ! (optional) the probabilities of the stars to be calibration stars
+    ! (0 for e <= 0), bmin (optional) the smallest width B of
+    ! the distribution of outliers. A value is used when e > 0, ex >= 0
+    ! and y, x finite.
+
+    real(dbl), dimension(:), intent(in) :: y, e, x, ex, cxy
+    integer, intent(in) :: order
+    real(dbl), intent(in) :: fixsig
+    real(dbl), dimension(0:2), intent(out) :: beta
+    real(dbl), dimension(3,3), intent(out) :: cov
+    real(dbl), intent(out) :: sigma, fout
+    real(dbl), dimension(:), intent(out), optional :: member
+    real(dbl), intent(in), optional :: bmin
+
+    call mixfit(y,e,x,ex,cxy,order,fixsig,beta,cov,sigma,fout,member,bmin)
+
+  end subroutine mixture_fit
+
+
+  subroutine mixfit(y,e,x,ex,cxy,order,fixsig,beta,cov,sigma,fout,member,bmin, &
+       dbeta0)
+
+    ! The implementation of mixture_fit and mixture_mean; dbeta0
+    ! (optional) is the error of beta(0). For the order 0 (the mean),
+    ! the weighted mean and its error are computed directly (not by
+    ! the inverse of a 1x1 matrix).
+
+    real(dbl), dimension(:), intent(in) :: y, e, x, ex, cxy
+    integer, intent(in) :: order
+    real(dbl), intent(in) :: fixsig
+    real(dbl), dimension(0:2), intent(out) :: beta
+    real(dbl), dimension(3,3), intent(out) :: cov
+    real(dbl), intent(out) :: sigma, fout
+    real(dbl), dimension(:), intent(out), optional :: member
+    real(dbl), intent(in), optional :: bmin
+    real(dbl), intent(out), optional :: dbeta0
+
     real(dbl), parameter :: q50 = 0.6744897501960817_dbl
     real(dbl), parameter :: fmax = 0.5_dbl, tol = 1e-10_dbl
     ! 1 mag in the natural logarithm of flux
     real(dbl), parameter :: bmag = 0.4_dbl*2.302585092994046_dbl
-    real(dbl), dimension(:), allocatable :: x, e2, r, q, v, w, a
+    real(dbl), dimension(:), allocatable :: yy, e0, xx, ex2, cc, e2, r, q, v, w
+    real(dbl), dimension(:,:), allocatable :: xm
     logical, dimension(size(y)) :: mask
-    real(dbl) :: vb, vbmin, smax, f, mu1, sig1, f1, emin, e2med, sq
-    integer :: n, iter, m
+    real(dbl), dimension(3) :: th, th1
+    real(dbl), dimension(3,3) :: ainv
+    real(dbl) :: vb, vbmin, smax, f, sig1, f1, emin, e2med, sq, xs
+    integer :: n, p, iter, k
+    logical :: conv
 
-    mu = 0
-    dmu = 0
-    sigma = 0
+    beta = 0
+    cov = 0
+    sigma = max(fixsig,0.0_dbl)
     fout = 0
     if( present(member) ) member = 0
+    if( present(dbeta0) ) dbeta0 = 0
 
-    mask = err > 0 .and. abs(y) < huge(y)
+    mask = e > 0 .and. ex >= 0 .and. abs(y) < huge(y) .and. abs(x) < huge(x)
     n = count(mask)
     if( n == 0 ) return
 
-    x = pack(y,mask)
-    e2 = pack(err,mask)**2
-    allocate(r(n),q(n),v(n),w(n))
-    q = 1
+    yy = pack(y,mask)
+    e0 = pack(e,mask)
+    xx = pack(x,mask)
+    ex2 = pack(ex,mask)**2
+    cc = pack(cxy,mask)
+    allocate(e2(n),r(n),q(n),v(n),w(n))
 
-    if( n < 3 ) then
-       ! too few values for the scatter: the weighted mean
-       w = 1 / e2
-       mu = sum(w*x) / sum(w)
-       dmu = 1 / sqrt(sum(w))
+    ! the order is limited by the stars and by the range of the colours
+    p = min(order,2) + 1
+    p = max(min(p,n),1)
+    xs = maxval(abs(xx))
+    if( .not. (maxval(xx) - minval(xx) > 1e-6_dbl*max(xs,1.0_dbl)) ) p = 1
+    if( p == 1 ) xs = 1
+    xs = max(xs,epsilon(xs))
+
+    allocate(xm(n,3))
+    xm(:,1) = 1
+    xm(:,2) = xx
+    xm(:,3) = xx**2
+
+    q = 1
+    th = 0
+
+    if( n < p + 2 ) then
+       ! too few stars for the scatter and outliers: the weighted fit
+       call effvar(th)
+       v = e2 + sigma**2
+       w = 1 / v
+       call wls(w,th,ainv)
+       call effvar(th)
+       v = e2 + sigma**2
+       w = 1 / v
+       call wls(w,th,ainv)
+       beta(0:p-1) = th(1:p)
+       cov(1:p,1:p) = ainv(1:p,1:p)
+       if( present(dbeta0) ) dbeta0 = 1 / sqrt(sum(w))
        if( present(member) ) member = merge(1.0_dbl,0.0_dbl,mask)
        return
     end if
@@ -201,42 +299,40 @@ contains
     vb = bmag**2
     vbmin = (0.1_dbl*bmag)**2
     if( present(bmin) ) vbmin = bmin**2
-    emin = sqrt(minval(e2))
-    a = e2
-    call sort(a)
-    if( mod(n,2) == 1 ) then
-       e2med = a(n/2+1)
-    else
-       e2med = (a(n/2) + a(n/2+1)) / 2
-    end if
 
-    ! the robust start: the median and the scatter by the median
-    ! of |r|/sqrt(err**2 + sigma**2), equal to the one of N(0,1)
-    a = x
-    call sort(a)
-    m = size(a)
-    if( mod(m,2) == 1 ) then
-       mu = a(m/2+1)
-    else
-       mu = (a(m/2) + a(m/2+1)) / 2
-    end if
-    r = x - mu
+    ! the robust start: the slope by the median of the slopes of pairs,
+    ! the intercept by the median, the scatter by the median absolute
+    ! deviation of the normalised residuals
+    th = 0
+    if( p >= 2 ) th(2) = theilsen(xx,yy)
+    th(1) = median(yy - th(2)*xx)
+    call effvar(th)
+    e2med = median(e2)
+    emin = sqrt(minval(e2))
+    r = yy - matmul(xm(:,1:p),th(1:p))
     smax = 10*maxval(abs(r)) + tiny(smax)
-    if( madnorm(0.0_dbl) > q50 ) sigma = bisect(madfun,0.0_dbl,smax)
+    if( fixsig < 0 ) then
+       sigma = 0
+       if( madnorm(0.0_dbl) > q50 ) sigma = bisect(madfun,0.0_dbl,smax)
+    end if
     f = 0.1_dbl
 
     do iter = 1, 1000
 
-       ! E-step: the probabilities of inliers
-       call estep(mu,sigma,f)
+       ! the effective variances by the current slope, E-step
+       call effvar(th)
+       call estep(th,sigma,f)
 
-       ! M-step: mu, sigma (REML), f
+       ! M-step: beta, sigma (REML), f
        v = e2 + sigma**2
        w = q/v + (1 - q)/(v + vb)
-       mu1 = sum(w*x) / sum(w)
-       r = x - mu1
+       th1 = th
+       call wls(w,th1,ainv)
+       r = yy - matmul(xm(:,1:p),th1(1:p))
        smax = 10*maxval(abs(r)) + tiny(smax)
-       if( remlfun(0.0_dbl) > 0 ) then
+       if( fixsig >= 0 ) then
+          sig1 = fixsig
+       else if( remlfun(0.0_dbl) > 0 ) then
           sig1 = bisect(remlfun,0.0_dbl,smax)
        else
           sig1 = 0
@@ -247,33 +343,52 @@ contains
             vb = max(sum((1 - q)*(r**2 - e2 - sig1**2))/sq, &
             9*(e2med + sig1**2), vbmin)
 
-       if( abs(mu1 - mu) <= tol*emin .and. abs(sig1 - sigma) <= tol*emin &
-            .and. abs(f1 - f) <= tol ) exit
-       mu = mu1
+       conv = abs(sig1 - sigma) <= tol*emin .and. abs(f1 - f) <= tol
+       do k = 1, p
+          conv = conv .and. abs(th1(k) - th(k))*xs**(k-1) <= tol*emin
+       end do
+       th = th1
        sigma = sig1
        f = f1
+       if( conv ) exit
     end do
-    mu = mu1
-    sigma = sig1
-    fout = f1
+    fout = f
 
-    call estep(mu,sigma,fout)
+    call effvar(th)
+    call estep(th,sigma,fout)
     w = q / (e2 + sigma**2)
-    if( sum(w) > 0 ) then
-       dmu = 1 / sqrt(sum(w))
-    else
-       dmu = 1 / sqrt(sum(1/(e2 + sigma**2)))
-    end if
+    if( .not. (sum(w) > 0) ) w = 1 / (e2 + sigma**2)
+    call wls(w,th1,ainv)
+    beta(0:p-1) = th(1:p)
+    cov(1:p,1:p) = ainv(1:p,1:p)
+    if( present(dbeta0) ) dbeta0 = 1 / sqrt(sum(w))
 
     if( present(member) ) member = unpack(q,mask,0.0_dbl)
 
   contains
 
-    subroutine estep(mu,sigma,f)
-      real(dbl), intent(in) :: mu, sigma, f
+    subroutine effvar(th)
+      ! the variance of y - g(x) by the errors of y and x
+      real(dbl), dimension(3), intent(in) :: th
+      real(dbl), dimension(n) :: gp
+      if( p >= 2 ) then
+         gp = th(2)
+         if( p >= 3 ) gp = gp + 2*th(3)*xx
+      else
+         gp = 0
+      end if
+      e2 = e0**2 + gp**2*ex2 - 2*gp*cc
+      ! the covariance cannot make the variance smaller than the parts
+      ! independent of the catalogue magnitude (a numerical guard)
+      e2 = max(e2,0.01_dbl*e0**2)
+    end subroutine effvar
+
+    subroutine estep(th,sigma,f)
+      real(dbl), dimension(3), intent(in) :: th
+      real(dbl), intent(in) :: sigma, f
       real(dbl), dimension(n) :: lin, lout, den
       v = e2 + sigma**2
-      r = x - mu
+      r = yy - matmul(xm(:,1:p),th(1:p))
       lin = exp(-r**2/(2*v)) / sqrt(v)
       lout = exp(-r**2/(2*(v + vb))) / sqrt(v + vb)
       den = (1 - f)*lin + f*lout
@@ -284,16 +399,39 @@ contains
       end where
     end subroutine estep
 
+    subroutine wls(w,th,ainv)
+      ! weighted least squares: th = (X'WX)**-1 X'W y, ainv = (X'WX)**-1;
+      ! the mean directly
+      real(dbl), dimension(:), intent(in) :: w
+      real(dbl), dimension(3), intent(out) :: th
+      real(dbl), dimension(3,3), intent(out) :: ainv
+      real(dbl), dimension(3,3) :: am
+      real(dbl), dimension(3) :: b
+      real(dbl) :: sw
+      integer :: i, j
+      th = 0
+      ainv = 0
+      if( p == 1 ) then
+         sw = sum(w)
+         th(1) = sum(w*yy) / sw
+         ainv(1,1) = 1 / sw
+         return
+      end if
+      am = 0
+      b = 0
+      do i = 1, p
+         b(i) = sum(w*xm(:,i)*yy)
+         do j = 1, p
+            am(i,j) = sum(w*xm(:,i)*xm(:,j))
+         end do
+      end do
+      call syminv(am,p,ainv)
+      th(1:p) = matmul(ainv(1:p,1:p),b(1:p))
+    end subroutine wls
+
     real(dbl) function madnorm(s)
       real(dbl), intent(in) :: s
-      real(dbl), dimension(n) :: b
-      b = abs(r)/sqrt(e2 + s**2)
-      call sort(b)
-      if( mod(n,2) == 1 ) then
-         madnorm = b(n/2+1)
-      else
-         madnorm = (b(n/2) + b(n/2+1)) / 2
-      end if
+      madnorm = median(abs(r)/sqrt(e2 + s**2))
     end function madnorm
 
     real(dbl) function madfun(s)
@@ -302,21 +440,137 @@ contains
     end function madfun
 
     real(dbl) function remlfun(s)
-      ! the REML equation of the inliers (decreasing in s)
+      ! the REML equation of the calibration stars (decreasing in s),
+      ! h the leverage of the polynomial (of the mean: u/sum(u))
       real(dbl), intent(in) :: s
-      real(dbl), dimension(n) :: u, ws
+      real(dbl), dimension(n) :: u, ws, h
+      real(dbl), dimension(3,3) :: am, ai
       real(dbl) :: su
+      integer :: i, j
       ws = 1 / (e2 + s**2)
       u = q * ws
       su = sum(u)
-      if( su > 0 ) then
-         remlfun = sum(u*ws*r**2) - sum(u*(1 - u/su))
-      else
+      if( .not. (su > 0) ) then
          remlfun = -1
+         return
       end if
+      if( p == 1 ) then
+         h = u / su
+      else
+         am = 0
+         do i = 1, p
+            do j = 1, p
+               am(i,j) = sum(u*xm(:,i)*xm(:,j))
+            end do
+         end do
+         call syminv(am,p,ai)
+         do i = 1, n
+            h(i) = u(i)*dot_product(xm(i,1:p),matmul(ai(1:p,1:p),xm(i,1:p)))
+         end do
+      end if
+      remlfun = sum(u*ws*r**2) - sum(u*(1 - h))
     end function remlfun
 
-  end subroutine mixture_mean
+  end subroutine mixfit
+
+
+  subroutine syminv(a,p,ai)
+
+    ! the inverse of the symmetric positive definite matrix a(1:p,1:p)
+    ! by the Cholesky decomposition (p <= 3); ai = 0 for a singular one
+
+    real(dbl), dimension(3,3), intent(in) :: a
+    integer, intent(in) :: p
+    real(dbl), dimension(3,3), intent(out) :: ai
+
+    real(dbl), dimension(3,3) :: l, li
+    integer :: i, j, k
+    real(dbl) :: s
+
+    ai = 0
+    l = 0
+    do j = 1, p
+       s = a(j,j) - sum(l(j,1:j-1)**2)
+       if( .not. (s > 0) ) return
+       l(j,j) = sqrt(s)
+       do i = j+1, p
+          l(i,j) = (a(i,j) - sum(l(i,1:j-1)*l(j,1:j-1))) / l(j,j)
+       end do
+    end do
+    ! the inverse of the lower triangular matrix
+    li = 0
+    do j = 1, p
+       li(j,j) = 1 / l(j,j)
+       do i = j+1, p
+          s = 0
+          do k = j, i-1
+             s = s + l(i,k)*li(k,j)
+          end do
+          li(i,j) = -s / l(i,i)
+       end do
+    end do
+    ai(1:p,1:p) = matmul(transpose(li(1:p,1:p)),li(1:p,1:p))
+
+  end subroutine syminv
+
+
+  real(dbl) function theilsen(x,y)
+
+    ! the median of the slopes of the pairs of points (Theil-Sen);
+    ! for many points, the pairs of every point with a regular subset
+    ! of the others (at most about 2e6 pairs)
+
+    real(dbl), dimension(:), intent(in) :: x, y
+    real(dbl), dimension(:), allocatable :: s
+    real(dbl) :: dx, dmin
+    integer :: n, i, j, m, step
+    integer(int64) :: npairs
+
+    n = size(x)
+    npairs = int(n,int64)*(n-1)/2
+    step = int(max(1_int64,npairs/2000000_int64 + 1))
+    allocate(s(int(min(npairs,2000000_int64)) + n))
+    dmin = 1e-6_dbl*max(maxval(x) - minval(x),tiny(dmin))
+    m = 0
+    do i = 1, n - 1
+       do j = i + 1, n, step
+          dx = x(j) - x(i)
+          if( abs(dx) > dmin .and. m < size(s) ) then
+             m = m + 1
+             s(m) = (y(j) - y(i)) / dx
+          end if
+       end do
+    end do
+    if( m > 0 ) then
+       theilsen = median(s(1:m))
+    else
+       theilsen = 0
+    end if
+
+  end function theilsen
+
+
+  real(dbl) function median(x)
+
+    real(dbl), dimension(:), intent(in) :: x
+    real(dbl), dimension(:), allocatable :: a
+    integer :: n
+
+    n = size(x)
+    if( n == 0 ) then
+       median = 0
+       return
+    end if
+    allocate(a(n))
+    a = x
+    call sort(a)
+    if( mod(n,2) == 1 ) then
+       median = a(n/2+1)
+    else
+       median = (a(n/2) + a(n/2+1)) / 2
+    end if
+
+  end function median
 
 
   real(dbl) function bisect(f,a0,b0)

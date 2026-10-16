@@ -435,6 +435,7 @@ contains
     ! error, the errors of the colours propagated, outliers without weight.
 
     use colterm
+    use exscatter
     use fits_fotran
 
     type(type_phsys), intent(in) :: phsys
