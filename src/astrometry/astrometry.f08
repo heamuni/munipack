@@ -61,6 +61,11 @@ program astrometry
   character(len=FLEN_VALUE) :: key_dateobs = FITS_KEY_DATEOBS
   real(REAL64), dimension(2) :: crpix = 0.0_REAL64, crval = 0.0_REAL64
   real(REAL64) :: scale = 1.0_REAL64, angle = 0.0_REAL64, refl=1.0_REAL64
+  ! the scale prior: the relative tolerance of the scale given by --scale,
+  ! or by the astrometry calibration of a frame, for the match (0 = free)
+  real(REAL64) :: scaletol = 0.05_REAL64
+  ! copies of --scale, --angle, --reflex for the frames
+  real(REAL64) :: user_scale, user_angle, user_refl
   real(REAL64) :: sig2 = 1.0, sig1 = 1.0/3600.0, xsig = 5
   real(REAL64) :: flxmin = 10.0**(-0.5/2.5), flxmax = 10.0**(0.5/2.5)
   real(REAL64) :: manepoch
@@ -168,6 +173,10 @@ program astrometry
         else if( key == 'EPOCH' ) then
 
            read(val,*) manepoch
+
+        else if( key == 'SCALETOL' ) then
+
+           read(val,*) scaletol
 
         else if( key == 'SIG' ) then
 
@@ -309,6 +318,10 @@ program astrometry
   call co_broadcast(fangle,1)
   call co_broadcast(reflex,1)
   if( reflex ) refl = -1.0_REAL64
+  user_scale = scale
+  user_angle = angle
+  user_refl = refl
+  call co_broadcast(scaletol,1)
   call co_broadcast(sig1,1)
   call co_broadcast(sig2,1)
   call co_broadcast(flxmin,1)
@@ -517,6 +530,10 @@ contains
     real(REAL64), dimension(2) :: zcrval, dcrval, zcrpix
     real(REAL64) :: dscale = epsilon(1.0_REAL64), dangle=epsilon(1.0_REAL64), &
          a,da,b,db,s,ds, sm, epoch, rms=0.0_REAL64, zscale, zangle, zrefl
+    ! the solution (the parameters given by the user, --scale, --angle,
+    ! --reflex, are user_scale, user_angle, user_refl, unchanged
+    ! for the next frames)
+    real(REAL64) :: scale, angle, refl, scale0
     integer :: n,nmin,nskip,nattempt
     logical :: matched = .false., reliable, zwcs
     real(REAL64), dimension(2) :: crval0
@@ -524,6 +541,9 @@ contains
     integer, parameter :: maxattempt = 20
 
     success = .false.
+    scale = user_scale
+    angle = user_angle
+    refl = user_refl
     if( ptype == 'TPV' ) then
        pcode = 'TAN' ! for the base projection
     else
@@ -545,6 +565,19 @@ contains
 
     if( .not. fcrval ) crval = xcrval
     if( .not. fcrpix ) crpix = zcrpix
+
+    ! the scale prior for the match: --scale, or the astrometry
+    ! calibration of the frame, known within --scale-tol
+    scale0 = -1
+    if( scaletol > 0 .and. mode == 'MATCH' .and. rel == '' ) then
+       if( fscale ) then
+          scale0 = user_scale
+       else if( zwcs ) then
+          scale0 = zscale
+       end if
+       if( verbose .and. scale0 > 0 ) write(error_unit,'(a,f0.2,a,f0.1,a)') &
+            ' The scale prior: ',scale0,' [pix/deg] +- ',100*scaletol,'%.'
+    end if
 
     ! equatorial coordinates at current epoch
     if( IEEE_IS_NORMAL(epoch) ) then
@@ -574,7 +607,7 @@ contains
        call astromatch(minmatch,maxmatch,pcode,rec,dec,rflux,x,y,flux, &
             crval(1),crval(2),crpix(1),crpix(2), &
             id1,id2,sig1,sig2,flxmin,flxmax,fluxtest,&
-            luckymatch,verbose,matched,nskip)
+            luckymatch,verbose,matched,nskip,scale0,scaletol)
 !           write(*,'(a,f10.7)') "=MATCH> End "
 
     else if( mode == 'SEQUENCE' ) then
@@ -645,7 +678,7 @@ contains
        call astrofit(fit,ptype,pcode,rec,dec,x,y,sig2,xsig, &
             crpix(1),crpix(2),crval(1),dcrval(1),crval(2),dcrval(2),&
             scale,dscale,refl,rms,angle,dangle,pv,ares,dres,id1,id2,i1,i2, &
-            rmscheck,verbose,plog,reliable)
+            rmscheck,verbose,plog,reliable,scale0,scaletol)
 
        if( .not. reliable .and. mode == 'MATCH' .and. nattempt < maxattempt ) then
           ! try a next match, nskip is the chunk pair of the rejected one
@@ -993,6 +1026,8 @@ contains
     write(*,*) '  Minimum stars for matching: ',minmatch
     write(*,*) '  Maximum stars for matching: ',maxmatch
     write(*,*) '  Number stars for lucky matching: ',luckymatch
+    write(*,'(a,f0.3,a)') '   Relative tolerance of the scale prior: ',scaletol, &
+         ' (--scale or the WCS of the frame, 0: free)'
 
     write(*,*) '  Check fluxes: ',fluxtest
     write(*,*) '  Check RMS:    ',rmscheck

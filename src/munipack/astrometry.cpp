@@ -97,6 +97,12 @@ MuniAstrometry::MuniAstrometry(wxEvtHandler *h, const MuniCmdLineParser& cmd):
     if( cmd.Found("angle",&x) )
       Write("ANGLE = %20.15f",x);
 
+    if( cmd.Found("scale-tol",&x) )
+      Write("SCALETOL = %e",x);
+
+    if( cmd.Found("scale-free") )
+      Write("SCALETOL = 0");
+
     if( cmd.Found("reflex") )
       Write("REFLEX = T");
 

@@ -316,6 +316,10 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
 	      wxCMD_LINE_VAL_DOUBLE);
     AddOption("","dcen","center of FOV in Declination [deg]",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","scale","scale [pix/deg]",wxCMD_LINE_VAL_DOUBLE);
+    AddOption("","scale-tol","relative tolerance of the scale (--scale or "
+	      "the WCS of the frame) for the match, default 0.05 (0: free)",
+	      wxCMD_LINE_VAL_DOUBLE);
+    AddSwitch("","scale-free","match with any scale (as --scale-tol 0)");
     AddOption("","angle","rotation angle [deg], clockwise positive",
 	      wxCMD_LINE_VAL_DOUBLE);
     AddSwitch("","reflex","set reflection");

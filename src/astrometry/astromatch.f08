@@ -35,12 +35,14 @@ contains
 
   subroutine astromatch(minmatch,maxmatch,type,rec,dec,rflux,xpix,ypix,flux, &
        acen,dcen,xcen,ycen,id1,id2,sig1,sig2,flxmin,flxmax,fluxtest,luckymatch,&
-       verbose,status,nskip)
+       verbose,status,nskip,scale0,scaletol)
 
     ! nskip (optional): on input, the number of chunk pairs to skip
     ! (a match found there has been rejected by a previous attempt),
     ! on output, the number of the chunk pair providing the match,
-    ! so a next call with it continues by next chunks of stars
+    ! so a next call with it continues by next chunks of stars;
+    ! scale0, scaletol (optional): the scale prior [pix/deg] and its
+    ! relative tolerance (see match)
 
     use matcher
     use astrotrafo
@@ -54,6 +56,7 @@ contains
     integer, dimension(:), allocatable, intent(out) :: id1,id2
     logical, intent(out) :: status
     integer, intent(in out), optional :: nskip
+    real(REAL64), intent(in), optional :: scale0, scaletol
 
     real(REAL64), parameter :: rad = 57.29577951308232_REAL64
 
@@ -113,7 +116,7 @@ contains
           call match(u(l:l+n1),v(l:l+n1),rflux(l:l+n1),idx1(l:l+n1), &
                x(k:k+n2),y(k:k+n2),flux(k:k+n2),idx2(k:k+n2), &
                minmatch,maxmatch,sig1,sig2,flxmin,flxmax,fluxtest,id1,id2,&
-               luckymatch,verbose,status)
+               luckymatch,verbose,status,scale0,scaletol)
           if( status ) then
              id1 = l + id1 - 1
              id2 = k + id2 - 1

@@ -289,7 +289,8 @@ On output, the WCS calibration in the header of primary FITS is created
 <dt><samp>--ycen xxx.y</samp></dt><dd>centre of projection on chip [pix] (default: height/2)</dd>
 <dt><samp>--rcen ddd.ddd</samp></dt><dd>centre of projection in Right Ascension [deg]</dd>
 <dt><samp>--dcen ddd.ddd</samp></dt><dd>centre of projection in Declination [deg]</dd>
-<dt><samp>--scale ssss.s</samp></dt><dd>scale [deg/pix]</dd>
+<dt><samp>--scale ssss.s</samp></dt><dd>scale [pix/deg]; in the match mode,
+  the expected scale (<a href="#scaleprior">the scale prior</a>)</dd>
 <dt><samp>--angle aa.aaa</samp></dt><dd>angle of rotation [deg], clockwise positive</dd>
 <dt><samp>--reflex</samp></dt><dd>set whatever the frame is reflected</dd>
 <dt><samp>--radesys</samp></dt><dd>the reference coordinate frame (default: ICRS)</dd>
@@ -337,6 +338,20 @@ length is 3. Upper limit is given by <samp>--maxmatch</samp>.</dd>
     and <samp>--luckymatch 3</samp> indicates good match when result
     has at least 8 successful matches. The default value is 3.
 </dd>
+<dt id="scaleprior"><samp>--scale-tol x</samp></dt><dd>The scale prior:
+    the relative tolerance of the expected scale, the default is 0.05 (±5%).
+    The expected scale is given by <samp>--scale</samp> [pix/deg], or by the
+    astrometry calibration (CD or CDELT) in the header of the frame. The match
+    then skips the pairs of stars whose lengths on the frame and in the
+    catalogue do not agree with the scale (within the tolerance and the errors
+    of their positions), which makes the matching tens of times faster and
+    removes the false matches by a wrong scale; a solution with a scale out of
+    the tolerance is rejected. Zero (or a negative value) matches with any
+    scale, as before. Without <samp>--scale</samp> and without a calibration
+    in the header the scale is always free.</dd>
+<dt><samp>--scale-free</samp></dt><dd>Match with any scale, an alias for
+    <samp>--scale-tol 0</samp>: use it when the scale in the headers
+    of the frames is wrong (by more than the tolerance).</dd>
 <dt><samp>--disable-lucky-match</samp></dt><dd>
     Finish at first success match when <samp>--minmatch</samp>
     is reached. Alias for <samp>--luckymatch 0</samp>
@@ -494,7 +509,7 @@ no any checks.
 <tr><td>--dcen</td><td>Declination of centre of the projection <i>δ</i><sub>c</sub> (CRVAL2)<sup><a href="#tw">[b]</a></sup></td><td>degrees</td></tr>
 <tr><td>--xcen</td><td>Reference point on a chip <i>x</i><sub>c</sub> (CRPIX1)<sup><a href="#tw">[b]</a></sup></td><td>pixels</td></tr>
 <tr><td>--ycen</td><td>Reference point on a chip <i>y</i><sub>c</sub> (CRPIX2)<sup><a href="#tw">[b]</a></sup></td><td>pixels</td></tr>
-<tr><td>--scale</td><td>Scale of projection <i>c</i></td><td>degrees/pixel</td></tr>
+<tr><td>--scale</td><td>Scale of projection <i>c</i></td><td>pixels/degree</td></tr>
 <tr><td>--angle</td><td>Angle of rotation around centre <i>φ</i></td><td>degrees</td></tr>
 <tr><td>--reflex</td><td>Reflected frame</td><td>degrees</td></tr>
 <tr><td><samp>file</samp></td><td>a file to calibrate<sup><a href="#fl">[c]</a></sup></td><td></td></tr>

@@ -79,7 +79,12 @@ module matcher
 contains
 
   subroutine match(x1,y1,f1,index1,x2,y2,f2,index2,minmatch,maxmatch,sigma1,sigma2, &
-       flxmin,flxmax,fluxtest,id1,id2,luckymatch,verbose,status)
+       flxmin,flxmax,fluxtest,id1,id2,luckymatch,verbose,status,scale0,scaletol)
+
+    ! scale0 (optional, > 0) is an expected scale (the frame units per
+    ! the reference units: pix/deg) known within the relative tolerance
+    ! scaletol: the starting pairs of the sequences whose ratio of
+    ! lengths is far from it are skipped (the scale prior)
 
     implicit none
 
@@ -107,9 +112,10 @@ contains
     real(REAL64), intent(in) :: sigma1, sigma2, flxmin, flxmax
     logical, intent(in) :: verbose
     logical, intent(out) :: status
+    real(REAL64), intent(in), optional :: scale0, scaletol
 
     integer :: i1,i2,j1,j2,ns,ntot,n1,n2
-    real(REAL64) :: r,d1,d2
+    real(REAL64) :: r,d1,d2,s0,stol,sabs
     type(sequences) :: seq
     type(dataseq) :: ref, lst
 
@@ -146,6 +152,20 @@ contains
     seq%dtol1 = xsig * seq%sig1
     seq%dtol2 = xsig * seq%sig2
     seq%minseq = minmatch + luckymatch
+
+    ! the scale prior: the lengths of a starting pair (frame d2,
+    ! reference d1) must agree with scale0 within the relative tolerance
+    ! and the errors of both ends (Normal limit of a difference)
+    s0 = -1
+    stol = 0
+    sabs = 0
+    if( present(scale0) .and. present(scaletol) ) then
+       if( scale0 > 0 .and. scaletol > 0 ) then
+          s0 = scale0
+          stol = scaletol
+          sabs = xsig*sqrt(2.0_REAL64)*max(sigma2,scale0*sigma1)
+       end if
+    end if
 
     ns = 0
     n1 = size(x1)
@@ -199,6 +219,9 @@ contains
 
                       seq%nid = 2
                       d2 = lst%enorm(j1,j2)
+                      if( s0 > 0 ) then
+                         if( abs(d2 - s0*d1) > stol*s0*d1 + sabs ) cycle
+                      end if
                       seq%idx2 = index2
                       seq%idx2(seq%id2(1:2)) = .false.
 

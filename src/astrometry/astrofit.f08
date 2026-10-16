@@ -31,7 +31,11 @@ contains
 
   subroutine astrofit(fit,ptype,pcode,a,d,x,y,sig,xsig,xcen,ycen, &
        acen,dacen,dcen,ddcen,sc,dsc,refl,rms,rot,drot,pv,ares,dres, &
-       id1_init,id2_init,id1_final,id2_final,rmscheck,verbose,plog,reliable)
+       id1_init,id2_init,id1_final,id2_final,rmscheck,verbose,plog,reliable, &
+       scale0,scaletol)
+
+    ! scale0, scaletol (optional): the expected scale [pix/deg] and its
+    ! relative tolerance; a solution with a scale outside is rejected
 
     use robfit
     use deform
@@ -49,6 +53,7 @@ contains
     real(REAL64), dimension(:), allocatable, intent(out) :: ares, dres
     integer, dimension(:), intent(in) :: id1_init,id2_init
     integer, dimension(:), allocatable, intent(out) :: id1_final,id2_final
+    real(REAL64), intent(in), optional :: scale0, scaletol
 
     real(REAL64), dimension(:), allocatable :: alpha,delta,xstar,ystar
     integer, dimension(:), allocatable :: id1, id2
@@ -105,6 +110,7 @@ contains
     call robmin(pcode,'ROBUST',alpha,delta,refl,xstar,ystar,s,&
          acen,dacen,dcen,ddcen,sc,dsc,rot,drot,rms,verbose,reliable)
     if( .not. reliable ) return
+    if( .not. scale_prior() ) return
 
     ! select such much stars as possible for final fit
     deallocate(alpha,delta,xstar,ystar)
@@ -190,6 +196,7 @@ contains
 
        if(plog) write(*,'(a,en12.3,en13.3,f8.1,2f14.5)') &
             "=RFIT> ",rms,sc,rot,acen,dcen
+       if( .not. scale_prior() ) return
 
     else
 
@@ -262,6 +269,25 @@ contains
     deallocate(id1,id2)
 
   contains
+
+    logical function scale_prior()
+
+      ! the scale of the solution against the scale prior (if any),
+      ! a solution out of the tolerance is rejected
+
+      scale_prior = .true.
+      if( .not. (present(scale0) .and. present(scaletol)) ) return
+      if( .not. (scale0 > 0 .and. scaletol > 0) ) return
+      scale_prior = abs(sc / scale0 - 1) <= scaletol
+      if( .not. scale_prior ) then
+         if( verbose ) write(error_unit,'(a,f0.1,a,f0.1,a,f0.1,a)') &
+              '# the scale of the solution ',sc,' [pix/deg] is out of the expected ', &
+              scale0,' +- ',100*scaletol,'%, rejected.'
+         reliable = .false.
+         if( .not. allocated(id1_final) ) allocate(id1_final(0),id2_final(0))
+      end if
+
+    end function scale_prior
 
     subroutine tpvstaged
 
