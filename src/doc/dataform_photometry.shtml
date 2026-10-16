@@ -133,6 +133,37 @@ further processing.
 </table>
 </div>
 
+<p id="colterm">
+With a colour term (<a href="man_phcal.html#colterm">phcal --color-term</a>,
+or <samp>--tratab</samp> with a magnitude transformation of
+<a href="man_phfotran.html">phfotran</a>), the calibration is
+<i>m</i><sub>cat</sub> − <i>m</i><sub>inst</sub> = ZP +
+<i>k</i><sub>1</sub> (<i>c</i> − <i>c</i><sub>ref</sub>) +
+<i>k</i><sub>2</sub> (<i>c</i> − <i>c</i><sub>ref</sub>)², CTPH is
+the calibration of a star of the colour <i>c</i><sub>ref</sub>, and
+these keywords are added:
+</p>
+
+<div class="table">
+<table>
+<caption>Keywords of the colour term</caption>
+<tr><th>Keyword</th><th>Description</th><th>Units</th></tr>
+<tr><td>COLTMODE</td><td>CATALOGUE (fitted, applied by the catalogue
+    colours), TRANSFORM (the magnitude transformation of the table,
+    applied by the colours of the calibrated magnitudes)</td><td></td></tr>
+<tr><td>COLTERM</td><td>the colour <i>c</i>: A-B, the catalogue columns
+    (CATALOGUE) or the filters (TRANSFORM)</td><td></td></tr>
+<tr><td>COLTREF</td><td>the reference colour <i>c</i><sub>ref</sub></td><td>mag</td></tr>
+<tr><td>COLTK1, COLTK1E</td><td><i>k</i><sub>1</sub> and its error</td><td>mag/mag</td></tr>
+<tr><td>COLTK2, COLTK2E</td><td><i>k</i><sub>2</sub> and its error
+    (order 2 only)</td><td>mag/mag²</td></tr>
+<tr><td>COLTCOV</td><td>the correlation of CTPH and COLTK1 (CATALOGUE)</td><td></td></tr>
+<tr><td>COLTMEAN, COLTSTD</td><td>the mean colour of the calibration stars
+    and its standard deviation (CATALOGUE)</td><td>mag</td></tr>
+<tr><td>COLTNSTA</td><td>the calibration stars with a colour (CATALOGUE)</td><td></td></tr>
+</table>
+</div>
+
 <p>
 The parameters ANULLUSes an APER are directly copied from instrumental
 table and with known astrometry calibration converted to degrees.
@@ -182,6 +213,15 @@ and last the ratio of [(3) - CTPH *(4)]/(3) as an analogy of residuals.
 <tr><td>SKYERR</td><td>Statistical error of SKY</td><td>photons per square arcsec</td></tr>
 <tr><td>PHOTON</td><td>Star photon count</td><td>photons</td></tr>
 <tr><td>PHOTONERR</td><td>Statistical error of PHOTON</td><td>photons</td></tr>
+<tr><td>COLOR</td><td>the colour of the colour term (only with
+    a colour term, after the quantities)</td><td>mag</td></tr>
+<tr><td>COLORERR</td><td>its error</td><td>mag</td></tr>
+<tr><td>COLORSRC</td><td>the source of COLOR: 1 the catalogue,
+    0 none (the star is not in the catalogue or its colour is missing:
+    COLOR is the mean colour of the calibration stars, COLORERR their
+    scatter, and the mean correction of the calibration stars is applied
+    with its scatter in the errors), 2 solved from the calibrated
+    magnitudes of all filters (TRANSFORM)</td><td></td></tr>
 </table>
 </table>
 

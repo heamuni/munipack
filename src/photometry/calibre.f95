@@ -263,4 +263,166 @@ contains
   end subroutine calibr
 
 
+  subroutine calibr_colour(pht,dpht,cts,dcts,col,dcol,cyc,ctm,ctph,dctph,phres,&
+       verbose,syserr,sys)
+
+    ! The calibration of every band (column) with a colour term (colterm):
+    ! ln(ph/ct) = ln ctph + b1 (c - cref) + b2 (c - cref)**2. col are
+    ! the colours of the stars, dcol their errors (< 0: no colour, the star
+    ! is not used), cyc the covariance of ln(ph) and of the colour
+    ! (the colour contains the catalogue magnitude of the band).
+    ! ctm%model = COLT_CAT: the coefficients are fitted with ctph (of
+    ! the order ctm%order), cref is the mean colour of the calibration
+    ! stars when ctm%cref = cref_mean; COLT_TRA: the coefficients
+    ! ctm%beta(1:2,:) and ctm%cref are fixed, ctph is fitted.
+    ! syserr as in calibr (< 0: the systematic error fitted by the mixture
+    ! likelihood, >= 0: the value [mag], fixed); sys the values applied.
+    ! On output, ctm holds the coefficients, their covariance (ln ctph
+    ! included), the mean colour, the mean colour correction of
+    ! the calibration stars and their scatter.
+
+    use colterm
+
+    real(dbl), dimension(:,:), intent(in) :: pht,dpht,cts,dcts,col,dcol,cyc
+    type(colour_term), intent(in out) :: ctm
+    real(dbl), dimension(:), intent(out) :: ctph,dctph
+    type(photores), dimension(:), intent(in out) :: phres
+    logical, intent(in) :: verbose
+    real(dbl), intent(in) :: syserr
+    real(dbl), dimension(:), intent(out) :: sys
+
+    real(dbl), dimension(:), allocatable :: ct,dct,ph,dph,y,e,x,ex,cx,q,g,gp,w
+    real(dbl), dimension(0:2) :: b
+    real(dbl), dimension(3,3) :: cv, jm
+    real(dbl) :: fixsig, sig, fout, cbar, d, sw
+    integer :: n, ndat, i
+    logical, dimension(:), allocatable :: valid
+
+    ndat = size(pht,1)
+    allocate(ct(ndat),dct(ndat),ph(ndat),dph(ndat),y(ndat),e(ndat),x(ndat), &
+         ex(ndat),cx(ndat),q(ndat),g(ndat),gp(ndat),w(ndat),valid(ndat))
+
+    fixsig = -1
+    if( syserr >= 0 ) fixsig = syserr / magln
+
+    do n = 1, size(cts,2)
+
+       ct = cts(:,n)
+       dct = dcts(:,n)
+       ph = pht(:,n)
+       dph = dpht(:,n)
+       where( ph > 0 .and. dph < epsilon(dph) )
+          dph = sqrt(ph)
+       end where
+       where( ct > 0 .and. dct < epsilon(dct) )
+          dct = sqrt(ct)
+       end where
+
+       valid = ph > 0 .and. ct > 0 .and. dcol(:,n) >= 0
+       where( valid )
+          y = log(ph / ct)
+          e = sqrt((dph/ph)**2 + (dct/ct)**2)
+          ex = dcol(:,n)
+          cx = cyc(:,n)
+       elsewhere
+          y = 0
+          e = -1
+          ex = -1
+          cx = 0
+       end where
+       ctm%nstars(n) = count(valid)
+       if( ctm%nstars(n) == 0 ) stop 'No calibration star with a colour.'
+
+       if( ctm%model == COLT_CAT ) then
+
+          ! the colours centred for the numerics, then shifted to cref
+          cbar = sum(col(:,n),mask=valid) / count(valid)
+          x = col(:,n) - cbar
+          call mixture_fit(y,e,x,ex,cx,ctm%order(n),fixsig,b,cv,sig,fout,q)
+          if( ctm%cref(n) == cref_mean ) then
+             w = q / (e**2 + sig**2)
+             sw = sum(w,mask=valid)
+             if( sw > 0 ) then
+                ctm%cref(n) = sum(w*col(:,n),mask=valid) / sw
+             else
+                ctm%cref(n) = cbar
+             end if
+          end if
+          ! b(c - cbar) = b'(c - cref): d = cref - cbar
+          d = ctm%cref(n) - cbar
+          jm = 0
+          jm(1,:) = [ 1.0_dbl, d, d**2 ]
+          jm(2,:) = [ 0.0_dbl, 1.0_dbl, 2*d ]
+          jm(3,:) = [ 0.0_dbl, 0.0_dbl, 1.0_dbl ]
+          ctm%beta(:,n) = matmul(jm,b)
+          ctm%cov(:,:,n) = matmul(jm,matmul(cv,transpose(jm)))
+
+       else
+
+          ! the coefficients fixed: the zero point of y - g(c)
+          x = col(:,n) - ctm%cref(n)
+          g = ctm%beta(1,n)*x + ctm%beta(2,n)*x**2
+          gp = ctm%beta(1,n) + 2*ctm%beta(2,n)*x
+          where( valid )
+             y = y - g
+             e = sqrt(max(e**2 + gp**2*ex**2 - 2*gp*cx, 0.01_dbl*e**2))
+          end where
+          ex = 0
+          cx = 0
+          call mixture_fit(y,e,x,ex,cx,0,fixsig,b,cv,sig,fout,q)
+          ctm%beta(0,n) = b(0)
+          ! the coefficients of the table: their errors only
+          ctm%cov(1,1,n) = cv(1,1)
+
+       end if
+
+       ctph(n) = exp(ctm%beta(0,n))
+       dctph(n) = ctph(n) * sqrt(ctm%cov(1,1,n))
+       sys(n) = sig * magln
+
+       ! the mean colour and the mean correction of the calibration stars
+       x = col(:,n) - ctm%cref(n)
+       g = ctm%beta(1,n)*x + ctm%beta(2,n)*x**2
+       sw = sum(q,mask=valid)
+       if( sw > 0 ) then
+          ctm%cmean(n) = sum(q*col(:,n),mask=valid) / sw
+          ctm%cstd(n) = sqrt(sum(q*(col(:,n) - ctm%cmean(n))**2,mask=valid)/sw)
+          ctm%gmean(n) = sum(q*g,mask=valid) / sw
+          ctm%gstd(n) = sqrt(sum(q*(g - ctm%gmean(n))**2,mask=valid) / sw)
+       end if
+
+       if( verbose ) then
+          write(*,'(a,i0,a,i0,a)') ' Colour term, band ',n,' (',ctm%nstars(n), &
+               ' stars with a colour):'
+          write(*,'(a,f0.4,a,f0.4,a,f0.4)') '  reference colour: ',ctm%cref(n), &
+               ', mean colour: ',ctm%cmean(n),' +- ',ctm%cstd(n)
+          write(*,'(a,f0.5,a,f0.5,a)') '  k1 = ',-magln*ctm%beta(1,n),' +- ', &
+               magln*sqrt(max(ctm%cov(2,2,n),0.0_dbl)),' mag/mag'
+          if( ctm%order(n) >= 2 .or. ctm%beta(2,n) /= 0 ) &
+               write(*,'(a,f0.5,a,f0.5,a)') '  k2 = ',-magln*ctm%beta(2,n), &
+               ' +- ',magln*sqrt(max(ctm%cov(3,3,n),0.0_dbl)),' mag/mag**2'
+          write(*,'(a,f0.5,a,f0.3,a,1pg0.6,a,1pg0.2)') '  systematic error: ', &
+               sys(n),' mag, outlier fraction: ',fout,', calibration: ', &
+               ctph(n),' +- ',dctph(n)
+       end if
+
+       ! the residuals by the colour of the stars (the mean correction
+       ! for the stars without a colour); the counts are corrected
+       ! to the reference colour
+       do i = 1, ndat
+          if( .not. valid(i) ) g(i) = ctm%gmean(n)
+       end do
+       ct = cts(:,n) * exp(g)
+       phres(n)%pht = pht(:,n)
+       phres(n)%cts = ct
+       phres(n)%res = (pht(:,n) - ctph(n)*ct) / ((pht(:,n) + ctph(n)*ct) / 2)
+
+    end do
+
+    phres(:)%ctph = ctph
+    phres(:)%dctph = dctph
+
+  end subroutine calibr_colour
+
+
 end module calibre

@@ -64,7 +64,13 @@ program phcal
   ! < 0: estimated by the residuals of the calibration stars
   real(dbl) :: syserr = -1
   real(dbl), dimension(:), allocatable :: ctph_manual,dctph_manual
-  integer :: eq,nfile,n,nmag,nmagerr,nfilters,nctph,saper
+  ! the colour term (--color-term): the catalogue columns A,B of the colour
+  ! A - B (and of their errors), the order of the polynomial, the reference
+  ! colour (huge: the mean colour of the calibration stars)
+  character(len=FLEN_VALUE), dimension(:), allocatable :: col_color
+  integer :: color_order = 1
+  real(dbl) :: color_ref = huge(1.0_dbl)
+  integer :: eq,nfile,n,nmag,nmagerr,nfilters,nctph,saper,ncolor
   character(len=FLEN_KEYWORD), dimension(8) :: keys
   integer :: nqlabels
 
@@ -80,7 +86,7 @@ program phcal
   allocate(qlabels(nqlabels))
   qlabels = [ character(len=FLEN_VALUE) :: 'FLUX', 'MAG' ]
 
-  allocate(col_mag(0), col_magerr(0), filters(0))
+  allocate(col_mag(0), col_magerr(0), filters(0), col_color(0))
   allocate(ctph_manual(0), dctph_manual(0))
   allocate(filename(0), output(0))
   nfilters = 0
@@ -188,6 +194,29 @@ program phcal
      else if( key == 'COL_MAGERR' ) then
 
         read(val,*) col_magerr
+
+     else if( key == 'COL_NCOLOR' ) then
+
+        read(val,*) ncolor
+        if( .not. (ncolor == 2 .or. ncolor == 4) ) &
+             stop 'Error: --color-term takes two columns (A,B) or four (A,B,errA,errB).'
+        deallocate(col_color)
+        allocate(col_color(ncolor))
+        col_color = ''
+
+     else if( key == 'COL_COLOR' ) then
+
+        read(val,*) col_color
+
+     else if( key == 'COLOR_ORDER' ) then
+
+        read(val,*) color_order
+        if( color_order < 1 .or. color_order > 2 ) &
+             stop 'Error: --color-order is 1 or 2.'
+
+     else if( key == 'COLOR_REF' ) then
+
+        read(val,*) color_ref
 
      else if( key == 'TOL' ) then
 
@@ -336,6 +365,9 @@ program phcal
      if( .not. (area > 0) ) &
           stop 'Error: The specified area is negative or zero, very funny!'
 
+     if( size(col_color) > 0 .and. cat == '' ) &
+          stop 'Error: --color-term needs a reference catalogue (-c).'
+
      if( cat /= '' ) then
         call calibrate   ! catcal ?
      else if( ref /= '' ) then
@@ -349,7 +381,7 @@ program phcal
   end if
 
   deallocate(filename,output,col_mag,col_magerr,filters,ctph_manual, &
-       dctph_manual)
+       dctph_manual,col_color)
 
   stop 0
 !  write(error_unit,*) 'STOP 0'
@@ -367,20 +399,24 @@ contains
     use jamming
     use sfits
     use fits_fotran
+    use colterm
 
-    character(len=FLEN_VALUE) :: catid,photosys_instr,photsys1,photsys2
+    character(len=FLEN_VALUE) :: catid,photosys_instr,photsys1,photsys2,catid1, &
+         tmodel
     character(len=FLEN_VALUE), dimension(:), allocatable :: filter_frames, &
-         filters_tab
+         filters_tab, colmag, tcola, tcolb
     real(dbl), allocatable, dimension(:) :: refra, refdec, ctph,dctph, &
-         exptime, areas, tol, aper, sys
+         exptime, areas, tol, aper, sys, cra, cdec, ccol, dccol, &
+         tcref, tzp, tdzp, tk1, tdk1, tk2, tdk2
     real(dbl), allocatable, dimension(:,:) :: tr,tr1,trerr,tr1err,refph,drefph,&
-         cts,dcts,dn,ddn,ra,dec,mag,dmag
+         cts,dcts,dn,ddn,ra,dec,mag,dmag,cmag,cdmag,magx,dmagx,ccl,dccl,ccy
     real(dbl) :: q, d
     type(type_phsys) :: phsyscal
     type(photores), dimension(:), allocatable :: phres
+    type(colour_term) :: ctm
     integer, dimension(:,:), allocatable :: pairs
     integer, dimension(:), allocatable :: forder, perm
-    integer :: status,nfiles,ncat,i
+    integer :: status,nfiles,ncat,i,nf,ia,ib
 
     if( photsys_ref == '' ) &
          stop 'No identificator for reference photometry system.'
@@ -401,6 +437,31 @@ contains
     ! filters as results of readcat (?!)
     if( status /= 0 ) stop 'Failed to read a catalogue.'
     if( .not. allocated(mag) ) stop 'An empty catalogue.'
+
+    ! the colour term: the colour A - B of the catalogue (and its error
+    ! by the error columns, zero without them), undefined (an error < 0)
+    ! when a magnitude is missing
+    if( size(col_color) > 0 ) then
+       if( tratable /= '' ) stop &
+            'Error: --color-term and --tratab exclude each other (the table has the colours).'
+       call readcat(cat,(/col_ra,col_dec/),col_color(1:2), &
+            col_color(3:size(col_color)),cra,cdec,cmag,cdmag,catid1,status)
+       if( status /= 0 ) stop 'Failed to read the colour columns of the catalogue.'
+       allocate(ccol(size(cmag,1)),dccol(size(cmag,1)))
+       where( cmag(:,1) < 99 .and. cmag(:,2) < 99 )
+          ccol = cmag(:,1) - cmag(:,2)
+          dccol = 0
+       elsewhere
+          ccol = 0
+          dccol = -1
+       end where
+       if( size(col_color) == 4 ) then
+          where( dccol >= 0 .and. cdmag(:,1) < 9 .and. cdmag(:,2) < 9 )
+             dccol = sqrt(cdmag(:,1)**2 + cdmag(:,2)**2)
+          end where
+       end if
+       deallocate(cra,cdec,cmag,cdmag)
+    end if
 
     ! reference system
     call phselect(phsystable,photsys_ref,phsyscal)
@@ -428,6 +489,13 @@ contains
        dmag = dmag(:,perm)
     end if
     call phsyspairs(phsyscal,filters,pairs)
+    ! the catalogue columns of the frames (arranged)
+    allocate(colmag(nfiles))
+    if( nfiles > 1 ) then
+       colmag = col_mag(perm)
+    else
+       colmag = col_mag(1)
+    end if
 
     if( verbose ) then
        write(*,*) 'Filename, filter, exptime [s], area [m2]:'
@@ -446,7 +514,35 @@ contains
 
 !    write(*,*) size(mag), tol
 !    write(*,*) size(cts,1)
-    call jamcat(tol, refra, refdec, mag, dmag, ra,dec,dn,ddn,cts,dcts)
+    if( allocated(ccol) ) then
+       ! the colours of all stars of the catalogue for the outputs,
+       ! the colours of the calibration stars joint with the magnitudes
+       call colterm_init(ctm,COLT_CAT,nfiles)
+       ctm%cola = col_color(1)
+       ctm%colb = col_color(2)
+       ctm%order = color_order
+       ctm%cref = color_ref
+       ctm%ra = refra
+       ctm%dec = refdec
+       ctm%col = ccol
+       ctm%dcol = dccol
+       ctm%tol = tol(1)
+       nf = size(mag,2)
+       allocate(magx(size(mag,1),nf+2),dmagx(size(mag,1),nf+2))
+       magx(:,1:nf) = mag
+       magx(:,nf+1) = ccol
+       magx(:,nf+2) = dccol
+       dmagx(:,1:nf) = dmag
+       dmagx(:,nf+1:) = 0
+       call jamcat(tol, refra, refdec, magx, dmagx, ra,dec,dn,ddn,cts,dcts)
+       mag = magx(:,1:nf)
+       dmag = dmagx(:,1:nf)
+       ccol = magx(:,nf+1)
+       dccol = magx(:,nf+2)
+       deallocate(magx,dmagx)
+    else
+       call jamcat(tol, refra, refdec, mag, dmag, ra,dec,dn,ddn,cts,dcts)
+    end if
 
     ncat = size(cts,1)
     if( ncat == 0 ) stop 'Catalogue to frame joint stars not found.'
@@ -473,7 +569,63 @@ contains
 !       write(*,*) mag(i,1),dmag(i,1),1.086*drefph(i,1)/refph(i,1),refph(i,1)
 !    end do
 
-    if( tratable/= '' ) then
+    tmodel = ''
+    if( tratable /= '' ) then
+       call tramodel(tratable,tmodel,status)
+       if( status /= 0 ) &
+            stop 'Instrumental to standard conversion table not found.'
+    end if
+
+    if( tmodel == 'MAG' ) then
+       ! the magnitude transformation: the colour terms of every filter
+       ! (fixed) by the colours of the catalogue, the counts converted
+       ! by the colours of the calibrated magnitudes (writecal)
+       call traload_mag(tratable,photsys2,photsys1,filters_tab,tcola,tcolb, &
+            tcref,tzp,tdzp,tk1,tdk1,tk2,tdk2,status)
+       if( status /= 0 ) &
+            stop 'Instrumental to standard conversion table not found.'
+       if( photsys2 /= photsys_ref ) &
+            stop 'Reference photometry system does not match the conversion table.'
+       if( photsys_instr /= '' ) photosys_instr = photsys_instr
+       if( photsys1 /= photosys_instr ) then
+          write(error_unit,*) "Instrumental photometry systems: `", &
+               trim(photsys1),"' (table), `",trim(photosys_instr),"' (frames)."
+          stop 'Instrumental photometry system does not match the conversion table.'
+       end if
+       if( size(filters_tab) /= size(filters) ) &
+            stop "Amount of filters doesn't correspons to transformation table."
+       if( any(filters_tab /= filters) ) then
+          write(error_unit,*) 'Filters of the table: ', &
+               (trim(filters_tab(i))//' ',i=1,size(filters_tab))
+          stop 'Filters do not match the conversion table.'
+       end if
+       call colterm_init(ctm,COLT_TRA,nfiles)
+       do n = 1, nfiles
+          ia = findloc(filters,tcola(n),1)
+          ib = findloc(filters,tcolb(n),1)
+          if( ia == 0 .or. ib == 0 ) &
+               stop 'Filters of the colours of the conversion table not found.'
+          ctm%ia(n) = ia
+          ctm%ib(n) = ib
+          ctm%cola(n) = tcola(n)
+          ctm%colb(n) = tcolb(n)
+          ctm%cref(n) = tcref(n)
+          ctm%beta(1,n) = -tk1(n) / magln
+          ctm%beta(2,n) = -tk2(n) / magln
+          ctm%cov(2,2,n) = (tdk1(n) / magln)**2
+          ctm%cov(3,3,n) = (tdk2(n) / magln)**2
+          ctm%order(n) = merge(2,1,tk2(n) /= 0)
+       end do
+       ctm%tol = tol(1)
+       deallocate(filters_tab,tcola,tcolb,tcref,tzp,tdzp,tk1,tdk1,tk2,tdk2)
+       allocate(tr(size(refph,2),size(refph,2)),tr1(size(refph,2),size(refph,2)), &
+            trerr(size(refph,2),size(refph,2)),tr1err(size(refph,2),size(refph,2)))
+       tr = 0.0_dbl
+       forall(n=1:size(refph,2))
+          tr(n,n) = 1.0_dbl
+       end forall
+       tr1 = tr
+    else if( tratable/= '' ) then
        call traload(tratable,photsys2,photsys1,tr,trerr,tr1,tr1err,status, &
             filters_tab)
        if( status /= 0 ) &
@@ -586,7 +738,46 @@ contains
        phres(n)%dec = refdec(1:ncat)
     enddo
 
-    if( nfiles == 1 ) then
+    if( ctm%model /= COLT_NONE ) then
+       ! the colours of the calibration stars, their errors, the covariance
+       ! of ln(ph) and the colour (the colour of a band containing
+       ! the catalogue magnitude of the band: -dmag**2/magln for A,
+       ! +dmag**2/magln for B, with the errors of the colour only)
+       allocate(ccl(ncat,nfiles),dccl(ncat,nfiles),ccy(ncat,nfiles))
+       ccy = 0
+       do n = 1, nfiles
+          if( ctm%model == COLT_CAT ) then
+             ccl(:,n) = ccol(1:ncat)
+             dccl(:,n) = dccol(1:ncat)
+             if( size(col_color) == 4 ) then
+                d = 0
+                if( col_color(1) == colmag(n) ) d = d - 1
+                if( col_color(2) == colmag(n) ) d = d + 1
+                where( dccl(:,n) >= 0 .and. dmag(1:ncat,n) < 9 )
+                   ccy(:,n) = d * dmag(1:ncat,n)**2 / magln
+                end where
+             end if
+          else
+             ia = ctm%ia(n)
+             ib = ctm%ib(n)
+             ccl(:,n) = mag(1:ncat,ia) - mag(1:ncat,ib)
+             where( dmag(1:ncat,ia) < 9 .and. dmag(1:ncat,ib) < 9 )
+                dccl(:,n) = sqrt(dmag(1:ncat,ia)**2 + dmag(1:ncat,ib)**2)
+             elsewhere
+                dccl(:,n) = 0
+             end where
+             d = 0
+             if( ia == n ) d = d - 1
+             if( ib == n ) d = d + 1
+             where( dmag(1:ncat,ia) < 9 .and. dmag(1:ncat,ib) < 9 )
+                ccy(:,n) = d * dmag(1:ncat,n)**2 / magln
+             end where
+          end if
+       end do
+       call calibr_colour(refph,drefph,cts(1:ncat,:),dcts(1:ncat,:),ccl,dccl, &
+            ccy,ctm,ctph,dctph,phres,verbose,syserr,sys)
+       deallocate(ccl,dccl,ccy)
+    else if( nfiles == 1 ) then
        call calibr(refph,drefph,cts(1:ncat,:),dcts(1:ncat,:),ctph,dctph, &
             phres,verbose,syserr,sys)
     else
@@ -619,9 +810,15 @@ contains
 !    ctph = q / ctph
 !    dctph = ctph * d
 
-    call writecal(filename,output,keys,advanced,phsystable,filters, &
-         catid,photsys_ref,area,init_area,saper,tr1,ctph,dctph,qlabels,phres,verbose, &
-         sys,apcorr)
+    if( ctm%model /= COLT_NONE ) then
+       call writecal(filename,output,keys,advanced,phsystable,filters, &
+            catid,photsys_ref,area,init_area,saper,tr1,ctph,dctph,qlabels,phres, &
+            verbose,sys,apcorr,ctm)
+    else
+       call writecal(filename,output,keys,advanced,phsystable,filters, &
+            catid,photsys_ref,area,init_area,saper,tr1,ctph,dctph,qlabels,phres, &
+            verbose,sys,apcorr)
+    end if
 
     do i = 1,size(phres)
        call photores_destroy(phres(i))
@@ -631,7 +828,8 @@ contains
     if( allocated(pairs) ) deallocate(pairs)
 
     deallocate(refra,refdec,refph,drefph,filter_frames,exptime,areas,aper, &
-         tol,tr,tr1,trerr,tr1err,cts,dcts,dn,ddn,ra,dec,mag,dmag,ctph,dctph,sys)
+         tol,tr,tr1,trerr,tr1err,cts,dcts,dn,ddn,ra,dec,mag,dmag,ctph,dctph,sys, &
+         colmag)
 
   end subroutine calibrate
 
@@ -867,6 +1065,9 @@ contains
     end if
 
     if( tratable/= '' ) then
+       call tramodel(tratable,photsys1,status)
+       if( status == 0 .and. photsys1 == 'MAG' ) stop &
+            'Error: a magnitude transformation (MAG) needs the catalogue calibration (-c).'
        call traload(tratable,photsys2,photsys1,tr,trerr,tr1,tr1err,status)
        if( status /= 0 ) &
             stop 'Instrumental to standard conversion table not found.'

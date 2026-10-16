@@ -17,6 +17,13 @@
 !
 !  You should have received a copy of the GNU General Public License
 !  along with Munipack.  If not, see <http://www.gnu.org/licenses/>.
+!
+!  Two models (MODEL):
+!   MAG  (default) colour terms of the magnitudes of every filter by
+!        the colour of its neighbour, m_std - m_inst = ZP + k1 (c - cref)
+!        [+ k2 (c - cref)**2] (the standard transformation; magtrafo),
+!   FLUX the linear mixing of the photon rates of the standard filters,
+!        counts = T photons (a nearly tridiagonal matrix; trafo).
 
 
 program phfotran
@@ -42,6 +49,10 @@ program phfotran
   logical :: init_area = .false.
   real(dbl) :: area
   integer :: nfile,n,eq,nmag,nmagerr,nfilters,nctph,nextin
+  ! the model of the transformation: MAG (colour terms of the magnitudes,
+  ! of the order color_order) or FLUX (the linear mixing of photon rates)
+  character(len=FLEN_VALUE) :: model = 'MAG'
+  integer :: color_order = 1
 
   output = '!phfotran.fits'
   area = 1
@@ -195,6 +206,18 @@ program phfotran
 
         read(val,*) list
 
+     else if( key == 'MODEL' ) then
+
+        read(val,*) model
+        if( .not. (model == 'MAG' .or. model == 'FLUX') ) &
+             stop 'Error: the model is MAG or FLUX.'
+
+     else if( key == 'COLOR_ORDER' ) then
+
+        read(val,*) color_order
+        if( color_order < 1 .or. color_order > 2 ) &
+             stop 'Error: the order of the colour terms is 1 or 2.'
+
      else if( key == 'TOL' ) then
 
         read(val,*) utol
@@ -344,10 +367,14 @@ contains
 !       dcts(k,:) = matmul(tr,dph(k,:))
 !    end do
 
-    call trafo(pairs,ph,dph,cts,dcts,tr,trerr,tr1,tr1err,verbose)
+    if( model == 'MAG' ) then
+       call magtrafo(phsys,ph,dph,cts,dcts,verbose,ra,dec,filenames,airmass)
+    else
+       call trafo(pairs,ph,dph,cts,dcts,tr,trerr,tr1,tr1err,verbose)
 
-    call trawrite(output,photsys_ref,photsys_instr,filters,filters, &
-         ra,dec,ci0,ph,dph,cts,dcts,tr,trerr,tr1,tr1err,filenames,airmass,ctph,extin)
+       call trawrite(output,photsys_ref,photsys_instr,filters,filters, &
+            ra,dec,ci0,ph,dph,cts,dcts,tr,trerr,tr1,tr1err,filenames,airmass,ctph,extin)
+    end if
 
     deallocate(ra,dec,airmass,cts,dcts,ph,dph,filter,tr,trerr,tr1,tr1err)
 
@@ -373,16 +400,165 @@ contains
     call tradata(filenames(1),ra,dec,ph,dph,cts,dcts)
 
     n = size(ph,2)
-    allocate(tr(n,n),trerr(n,n),tr1(n,n),tr1err(n,n))
+    if( size(filters) /= n ) &
+         stop 'Filters (-f) do not match the data of the table.'
 
-    call trafo(pairs,ph,dph,cts,dcts,tr,trerr,tr1,tr1err,verbose)
+    if( model == 'MAG' ) then
+       call magtrafo(phsys,ph,dph,cts,dcts,verbose,ra,dec)
+    else
+       allocate(tr(n,n),trerr(n,n),tr1(n,n),tr1err(n,n))
 
-    call trawrite(output,photsys_ref,photsys_instr,filters,filters, &
-         ra,dec,ci0,ph,dph,cts,dcts,tr,trerr,tr1,tr1err)
+       call trafo(pairs,ph,dph,cts,dcts,tr,trerr,tr1,tr1err,verbose)
 
-    deallocate(ra,dec,cts,dcts,ph,dph,tr,trerr,tr1,tr1err)
+       call trawrite(output,photsys_ref,photsys_instr,filters,filters, &
+            ra,dec,ci0,ph,dph,cts,dcts,tr,trerr,tr1,tr1err)
+       deallocate(tr,trerr,tr1,tr1err)
+    end if
+
+    deallocate(ra,dec,cts,dcts,ph,dph)
 
   end subroutine table
+
+
+  subroutine magtrafo(phsys,ph,dph,cts,dcts,verbose,ra,dec,filenames,airmass)
+
+    ! The magnitude transformation: for every filter n (in the order of
+    ! the photometry system),
+    !
+    !    m_std(n) - m_inst(n) = ZP(n) + k1(n) c(n) + k2(n) c(n)**2,
+    !
+    ! m_std the catalogue magnitudes, m_inst = -2.5 log10(count rate),
+    ! c(n) the colour of the standard magnitudes of the filter and its
+    ! neighbour: m(n-1) - m(n), for the first filter m(1) - m(2) (B-V for
+    ! B and V, V-R for R of Johnson BVR). The fit is the one of the colour
+    ! term of phcal (colterm): the mixture likelihood with the systematic
+    ! error, the errors of the colours propagated, outliers without weight.
+
+    use colterm
+    use fits_fotran
+
+    type(type_phsys), intent(in) :: phsys
+    real(dbl), dimension(:,:), intent(in) :: ph,dph,cts,dcts
+    logical, intent(in) :: verbose
+    real(dbl), dimension(:), intent(in) :: ra,dec
+    character(len=*), dimension(:), intent(in), optional :: filenames
+    real(dbl), dimension(:), intent(in), optional :: airmass
+
+    character(len=FLEN_VALUE), dimension(:), allocatable :: cola, colb
+    real(dbl), dimension(:,:), allocatable :: m, dm
+    real(dbl), dimension(:), allocatable :: y, e, x, ex, cxy, q, r, cref, zp, dzp, &
+         k1, dk1, k2, dk2, sys, rms
+    integer, dimension(:), allocatable :: nstars
+    real(dbl), dimension(0:2) :: b
+    real(dbl), dimension(3,3) :: cov
+    real(dbl), dimension(1) :: m1, dm1, p1, dp1
+    real(dbl) :: sig, fout, d, s0, s1
+    integer :: nb, nd, n, ia, ib
+
+    nd = size(ph,1)
+    nb = size(ph,2)
+    if( nb < 2 ) stop 'The magnitude transformation needs two filters at least.'
+    if( nd < 3 ) stop 'Too few stars for the magnitude transformation.'
+
+    allocate(m(nd,nb),dm(nd,nb),y(nd),e(nd),x(nd),ex(nd),cxy(nd),q(nd),r(nd), &
+         cref(nb),zp(nb),dzp(nb),k1(nb),dk1(nb),k2(nb),dk2(nb),sys(nb),rms(nb), &
+         nstars(nb),cola(nb),colb(nb))
+
+    ! the catalogue magnitudes (the inverse of the photons of jamcatx)
+    do n = 1, nb
+       call phsysphmag1(phsys,filters(n),ph(:,n),dph(:,n),m(:,n),dm(:,n))
+    end do
+
+    if( verbose ) write(*,*) 'Magnitude transformation: m_std - m_inst = ', &
+         'ZP + k1*(c - cref) + k2*(c - cref)**2:'
+
+    do n = 1, nb
+
+       if( n == 1 ) then
+          ia = 1
+          ib = 2
+       else
+          ia = n - 1
+          ib = n
+       end if
+       cola(n) = filters(ia)
+       colb(n) = filters(ib)
+
+       where( ph(:,n) > 0 .and. cts(:,n) > 0 .and. dcts(:,n) > 0 )
+          y = log(ph(:,n) / cts(:,n))
+          e = sqrt(max(dph(:,n),0.0_dbl)**2/ph(:,n)**2 + (dcts(:,n)/cts(:,n))**2)
+       elsewhere
+          y = 0
+          e = -1
+       end where
+       where( m(:,ia) > 98 .or. m(:,ib) > 98 ) e = -1
+       if( count(e > 0) < 3 ) stop 'Too few stars for the magnitude transformation.'
+       ! the reference colour: the mean colour of the stars, so the zero
+       ! point and the coefficients are nearly uncorrelated (phcal adds
+       ! the errors of the coefficients of the table to the errors
+       ! of the stars as independent)
+       cref(n) = sum(m(:,ia) - m(:,ib),mask=e > 0) / count(e > 0)
+       x = m(:,ia) - m(:,ib) - cref(n)
+       where( dm(:,ia) < 9 .and. dm(:,ib) < 9 )
+          ex = sqrt(dm(:,ia)**2 + dm(:,ib)**2)
+       elsewhere
+          ex = 0
+       end where
+       d = 0
+       if( ia == n ) d = d - 1
+       if( ib == n ) d = d + 1
+       where( dm(:,ia) < 9 .and. dm(:,ib) < 9 )
+          cxy = d * dm(:,n)**2 / magln
+       elsewhere
+          cxy = 0
+       end where
+
+       call mixture_fit(y,e,x,ex,cxy,color_order,-1.0_dbl,b,cov,sig,fout,q)
+
+       ! the zero point: m_std - m_inst = magln (ln ph0 - b0)
+       m1 = 0
+       dm1 = 0
+       call phsysmagph1(phsys,filters(n),m1,dm1,p1,dp1)
+       zp(n) = magln * (log(p1(1)) - b(0))
+       dzp(n) = magln * sqrt(max(cov(1,1),0.0_dbl))
+       k1(n) = -magln * b(1)
+       dk1(n) = magln * sqrt(max(cov(2,2),0.0_dbl))
+       k2(n) = -magln * b(2)
+       dk2(n) = magln * sqrt(max(cov(3,3),0.0_dbl))
+       sys(n) = magln * sig
+       nstars(n) = count(e > 0)
+
+       ! the scatter of the calibration stars [mag]: with the colour
+       ! terms and with the zero point alone (the colour terms ignored)
+       r = magln * (y - b(0) - b(1)*x - b(2)*x**2)
+       s1 = sqrt(sum(q*r**2,mask=e > 0) / max(sum(q,mask=e > 0),1.0_dbl))
+       rms(n) = s1
+       if( verbose ) then
+          r = magln * y
+          s0 = sum(q*r,mask=e > 0) / max(sum(q,mask=e > 0),1.0_dbl)
+          s0 = sqrt(sum(q*(r - s0)**2,mask=e > 0) / max(sum(q,mask=e > 0),1.0_dbl))
+          write(*,'(1x,6a,f0.4,a,f0.4,a,f0.4,a,f0.5,a,f0.5)') trim(filters(n)), &
+               ' (c = ',trim(cola(n)),'-',trim(colb(n)),'): cref = ',cref(n), &
+               ', ZP = ',zp(n),' +- ',dzp(n),', k1 = ',k1(n),' +- ',dk1(n)
+          if( color_order >= 2 ) write(*,'(3x,a,f0.5,a,f0.5)') 'k2 = ',k2(n), &
+               ' +- ',dk2(n)
+          write(*,'(3x,a,f0.4,a,f0.3,a,i0,a,f0.4,a,f0.4,a)') 'systematic error: ', &
+               sys(n),' mag, outliers: ',fout,', stars: ',nstars(n), &
+               ', rms ',s0,' -> ',s1,' mag'
+       end if
+    end do
+
+    if( present(filenames) ) then
+       call trawrite_mag(output,photsys_ref,photsys_instr,filters,filters, &
+            cola,colb,cref,zp,dzp,k1,dk1,k2,dk2,sys,nstars,rms, &
+            ra,dec,ph,dph,cts,dcts,filenames,airmass,ctph,extin)
+    else
+       call trawrite_mag(output,photsys_ref,photsys_instr,filters,filters, &
+            cola,colb,cref,zp,dzp,k1,dk1,k2,dk2,sys,nstars,rms, &
+            ra,dec,ph,dph,cts,dcts)
+    end if
+
+  end subroutine magtrafo
 
 
   subroutine trafo(pairs,ph,dph,cts,dcts,tr,trerr,tr1,tr1err,verbose)

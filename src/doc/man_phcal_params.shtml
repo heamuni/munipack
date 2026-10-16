@@ -31,6 +31,17 @@ usually created by <samp>-c,-C</samp> options. Useful for relative photometry.</
     as the square of photons derived from magnitudes.</dd>
 <dt><samp>--tol</samp></dt><dd>search radius for object identification in degrees
                                (default 5*FWHM) </dd>
+<dt><samp>--color-term A,B[,errA,errB]</samp></dt><dd>the colour term:
+    the catalogue columns A, B of the colour A − B (and of their errors);
+    <i>m</i><sub>cat</sub> − <i>m</i><sub>inst</sub> = ZP +
+    <i>k</i><sub>1</sub> (<i>c</i> − <i>c</i><sub>ref</sub>) is fitted with
+    the calibration (<a href="man_phcal.html#colterm">Colour Term</a>)</dd>
+<dt><samp>--color-order</samp></dt><dd>the order of the colour term:
+    1 (default) or 2 (+ <i>k</i><sub>2</sub>
+    (<i>c</i> − <i>c</i><sub>ref</sub>)²)</dd>
+<dt><samp>--color-ref</samp></dt><dd>the reference colour
+    <i>c</i><sub>ref</sub> [mag] of CTPH: mean (the weighted mean
+    colour of the calibration stars, default) or a value</dd>
 </dl>
 
 <h3>Calibration specific:</h3>

@@ -86,6 +86,22 @@ MuniPhfotran::MuniPhfotran(wxEvtHandler *h, const MuniCmdLineParser& cmd):
       Write("COL_MAGERR = " + c);
     }
 
+    // the model: mag (colour terms of magnitudes, default) or flux
+    // (the linear mixing of photon rates)
+    if( cmd.Found("model",&a) ) {
+      wxString m = a.Upper();
+      if( ! (m == "MAG" || m == "FLUX") )
+	MuniFatalError("Unknown --model `%s' (mag, flux).",a);
+      Write("MODEL = '" + m + "'");
+    }
+
+    long n;
+    if( cmd.Found("color-order",&n) ) {
+      if( ! (n == 1 || n == 2) )
+	MuniFatalError("--color-order is 1 (linear) or 2 (quadratic).");
+      Write("COLOR_ORDER = %ld",n);
+    }
+
     if( cmd.Found("photsys-instr",&a) )
       Write("PHOTSYS_INSTR = '"+a+"'");
 
