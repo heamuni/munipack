@@ -404,7 +404,7 @@ contains
           x = col(:,n,1) - cbar
           call mixture_fit(y,e,x,ex,cx,ctm%order(1,n),fixsig,b,cv,sig,fout,q, &
                sigint=si,nfit=nf,errcorr=ctm%errcorr,lambda=ctm%lam(1,n), &
-               eivstat=ctm%eivst(n))
+               eivstat=ctm%eivst(n),eivh=ctm%eivh(n))
           if( ctm%cref(1,n) == cref_mean ) then
              w = q / (e**2 + sig**2)
              sw = sum(w,mask=valid)
@@ -451,7 +451,7 @@ contains
           end do
           call mixture_fit_multi(y,e,xm,exm,exx,cxm,ctm%order(:,n),fixsig, &
                bm,cvm,sig,fout,q,sigint=si,nfit=nf,errcorr=ctm%errcorr, &
-               lambda=ctm%lam(:,n),eivstat=ctm%eivst(n))
+               lambda=ctm%lam(:,n),eivstat=ctm%eivst(n),eivh=ctm%eivh(n))
           w = q / (e**2 + sig**2)
           sw = sum(w,mask=valid)
           do j = 1, nt
@@ -493,10 +493,15 @@ contains
        end if
 
        if( ctm%model == COLT_CAT .and. ctm%eivst(n) == 2 ) &
-            write(error_unit,'(a,i0,a)') 'Warning: the correction of the colour ' // &
-            'terms for the errors of the colours capped (band ',n, &
-            '): the colours hardly wider than their errors (a reliability ' // &
-            'ratio below 0.5), the colour terms biased towards zero.'
+            write(error_unit,'(a,i0,a,f0.3,a)') 'Warning: the correction of the ' // &
+            'colour terms for the errors of the colours capped (band ',n, &
+            '): a combination of the terms (the square of a colour, ' // &
+            'correlated colours) hardly wider than its errors, the dilution ' // &
+            'corrected by the fraction ',ctm%eivh(n),' (COLTCAP).'
+       if( ctm%model == COLT_CAT .and. ctm%eivst(n) == 3 ) &
+            write(error_unit,'(a,i0,a)') 'Warning: the fit of the colour terms ' // &
+            'corrected for the errors of the colours did not converge (band ',n, &
+            '): the result uncertain beyond its errors.'
 
        ctph(n) = exp(ctm%beta(0,n))
        dctph(n) = ctph(n) * sqrt(ctm%cov(1,1,n))
@@ -578,8 +583,11 @@ contains
              if( ctm%eivst(n) == 1 ) then
                 write(*,'(a)',advance='no') '  corrected for the errors of the colours'
              else if( ctm%eivst(n) == 2 ) then
+                write(*,'(a,f0.3)',advance='no') &
+                     '  corrected for the errors of the colours, capped at ',ctm%eivh(n)
+             else if( ctm%eivst(n) == 3 ) then
                 write(*,'(a)',advance='no') &
-                     '  corrected for the errors of the colours, capped'
+                     '  corrected for the errors of the colours, not converged'
              else
                 write(*,'(a)',advance='no') '  not corrected for the errors of the colours'
              end if

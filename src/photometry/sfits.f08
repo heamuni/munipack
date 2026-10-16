@@ -1298,6 +1298,8 @@ contains
        if( any(ctm%colerr) ) then
           call fits_update_key(fitscal,'COLTDILU',ctm%eivst(n) > 0, &
                'corrected for the errors of the colours',status)
+          call fits_update_key(fitscal,'COLTCAP',ctm%eivh(n),-4, &
+               'fraction of the dilution corrected (1 full)',status)
           call fits_update_key(fitscal,'COLTLAM',ctm%lam(1,n),-4, &
                'reliability ratio of c: var(true)/var(obs)',status)
        end if
@@ -1373,25 +1375,31 @@ contains
     integer, intent(in) :: n
     integer, intent(in out) :: status
 
-    character(len=FLEN_CARD) :: buf
+    character(len=FLEN_CARD) :: buf, buf2
     integer :: j, ios
 
     ! the numbers of the comments (huge errors of an ill-determined fit
-    ! overflow the card): iostat
+    ! overflow the card): iostat, the text without them
     if( ctm%nterm > 1 ) then
        call fits_write_comment(fitscal,"Colour terms: m_cat - m_inst = ZP + " // &
             "sum_j k1_j*(c_j - ref_j)",status)
        if( any(ctm%order(:,n) >= 2) ) &
             call fits_write_comment(fitscal,"  + k2_j*(c_j - ref_j)**2",status)
        do j = 1, ctm%nterm
+          buf = ''
           write(buf,'(a,i0,3a,f0.4,a,f0.5,a,f0.5)',iostat=ios) "  c",j," = ", &
                trim(ctm%cola(j,n))//'-'//trim(ctm%colb(j,n)),", ref = ", &
                ctm%cref(j,n),", k1 = ",-magln*ctm%beta(2*j-1,n)," +- ", &
                magln*sqrt(max(ctm%cov(2*j,2*j,n),0.0_dbl))
+          if( ios /= 0 ) write(buf,'(a,i0,3a)') "  c",j," = ", &
+               trim(ctm%cola(j,n))//'-'//trim(ctm%colb(j,n)),", k1 out of range"
           if( ctm%order(j,n) >= 2 ) then
-             write(buf,'(a,a,f0.5,a,f0.5)',iostat=ios) trim(buf),", k2 = ", &
+             buf2 = ''
+             write(buf2,'(a,a,f0.5,a,f0.5)',iostat=ios) trim(buf),", k2 = ", &
                   -magln*ctm%beta(2*j,n)," +- ", &
                   magln*sqrt(max(ctm%cov(2*j+1,2*j+1,n),0.0_dbl))
+             if( ios /= 0 ) buf2 = trim(buf) // ", k2 out of range"
+             buf = buf2
           end if
           call fits_write_comment(fitscal,buf,status)
        end do
@@ -1409,12 +1417,18 @@ contains
          ctm%cref(1,n),")"
     if( ctm%order(1,n) >= 2 ) buf = trim(buf) // " + k2*(c - ref)**2"
     call fits_write_comment(fitscal,buf,status)
+    buf = ''
     write(buf,'(3a,f0.5,a,f0.5)',iostat=ios) "  c = ",trim(ctm%cola(1,n))//'-'// &
          trim(ctm%colb(1,n)),", k1 = ",-magln*ctm%beta(1,n)," +- ", &
          magln*sqrt(max(ctm%cov(2,2,n),0.0_dbl))
+    if( ios /= 0 ) write(buf,'(3a)') "  c = ",trim(ctm%cola(1,n))//'-'// &
+         trim(ctm%colb(1,n)),", k1 out of range"
     if( ctm%order(1,n) >= 2 ) then
-       write(buf,'(a,a,f0.5,a,f0.5)',iostat=ios) trim(buf),", k2 = ",-magln*ctm%beta(2,n), &
+       buf2 = ''
+       write(buf2,'(a,a,f0.5,a,f0.5)',iostat=ios) trim(buf),", k2 = ",-magln*ctm%beta(2,n), &
             " +- ",magln*sqrt(max(ctm%cov(3,3,n),0.0_dbl))
+       if( ios /= 0 ) buf2 = trim(buf) // ", k2 out of range"
+       buf = buf2
     end if
     call fits_write_comment(fitscal,buf,status)
     if( ctm%model == COLT_CAT ) then
@@ -1441,14 +1455,22 @@ contains
               "colours (COLTDILU).",status)
       else if( ctm%eivst(n) == 2 ) then
          call fits_write_comment(fitscal,"  Corrected for the errors of the catalogue " // &
-              "colours, capped: the",status)
-         call fits_write_comment(fitscal,"  colours hardly wider than their errors " // &
-              "(a reliability ratio",status)
-         call fits_write_comment(fitscal,"  below 0.5); k biased towards zero.",status)
+              "colours, capped: a",status)
+         call fits_write_comment(fitscal,"  combination of the terms (the square of a " // &
+              "colour, correlated",status)
+         call fits_write_comment(fitscal,"  colours) hardly wider than its errors; " // &
+              "the dilution corrected",status)
+         call fits_write_comment(fitscal,"  by the fraction COLTCAP only.",status)
+      else if( ctm%eivst(n) == 3 ) then
+         call fits_write_comment(fitscal,"  Corrected for the errors of the catalogue " // &
+              "colours; the fit did",status)
+         call fits_write_comment(fitscal,"  not converge (uncertain beyond its errors).",status)
       else if( ctm%errcorr ) then
          call fits_write_comment(fitscal,"  Not corrected for the errors of the " // &
-              "catalogue colours", status)
-         call fits_write_comment(fitscal,"  (the colours too uncertain).",status)
+              "catalogue colours (the", status)
+         call fits_write_comment(fitscal,"  errors zero, a colour of one value, too " // &
+              "few stars, or no",status)
+         call fits_write_comment(fitscal,"  correction within the cap).",status)
       else
          call fits_write_comment(fitscal,"  Not corrected for the errors of the " // &
               "catalogue colours", status)
