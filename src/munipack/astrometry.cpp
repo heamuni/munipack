@@ -106,11 +106,49 @@ MuniAstrometry::MuniAstrometry(wxEvtHandler *h, const MuniCmdLineParser& cmd):
     if( cmd.Found("blind") )
       Write("WCSGUIDE = F");
 
-    if( cmd.Found("wcs-offset",&x) )
+    if( cmd.Found("wcs-offset",&a) ) {
+      // a number with optional units: pix (default), arcsec ("), arcmin ('),
+      // deg, % (of the larger side of the frame)
+      wxString num = a.Strip(wxString::both), unit;
+      size_t n = 0;
+      while( n < num.Len() && (wxIsdigit(num[n]) || num[n] == '.' || num[n] == '+' ||
+			       num[n] == 'e' || num[n] == 'E' ||
+			       (n > 0 && num[n] == '-' && (num[n-1] == 'e' || num[n-1] == 'E'))) )
+	n++;
+      unit = num.Mid(n).Strip(wxString::both).Lower();
+      num = num.Left(n);
+      if( unit == "" || unit == "pix" || unit == "px" )
+	unit = "PIX";
+      else if( unit == "arcsec" || unit == "as" || unit == "\"" )
+	unit = "ARCSEC";
+      else if( unit == "arcmin" || unit == "am" || unit == "'" )
+	unit = "ARCMIN";
+      else if( unit == "deg" || unit == "d" )
+	unit = "DEG";
+      else if( unit == "%" )
+	unit = "PERCENT";
+      else
+	MuniFatalError("--wcs-offset " + a + ": the units must be pix, arcsec, arcmin, deg or %.");
+      if( ! num.ToCDouble(&x) || ! (x > 0) )
+	MuniFatalError("--wcs-offset " + a + ": a positive number (with units) is expected.");
       Write("WCSOFFSET = %e",x);
+      Write("WCSOFFUNIT = '" + unit + "'");
+    }
 
     if( cmd.Found("wcs-rot",&x) )
       Write("WCSROT = %e",x);
+
+    if( cmd.Found("roll-unknown") && cmd.Found("roll-known") )
+      MuniFatalError("--roll-unknown and --roll-known exclude each other.");
+
+    if( cmd.Found("roll-unknown") )
+      Write("ROLL = 'UNKNOWN'");
+
+    if( cmd.Found("roll-known") )
+      Write("ROLL = 'KNOWN'");
+
+    if( cmd.Found("reflex-unknown") )
+      Write("REFLBOTH = T");
 
     if( cmd.Found("wcs-scale",&x) )
       Write("WCSSCALE = %e",x);
