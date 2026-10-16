@@ -703,6 +703,10 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption(wxEmptyString,"col-dec","Declination column");
     AddOption(wxEmptyString,"col-mag","magnitude column(s), order of -f");
     AddOption(wxEmptyString,"col-magerr","magnitude std. error column(s)");
+    AddOption("","model","mag (colour terms of magnitudes, default) or "
+	      "flux (linear mixing of photon rates)");
+    AddOption("","color-order","order of the colour terms of the mag model: "
+	      "1 (default) or 2",wxCMD_LINE_VAL_NUMBER);
     AddOption("","photsys-ref","reference photometry system (catalogue)");
     AddOption("","photsys-instr","instrumental photometry system "
 	      "(default: PHOTSYS of the frames)");

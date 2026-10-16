@@ -401,11 +401,13 @@ contains
     use fits_fotran
     use colterm
 
-    character(len=FLEN_VALUE) :: catid,photosys_instr,photsys1,photsys2,catid1
+    character(len=FLEN_VALUE) :: catid,photosys_instr,photsys1,photsys2,catid1, &
+         tmodel
     character(len=FLEN_VALUE), dimension(:), allocatable :: filter_frames, &
-         filters_tab, colmag
+         filters_tab, colmag, tcola, tcolb
     real(dbl), allocatable, dimension(:) :: refra, refdec, ctph,dctph, &
-         exptime, areas, tol, aper, sys, cra, cdec, ccol, dccol
+         exptime, areas, tol, aper, sys, cra, cdec, ccol, dccol, &
+         tcref, tzp, tdzp, tk1, tdk1, tk2, tdk2
     real(dbl), allocatable, dimension(:,:) :: tr,tr1,trerr,tr1err,refph,drefph,&
          cts,dcts,dn,ddn,ra,dec,mag,dmag,cmag,cdmag,magx,dmagx,ccl,dccl,ccy
     real(dbl) :: q, d
@@ -414,7 +416,7 @@ contains
     type(colour_term) :: ctm
     integer, dimension(:,:), allocatable :: pairs
     integer, dimension(:), allocatable :: forder, perm
-    integer :: status,nfiles,ncat,i,nf
+    integer :: status,nfiles,ncat,i,nf,ia,ib
 
     if( photsys_ref == '' ) &
          stop 'No identificator for reference photometry system.'
@@ -567,7 +569,63 @@ contains
 !       write(*,*) mag(i,1),dmag(i,1),1.086*drefph(i,1)/refph(i,1),refph(i,1)
 !    end do
 
-    if( tratable/= '' ) then
+    tmodel = ''
+    if( tratable /= '' ) then
+       call tramodel(tratable,tmodel,status)
+       if( status /= 0 ) &
+            stop 'Instrumental to standard conversion table not found.'
+    end if
+
+    if( tmodel == 'MAG' ) then
+       ! the magnitude transformation: the colour terms of every filter
+       ! (fixed) by the colours of the catalogue, the counts converted
+       ! by the colours of the calibrated magnitudes (writecal)
+       call traload_mag(tratable,photsys2,photsys1,filters_tab,tcola,tcolb, &
+            tcref,tzp,tdzp,tk1,tdk1,tk2,tdk2,status)
+       if( status /= 0 ) &
+            stop 'Instrumental to standard conversion table not found.'
+       if( photsys2 /= photsys_ref ) &
+            stop 'Reference photometry system does not match the conversion table.'
+       if( photsys_instr /= '' ) photosys_instr = photsys_instr
+       if( photsys1 /= photosys_instr ) then
+          write(error_unit,*) "Instrumental photometry systems: `", &
+               trim(photsys1),"' (table), `",trim(photosys_instr),"' (frames)."
+          stop 'Instrumental photometry system does not match the conversion table.'
+       end if
+       if( size(filters_tab) /= size(filters) ) &
+            stop "Amount of filters doesn't correspons to transformation table."
+       if( any(filters_tab /= filters) ) then
+          write(error_unit,*) 'Filters of the table: ', &
+               (trim(filters_tab(i))//' ',i=1,size(filters_tab))
+          stop 'Filters do not match the conversion table.'
+       end if
+       call colterm_init(ctm,COLT_TRA,nfiles)
+       do n = 1, nfiles
+          ia = findloc(filters,tcola(n),1)
+          ib = findloc(filters,tcolb(n),1)
+          if( ia == 0 .or. ib == 0 ) &
+               stop 'Filters of the colours of the conversion table not found.'
+          ctm%ia(n) = ia
+          ctm%ib(n) = ib
+          ctm%cola(n) = tcola(n)
+          ctm%colb(n) = tcolb(n)
+          ctm%cref(n) = tcref(n)
+          ctm%beta(1,n) = -tk1(n) / magln
+          ctm%beta(2,n) = -tk2(n) / magln
+          ctm%cov(2,2,n) = (tdk1(n) / magln)**2
+          ctm%cov(3,3,n) = (tdk2(n) / magln)**2
+          ctm%order(n) = merge(2,1,tk2(n) /= 0)
+       end do
+       ctm%tol = tol(1)
+       deallocate(filters_tab,tcola,tcolb,tcref,tzp,tdzp,tk1,tdk1,tk2,tdk2)
+       allocate(tr(size(refph,2),size(refph,2)),tr1(size(refph,2),size(refph,2)), &
+            trerr(size(refph,2),size(refph,2)),tr1err(size(refph,2),size(refph,2)))
+       tr = 0.0_dbl
+       forall(n=1:size(refph,2))
+          tr(n,n) = 1.0_dbl
+       end forall
+       tr1 = tr
+    else if( tratable/= '' ) then
        call traload(tratable,photsys2,photsys1,tr,trerr,tr1,tr1err,status, &
             filters_tab)
        if( status /= 0 ) &
@@ -688,13 +746,30 @@ contains
        allocate(ccl(ncat,nfiles),dccl(ncat,nfiles),ccy(ncat,nfiles))
        ccy = 0
        do n = 1, nfiles
-          ccl(:,n) = ccol(1:ncat)
-          dccl(:,n) = dccol(1:ncat)
-          if( size(col_color) == 4 ) then
+          if( ctm%model == COLT_CAT ) then
+             ccl(:,n) = ccol(1:ncat)
+             dccl(:,n) = dccol(1:ncat)
+             if( size(col_color) == 4 ) then
+                d = 0
+                if( col_color(1) == colmag(n) ) d = d - 1
+                if( col_color(2) == colmag(n) ) d = d + 1
+                where( dccl(:,n) >= 0 .and. dmag(1:ncat,n) < 9 )
+                   ccy(:,n) = d * dmag(1:ncat,n)**2 / magln
+                end where
+             end if
+          else
+             ia = ctm%ia(n)
+             ib = ctm%ib(n)
+             ccl(:,n) = mag(1:ncat,ia) - mag(1:ncat,ib)
+             where( dmag(1:ncat,ia) < 9 .and. dmag(1:ncat,ib) < 9 )
+                dccl(:,n) = sqrt(dmag(1:ncat,ia)**2 + dmag(1:ncat,ib)**2)
+             elsewhere
+                dccl(:,n) = 0
+             end where
              d = 0
-             if( col_color(1) == colmag(n) ) d = d - 1
-             if( col_color(2) == colmag(n) ) d = d + 1
-             where( dccl(:,n) >= 0 .and. dmag(1:ncat,n) < 9 )
+             if( ia == n ) d = d - 1
+             if( ib == n ) d = d + 1
+             where( dmag(1:ncat,ia) < 9 .and. dmag(1:ncat,ib) < 9 )
                 ccy(:,n) = d * dmag(1:ncat,n)**2 / magln
              end where
           end if
@@ -990,6 +1065,9 @@ contains
     end if
 
     if( tratable/= '' ) then
+       call tramodel(tratable,photsys1,status)
+       if( status == 0 .and. photsys1 == 'MAG' ) stop &
+            'Error: a magnitude transformation (MAG) needs the catalogue calibration (-c).'
        call traload(tratable,photsys2,photsys1,tr,trerr,tr1,tr1err,status)
        if( status /= 0 ) &
             stop 'Instrumental to standard conversion table not found.'

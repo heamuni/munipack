@@ -112,6 +112,8 @@ contains
     real(dbl), dimension(:,:), allocatable :: scol,sdcol
     integer, dimension(:,:), allocatable :: csrc
     integer, dimension(:), allocatable :: cidx
+    real(dbl), dimension(size(ctph)) :: m0,dm0,mm,dmm,cc,dcc
+    real(dbl), dimension(1) :: x1,dx1,y1,dy1
     real(dbl) :: g,dg,f
     logical :: lcol
 
@@ -399,6 +401,38 @@ contains
           where( phr(i,:) > 0 )
              dphr(i,:) = sqrt(dphr(i,:)**2 + (srel*phr(i,:))**2)
           end where
+          if( lcol .and. ctm%model == COLT_TRA ) then
+             ! the magnitude transformation: the magnitudes calibrated
+             ! by CTPH, the colour terms by the colours of the standard
+             ! magnitudes (solved), back to the photons
+             if( all(phr(i,:) > 0 .and. dphr(i,:) > 0) ) then
+                do n = 1, nfiles
+                   x1 = phr(i,n)
+                   dx1 = dphr(i,n)
+                   call phsysphmag1(phsyscal,filters(n),x1,dx1,y1,dy1)
+                   m0(n) = y1(1)
+                   dm0(n) = magln * dphr(i,n) / phr(i,n)
+                end do
+                call colour_solve(ctm,m0,dm0,mm,dmm,cc,dcc,status)
+                if( status == 0 ) then
+                   do n = 1, nfiles
+                      y1 = mm(n)
+                      dy1 = 0
+                      call phsysmagph1(phsyscal,filters(n),y1,dy1,x1,dx1)
+                      phr(i,n) = x1(1)
+                      dphr(i,n) = x1(1) * dmm(n) / magln
+                   end do
+                   scol(i,:) = cc
+                   sdcol(i,:) = dcc
+                   csrc(i,:) = 2
+                else
+                   phr(i,:) = -1
+                end if
+                status = 0
+             else
+                phr(i,:) = -1
+             end if
+          end if
           where( phr(i,:) > 0 )
              ph(i,:) = phr(i,:) * xctph
              dph(i,:) = dphr(i,:) * xctph !! correct !!!

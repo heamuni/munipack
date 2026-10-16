@@ -111,7 +111,7 @@ module colterm
      real(dbl) :: tol = 0
   end type colour_term
 
-  public :: colterm_init, mixture_fit, colour_corr
+  public :: colterm_init, mixture_fit, colour_corr, colour_solve
 
 contains
 
@@ -173,6 +173,137 @@ contains
     dg = sqrt(max(v,0.0_dbl))
 
   end subroutine colour_corr
+
+
+  subroutine colour_solve(ctm,m0,dm0,m,dm,c,dc,status)
+
+    ! The magnitudes of a star in the standard bands by the magnitude
+    ! transformation (COLT_TRA): m0 are the magnitudes calibrated by CTPH
+    ! (the colour terms not applied) with their errors dm0 (the counts,
+    ! CTPH and the systematic error), m the solution of
+    !
+    !     m(n) = m0(n) + k1(n) d(n) + k2(n) d(n)**2,
+    !     d(n) = m(ia(n)) - m(ib(n)) - cref(n),  k = -magln beta,
+    !
+    ! by Newton's method (the colours of the standard magnitudes), dm
+    ! the errors of m by the linearised solution, (I - G) dm = dm0,
+    ! the errors of the coefficients included; c, dc the colours d(n) +
+    ! cref(n) and their errors. status /= 0 when it does not converge.
+
+    type(colour_term), intent(in) :: ctm
+    real(dbl), dimension(:), intent(in) :: m0, dm0
+    real(dbl), dimension(:), intent(out) :: m, dm, c, dc
+    integer, intent(out) :: status
+
+    real(dbl), dimension(size(m0),size(m0)) :: jm, ji, vm
+    real(dbl), dimension(size(m0)) :: f, d, k1, k2, gp, s2, delta
+    integer :: nb, n, iter
+
+    nb = size(m0)
+    k1 = -magln*ctm%beta(1,:)
+    k2 = -magln*ctm%beta(2,:)
+    m = m0
+    status = 1
+    do iter = 1, 50
+       d = m(ctm%ia) - m(ctm%ib) - ctm%cref
+       f = m - m0 - k1*d - k2*d**2
+       gp = k1 + 2*k2*d
+       call jacobian
+       call gsolve(jm,-f,delta,status)
+       if( status /= 0 ) exit
+       m = m + delta
+       if( maxval(abs(delta)) < 1e-12_dbl ) then
+          status = 0
+          exit
+       end if
+       status = 1
+    end do
+
+    d = m(ctm%ia) - m(ctm%ib) - ctm%cref
+    gp = k1 + 2*k2*d
+    call jacobian
+    c = d + ctm%cref
+
+    ! the errors: dm = (I - G)**-1 (dm0 + errors of k1, k2)
+    s2 = dm0**2 + magln**2*(d**2*ctm%cov(2,2,:) + d**4*ctm%cov(3,3,:))
+    ji = 0
+    do n = 1, nb
+       delta = 0
+       delta(n) = 1
+       call gsolve(jm,delta,ji(:,n),iter)
+       if( iter /= 0 ) status = 1
+    end do
+    vm = matmul(ji,matmul(diag(s2),transpose(ji)))
+    do n = 1, nb
+       dm(n) = sqrt(max(vm(n,n),0.0_dbl))
+       dc(n) = sqrt(max(vm(ctm%ia(n),ctm%ia(n)) + vm(ctm%ib(n),ctm%ib(n)) &
+            - 2*vm(ctm%ia(n),ctm%ib(n)),0.0_dbl))
+    end do
+
+  contains
+
+    subroutine jacobian
+      ! the Jacobian of f: I - G, G(n,ia) = gp, G(n,ib) = -gp
+      integer :: i
+      jm = 0
+      do i = 1, nb
+         jm(i,i) = 1
+      end do
+      do i = 1, nb
+         jm(i,ctm%ia(i)) = jm(i,ctm%ia(i)) - gp(i)
+         jm(i,ctm%ib(i)) = jm(i,ctm%ib(i)) + gp(i)
+      end do
+    end subroutine jacobian
+
+    function diag(v) result(a)
+      real(dbl), dimension(:), intent(in) :: v
+      real(dbl), dimension(size(v),size(v)) :: a
+      integer :: i
+      a = 0
+      do i = 1, size(v)
+         a(i,i) = v(i)
+      end do
+    end function diag
+
+  end subroutine colour_solve
+
+
+  subroutine gsolve(a,b,x,status)
+
+    ! the solution of a x = b by the Gauss elimination with partial pivoting
+
+    real(dbl), dimension(:,:), intent(in) :: a
+    real(dbl), dimension(:), intent(in) :: b
+    real(dbl), dimension(:), intent(out) :: x
+    integer, intent(out) :: status
+
+    real(dbl), dimension(size(b),size(b)+1) :: w
+    real(dbl), dimension(size(b)+1) :: t
+    integer :: n, i, k, ip
+
+    n = size(b)
+    w(:,1:n) = a
+    w(:,n+1) = b
+    x = 0
+    status = 1
+    do k = 1, n
+       ip = k - 1 + maxloc(abs(w(k:n,k)),1)
+       if( .not. (abs(w(ip,k)) > tiny(1.0_dbl)) ) return
+       if( ip /= k ) then
+          t = w(k,:)
+          w(k,:) = w(ip,:)
+          w(ip,:) = t
+       end if
+       do i = k+1, n
+          w(i,k:) = w(i,k:) - w(i,k)/w(k,k)*w(k,k:)
+       end do
+    end do
+    do i = n, 1, -1
+       x(i) = (w(i,n+1) - sum(w(i,i+1:n)*x(i+1:n))) / w(i,i)
+    end do
+    status = 0
+
+  end subroutine gsolve
 
 
   subroutine mixture_fit(y,e,x,ex,cxy,order,fixsig,beta,cov,sigma,fout,member)

@@ -50,7 +50,7 @@ phcal_LDADD = $(ldir)/liblmin.a $(ldir)/libsort.a $(ldir)/libastrotrafo.a \
               $(ldir)/libphotometry.a  $(WCSLIB_LIBS) \
               $(ldir)/libastrosphere.a $(LIBOAKLEAF) $(LIBMINPACK) $(FITSADD)
 
-phfotran_SOURCES = mfits.f08 jam.f95 fitsfotran.f95 rplane.f95 \
+phfotran_SOURCES = mfits.f08 jam.f95 fitsfotran.f95 colterm.f08 rplane.f95 \
                    rational.f95 fotran.f95 phfotran.f95
 phfotran_LDADD   = $(ldir)/libastrotrafo.a $(ldir)/libphotometry.a \
                    $(ldir)/libminpacks.a $(ldir)/liblmin.a \
