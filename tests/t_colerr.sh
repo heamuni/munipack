@@ -62,5 +62,31 @@ munipack phcal $C --color-term Bmag,Vmag -t nx V.fits > /dev/null 2>&1
 ok "no COLTDILU without the error columns"
 check "no error columns: (COLTK1 + 0.3) / COLTK1E" "$(pull nx)" 2.5 10
 
+# the band of the calibration in the colour (V of B - V; QUVIK: u of
+# u - g against u) and noisy: V of the catalogue with errors of 0.15 mag,
+# B 0.01, the error of V in both y and the colour, cov = -0.15**2, which
+# biases k1 further (-0.375 uncorrected); the correction subtracts it.
+# The covariance is by the error of the band in the colour: a magnitude
+# error column of 0.01 for the same V (e_Vlow) gives the same k1 and
+# a warning (by that error the covariance was left out: about -0.42)
+column "truth.fits[1]" RAJ2000 DEJ2000 Vmag Bmag | awk '
+    function rnd() { s = (s * 16807) % 2147483647; return s / 2147483647 }
+    function gauss() { return sqrt(-2 * log(rnd())) * cos(2 * pi * rnd()) }
+    BEGIN { s = 777; pi = atan2(0, -1) }
+    { printf "%s %s 0 0 %.4f 0.15 %.4f 0.01 0.01\n", $1, $2, $3 + 0.15 * gauss(), $4 + 0.01 * gauss() }' \
+    | tabfits catv.fits "RAJ2000 D deg DEJ2000 D deg pmRA D mas/yr pmDE D mas/yr \
+    Vmag E - e_Vmag E - Bmag E - e_Bmag E - e_Vlow E -"
+CV="--photsys-ref Johnson -f V --col-ra RAJ2000 --col-dec DEJ2000 -c catv.fits --col-mag Vmag"
+mkdir sv svn svl
+munipack phcal $CV --col-magerr e_Vmag --color-term Bmag,Vmag,e_Bmag,e_Vmag -t sv V.fits > /dev/null 2>&1
+check "noisy V in y and B - V: (COLTK1 + 0.3) / COLTK1E" "$(pull sv)" -2.5 2.5
+munipack phcal $CV --col-magerr e_Vmag --color-term Bmag,Vmag,e_Bmag,e_Vmag \
+    --color-err-correct no -t svn V.fits > /dev/null 2>&1
+check "noisy V, not corrected: COLTK1 (-0.375)" "$(key "svn/V.fits[PHOTOMETRY]" COLTK1)" -0.45 -0.34
+munipack phcal $CV --col-magerr e_Vlow --color-term Bmag,Vmag,e_Bmag,e_Vmag -t svl V.fits \
+    > /dev/null 2> svl/err.txt
+check "noisy V, --col-magerr of 0.01: (COLTK1 + 0.3) / COLTK1E" "$(pull svl)" -2.5 2.5
+check "noisy V, --col-magerr of 0.01: the warning" "$(grep -c 'differ' svl/err.txt)" 1 9
+
 expect_fail "--color-err-correct maybe" munipack phcal $C \
     --color-term Bmag,Vmag,e_Bmag,e_Vmag --color-err-correct maybe V.fits
