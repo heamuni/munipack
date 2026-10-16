@@ -330,13 +330,14 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption("","sig","errors of centroids on frame [pix]",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","sigcat","coordinate errors of cat/ref [deg]",
 	      wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","flxmin","minimum of relative fluxes, default=0.8",
+    AddOption("","flxmin","minimum of relative fluxes, default=0.63 (-0.5 mag)",
 	      wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","flxmax","maximum of relative fluxes, default=1.3",
+    AddOption("","flxmax","maximum of relative fluxes, default=1.58 (+0.5 mag)",
 	      wxCMD_LINE_VAL_DOUBLE);
-    AddOption("","minmatch","minimal length of match sequence",
+    AddOption("","minmatch","minimal length of match sequence "
+	      "(default 5, at least 5: a solution needs five stars)",
 	      wxCMD_LINE_VAL_NUMBER);
-    AddOption("","maxmatch","maximal length of match sequence",
+    AddOption("","maxmatch","stars in the chunks of the match, default 42",
 	      wxCMD_LINE_VAL_NUMBER);
     AddOption("","maxstars","total number of astrometry stars",
 	      wxCMD_LINE_VAL_NUMBER);

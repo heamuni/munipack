@@ -102,8 +102,7 @@ Astrometry transformation is computed by using of robust algorithms.
   which is supposet to by complete (sucesfull match). For sparse
   fileds, the defaults are usually satisfactyory, but very dense
   fields like SMC, LMC needs increase this parameters. Munipack
-  sets the default of 5. If the mean surface density exceeds
-  the limit (?), the parameter is increased. The small values
+  sets the default of 5, which is also the minimum. The small values
   on crowded fiedls can produce false match (because probability
   of miss-match is getting appreciable).
   </p>
@@ -243,10 +242,20 @@ solutions was below 10<sup>−9</sup>, also with five or six stars.
 </p>
 
 <p>
-The matching needs at least of tree stars (to construct of a triangle. The
-astrometry algorithm needs at least 5 stars (for 4 parameters) but
-has lower-count alternative with minimum of two stars. Generally,
-the astrometry has recommended minimum of 7 stars, but ideal is over 20.
+<b>The calibration needs at least five matched stars</b>: the solution has
+four parameters (the scale, the rotation and the centre) and their errors
+(the match sequence is five stars at least, <samp>--minmatch</samp> smaller
+than five is rejected). A frame with fewer stars on it (or in the catalogue)
+fails with the error <i>too few stars</i>, and a solution which cross-matches
+fewer than five stars is unreliable; the other frames of the same run are
+processed (the exit status is 1 when any frame fails). There is no
+solution from fewer stars (versions before 0.6.2+hg1653 (patched) documented
+an alternative with two stars, which did not work: it stopped, or crashed
+on the residuals of a 'low-precision solution', the whole run with it).
+Generally, the astrometry has recommended minimum of 7 stars, but ideal is
+over 20, and sparse frames (5–10 stars) need a catalogue restricted to
+the field of view (and the <a href="#significance">significance test</a>
+needs a few stars beyond the two fixing the solution).
 Any modern (like Munipack default UCAC5) catalogue has more reference
 objects on medium crowded fields.
 </p>
@@ -348,9 +357,9 @@ On output, the WCS calibration in the header of primary FITS is created
     range 0.8 -- 1.3 is enough, but for different filters the default 0.5 -- 2 should
 by prefered.</dd>
 <dt><samp>--minmatch n</samp></dt><dd>Sets count of objects in match sequence.
-Default is 5. Crowded fields will require increase the value on 7 or more. The extremely
-sparse fields with a few stars only will enough 3-5. To use match algorithm minimal
-length is 3. Upper limit is given by <samp>--maxmatch</samp>.</dd>
+Default is 5, which is also the minimum (a solution needs five stars; smaller
+values are rejected with an error). Crowded fields will require increase the
+value on 7 or more. Upper limit is given by <samp>--maxmatch</samp>.</dd>
 <dt><samp>--maxmatch n</samp></dt><dd>Set maximum count of objects
     in match sequence.
     The default is 42 or count of objects in catalogue or in frame.

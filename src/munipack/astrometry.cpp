@@ -132,8 +132,12 @@ MuniAstrometry::MuniAstrometry(wxEvtHandler *h, const MuniCmdLineParser& cmd):
 	cmd.Found("scale",&x) || cmd.Found("angle",&x) )
       Write("INITPAR = F");
 
-    if( cmd.Found("minmatch",&i) )
+    if( cmd.Found("minmatch",&i) ) {
+      // the solution needs five stars (four parameters and their errors)
+      if( i < 5 )
+	MuniFatalError("--minmatch %ld: the match sequence needs five stars at least.",i);
       Write("MINMATCH = %ld",i);
+    }
 
     if( cmd.Found("maxmatch",&i) )
       Write("MAXMATCH = %ld",i);

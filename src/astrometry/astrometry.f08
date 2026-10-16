@@ -322,6 +322,10 @@ program astrometry
   user_angle = angle
   user_refl = refl
   call co_broadcast(scaletol,1)
+  ! the solution needs five stars, the sequence as well (the front end
+  ! rejects smaller values)
+  if( minmatch < astrominstars ) stop 'Error: --minmatch must be five at least.'
+  if( maxmatch <= minmatch ) stop 'Error: --maxmatch must be larger than --minmatch.'
   call co_broadcast(sig1,1)
   call co_broadcast(sig2,1)
   call co_broadcast(flxmin,1)
@@ -566,6 +570,15 @@ contains
 
     if( .not. fcrval ) crval = xcrval
     if( .not. fcrpix ) crpix = zcrpix
+
+    ! a solution needs five stars at least, on the frame and in the catalogue
+    if( size(x) < astrominstars .or. size(alpha) < astrominstars ) then
+       write(error_unit,'(5a,i0,a,i0,a,i0,a)') "Error: astrometry of `",trim(filename), &
+            "' with `",trim(cat)//trim(ref)//trim(rel),"': too few stars (",size(x), &
+            " on the frame, ",size(alpha)," in the reference), at least ", &
+            astrominstars," are required."
+       goto 77
+    end if
 
     ! the scale prior for the match: --scale, or the astrometry
     ! calibration of the frame, known within --scale-tol
@@ -1008,6 +1021,7 @@ contains
          col_epdec,maxstars,alpha,delta,pmalpha,pmdelta,epalpha,epdelta,rflux, &
          rframe,idcat,repoch,verbose,status)
     if( status /= 0 ) stop "Failed to open the catalogue file."
+    if( size(alpha) < 1 ) stop "Error: no valid stars in the catalogue."
 
     ! a default centre of projection, --rcen, --dcen takes precedence
     xcrval(1) = median(alpha)

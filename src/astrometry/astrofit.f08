@@ -25,6 +25,10 @@ module astrofitting
   implicit none
   private
 
+  ! the minimum of stars for a solution: four parameters
+  ! (the scale, the rotation and the centre) and their errors
+  integer, parameter, public :: astrominstars = 5
+
   public :: astrofit
 
 contains
@@ -78,9 +82,12 @@ contains
     if( size(x) /= size(y) ) &
          stop 'Astrofit: xstar and ystar sizes does not corresponds.'
 
-    ! check stars > 1
-    if( .not. (size(id1_init) > 1) ) then
+    ! a solution requires five stars at least
+    if( size(id1_init) < astrominstars ) then
+       write(error_unit,'(a,i0,a,i0,a)') 'Warning: too few matched stars (', &
+            size(id1_init),'), at least ',astrominstars,' are required.'
        rms = huge(rms)
+       allocate(id1_final(0),id2_final(0))
        return
     end if
 
@@ -113,9 +120,12 @@ contains
 
     ! estimate preliminary solution based on a small set of matched stars
     s = rms
-    call robmin(pcode,'ROBUST',alpha,delta,refl,xstar,ystar,s,&
+    call robmin(pcode,fitmethod,alpha,delta,refl,xstar,ystar,s,&
          acen,dacen,dcen,ddcen,sc,dsc,rot,drot,rms,verbose,reliable)
-    if( .not. reliable ) return
+    if( .not. reliable ) then
+       allocate(id1_final(0),id2_final(0))
+       return
+    end if
     if( .not. scale_prior() ) return
 
     ! select such much stars as possible for final fit
@@ -129,10 +139,6 @@ contains
          write(error_unit,'(a,f0.2)') '# Cross match limit for stars [pix]: ',dlim*sc
     call listmatch(pcode,a,d,x,y,acen,dcen,xcen,ycen,sc,rot,refl,dlim,id1,id2,status)
     n = size(id1)
-    if( .not. n > 1 ) then
-       reliable = .false.
-       return
-    end if
 
     if( size(id1) /= size(id2) ) stop 'Error in astrofit(): unconformed sequences.'
     allocate(alpha(n),delta(n),xstar(n),ystar(n))
@@ -152,18 +158,24 @@ contains
             ' as the statistical scale is zero.'
     end if
 
-    if( n > 5 ) then
+    if( n >= astrominstars ) then
 
        call robmin(pcode,fitmethod,alpha,delta,refl,xstar,ystar,s,&
             acen,dacen,dcen,ddcen,sc,dsc,rot,drot,rms,verbose,reliable)
-       if( .not. reliable ) return
+       if( .not. reliable ) then
+          allocate(id1_final(0),id2_final(0))
+          return
+       end if
 
        if( ptype == 'TPV' ) then
 
           if( fitmethod == 'ROBUST' .and. n > size(pv) + 1 ) then
 
              call tpvstaged
-             if( .not. reliable ) return
+             if( .not. reliable ) then
+                allocate(id1_final(0),id2_final(0))
+                return
+             end if
           else if( fitmethod == 'ROBUST' ) then
              if( verbose ) write(error_unit,*) &
                   'Warning in astrofit(): too few stars for deformations.'
@@ -188,9 +200,12 @@ contains
 
     else
 
-       write(error_unit,*) &
-            "Warning in astrofit: low-precision solution having a few points only."
-       reliable = n > 2
+       ! (there was a 'low-precision solution' marked reliable here,
+       ! without residuals: the caller crashed on them)
+       write(error_unit,'(a,i0,a,i0,a)') 'Warning: too few stars cross-matched by the solution (', &
+            n,'), at least ',astrominstars,' are required: the solution is unreliable.'
+       reliable = .false.
+       allocate(id1_final(0),id2_final(0))
        return
 
     end if

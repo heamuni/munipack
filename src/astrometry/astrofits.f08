@@ -85,6 +85,8 @@ contains
     if( status /= 0 ) goto 666
     if( .not. (nrows > 0) )then
        write(error_unit,*) 'Error: empty table in the file `',trim(filename),"'."
+       ! (the status was zero: the empty arrays were not allocated)
+       status = -1
        goto 666
     end if
 

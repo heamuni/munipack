@@ -566,9 +566,18 @@ contains
 
     ndat = size(a)
 
-    if( .not. (ndat > npar) ) stop 'Robust fitting requires at least five stars.'
-    if( .not. s > 0 .and. fit == 'ROBUST' ) &
-         stop 'Robust fitting needs statistical scale > 0.'
+    ! too few stars, or no scale for the robust fit: no solution
+    ! (the frame fails, the next frames are processed)
+    if( .not. (ndat > npar) ) then
+       write(error_unit,'(a,i0,a)') 'Warning: the astrometry fit of ',ndat, &
+            ' stars: at least five stars are required.'
+       return
+    end if
+    if( .not. s > 0 .and. fit == 'ROBUST' ) then
+       write(error_unit,'(a)') &
+            'Warning: the robust astrometry fit needs a statistical scale > 0.'
+       return
+    end if
 
     allocate(uref(ndat),vref(ndat),u(ndat),v(ndat))
 
