@@ -156,7 +156,15 @@ the offset of the most votes give the transformation, the nearest stars by
 it are the match, and the solution is fitted and tested (the
 <a href="#significance">significance</a>, with the trials of the vote: the nodes
 and the bins) as any other. When it fails, the blind match below
-follows (with the <a href="#scaleprior">scale prior</a> by the header).
+follows (with the <a href="#scaleprior">scale prior</a> by the header):
+first of the catalogue stars near the frame by the header (within the
+half-diagonal of the frame with 10% and the tolerance of the offset),
+then of all catalogue stars. The blind match of a frame with a header
+rotated by 30° and moved by 300 pixels (beyond the tolerances) against
+the full cone of 0.61° solved 25 of 30 QUVIK-like frames (all with five
+stars and more), as against the cone restricted to the frame; the blind
+match of all stars of the cone solves only 14 of them (the brightest 250
+stars of the cone, few of them on the frame).
 The keyword ASTRMETH of the header records the method of the solution:
 <samp>WCS</samp> (WCS-guided), <samp>BLIND</samp>, <samp>CROSS</samp>
 or <samp>SEQUENCE</samp>.

@@ -571,7 +571,9 @@ contains
     integer, dimension(2) :: naxes
     ! the method of the solution (ASTRMETH): WCS, BLIND, CROSS, SEQUENCE
     character(len=8) :: method
-    logical :: wcspass
+    logical :: wcspass, nearpass
+    ! the catalogue stars near the centre by the WCS of the frame
+    integer, allocatable, dimension(:) :: inear
     integer :: n,nmin,nskip,nattempt
     logical :: matched = .false., reliable, zwcs
     real(REAL64), dimension(2) :: crval0
@@ -654,6 +656,23 @@ contains
     ! the first attempt is guided by the WCS of the frame (if any),
     ! the blind match follows when it fails
     wcspass = mode == 'MATCH' .and. wcsguide .and. zwcs .and. rel == ''
+    ! when it fails, the blind match takes the catalogue stars near the
+    ! frame by the header (within the half-diagonal of the frame with 10%
+    ! and the tolerance of the offset) first, all of them when it fails
+    nearpass = .false.
+    if( wcspass ) then
+       block
+         real(REAL64), dimension(size(rec)) :: r
+         real(REAL64) :: rlim
+         integer :: k
+         rlim = (1.1_REAL64*hypot(real(naxes(1),REAL64),real(naxes(2),REAL64))/2 &
+              + wcsoff(naxes)) / zscale
+         r = rad*acos(min(1.0_REAL64,sin(dec/rad)*sin(zcrval(2)/rad) + &
+              cos(dec/rad)*cos(zcrval(2)/rad)*cos((rec - zcrval(1))/rad)))
+         inear = pack([(k, k = 1, size(rec))], r < rlim)
+         nearpass = size(inear) >= astrominstars .and. size(inear) < size(rec)
+       end block
+    end if
 55  continue
     nattempt = nattempt + 1
 
@@ -688,10 +707,32 @@ contains
           call uvhisto(x,y)
        end if
 
-       call astromatch(minmatch,maxmatch,pcode,rec,dec,rflux,x,y,flux, &
-            crval(1),crval(2),crpix(1),crpix(2), &
-            id1,id2,sig1,sig2,flxmin,flxmax,fluxtest,&
-            luckymatch,verbose,matched,nskip,scale0,scaletol,ntrial)
+       if( nearpass ) then
+          ! the catalogue stars near the frame, the centre by the header
+          if( verbose ) write(error_unit,'(a,i0,a)') ' The blind match of ', &
+               size(inear),' catalogue stars near the frame by its header.'
+          if( .not. fcrval ) crval = zcrval
+          call astromatch(minmatch,maxmatch,pcode,rec(inear),dec(inear),rflux(inear), &
+               x,y,flux,crval(1),crval(2),crpix(1),crpix(2), &
+               id1,id2,sig1,sig2,flxmin,flxmax,fluxtest,&
+               luckymatch,verbose,matched,nskip,scale0,scaletol,ntrial)
+          if( matched ) then
+             id1 = inear(id1)
+          else
+             ! all catalogue stars
+             if( verbose ) write(error_unit,'(a)') &
+                  ' The blind match of all catalogue stars follows.'
+             nearpass = .false.
+             nskip = 0
+             crval = crval0
+             goto 55
+          end if
+       else
+          call astromatch(minmatch,maxmatch,pcode,rec,dec,rflux,x,y,flux, &
+               crval(1),crval(2),crpix(1),crpix(2), &
+               id1,id2,sig1,sig2,flxmin,flxmax,fluxtest,&
+               luckymatch,verbose,matched,nskip,scale0,scaletol,ntrial)
+       end if
 !           write(*,'(a,f10.7)') "=MATCH> End "
 
     else if( mode == 'SEQUENCE' ) then
