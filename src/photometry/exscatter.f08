@@ -71,22 +71,25 @@
 !  - 2 g' cov(y,x) (g' the slope of the polynomial at x(i)). The covariance
 !  of beta is (X' U X)**(-1). mixture_mean is mixture_fit of the order 0.
 !
-!  Few stars (n - p + 1 < 8, p the number of the coefficients): f and B
+!  Few stars (n - p + 1 < 16, p the number of the coefficients): f and B
 !  cannot be estimated from few values, and the likelihood has two modes,
 !  a deviating value either an outlier or a part of the scatter; EM from
 !  the robust start, which prefers the first, biased sigma low by 15-25%
-!  for 3-7 values (Monte Carlo). For few values, f is fixed at 0.1 and B
-!  at 1 mag (at least 3 times the inliers), EM runs from the robust start
-!  and from the plain restricted likelihood of all values (q = 1), and
-!  the solution of the larger posterior is taken: the restricted
-!  likelihood of the mixture, sum ln((1-f) N(r,v) + f N(r,v+B**2))
-!  - 1/2 ln det X'UX, with a weak prior of sigma, half-normal of the scale
-!  0.1 mag (a scatter of 0.2 mag is unlikely, an outlier of 0.4 mag is
-!  not). Sigma is then nearly as unbiased as by the plain REML (its square
-!  within 1-2% for 3-7 values) and the outliers far from the others are
-!  still found; moderate ones (a few sigma) cannot be told from
-!  the scatter. The results of 8 and more values are those of the mixture
-!  above.
+!  for 3-7 values and by 5-10% for 10-15 values (Monte Carlo). For few
+!  values, f is fixed at 0.1 and B at 1 mag (at least 3 times
+!  the inliers), EM runs from the robust start and from the plain
+!  restricted likelihood of all values (q = 1), and the solution of
+!  the larger posterior is taken: the restricted likelihood of the mixture,
+!  sum ln((1-f) N(r,v) + f N(r,v+B**2)) - 1/2 ln det X'UX, with a weak
+!  prior of sigma, half-normal of the scale 0.1 mag (a scatter of 0.2 mag
+!  is unlikely, an outlier of 0.4 mag is not). Sigma is then nearly as
+!  unbiased as by the plain REML (its square within 1-2% for 3-7 values)
+!  and the outliers far from the others are still found; moderate ones
+!  (a few sigma) cannot be told from the scatter. The results of 16 and
+!  more values are those of the mixture above. With the prior, one degree
+!  of freedom (n = p + 1) is enough for an estimate of sigma (3 stars and
+!  a linear colour term); n = p, and n = p + 1 with a fixed sigma, is
+!  the plain weighted fit.
 !
 !  The interval of sigma (optional) is given by the profile of
 !  the restricted likelihood of the calibration stars (q fixed),
@@ -113,7 +116,7 @@ module exscatter
   ! the fraction of outliers fixed at ffew, their width at 1 mag; the two
   ! modes of the likelihood compared with a prior of sigma, half-normal
   ! of the scale sfew [mag]
-  integer, parameter :: nfew = 8
+  integer, parameter :: nfew = 16
   real(dbl), parameter :: ffew = 0.1_dbl, sfew = 0.1_dbl
 
 contains
@@ -327,7 +330,7 @@ contains
     q = 1
     th = 0
 
-    if( n < p + 2 ) then
+    if( n < p + 1 .or. (fixsig >= 0 .and. n < p + 2) ) then
        ! too few stars for the scatter and outliers: the weighted fit
        call effvar(th)
        v = e2 + sigma**2
