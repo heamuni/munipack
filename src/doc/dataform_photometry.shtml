@@ -171,12 +171,13 @@ these keywords are added:
     with all the colours for several)</td><td></td></tr>
 <tr><td>COLTDILU</td><td>T when the fit is corrected for the errors of
     the catalogue colours (the regression dilution), F when not
-    (<samp>--color-err-correct no</samp>, the errors zero, or no correction
+    (<samp>--color-err-correct no</samp>, fewer than 17 stars, 18 of
+    the order 2 or several colours, the errors zero, or no correction
     within the cap);
     CATALOGUE with the error columns only</td><td></td></tr>
-<tr><td>COLTCAP</td><td>the fraction of the correction of the dilution
-    applied (1 full, below 1 capped: a combination of the terms hardly
-    wider than its errors; with the error columns only)</td><td></td></tr>
+<tr><td>COLTCAP</td><td>the fraction of the correction applied (1 full,
+    below 1 capped: a combination of the terms hardly wider than its errors
+    for the number of the stars; with the error columns only)</td><td></td></tr>
 <tr><td>COLTLAM</td><td>the reliability ratio of the colour of
     the calibration stars, the variance of the true colours over that of
     the catalogue ones (1 − the mean squared error over the weighted
