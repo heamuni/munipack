@@ -75,6 +75,9 @@ program phcal
   integer :: ncterm = 0
   integer, dimension(:), allocatable :: color_order
   real(dbl), dimension(:), allocatable :: color_ref
+  ! the fit corrected for the errors of the catalogue colours (with
+  ! the error columns; --color-err-correct)
+  logical :: color_errcorr = .true.
   integer :: eq,nfile,n,nmag,nmagerr,nfilters,nctph,saper,ncol1
   character(len=FLEN_KEYWORD), dimension(8) :: keys
   integer :: nqlabels
@@ -243,6 +246,10 @@ program phcal
      else if( key == 'COLOR_REF' ) then
 
         read(val,*) color_ref
+
+     else if( key == 'COLOR_ERRCORR' ) then
+
+        read(val,*) color_errcorr
 
      else if( key == 'TOL' ) then
 
@@ -579,7 +586,9 @@ contains
           ctm%colb(j,:) = col_color(2,j)
           ctm%order(j,:) = color_order(min(j,size(color_order)))
           ctm%cref(j,:) = color_ref(min(j,size(color_ref)))
+          ctm%colerr(j) = ncolor(j) == 4
        end do
+       ctm%errcorr = color_errcorr
        ctm%ra = refra
        ctm%dec = refdec
        ctm%col = ccol

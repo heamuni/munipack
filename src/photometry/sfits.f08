@@ -1293,6 +1293,14 @@ contains
           call fits_update_key(fitscal,'COLTNSTA',ctm%nstars(n), &
                'calibration stars with all the colours',status)
        end if
+       ! the correction for the errors of the colours (with the error
+       ! columns only): applied, the reliability ratios of the colours
+       if( any(ctm%colerr) ) then
+          call fits_update_key(fitscal,'COLTDILU',ctm%eivst(n) > 0, &
+               'corrected for the errors of the colours',status)
+          call fits_update_key(fitscal,'COLTLAM',ctm%lam(1,n),-4, &
+               'reliability ratio of c: var(true)/var(obs)',status)
+       end if
     end if
     if( nt == 1 ) return
 
@@ -1333,6 +1341,11 @@ contains
        write(key,'(a,i0)') 'COLTSTD',j
        write(com,'(a,i0,a)') '[mag] std. deviation of their colours c',j
        call fits_update_key(fitscal,key,ctm%cstd(j,n),-4,com,status)
+       if( any(ctm%colerr) ) then
+          write(key,'(a,i0)') 'COLTLAM',j
+          write(com,'(a,i0,a)') 'reliability ratio of c',j,': var(true)/var(obs)'
+          call fits_update_key(fitscal,key,ctm%lam(j,n),-4,com,status)
+       end if
     end do
     ! the correlations of the linear coefficients (u - g and g - r of
     ! the stars are correlated, so are their coefficients)
@@ -1363,6 +1376,8 @@ contains
     character(len=FLEN_CARD) :: buf
     integer :: j, ios
 
+    ! the numbers of the comments (huge errors of an ill-determined fit
+    ! overflow the card): iostat
     if( ctm%nterm > 1 ) then
        call fits_write_comment(fitscal,"Colour terms: m_cat - m_inst = ZP + " // &
             "sum_j k1_j*(c_j - ref_j)",status)
@@ -1386,6 +1401,7 @@ contains
             "the others", status)
        call fits_write_comment(fitscal,"  (the colours of the calibration stars), " // &
             "error by its scatter.",status)
+       call eivcomments
        return
     end if
 
@@ -1408,11 +1424,37 @@ contains
             status)
        call fits_write_comment(fitscal,"  of the calibration stars, error by its scatter (0).",&
             status)
+       call eivcomments
     else
        call fits_write_comment(fitscal,"  applied by the colours of the standard magnitudes", &
             status)
        call fits_write_comment(fitscal,"  solved from all filters (COLORSRC = 2).",status)
     end if
+
+  contains
+
+    subroutine eivcomments
+      ! the correction for the errors of the catalogue colours
+      if( .not. any(ctm%colerr) ) return
+      if( ctm%eivst(n) == 1 ) then
+         call fits_write_comment(fitscal,"  Corrected for the errors of the catalogue " // &
+              "colours (COLTDILU).",status)
+      else if( ctm%eivst(n) == 2 ) then
+         call fits_write_comment(fitscal,"  Corrected for the errors of the catalogue " // &
+              "colours, capped: the",status)
+         call fits_write_comment(fitscal,"  colours hardly wider than their errors " // &
+              "(a reliability ratio",status)
+         call fits_write_comment(fitscal,"  below 0.5); k biased towards zero.",status)
+      else if( ctm%errcorr ) then
+         call fits_write_comment(fitscal,"  Not corrected for the errors of the " // &
+              "catalogue colours", status)
+         call fits_write_comment(fitscal,"  (the colours too uncertain).",status)
+      else
+         call fits_write_comment(fitscal,"  Not corrected for the errors of the " // &
+              "catalogue colours", status)
+         call fits_write_comment(fitscal,"  (--color-err-correct no).",status)
+      end if
+    end subroutine eivcomments
 
   end subroutine colcomments
 
