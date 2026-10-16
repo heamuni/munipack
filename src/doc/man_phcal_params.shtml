@@ -35,13 +35,17 @@ usually created by <samp>-c,-C</samp> options. Useful for relative photometry.</
     the catalogue columns A, B of the colour A − B (and of their errors);
     <i>m</i><sub>cat</sub> − <i>m</i><sub>inst</sub> = ZP +
     <i>k</i><sub>1</sub> (<i>c</i> − <i>c</i><sub>ref</sub>) is fitted with
-    the calibration (<a href="man_phcal.html#colterm">Colour Term</a>)</dd>
+    the calibration (<a href="man_phcal.html#colterm">Colour Term</a>);
+    repeatable, every occurrence adds a colour, at most three
+    (<a href="man_phcal.html#colterm2">Several colours</a>)</dd>
 <dt><samp>--color-order</samp></dt><dd>the order of the colour term:
     1 (default) or 2 (+ <i>k</i><sub>2</sub>
-    (<i>c</i> − <i>c</i><sub>ref</sub>)²)</dd>
+    (<i>c</i> − <i>c</i><sub>ref</sub>)²); one value for all the colours
+    or a list of one for every <samp>--color-term</samp> (2,1)</dd>
 <dt><samp>--color-ref</samp></dt><dd>the reference colour
     <i>c</i><sub>ref</sub> [mag] of CTPH: mean (the weighted mean
-    colour of the calibration stars, default) or a value</dd>
+    colour of the calibration stars, default) or a value; one for all
+    the colours or a list (mean,0.5)</dd>
 </dl>
 
 <h3>Calibration specific:</h3>

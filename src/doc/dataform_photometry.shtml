@@ -167,7 +167,24 @@ these keywords are added:
 <tr><td>COLTCOV</td><td>the correlation of CTPH and COLTK1 (CATALOGUE)</td><td></td></tr>
 <tr><td>COLTMEAN, COLTSTD</td><td>the mean colour of the calibration stars
     and its standard deviation (CATALOGUE)</td><td>mag</td></tr>
-<tr><td>COLTNSTA</td><td>the calibration stars with a colour (CATALOGUE)</td><td></td></tr>
+<tr><td>COLTNSTA</td><td>the calibration stars with a colour (CATALOGUE;
+    with all the colours for several)</td><td></td></tr>
+<tr><td>COLTNTRM</td><td>the number of the colours (several
+    <samp>--color-term</samp> only; the keys above are those of the first
+    colour)</td><td></td></tr>
+<tr><td>COLTERM<i>j</i>, COLTREF<i>j</i></td><td>the colour
+    <i>c</i><sub><i>j</i></sub> (<i>j</i> = 2, 3) and its reference</td><td>mag</td></tr>
+<tr><td>COLT<i>j</i>K1, COLT<i>j</i>K1E</td><td><i>k</i><sub>1</sub> of
+    the colour <i>j</i> and its error</td><td>mag/mag</td></tr>
+<tr><td>COLT<i>j</i>K2, COLT<i>j</i>K2E</td><td><i>k</i><sub>2</sub> of
+    the colour <i>j</i> and its error (order 2 only)</td><td>mag/mag²</td></tr>
+<tr><td>COLT<i>j</i>COV</td><td>the correlation of CTPH and
+    COLT<i>j</i>K1</td><td></td></tr>
+<tr><td>COLTMEA<i>j</i>, COLTSTD<i>j</i></td><td>the mean colour
+    <i>c</i><sub><i>j</i></sub> of the calibration stars and its standard
+    deviation</td><td>mag</td></tr>
+<tr><td>COLTC12, COLTC13, COLTC23</td><td>the correlations of the linear
+    coefficients of two colours (COLTK1 and COLT2K1, …)</td><td></td></tr>
 </table>
 </div>
 
@@ -228,7 +245,14 @@ and last the ratio of [(3) - CTPH *(4)]/(3) as an analogy of residuals.
     COLOR is the mean colour of the calibration stars, COLORERR their
     scatter, and the mean correction of the calibration stars is applied
     with its scatter in the errors), 2 solved from the calibrated
-    magnitudes of all filters (TRANSFORM)</td><td></td></tr>
+    magnitudes of all filters (TRANSFORM); several colours: the bit
+    <i>j</i> − 1 set for the colour <i>j</i> of the catalogue (3: both of
+    two colours), a missing colour is predicted by the known ones
+    (the colours of the calibration stars), COLORERR (COLOR<i>j</i>ERR)
+    its conditional scatter</td><td></td></tr>
+<tr><td>COLOR<i>j</i>, COLOR<i>j</i>ERR</td><td>the colour <i>j</i> = 2, 3
+    and its error (several <samp>--color-term</samp>, after
+    COLORSRC)</td><td>mag</td></tr>
 </table>
 </table>
 

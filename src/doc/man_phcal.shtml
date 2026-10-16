@@ -398,6 +398,146 @@ stars, <i>k</i><sub>1</sub> within 2σ of the true one in all 12 frames
 the units of MAGERR and the catalogue errors) 0.84–1.13.
 </p>
 
+<h4 id="colterm2">Several colours</h4>
+
+<p>
+A passband may depend on more than one colour: QUVIK's 260–360 nm band
+against SDSS <i>u</i> follows <i>u</i> − <i>g</i> and
+<i>g</i> − <i>r</i> (the band extends below <i>u</i>, where the spectrum
+of a star is not a function of <i>u</i> − <i>g</i> alone), and one colour,
+of either order, leaves 0.02–0.03 mag about its best function (above).
+<samp>--color-term</samp> is repeatable, every occurrence adds a colour
+(at most three):
+</p>
+<pre>
+$ munipack phcal -c sdss.fits --photsys-ref UVSIM -f q310 --col-mag upmag --col-magerr e_upmag \
+   --color-term upmag,gpmag,e_upmag,e_gpmag --color-term gpmag,rpmag,e_gpmag,e_rpmag frame.fits
+</pre>
+<p>
+and the calibration is
+</p>
+<p>
+<i>m</i><sub>cat</sub> − <i>m</i><sub>inst</sub> = ZP +
+Σ<sub><i>j</i></sub> <i>k</i><sub>1,<i>j</i></sub>
+(<i>c</i><sub><i>j</i></sub> − <i>c</i><sub>ref,<i>j</i></sub>)
+[+ <i>k</i><sub>2,<i>j</i></sub>
+(<i>c</i><sub><i>j</i></sub> − <i>c</i><sub>ref,<i>j</i></sub>)²],
+</p>
+<p>
+<samp>--color-order</samp> and <samp>--color-ref</samp> take one value for
+all the colours or a list of one for every colour in the order of
+<samp>--color-term</samp> (<samp>--color-order 2,1</samp>,
+<samp>--color-ref mean,0.5</samp>); no cross terms
+(<i>c</i><sub>1</sub><i>c</i><sub>2</sub>) are fitted: the quadratic
+terms of the QUVIK-like band are zero within their errors (below). The colours
+must be independent (<i>u</i> − <i>g</i>, <i>g</i> − <i>u</i>, or
+<i>u</i> − <i>g</i>, <i>g</i> − <i>r</i>, <i>u</i> − <i>r</i> are
+refused). The fit is that of one colour (the mixture likelihood, σ, the
+errors with its uncertainty) with these differences:
+</p>
+<ul>
+<li>The errors of the colours of a star are correlated when they share
+a band: <i>u</i> − <i>g</i> and <i>g</i> − <i>r</i> have the covariance
+−σ<sub><i>g</i></sub>² (by the error columns); the variance of a star is
+(∇<i>g</i>)′ <b>S</b> ∇<i>g</i> − 2 (∇<i>g</i>)′ <b>c</b>, <b>S</b> the
+covariance of its colours, <b>c</b> their covariances with the catalogue
+magnitude of the calibration, and the errors of the outputs (MAGERR) have
+the same.</li>
+<li>The colours of the stars are strongly correlated (0.96 for
+<i>u</i> − <i>g</i> and <i>g</i> − <i>r</i> of SDSS stars), so are the
+coefficients (COLTC12 ≈ −0.95) and their errors are several times those of
+one colour; the scatter of the catalogue colours about the true ones
+then biases the coefficients towards zero (the regression dilution,
+amplified by the correlation: 4% and 10% of <i>k</i> = −0.3, +0.2 with
+SDSS errors, one to two errors of 100 stars). The weighted least
+squares of several colours is corrected for the errors of the colours
+(the moments of the linear terms less their expected part by the errors,
+Fuller 1987, Measurement Error Models): the bias is below 0.15 of
+the errors. The correction assumes that the catalogue colours are the true
+ones plus their errors (a measured catalogue); a simulation that draws
+the true magnitudes about the catalogue (a catalogue more precise than its
+errors say) is over-corrected (−1.03 for −0.86): give such a catalogue
+without the error columns. The quadratic terms are not corrected; one colour
+is fitted as before (its dilution is 0.7% for <i>k</i> = 0.3 with SDSS
+errors; on faint stars with large <i>u</i> errors more, below).</li>
+<li>The calibration stars are those with all the colours. A star of
+the output without some of its colours (COLORSRC the bit <i>j</i> − 1 set
+for the colour <i>j</i> of the catalogue: 3 both of two, 2 only the second,
+…) gets the missing ones predicted by the known ones by the colours of the
+calibration stars as a Gaussian (the conditional mean, the colour–colour
+relation of the field) with the conditional scatter as their error, which
+for <i>u</i> − <i>g</i> by <i>g</i> − <i>r</i> is a fraction of the scatter
+of the colours; without any colour, the mean colours and their covariance.
+On the M67 frame below with 15% of the stars without <i>u</i>: their
+residuals scatter by 0.051 mag for MAGERR 0.056 (the mean correction of
+<i>u</i> − <i>g</i> instead: 0.27 mag for 0.17); without <i>r</i>
+0.018 mag for MAGERR 0.026.</li>
+<li>The table gets COLOR2, COLOR2ERR (COLOR3, COLOR3ERR) after COLORSRC,
+the header COLTNTRM, the keys of the colour <i>j</i> ≥ 2
+(COLTERM<i>j</i>, COLTREF<i>j</i>, COLT<i>j</i>K1, COLT<i>j</i>K1E,
+COLT<i>j</i>K2, COLT<i>j</i>K2E, COLT<i>j</i>COV, COLTMEA<i>j</i>,
+COLTSTD<i>j</i>) and the correlations COLTC12, COLTC13, COLTC23 of
+the linear coefficients (<a href="dataform_photometry.html#colterm">format</a>);
+the keys of the first colour are those of one colour. With one
+<samp>--color-term</samp> all outputs are bit-identical to the previous
+version.</li>
+</ul>
+<p>
+<b>QUVIK.</b> For a 260–360 nm band calibrated against SDSS <i>u</i>
+use <i>u</i> − <i>g</i> and <i>g</i> − <i>r</i>, linear, with the error
+columns. It needs enough stars: the coefficients of 15–67 calibration stars
+of a 2048² frame have the errors 0.10–0.42 (<i>u</i> − <i>g</i>) and
+0.22–0.72 mag/mag (<i>g</i> − <i>r</i>); a frame of few stars should not
+fit two colours (σ and three coefficients from 2–8 stars).
+</p>
+<p>
+Validation of several colours (the cones of SDSS DR16 above; the catalogue
+"measured" by its errors: the SDSS magnitudes taken as the truth and
+the catalogue of the calibration the truth plus its errors, ten
+realisations). The QUVIK-like band (310 nm, the true transformation
+<i>u</i> − <i>m</i> = −0.8564 (<i>u</i> − <i>g</i>) + 0.3705
+(<i>g</i> − <i>r</i>), exact for the parabola of the SED): with the exact
+catalogue (no error columns) <i>k</i> = −0.862 ± 0.020, +0.387 ± 0.041
+and −0.859 ± 0.012, +0.377 ± 0.024 (the two cones), the residuals scatter
+by 0.0129 and 0.0093 mag, the noise of the frames (the frames calibrated
+against their own truth: 0.0140, 0.0095; one colour 0.034, 0.024), no
+slope against either colour (≤ 0.003 ± 0.02–0.05), the blue and red ends within
+0.006 mag (one colour: −0.07 and −0.03 mag at <i>u</i> − <i>g</i> &lt; 0.8);
+the orders (2,1), (2,2) the same, the quadratic coefficients
+0.001–0.011 ± 0.007–0.027 (<i>u</i> − <i>g</i>) and −0.03, −0.04 ± 0.06–0.12
+(<i>g</i> − <i>r</i>). Against the measured catalogue: mean <i>k</i> −0.858, +0.366
+(sd 0.043, 0.083 for the errors 0.049, 0.103) and −0.870, +0.398 (sd 0.030,
+0.062, errors 0.029, 0.060), the bias within 0.5 of the errors, Q 0.98–0.99
+(one colour 1.06–1.08), the slopes of the residuals against the true
+colours within 0.04 (one colour 0.16, −0.35); the scatter against the true
+<i>u</i>, 0.044 and 0.030 mag, is that of the catalogue colours propagated
+by the coefficients (the same as of one colour, whose 0.024–0.034 mag of
+the transformation it replaces). A band of an exactly known relation on
+real SDSS stars, X = <i>g</i> + 0.3 (<i>u</i> − <i>g</i>) − 0.2
+(<i>g</i> − <i>r</i>), calibrated against <i>g</i>: −0.3030 ± 0.0077,
++0.2039 ± 0.0140 and −0.2977 ± 0.0048, +0.1960 ± 0.0087 (exact catalogue),
+over the measured catalogues −0.3018, +0.2025 (sd 0.0051, 0.0095, errors
+0.0073, 0.0131) and −0.2983, +0.1979 (sd 0.0049, 0.0093, errors 0.0043,
+0.0079), Q 0.98; one colour −0.19 with a slope of 0.10 against
+<i>u</i> − <i>g</i>. Monte Carlo of the calibration (stars drawn from the
+1312 SDSS stars of both cones, their catalogue magnitudes the truth plus
+their errors, the photometric errors 0.005–0.05 mag, 1000 sets per case):
+the bias of <i>k</i> below 0.01 (0.13 of the errors) for 30 and 100 stars,
+below 0.15 of the errors for 10, the coverage of COLTK1E, COLT2K1E 0.67–0.73 (30 stars), 0.65–0.70
+(100 stars), 0.73–0.78 (10 stars), with and without 5% outliers and
+σ = 0, 0.02 mag; without the correction of the errors of the colours the
+bias was 4% and 10% and the coverage 0.56–0.64 (30 stars) and 0.46–0.53
+(100 stars). QUVIK-like 2048² frames (20 and 60 s, the detector of QUVIK,
+the frames of the true magnitudes, find, aphot, astrometry, phcal against
+the measured catalogue): 15–67 stars, the rms of
+(<i>k</i> − <i>k</i><sub>true</sub>)/σ<sub><i>k</i></sub> 0.78 and 0.72
+(11 of 12 within 1σ for <i>g</i> − <i>r</i>, 10 of 12 for
+<i>u</i> − <i>g</i>, all within 2.1σ), Q 0.75–1.22 (mean 0.95); one colour
+on the same frames −0.43…−0.72 (mean −0.62 for −0.686 of the exact
+catalogue: the regression dilution of one colour by the errors of
+<i>u</i> of faint stars).
+</p>
+
 <p>When photometry transformation table from instrumental to
 standard system is available <samp>--tratab</samp> (made by
 <a href="man_phfotran.html">phfotran</a>), the calibration follows its model.
@@ -605,6 +745,16 @@ the instrumental band calibrated by the catalogue band of V:
 <pre>
 $ munipack phcal -c cat.fits --photsys-ref Johnson -f V --col-mag Vmag --col-magerr e_Vmag \
    --color-term Bmag,Vmag,e_Bmag,e_Vmag --verbose frame.fits
+</pre>
+
+<p>
+Two colour terms, a QUVIK-like UV band against SDSS <i>u</i> with
+the colours <i>u</i> − <i>g</i> and <i>g</i> − <i>r</i>
+(<a href="#colterm2">Several colours</a>):
+</p>
+<pre>
+$ munipack phcal -c sdss.fits --photsys-ref UVSIM -f q310 --col-mag upmag --col-magerr e_upmag \
+   --color-term upmag,gpmag,e_upmag,e_gpmag --color-term gpmag,rpmag,e_gpmag,e_rpmag frame.fits
 </pre>
 
 
