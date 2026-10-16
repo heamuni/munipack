@@ -93,8 +93,17 @@ Astrometry transformation is computed by using of robust algorithms.
 
 <p>
   Parameter --maxmatch slices the catalogue on parts with similar
-  magnitudes (magnitudes in certain range). This is due to sorting
-  of both catalpogue and frame by magnitudes.
+  magnitudes (magnitudes in certain range): both the catalogue and the
+  frame are sorted by brightness (the catalogue by <samp>--col-mag</samp>,
+  the frame by the counts of the first aperture of APERPHOT; the tables
+  can be in any order), the brightest <samp>--maxstars</samp> (250) of each are
+  used, in chunks of <samp>--maxmatch</samp> (42) stars: the chunks of
+  the frame (three at most) are matched against the chunks of
+  the catalogue. Versions before 0.6.2+hg1653 (patched) took the first
+  rows of the tables as they were: the catalogue in the order of the file
+  (a cone search not sorted by magnitude gave the first 250 rows of the cone,
+  often few of them on a small frame), the frame in the order of the
+  detection.
   </p>
 
 <p>
@@ -236,7 +245,14 @@ The known sequence of stars can be used to determine astrometry transformation:
 </p>
 <ul>
 <li>The coordinates of catalogue stars are corrected for its proper motion
-    (only when <samp>--col-pm-ra, --col-pm-dec</samp>) is set</li>
+    to the epoch of the frame (DATE-OBS) from the epoch of the catalogue
+    (the keyword JEPOCH of the table, or the columns <samp>--col-epoch-ra,
+    --col-epoch-dec</samp>). The proper motion in RA is the arc on the sky,
+    μ<sub>α</sub> cos δ (pmRA of UCAC4, UCAC5, Gaia, SDSS in VizieR);
+    the change of RA is pmRA / cos δ (versions before 0.6.2+hg1653 (patched)
+    added pmRA to RA: wrong by the factor 1/cos δ, 2 at Dec 60°).
+    When the catalogue has proper motions but no epoch, they are ignored with
+    a warning (on the standard error output and a COMMENT in the header).</li>
 <li>Initial estimation of parameters is computed by minimising of absolute
     deviations.</li>
 <li>The corresponding stars in catalogue and frame are found by searching
@@ -244,6 +260,16 @@ The known sequence of stars can be used to determine astrometry transformation:
     is performed.</li>
 <li>The transformation is determined with all possibles stars by the robust
     minimisation.</li>
+<li>The final fit (TAN, ten stars and more) is weighted by the errors of the
+    centroids: the error of a star is estimated by its S/N in the first
+    aperture of APERPHOT and the width of the PSF (HWHM of APERPHOT or FWHM
+    of FIND), with an excess scatter (the errors of the catalogue, of the
+    centroids of bright stars) by the maximum likelihood of the residuals;
+    the weights apply within the robust function. QUVIK-like frames (36
+    solutions of 10–220 stars): the rms error of the solution over the frame
+    against the truth 0.099 → 0.055 pixels (median), the maximal error
+    0.17 → 0.10 pixels, better in 22 frames, worse in 2. The TPV deformation
+    (<samp>-p TPV</samp>) is fitted without the weights.</li>
 </ul>
 
 <h3 id="significance">Significance of the solution</h3>
@@ -399,11 +425,13 @@ Default is 5, which is also the minimum (a solution needs five stars; smaller
 values are rejected with an error). Crowded fields will require increase the
 value on 7 or more. Upper limit is given by <samp>--maxmatch</samp>.</dd>
 <dt><samp>--maxmatch n</samp></dt><dd>Set maximum count of objects
-    in match sequence.
+    in match sequence: the number of stars in the chunks of the frame and the
+    catalogue which are matched against each other.
     The default is 42 or count of objects in catalogue or in frame.
     There is no upper limit, but values over hundredth are probably unusable.
     The recommended value for crowded field is 30 - 50.</dd>
-<dt><samp>--maxstar n</samp></dt><dd>Set maximum count of objects for matching.
+<dt><samp>--maxstars n</samp></dt><dd>Set maximum count of objects for matching:
+    the brightest stars of the catalogue and of the frame.
     The default is 250 or count of objects in catalogue or in frame.
     There is no upper limit, but values over hundredth are probably unusable.
     </dd>
@@ -553,9 +581,11 @@ munipack cone -c UCAC5 -o 0716cat.fits -r 0.1 -- 110.25 71.34
 UCAC5 is the recommended astrometric catalogue (default). We must provide
 coordinates of centre of frame (use coordinates of assumed object)
 and the cone radius (else a catalogue default will be used).
-Note parameter -s (sort by a column). The sorting requires
-knowledge of catalogue structure but strongly affects speed and
-success rate of matching.
+Note parameter -s (sort by a column). The astrometry sorts the catalogue
+by the magnitude column itself (<samp>--col-mag</samp>), so the sorting
+of the cone search is not needed any more; a cone restricted to the field
+of view of the frame (with a margin of about 10%) speeds up the matching
+and makes it more reliable.
 </p>
 
 
@@ -674,7 +704,7 @@ sorted by magnitude designed as 'f.mag'. You must known catalogue structure
 before
 use of -s (simply get catalogue without -s option, look for structure and
 than use -s with the given magnitude column label).
-Sorting significantly increase speed and probability of matching.
+The astrometry sorts the catalogue by <samp>--col-mag</samp> itself.
 </p>
 
 <h3>Invoking of Matching</h3>
@@ -727,7 +757,7 @@ Parameters -c, -r and -R are exclusive mutual.
 <sup><a href="#nm">[†]</a></sup>
 Parameters --minmatch and --maxmatch affects both speed (larger is slower)
 and chance of matching (lower is worse). The recommended values
-for --minmatch are 5 - 10 (default is 5) and --maxmatch 20 - 200 (default 33).
+for --minmatch are 5 - 10 (default and minimum 5) and --maxmatch 20 - 200 (default 42).
 </p>
 </div>
 
@@ -759,10 +789,9 @@ parameters for both matching and fitting algorithms.
 In doubts, check ones:
 </p>
 <ul>
-<li>The sorting of the table with astrometric stars.
-Stars would be sorted from the most brighter to faintness ones
-(parameter -s of the cone search,
-tables of detected objects are sorted by default)</li>
+<li>The magnitude column of the catalogue (<samp>--col-mag</samp>):
+both the catalogue and the detected stars are sorted by brightness
+internally, the brightest of them are matched.</li>
 <li>The search region is overlapping of the field of view of
 matched pictures.</li>
 <li>Try

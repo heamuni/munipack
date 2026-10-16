@@ -28,6 +28,8 @@ module astrofitting
   ! the minimum of stars for a solution: four parameters
   ! (the scale, the rotation and the centre) and their errors
   integer, parameter, public :: astrominstars = 5
+  ! the minimum of stars for the fit weighted by the errors of centroids
+  integer, parameter :: minweight = 10
 
   public :: astrofit
 
@@ -36,14 +38,16 @@ contains
   subroutine astrofit(fit,ptype,pcode,a,d,x,y,sig,xsig,xcen,ycen, &
        acen,dacen,dcen,ddcen,sc,dsc,refl,rms,rot,drot,pv,ares,dres, &
        id1_init,id2_init,id1_final,id2_final,rmscheck,verbose,plog,reliable, &
-       scale0,scaletol,frame,ntrial)
+       scale0,scaletol,frame,ntrial,perr)
 
     ! scale0, scaletol (optional): the expected scale [pix/deg] and its
     ! relative tolerance; a solution with a scale out of the tolerance is rejected;
     ! frame (optional): the size of the frame [pix] (NAXIS1, NAXIS2),
     ! ntrial (optional, 1 by default): the number of the transformations
     ! tried by the match (the starting pairs of the sequences), both for
-    ! the test of the significance of the solution
+    ! the test of the significance of the solution; perr (optional):
+    ! the errors of the centroids of the frame stars [pix], the final fit
+    ! is weighted by them (with the excess scatter of the solution)
 
     use robfit
     use deform
@@ -64,6 +68,7 @@ contains
     real(REAL64), intent(in), optional :: scale0, scaletol
     integer, dimension(:), intent(in), optional :: frame
     real(REAL64), intent(in), optional :: ntrial
+    real(REAL64), dimension(:), intent(in), optional :: perr
 
     real(REAL64), dimension(:), allocatable :: alpha,delta,xstar,ystar
     integer, dimension(:), allocatable :: id1, id2
@@ -166,6 +171,9 @@ contains
           allocate(id1_final(0),id2_final(0))
           return
        end if
+
+       ! the fit weighted by the errors of the centroids
+       if( present(perr) .and. n >= minweight ) call weighted
 
        if( ptype == 'TPV' ) then
 
@@ -272,6 +280,74 @@ contains
     deallocate(id1,id2)
 
   contains
+
+    subroutine weighted
+
+      ! The fit weighted by the errors of the centroids of the frame stars.
+      ! The variance of a residual (per axis) is modelled as k^2 (e^2 + q):
+      ! e by the S/N of the star (perr), k the scale of these errors,
+      ! q the excess (the errors of the catalogue, of the centroids of
+      ! bright stars: the pixel phase, unmodelled distortions); q is
+      ! the maximum of the likelihood of the residuals of the unweighted
+      ! solution (k profiled out), over the stars within 5 times their
+      ! scatter. The weights 1/sqrt(e^2 + q) are normalised by their mean
+      ! square (the scale of the fit is still in pixels). The unweighted
+      ! solution is kept when the weighted fit fails.
+
+      use oakleaf, only: median
+
+      integer, parameter :: nq = 80
+      type(AstroWCS) :: twcs
+      real(REAL64), dimension(n) :: xc, yc, r2, e2, w
+      logical, dimension(n) :: inl
+      real(REAL64) :: q, qbest, f, fbest, e2med, k2
+      real(REAL64), dimension(10) :: keep
+      logical :: rel
+      integer :: m, iq
+
+      call twcs % init(pcode,[acen,dcen],[xcen,ycen],sc,rot,refl)
+      call twcs % cel2pix(alpha,delta,xc,yc)
+      r2 = (xc - (xstar + xcen))**2 + (yc - (ystar + ycen))**2
+      e2 = perr(id2)**2
+      inl = r2 < (5*rms*sc)**2
+      m = count(inl)
+      if( .not. (m >= minweight .and. all(e2 > 0)) ) return
+
+      ! the profile likelihood of q on a logarithmic grid (and q = 0):
+      ! -log L = m + sum(log(e2 + q)) + m log(k2), k2 = sum(r2/(e2+q))/(2m)
+      e2med = median(pack(e2,inl))
+      qbest = 0
+      fbest = huge(fbest)
+      do iq = 0, nq
+         if( iq == 0 ) then
+            q = 0
+         else
+            q = e2med * 10.0_REAL64**(-3 + 5*real(iq - 1,REAL64)/(nq - 1))
+         end if
+         f = sum(log(e2 + q), inl) + m*log(sum(r2/(e2 + q), inl) / (2*m))
+         if( f < fbest ) then
+            fbest = f
+            qbest = q
+         end if
+      end do
+      k2 = sum(r2/(e2 + qbest), inl) / (2*m)
+      w = 1 / (e2 + qbest)
+      w = sqrt(w / (sum(w) / n))
+
+      keep = [acen,dacen,dcen,ddcen,sc,dsc,rot,drot,rms,s]
+      call robmin(pcode,fitmethod,alpha,delta,refl,xstar,ystar,s,&
+           acen,dacen,dcen,ddcen,sc,dsc,rot,drot,rms,verbose,rel,w)
+      if( verbose ) write(error_unit,'(a,i0,a,f0.3,a,f0.3,a,f0.3,a,f0.3,a,l1)') &
+           '# weighted fit: ',m,' stars, centroid errors (median) ',sqrt(e2med), &
+           ' pix x ',sqrt(k2),', excess ',sqrt(k2*qbest),' pix, rms ',rms*sc, &
+           ' pix, ok ',rel
+      if( .not. rel ) then
+         acen = keep(1); dacen = keep(2); dcen = keep(3); ddcen = keep(4)
+         sc = keep(5); dsc = keep(6); rot = keep(7); drot = keep(8)
+         rms = keep(9); s = keep(10)
+      end if
+
+    end subroutine weighted
 
     logical function significant()
 

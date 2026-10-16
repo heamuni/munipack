@@ -69,6 +69,8 @@ program astrometry
   ! at least), the rotation [deg], the relative scale
   logical :: wcsguide = .true.
   real(REAL64) :: wcsoffset = 0, wcsrot = 3, wcsscale = 0.03
+  ! the proper motions of the catalogue are ignored (no epoch)
+  logical :: catpmlost = .false.
   ! copies of --scale, --angle, --reflex for the frames
   real(REAL64) :: user_scale, user_angle, user_refl
   real(REAL64) :: sig2 = 1.0, sig1 = 1.0/3600.0, xsig = 5
@@ -550,7 +552,7 @@ contains
     real(REAL64), parameter :: rad = 57.295779513082322865_REAL64
 
     type(fitsfiles) :: fits
-    real(REAL64), allocatable, dimension(:) :: rec,dec,ares,dres,x,y,flux
+    real(REAL64), allocatable, dimension(:) :: rec,dec,ares,dres,x,y,flux,perr
     integer, allocatable, dimension(:) :: id1,id2
     integer, allocatable, dimension(:) :: i1,i2
     real(REAL64), dimension(2,0:11) :: pv
@@ -563,6 +565,9 @@ contains
     ! --reflex, are user_scale, user_angle, user_refl, unchanged
     ! for the next frames)
     real(REAL64) :: scale, angle, refl, scale0, ntrial
+    ! a note on the proper motions for the header, the lines of the header
+    character(len=2*FLEN_COMMENT) :: pmnote
+    integer :: nh
     integer, dimension(2) :: naxes
     ! the method of the solution (ASTRMETH): WCS, BLIND, CROSS, SEQUENCE
     character(len=8) :: method
@@ -590,7 +595,8 @@ contains
 
     status = 0
     call readfile(filename,key_dateobs,maxstars,x,y,flux,zcrpix,epoch,xframe,&
-         zcrval,status,scale=zscale,rot=zangle,refl=zrefl,wcsok=zwcs,frame=naxes)
+         zcrval,status,scale=zscale,rot=zangle,refl=zrefl,wcsok=zwcs,frame=naxes, &
+         perr=perr)
     if( status /= 0 ) then
        write(error_unit,*) "Error: Failed to open  `" //trim(filename)//"'"
        goto 77
@@ -621,15 +627,23 @@ contains
             ' The scale prior: ',scale0,' [pix/deg] +- ',100*scaletol,'%.'
     end if
 
-    ! equatorial coordinates at current epoch
+    ! equatorial coordinates at current epoch: the proper motion in RA
+    ! of the catalogues is the arc on the sky (pmRA = mu_alpha cos(delta):
+    ! UCAC4, UCAC5, Gaia, SDSS of VizieR), the change of RA is pmRA / cos(delta)
+    pmnote = ''
     if( IEEE_IS_NORMAL(epoch) ) then
-       rec = alpha + (epoch - epalpha)*pmalpha !*  cos(delta / rad)
+       rec = alpha + (epoch - epalpha)*pmalpha / max(cos(delta / rad),1e-6_REAL64)
        dec = delta + (epoch - epdelta)*pmdelta
     else
        ! missing proper motions or epochs
        rec = alpha
        dec = delta
+       if( any(pmalpha /= 0) .or. any(pmdelta /= 0) ) &
+            pmnote = 'Warning: proper motions ignored: no epoch of the frame (' &
+            //trim(key_dateobs)//')'
     end if
+    if( catpmlost ) pmnote = &
+         'Warning: proper motions ignored: no epoch of the catalogue (JEPOCH)'
 
     ! When the solution by a match is rejected (it is unreliable, or not
     ! significant; a false match), the next match is tried.
@@ -764,7 +778,7 @@ contains
        call astrofit(fit,ptype,pcode,rec,dec,x,y,sig2,xsig, &
             crpix(1),crpix(2),crval(1),dcrval(1),crval(2),dcrval(2),&
             scale,dscale,refl,rms,angle,dangle,pv,ares,dres,id1,id2,i1,i2, &
-            rmscheck,verbose,plog,reliable,scale0,scaletol,naxes,ntrial)
+            rmscheck,verbose,plog,reliable,scale0,scaletol,naxes,ntrial,perr)
 
        if( .not. reliable .and. mode == 'MATCH' .and. nattempt < maxattempt ) then
           ! try a next match, nskip is the chunk pair of the rejected one
@@ -785,7 +799,11 @@ contains
              write(*,'(a)') "=ASTROFIT> Finish Success"
           end if
 
-          allocate(com(17+size(i1)))
+          ! the header lines (and the note), the residuals
+          nh = 16
+          if( pmnote /= '' ) nh = 17
+          allocate(com(nh+1+size(i1)))
+          if( pmnote /= '' ) com(17) = pmnote
 
           a = cos(angle/rad)
           da = abs((dangle/rad)*sin(angle/rad))
@@ -868,19 +886,19 @@ contains
 
           if( aunits == 'uas' .or. aunits == 'mas' .or. aunits == 'arcsec' .or. &
                aunits == 'arcmin' .or. aunits == 'deg' ) then
-             write(com(17),'(3a)') '    Equatorial RA,DEC [deg]     Data X,Y [pix]     Residuals [',trim(aunits),']'
+             write(com(nh+1),'(3a)') '    Equatorial RA,DEC [deg]     Data X,Y [pix]     Residuals [',trim(aunits),']'
           else if( aunits == 'pix' ) then
-             write(com(17),'(a)') '   Reference X,Y [pix]       Data X,Y [pix]       Residuals [pix]'
+             write(com(nh+1),'(a)') '   Reference X,Y [pix]       Data X,Y [pix]       Residuals [pix]'
           end if
 
           if( rel /= '' ) then
              do n = 1, size(ares)
-                write(com(17+n),'(2f9.3,6x,2f10.3,1x,2f9.3)') &
+                write(com(nh+1+n),'(2f9.3,6x,2f10.3,1x,2f9.3)') &
                      alpha(i1(n))+xcrpix(1),delta(i1(n))+xcrpix(2),x(i2(n)),y(i2(n)),ares(n),dres(n)
              end do
           else
              do n = 1, size(ares)
-                write(com(17+n),'(2f13.7,2f10.3,2en12.1)') &
+                write(com(nh+1+n),'(2f13.7,2f10.3,2en12.1)') &
                      alpha(i1(n)),delta(i1(n)),x(i2(n)),y(i2(n)),sm*ares(n),sm*dres(n)
              end do
           end if
@@ -945,6 +963,7 @@ contains
 
 77  continue
     if( allocated(x) ) deallocate(x,y,flux)
+    if( allocated(perr) ) deallocate(perr)
     if( allocated(id1) ) deallocate(id1,id2)
 
     if( plog ) write(*,'(a)') "=ASTROMETRY> Finish"
@@ -1108,7 +1127,7 @@ contains
 
     call readtable(cat,col_ra,col_dec,col_pmra,col_pmdec,col_mag,col_epra, &
          col_epdec,maxstars,alpha,delta,pmalpha,pmdelta,epalpha,epdelta,rflux, &
-         rframe,idcat,repoch,verbose,status)
+         rframe,idcat,repoch,verbose,status,catpmlost)
     if( status /= 0 ) stop "Failed to open the catalogue file."
     if( size(alpha) < 1 ) stop "Error: no valid stars in the catalogue."
 
