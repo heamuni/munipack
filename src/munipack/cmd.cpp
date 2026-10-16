@@ -440,16 +440,18 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption("","psf-zoom","EMPIRICAL: samples per pixel "
 	      "(default: 4 for FWHM < 5 pix, else 2)",wxCMD_LINE_VAL_NUMBER);
     AddOption("","psf-radius","EMPIRICAL: radius of the residual table [pix] "
-	      "(default: 4*FWHM)",wxCMD_LINE_VAL_DOUBLE);
+	      "(default: 99.5% of the flux, at least 4*FWHM)",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","psf-var","EMPIRICAL: order of the spatial variation "
 	      "0, 1, 2 (default: 0)",wxCMD_LINE_VAL_NUMBER);
+    AddOption("","psf-var-radial","EMPIRICAL: order of the variation by "
+	      "the field radius 0-3 (default: 0)",wxCMD_LINE_VAL_NUMBER);
     AddOption("","psf-stars","EMPIRICAL: maximum of PSF stars (default: 100)",
 	      wxCMD_LINE_VAL_NUMBER);
     AddOption("","psf-list","EMPIRICAL: PSF stars by a list (x y per line, "
 	      "or a FITS table with X, Y)");
     AddOption("","psf-save","EMPIRICAL: save the PSF to a PSF file");
     AddOption("","psf-smooth","EMPIRICAL: regularisation of the residual "
-	      "table (default: 0.01)",wxCMD_LINE_VAL_DOUBLE);
+	      "table (default: by cross-validation)",wxCMD_LINE_VAL_DOUBLE);
     AddOption("","fwhm","FWHM [pix] of analytic PSF (default: fitted)",
 	      wxCMD_LINE_VAL_DOUBLE);
     AddOption("","beta","Moffat exponent (default: fitted)",
