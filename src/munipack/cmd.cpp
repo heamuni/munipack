@@ -704,6 +704,8 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption("","color-ref","reference colour of the colour term [mag]: "
 	      "mean (of the calibration stars, default) or a value; "
 	      "a list for every --color-term");
+    AddOption("","color-err-correct","correct the colour terms for the errors "
+	      "of the catalogue colours (errA,errB): yes (default) or no");
     AddOption("","photsys-ref","reference photometry system (catalogue)");
     AddOption("","photsys-instr","instrumental photometry system (frames)");
     AddOption(wxEmptyString,"area","area of input aperture [m2]",wxCMD_LINE_VAL_DOUBLE);

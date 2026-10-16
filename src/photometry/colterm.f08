@@ -61,6 +61,15 @@
 !  colours and their scatter); the calibration uses the stars with all
 !  the colours only.
 !
+!  The catalogue colours scatter about the true ones by their errors,
+!  which biases the coefficients towards zero (the regression dilution:
+!  by the reliability ratio lambda, the variance of the true colours over
+!  the observed one) and, as the colour contains the catalogue magnitude
+!  of the calibration, by the covariance of their errors. With the error
+!  columns, the fit of one or several colours is corrected for them
+!  (errcorr, the moments of Fuller 1987, mixfit of exscatter.f08), capped
+!  when a combination of the terms is hardly wider than its errors.
+!
 
 module colterm
 
@@ -118,6 +127,20 @@ module colterm
      real(dbl), dimension(:,:), allocatable :: col, dcol
      real(dbl), dimension(:,:,:), allocatable :: ccov
      real(dbl) :: tol = 0
+     ! COLT_CAT: the correction of the fit for the errors of the catalogue
+     ! colours (the regression dilution, --color-err-correct), the colours
+     ! with the error columns (j); the reliability ratios of the colours of
+     ! the calibration stars, the variance of the true colours over
+     ! the observed one (j,n; 1 without the errors), the status of
+     ! the correction (n): 0 not applied, 1 applied, 2 applied with the cap
+     ! (the corrected moments of a combination of the terms below lammin
+     ! of exscatter.f08), 3 applied, the fit not converged; the fraction of
+     ! the correction applied (n; 1 full, < 1 capped)
+     logical :: errcorr = .true.
+     logical, dimension(:), allocatable :: colerr
+     real(dbl), dimension(:,:), allocatable :: lam
+     integer, dimension(:), allocatable :: eivst
+     real(dbl), dimension(:), allocatable :: eivh
   end type colour_term
 
   public :: colterm_init, colour_corr, colour_predict, colour_solve
@@ -142,7 +165,8 @@ contains
          ctm%ib(nbands),ctm%order(nt,nbands),ctm%nstars(nbands), &
          ctm%beta(0:2*nt,nbands),ctm%cov(2*nt+1,2*nt+1,nbands), &
          ctm%cref(nt,nbands),ctm%cmean(nt,nbands),ctm%cstd(nt,nbands), &
-         ctm%gmean(nt,nbands),ctm%gstd(nt,nbands),ctm%ccs(nt,nt,nbands))
+         ctm%gmean(nt,nbands),ctm%gstd(nt,nbands),ctm%ccs(nt,nt,nbands), &
+         ctm%colerr(nt),ctm%lam(nt,nbands),ctm%eivst(nbands),ctm%eivh(nbands))
     ctm%cola = ''
     ctm%colb = ''
     ctm%ia = 0
@@ -157,6 +181,10 @@ contains
     ctm%gmean = 0
     ctm%gstd = 0
     ctm%ccs = 0
+    ctm%colerr = .false.
+    ctm%lam = 1
+    ctm%eivst = 0
+    ctm%eivh = 0
     allocate(ctm%ra(0),ctm%dec(0),ctm%col(0,nt),ctm%dcol(0,nt),ctm%ccov(0,nt,nt))
 
   end subroutine colterm_init

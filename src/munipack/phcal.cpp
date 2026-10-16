@@ -163,6 +163,17 @@ MuniPhcal::MuniPhcal(wxEvtHandler *h, const MuniCmdLineParser& cmd):
 	Write("COLOR_REF =" + l);
     }
 
+    // the correction of the colour terms for the errors of the catalogue
+    // colours (with the error columns of --color-term)
+    if( cmd.Found("color-err-correct",&a) ) {
+      if( a.Upper() == "YES" )
+	Write("COLOR_ERRCORR = T");
+      else if( a.Upper() == "NO" )
+	Write("COLOR_ERRCORR = F");
+      else
+	MuniFatalError("--color-err-correct `%s': yes or no.",a);
+    }
+
     if( cmd.Found("photsys-instr",&a) )
       Write("PHOTSYS_INSTR = '"+a+"'");
 

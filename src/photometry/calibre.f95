@@ -311,7 +311,10 @@ contains
     ! the colours j /= k of a star, (:,j,k).
     ! ctm%model = COLT_CAT: the coefficients are fitted with ctph (of
     ! the orders ctm%order), cref is the mean colour of the calibration
-    ! stars when ctm%cref = cref_mean; COLT_TRA (one colour):
+    ! stars when ctm%cref = cref_mean; with ctm%errcorr the fit is
+    ! corrected for the errors of the colours (the regression dilution;
+    ! the reliability ratios in ctm%lam, the status in ctm%eivst);
+    ! COLT_TRA (one colour):
     ! the coefficients ctm%beta(1:2,:) and ctm%cref are fixed, ctph is
     ! fitted.
     ! syserr as in calibr (< 0: the systematic error fitted by the mixture
@@ -324,6 +327,7 @@ contains
 
     use colterm
     use exscatter
+    use iso_fortran_env, only: error_unit
 
     real(dbl), dimension(:,:), intent(in) :: pht,dpht,cts,dcts
     real(dbl), dimension(:,:,:), intent(in) :: col,dcol,cyc
@@ -399,7 +403,8 @@ contains
           cbar = sum(col(:,n,1),mask=valid) / count(valid)
           x = col(:,n,1) - cbar
           call mixture_fit(y,e,x,ex,cx,ctm%order(1,n),fixsig,b,cv,sig,fout,q, &
-               sigint=si,nfit=nf)
+               sigint=si,nfit=nf,errcorr=ctm%errcorr,lambda=ctm%lam(1,n), &
+               eivstat=ctm%eivst(n),eivh=ctm%eivh(n))
           if( ctm%cref(1,n) == cref_mean ) then
              w = q / (e**2 + sig**2)
              sw = sum(w,mask=valid)
@@ -445,7 +450,8 @@ contains
              cbm(j) = cbar
           end do
           call mixture_fit_multi(y,e,xm,exm,exx,cxm,ctm%order(:,n),fixsig, &
-               bm,cvm,sig,fout,q,sigint=si,nfit=nf)
+               bm,cvm,sig,fout,q,sigint=si,nfit=nf,errcorr=ctm%errcorr, &
+               lambda=ctm%lam(:,n),eivstat=ctm%eivst(n),eivh=ctm%eivh(n))
           w = q / (e**2 + sig**2)
           sw = sum(w,mask=valid)
           do j = 1, nt
@@ -485,6 +491,21 @@ contains
           ctm%cov(1,1,n) = cv(1,1)
 
        end if
+
+       if( ctm%model == COLT_CAT .and. ctm%eivst(n) == 2 ) &
+            write(error_unit,'(a,i0,a,f0.3,a)') 'Warning: the correction of the ' // &
+            'colour terms for the errors of the colours capped (band ',n, &
+            '): a combination of the terms (the square of a colour, ' // &
+            'correlated colours) hardly wider than its errors for so few ' // &
+            'stars, corrected by the fraction ',ctm%eivh(n),' (COLTCAP).'
+       if( ctm%model == COLT_CAT .and. ctm%eivst(n) == -1 ) &
+            write(error_unit,'(a,i0,a)') 'Warning: the colour terms not ' // &
+            'corrected for the errors of the colours (band ',n, &
+            '): too few stars (COLTDILU F, COLTLAM reported).'
+       if( ctm%model == COLT_CAT .and. ctm%eivst(n) == 3 ) &
+            write(error_unit,'(a,i0,a)') 'Warning: the fit of the colour terms ' // &
+            'corrected for the errors of the colours did not converge (band ',n, &
+            '): the result uncertain beyond its errors.'
 
        ctph(n) = exp(ctm%beta(0,n))
        dctph(n) = ctph(n) * sqrt(ctm%cov(1,1,n))
@@ -562,6 +583,23 @@ contains
                   write(*,'(a,f0.5,a,f0.5,a)') '  k2 = ',-magln*ctm%beta(2*j,n), &
                   ' +- ',magln*sqrt(max(ctm%cov(2*j+1,2*j+1,n),0.0_dbl)),' mag/mag**2'
           end do
+          if( ctm%model == COLT_CAT .and. any(ctm%colerr) ) then
+             if( ctm%eivst(n) == 1 ) then
+                write(*,'(a)',advance='no') '  corrected for the errors of the colours'
+             else if( ctm%eivst(n) == 2 ) then
+                write(*,'(a,f0.3)',advance='no') &
+                     '  corrected for the errors of the colours, capped at ',ctm%eivh(n)
+             else if( ctm%eivst(n) == 3 ) then
+                write(*,'(a)',advance='no') &
+                     '  corrected for the errors of the colours, not converged'
+             else if( ctm%eivst(n) == -1 ) then
+                write(*,'(a)',advance='no') &
+                     '  not corrected for the errors of the colours (too few stars)'
+             else
+                write(*,'(a)',advance='no') '  not corrected for the errors of the colours'
+             end if
+             write(*,'(a,3(1x,f0.3))') ', reliability ratio:',ctm%lam(:,n)
+          end if
           write(*,'(a,f0.5,a,f0.5,a,f0.5,a,i0,a,f0.3,a,1pg0.6,a,1pg0.2)') &
                '  systematic error: ',sys(n),' mag (',magln*si(1),' .. ', &
                magln*si(2),', ',nf,' stars), outlier fraction: ',fout, &

@@ -127,6 +127,11 @@ slope() {   # the slope of MAG - r against g - r
         END { print (n * sxy - sx * sy) / (n * sxx - sx * sx) }' res.txt
 }
 
+# The frame is rendered from the catalogue, so its colours are exact and
+# (by the man page) the error columns should be left out; they are kept
+# here as in the previous version: the SDSS errors of g - r are 1-2% of its
+# range (lambda 0.99), the correction for them (BUGS P57) moves k1 by
+# 0.002, well within the checks
 mkdir o1 o2 nc
 munipack phcal $C --color-term gpmag,rpmag,e_gpmag,e_rpmag -t o1 g.fits \
     > /dev/null 2>&1

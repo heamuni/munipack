@@ -75,6 +75,9 @@ program phcal
   integer :: ncterm = 0
   integer, dimension(:), allocatable :: color_order
   real(dbl), dimension(:), allocatable :: color_ref
+  ! the fit corrected for the errors of the catalogue colours (with
+  ! the error columns; --color-err-correct)
+  logical :: color_errcorr = .true.
   integer :: eq,nfile,n,nmag,nmagerr,nfilters,nctph,saper,ncol1
   character(len=FLEN_KEYWORD), dimension(8) :: keys
   integer :: nqlabels
@@ -243,6 +246,10 @@ program phcal
      else if( key == 'COLOR_REF' ) then
 
         read(val,*) color_ref
+
+     else if( key == 'COLOR_ERRCORR' ) then
+
+        read(val,*) color_errcorr
 
      else if( key == 'TOL' ) then
 
@@ -444,6 +451,7 @@ contains
          cts,dcts,dn,ddn,ra,dec,mag,dmag,cmag,cdmag,magx,dmagx,sysint,ccol,dccol
     real(dbl), allocatable, dimension(:,:,:) :: ccl,dccl,ccy,ccv,cerr
     real(dbl) :: q, d
+    integer :: l0
     type(type_phsys) :: phsyscal
     type(photores), dimension(:), allocatable :: phres
     type(colour_term) :: ctm
@@ -497,7 +505,9 @@ contains
              dccol(:,j) = -1
           end where
           if( ncolor(j) == 4 ) then
-             where( dccol(:,j) >= 0 .and. cdmag(:,1) < 9 .and. cdmag(:,2) < 9 )
+             ! a negative error (a -9999 sentinel) is undefined, as one >= 9
+             where( dccol(:,j) >= 0 .and. cdmag(:,1) >= 0 .and. cdmag(:,1) < 9 .and. &
+                  cdmag(:,2) >= 0 .and. cdmag(:,2) < 9 )
                 dccol(:,j) = sqrt(cdmag(:,1)**2 + cdmag(:,2)**2)
                 cerr(:,1,j) = cdmag(:,1)
                 cerr(:,2,j) = cdmag(:,2)
@@ -505,15 +515,19 @@ contains
           end if
           deallocate(cra,cdec,cmag,cdmag)
        end do
+       ! (both colours with the error columns only, symmetric: the error of
+       ! the shared band the mean of its two error columns; a colour without
+       ! them is taken as exact, its covariances zero)
        ccv = 0
        do j = 1, ncterm
-          do k = 1, ncterm
-             if( j == k ) cycle
+          do k = j + 1, ncterm
+             if( .not. (ncolor(j) == 4 .and. ncolor(k) == 4) ) cycle
              where( dccol(:,j) >= 0 .and. dccol(:,k) >= 0 )
-                ccv(:,j,k) = shared(1,j,1,k)*cerr(:,1,j)**2 &
-                     - shared(1,j,2,k)*cerr(:,1,j)**2 &
-                     - shared(2,j,1,k)*cerr(:,2,j)**2 &
-                     + shared(2,j,2,k)*cerr(:,2,j)**2
+                ccv(:,j,k) = shared(1,j,1,k)*(cerr(:,1,j)**2 + cerr(:,1,k)**2)/2 &
+                     - shared(1,j,2,k)*(cerr(:,1,j)**2 + cerr(:,2,k)**2)/2 &
+                     - shared(2,j,1,k)*(cerr(:,2,j)**2 + cerr(:,1,k)**2)/2 &
+                     + shared(2,j,2,k)*(cerr(:,2,j)**2 + cerr(:,2,k)**2)/2
+                ccv(:,k,j) = ccv(:,j,k)
              end where
           end do
        end do
@@ -579,15 +593,19 @@ contains
           ctm%colb(j,:) = col_color(2,j)
           ctm%order(j,:) = color_order(min(j,size(color_order)))
           ctm%cref(j,:) = color_ref(min(j,size(color_ref)))
+          ctm%colerr(j) = ncolor(j) == 4
        end do
+       ctm%errcorr = color_errcorr
        ctm%ra = refra
        ctm%dec = refdec
        ctm%col = ccol
        ctm%dcol = dccol
        ctm%ccov = ccv
        ctm%tol = tol(1)
+       ! (with the errors of the bands A, B of every colour, l0)
        nf = size(mag,2)
-       l = nf + 2*ncterm + ncterm**2
+       l0 = nf + 2*ncterm + ncterm**2
+       l = l0 + 2*ncterm
        allocate(magx(size(mag,1),l),dmagx(size(mag,1),l))
        magx(:,1:nf) = mag
        do j = 1, ncterm
@@ -596,21 +614,25 @@ contains
           do k = 1, ncterm
              magx(:,nf+2*ncterm+(j-1)*ncterm+k) = ccv(:,j,k)
           end do
+          magx(:,l0+2*j-1) = cerr(:,1,j)
+          magx(:,l0+2*j) = cerr(:,2,j)
        end do
        dmagx(:,1:nf) = dmag
        dmagx(:,nf+1:) = 0
        call jamcat(tol, refra, refdec, magx, dmagx, ra,dec,dn,ddn,cts,dcts)
        mag = magx(:,1:nf)
        dmag = dmagx(:,1:nf)
-       deallocate(ccol,dccol,ccv)
+       deallocate(ccol,dccol,ccv,cerr)
        allocate(ccol(size(magx,1),ncterm),dccol(size(magx,1),ncterm), &
-            ccv(size(magx,1),ncterm,ncterm))
+            ccv(size(magx,1),ncterm,ncterm),cerr(size(magx,1),2,ncterm))
        do j = 1, ncterm
           ccol(:,j) = magx(:,nf+2*j-1)
           dccol(:,j) = magx(:,nf+2*j)
           do k = 1, ncterm
              ccv(:,j,k) = magx(:,nf+2*ncterm+(j-1)*ncterm+k)
           end do
+          cerr(:,1,j) = magx(:,l0+2*j-1)
+          cerr(:,2,j) = magx(:,l0+2*j)
        end do
        deallocate(magx,dmagx)
     else
@@ -815,8 +837,14 @@ contains
     if( ctm%model /= COLT_NONE ) then
        ! the colours of the calibration stars, their errors, the covariance
        ! of ln(ph) and the colour (the colour of a band containing
-       ! the catalogue magnitude of the band: -dmag**2/magln for A,
-       ! +dmag**2/magln for B, with the errors of the colour only)
+       ! the catalogue magnitude of the band: -err**2/magln for A,
+       ! +err**2/magln for B, with the errors of the colour only). err is
+       ! the error of the band in the colour (its error column of
+       ! --color-term), the one of the correction of the colour (P57: by
+       ! the error of the magnitude, --col-magerr, a colour of the error
+       ! 0.3 of the band and a magnitude error column of 0.002 left
+       ! the covariance out, k -0.38 for -0.30); a warning when the two
+       ! errors of the band differ
        allocate(ccl(ncat,nfiles,ctm%nterm),dccl(ncat,nfiles,ctm%nterm), &
             ccy(ncat,nfiles,ctm%nterm))
        ccy = 0
@@ -826,19 +854,29 @@ contains
                 ccl(:,n,j) = ccol(1:ncat,j)
                 dccl(:,n,j) = dccol(1:ncat,j)
                 if( ncolor(j) == 4 ) then
-                   d = 0
-                   if( col_color(1,j) == colmag(n) ) d = d - 1
-                   if( col_color(2,j) == colmag(n) ) d = d + 1
-                   where( dccl(:,n,j) >= 0 .and. dmag(1:ncat,n) < 9 )
-                      ccy(:,n,j) = d * dmag(1:ncat,n)**2 / magln
-                   end where
+                   do k = 1, 2
+                      if( col_color(k,j) /= colmag(n) ) cycle
+                      d = merge(-1.0_dbl,1.0_dbl,k == 1)
+                      where( dccl(:,n,j) >= 0 )
+                         ccy(:,n,j) = ccy(:,n,j) + d * cerr(1:ncat,k,j)**2 / magln
+                      end where
+                      if( any(dccl(:,n,j) > 0 .and. dmag(1:ncat,n) >= 0 .and. &
+                           dmag(1:ncat,n) < 9 .and. &
+                           abs(dmag(1:ncat,n) - cerr(1:ncat,k,j)) > &
+                           1e-3_dbl + 0.1_dbl*cerr(1:ncat,k,j)) ) &
+                           write(error_unit,*) 'Warning: the errors of `', &
+                           trim(colmag(n)),"' (--col-magerr) and of its colour (", &
+                           trim(col_color(k+2,j)),') differ; the covariance of ', &
+                           'the colour and the magnitude by the latter.'
+                   end do
                 end if
              end do
           else
              ia = ctm%ia(n)
              ib = ctm%ib(n)
              ccl(:,n,1) = mag(1:ncat,ia) - mag(1:ncat,ib)
-             where( dmag(1:ncat,ia) < 9 .and. dmag(1:ncat,ib) < 9 )
+             where( dmag(1:ncat,ia) >= 0 .and. dmag(1:ncat,ia) < 9 .and. &
+                  dmag(1:ncat,ib) >= 0 .and. dmag(1:ncat,ib) < 9 )
                 dccl(:,n,1) = sqrt(dmag(1:ncat,ia)**2 + dmag(1:ncat,ib)**2)
              elsewhere
                 dccl(:,n,1) = 0
@@ -846,7 +884,8 @@ contains
              d = 0
              if( ia == n ) d = d - 1
              if( ib == n ) d = d + 1
-             where( dmag(1:ncat,ia) < 9 .and. dmag(1:ncat,ib) < 9 )
+             where( dmag(1:ncat,ia) >= 0 .and. dmag(1:ncat,ia) < 9 .and. &
+                  dmag(1:ncat,ib) >= 0 .and. dmag(1:ncat,ib) < 9 )
                 ccy(:,n,1) = d * dmag(1:ncat,n)**2 / magln
              end where
           end if
