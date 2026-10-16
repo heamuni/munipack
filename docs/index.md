@@ -13,7 +13,11 @@ docker build -t munipack:0.6.2-hg1653-fixes .
 docker run --rm -u $(id -u):$(id -g) -v "$PWD":/data munipack:0.6.2-hg1653-fixes find frame.fits
 ```
 
-New here? Start with {doc}`install` and then the {doc}`quickstart`.
+New here? Start with {doc}`install` and then the {doc}`quickstart`. The
+tutorials then walk through whole tasks step by step:
+{doc}`a single image <tutorials/single-image>` from raw frame to calibrated
+magnitudes, {doc}`a time series <tutorials/time-series>` ending in a light
+curve, and {doc}`stacking and colour images <tutorials/colour-image>`.
 
 ## What you can do
 
@@ -42,7 +46,10 @@ New here? Start with {doc}`install` and then the {doc}`quickstart`.
 ## Routines
 
 Every routine is run as `munipack <routine> [options] file(s)`, and each has
-its own page in the sidebar. For the option list on your own machine, run
+its own page in the sidebar. The ones used in everyday work are under
+*Routines*; the less common ones (instrument transformations, name lookup,
+catalogue conversion and cross-matching, FITS utilities) are under *Other
+routines*. For the option list on your own machine, run
 `munipack <routine> --help`.
 
 `munipack` on its own takes three options: `--version` prints the version and
@@ -62,8 +69,10 @@ quickstart
 :caption: User guide
 :maxdepth: 2
 
+Single image <tutorials/single-image>
+Time series <tutorials/time-series>
+Colour images <tutorials/colour-image>
 concepts
-validation
 ```
 
 ```{toctree}
@@ -80,16 +89,22 @@ gphot <routines/gphot>
 psfphot <routines/psfphot>
 astrometry <routines/astrometry>
 phcal <routines/phcal>
-phfotran <routines/phfotran>
 kombine <routines/kombine>
 colouring <routines/colouring>
 artificial <routines/artificial>
 cone <routines/cone>
+timeseries <routines/timeseries>
+```
+
+```{toctree}
+:caption: Other routines
+:maxdepth: 1
+
+phfotran <routines/phfotran>
 sesame <routines/sesame>
 votable <routines/votable>
 cross <routines/cross>
 fits <routines/fits>
-timeseries <routines/timeseries>
 ```
 
 ```{toctree}

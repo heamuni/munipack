@@ -96,4 +96,9 @@ munipack gphot --var 0 --verbose 'frame.fits frame_grow.fits'
   extrapolation to infinity. Light in faint, extended PSF wings is missed,
   but it is the same fraction for every star, so the photometric calibration
   absorbs it.
+- The growth curves come from bright, isolated stars, and isolation is
+  judged from the FWHM written by {doc}`find`. If that FWHM is badly off, for
+  example because stars were split into several detections, check the `find`
+  result first. On a frame with very few stars, use `aphot --psf-file` or
+  {doc}`psfphot` instead.
 - {doc}`psfphot` is the other way to get total fluxes.

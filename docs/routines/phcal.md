@@ -127,7 +127,13 @@ fits this dependence in a catalogue colour. Stars without a catalogue colour
 get the average correction, with a correspondingly larger error. If several
 colours are given they must be independent (not u − g, g − r and u − r).
 Colour terms need a catalogue (`-c`) and cannot be combined with `-r` or
-`--tratab`. If your catalogue colours are more precise than their quoted
+`--tratab`.
+
+**Noisy catalogue colours.** Errors in the catalogue colours flatten the
+fitted colour term. When the colour columns come with error columns
+(`--color-term u,g,e_u,e_g`), `phcal` corrects for this. With fewer than
+about 17 stars the correction is unreliable, so it is skipped with a
+warning. If your catalogue colours are more precise than their quoted
 errors (e.g. frames simulated from the catalogue), use
 `--color-err-correct no`, otherwise the colour term is over-corrected.
 

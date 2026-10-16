@@ -48,6 +48,22 @@ fails. The tests in `tests/` then check each area on frames simulated by
 `artificial`, so the true answer is known and no network is needed. The whole
 set takes a few minutes; {doc}`tests` describes what each test checks.
 
+## How the methods were validated
+
+Each method was checked on frames made by `artificial`, where the true
+positions and fluxes of all stars are known, and against independent
+calculations with astropy, numpy and analytic formulas. Two kinds of frames
+were used: ground-based frames with a bright sky, and faint low-count frames
+typical of a space ultraviolet telescope.
+
+In short, the results agree with the truth within their reported errors, and
+the reported errors match the actual scatter. This holds for the whole chain
+from `find` to `phcal`, for the aperture, PSF and growth-curve photometry, for
+the astrometry and for the master calibration frames. Most of these checks
+are now part of the tests in `tests/` ({doc}`tests`), and the measured
+numbers for each fix are in
+[BUGS.md](https://github.com/heamuni/munipack/blob/develop/BUGS.md).
+
 ## Continuous integration
 
 Every push to `main` or `develop`, and every pull request, is built and

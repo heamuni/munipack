@@ -94,7 +94,8 @@ For `--apcorr auto`, let the apertures reach out to the sky ring, so that
 the growth curves level off before the largest aperture, for example
 `--apertures 1,1.5,2,3,4,5,7,9,12,15,20,23,26.4,30.4,35,40 --ring 45,60`.
 It works best with about 30 or more bright, isolated stars and a correct
-FWHM from `find`.
+FWHM from `find`. On a nearly empty frame give a PSF with `--psf-file`
+instead.
 ```
 
 ## Output

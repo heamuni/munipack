@@ -1,6 +1,6 @@
 # Differences from upstream
 
-This fork is based on the upstream Munipack development version 0.6.2+hg1653 (Mercurial revision 1653). It fixes a long list of bugs and adds a few new tools and options. This page gives the short version. The full technical list, with how each bug was found and checked, is in [BUGS.md](https://github.com/heamuni/munipack/blob/develop/BUGS.md), and the measured accuracy is in {doc}`validation`.
+This fork is based on the upstream Munipack development version 0.6.2+hg1653 (Mercurial revision 1653). It fixes a long list of bugs and adds a few new tools and options. This page gives the short version. The full technical list, with how each bug was found and checked, is in [BUGS.md](https://github.com/heamuni/munipack/blob/develop/BUGS.md), and how the methods were tested is in {doc}`development`.
 
 Most of the photometry fixes matter on faint skies of a few electrons per pixel. On typical ground-based frames, results change by less than their noise.
 

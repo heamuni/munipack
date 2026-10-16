@@ -115,6 +115,9 @@ Any FITS reader works too, such as TOPCAT or `astropy.io.fits`. Re-running an ac
 
 ## Next steps
 
+- The tutorials go through whole tasks with calibration frames included:
+  [a single image](tutorials/single-image.md) from raw frame to calibrated
+  magnitudes, [a time series](tutorials/time-series.md) ending in a light
+  curve, and [stacking and colour images](tutorials/colour-image.md).
 - [Concepts](concepts.md): files and extensions, units, errors and the PSF file format.
-- [Accuracy and validation](validation.md): what accuracy to expect from each method.
 - Each routine has its own page with every option, for example [artificial](routines/artificial.md), [find](routines/find.md), [aphot](routines/aphot.md), [psfphot](routines/psfphot.md), [gphot](routines/gphot.md), [astrometry](routines/astrometry.md), [phcal](routines/phcal.md), [cone](routines/cone.md), [phcorr](routines/phcorr.md), [kombine](routines/kombine.md), [fits](routines/fits.md); the full list is in the sidebar under Routines.

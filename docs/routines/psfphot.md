@@ -35,7 +35,8 @@ noise and saturation level are read from the FITS header (`GAIN`, `READNS` or
   (`--psf-var`, `--psf-var-radial`). If you also give `--psf-file`, the file is
   used as a starting point and the frame only corrects it.
 
-An empirical PSF needs enough bright, isolated, unsaturated stars. If there are
+An empirical PSF needs enough bright, isolated, unsaturated stars, and they
+should be mostly single stars, since any close companion goes into the PSF. If there are
 too few for the requested variation, `psfphot` lowers the order and warns you.
 
 ## Options
