@@ -300,29 +300,33 @@ contains
 
 
   subroutine calibr_colour(pht,dpht,cts,dcts,col,dcol,cyc,ctm,ctph,dctph,phres,&
-       verbose,syserr,sys,sysint,nsys)
+       verbose,syserr,sys,sysint,nsys,ccv)
 
-    ! The calibration of every band (column) with a colour term (colterm):
-    ! ln(ph/ct) = ln ctph + b1 (c - cref) + b2 (c - cref)**2. col are
-    ! the colours of the stars, dcol their errors (< 0: no colour, the star
-    ! is not used), cyc the covariance of ln(ph) and of the colour
-    ! (the colour contains the catalogue magnitude of the band).
+    ! The calibration of every band (column) with colour terms (colterm):
+    ! ln(ph/ct) = ln ctph + sum_j b1_j (c_j - cref_j) + b2_j (c_j - cref_j)**2.
+    ! col(:,n,j) are the colours j of the stars for the band n, dcol their
+    ! errors (< 0: no colour, the star is not used), cyc the covariance of
+    ! ln(ph) and of the colour (the colour contains the catalogue magnitude
+    ! of the band), ccv (optional, several colours) the covariances of
+    ! the colours j /= k of a star, (:,j,k).
     ! ctm%model = COLT_CAT: the coefficients are fitted with ctph (of
-    ! the order ctm%order), cref is the mean colour of the calibration
-    ! stars when ctm%cref = cref_mean; COLT_TRA: the coefficients
-    ! ctm%beta(1:2,:) and ctm%cref are fixed, ctph is fitted.
+    ! the orders ctm%order), cref is the mean colour of the calibration
+    ! stars when ctm%cref = cref_mean; COLT_TRA (one colour):
+    ! the coefficients ctm%beta(1:2,:) and ctm%cref are fixed, ctph is
+    ! fitted.
     ! syserr as in calibr (< 0: the systematic error fitted by the mixture
     ! likelihood, >= 0: the value [mag], fixed); sys the values applied,
     ! sysint (optional) their intervals, nsys (optional) the numbers of
     ! the stars (see syscal).
     ! On output, ctm holds the coefficients, their covariance (ln ctph
-    ! included), the mean colour, the mean colour correction of
+    ! included), the mean colours, the mean colour corrections of
     ! the calibration stars and their scatter.
 
     use colterm
     use exscatter
 
-    real(dbl), dimension(:,:), intent(in) :: pht,dpht,cts,dcts,col,dcol,cyc
+    real(dbl), dimension(:,:), intent(in) :: pht,dpht,cts,dcts
+    real(dbl), dimension(:,:,:), intent(in) :: col,dcol,cyc
     type(colour_term), intent(in out) :: ctm
     real(dbl), dimension(:), intent(out) :: ctph,dctph
     type(photores), dimension(:), intent(in out) :: phres
@@ -331,18 +335,26 @@ contains
     real(dbl), dimension(:), intent(out) :: sys
     real(dbl), dimension(:,:), intent(out), optional :: sysint
     integer, dimension(:), intent(out), optional :: nsys
+    real(dbl), dimension(:,:,:), intent(in), optional :: ccv
 
-    real(dbl), dimension(:), allocatable :: ct,dct,ph,dph,y,e,x,ex,cx,q,g,gp,w
+    real(dbl), dimension(:), allocatable :: ct,dct,ph,dph,y,e,x,ex,cx,q,g,gp,w,bm,cbm
+    real(dbl), dimension(:,:), allocatable :: xm,exm,cxm,gj,jmm,cvm
+    real(dbl), dimension(:,:,:), allocatable :: exx
     real(dbl), dimension(0:2) :: b
     real(dbl), dimension(3,3) :: cv, jm
     real(dbl), dimension(2) :: si
     real(dbl) :: fixsig, sig, fout, cbar, d, sw
-    integer :: n, ndat, i, nf
+    integer :: n, ndat, i, j, k, nf, nt
     logical, dimension(:), allocatable :: valid
+    logical, dimension(:,:), allocatable :: known
 
     ndat = size(pht,1)
+    nt = ctm%nterm
     allocate(ct(ndat),dct(ndat),ph(ndat),dph(ndat),y(ndat),e(ndat),x(ndat), &
          ex(ndat),cx(ndat),q(ndat),g(ndat),gp(ndat),w(ndat),valid(ndat))
+    if( nt > 1 ) allocate(xm(ndat,nt),exm(ndat,nt),cxm(ndat,nt), &
+         exx(ndat,nt,nt),gj(ndat,nt),known(ndat,nt),bm(0:2*nt),cbm(nt), &
+         jmm(2*nt+1,2*nt+1),cvm(2*nt+1,2*nt+1))
 
     fixsig = -1
     if( syserr >= 0 ) fixsig = syserr / magln
@@ -360,12 +372,15 @@ contains
           dct = sqrt(ct)
        end where
 
-       valid = ph > 0 .and. ct > 0 .and. dcol(:,n) >= 0
+       valid = ph > 0 .and. ct > 0
+       do j = 1, nt
+          valid = valid .and. dcol(:,n,j) >= 0
+       end do
        where( valid )
           y = log(ph / ct)
           e = sqrt((dph/ph)**2 + (dct/ct)**2)
-          ex = dcol(:,n)
-          cx = cyc(:,n)
+          ex = dcol(:,n,1)
+          cx = cyc(:,n,1)
        elsewhere
           y = 0
           e = -1
@@ -373,26 +388,29 @@ contains
           cx = 0
        end where
        ctm%nstars(n) = count(valid)
-       if( ctm%nstars(n) == 0 ) stop 'No calibration star with a colour.'
+       if( ctm%nstars(n) == 0 ) then
+          if( nt > 1 ) stop 'No calibration star with all the colours.'
+          stop 'No calibration star with a colour.'
+       end if
 
-       if( ctm%model == COLT_CAT ) then
+       if( ctm%model == COLT_CAT .and. nt == 1 ) then
 
           ! the colours centred for the numerics, then shifted to cref
-          cbar = sum(col(:,n),mask=valid) / count(valid)
-          x = col(:,n) - cbar
-          call mixture_fit(y,e,x,ex,cx,ctm%order(n),fixsig,b,cv,sig,fout,q, &
+          cbar = sum(col(:,n,1),mask=valid) / count(valid)
+          x = col(:,n,1) - cbar
+          call mixture_fit(y,e,x,ex,cx,ctm%order(1,n),fixsig,b,cv,sig,fout,q, &
                sigint=si,nfit=nf)
-          if( ctm%cref(n) == cref_mean ) then
+          if( ctm%cref(1,n) == cref_mean ) then
              w = q / (e**2 + sig**2)
              sw = sum(w,mask=valid)
              if( sw > 0 ) then
-                ctm%cref(n) = sum(w*col(:,n),mask=valid) / sw
+                ctm%cref(1,n) = sum(w*col(:,n,1),mask=valid) / sw
              else
-                ctm%cref(n) = cbar
+                ctm%cref(1,n) = cbar
              end if
           end if
           ! b(c - cbar) = b'(c - cref): d = cref - cbar
-          d = ctm%cref(n) - cbar
+          d = ctm%cref(1,n) - cbar
           jm = 0
           jm(1,:) = [ 1.0_dbl, d, d**2 ]
           jm(2,:) = [ 0.0_dbl, 1.0_dbl, 2*d ]
@@ -400,10 +418,59 @@ contains
           ctm%beta(:,n) = matmul(jm,b)
           ctm%cov(:,:,n) = matmul(jm,matmul(cv,transpose(jm)))
 
+       else if( ctm%model == COLT_CAT ) then
+
+          ! several colours: centred for the numerics, then shifted to
+          ! the references; the Jacobian of the shift of every colour
+          ! as above
+          jmm = 0
+          jmm(1,1) = 1
+          do j = 1, nt
+             cbar = sum(col(:,n,j),mask=valid) / count(valid)
+             where( valid )
+                xm(:,j) = col(:,n,j) - cbar
+                exm(:,j) = dcol(:,n,j)
+                cxm(:,j) = cyc(:,n,j)
+             elsewhere
+                xm(:,j) = 0
+                exm(:,j) = -1
+                cxm(:,j) = 0
+             end where
+             do k = 1, nt
+                exx(:,j,k) = 0
+                if( present(ccv) .and. j /= k ) then
+                   where( valid ) exx(:,j,k) = ccv(:,j,k)
+                end if
+             end do
+             cbm(j) = cbar
+          end do
+          call mixture_fit_multi(y,e,xm,exm,exx,cxm,ctm%order(:,n),fixsig, &
+               bm,cvm,sig,fout,q,sigint=si,nfit=nf)
+          w = q / (e**2 + sig**2)
+          sw = sum(w,mask=valid)
+          do j = 1, nt
+             cbar = cbm(j)
+             if( ctm%cref(j,n) == cref_mean ) then
+                if( sw > 0 ) then
+                   ctm%cref(j,n) = sum(w*col(:,n,j),mask=valid) / sw
+                else
+                   ctm%cref(j,n) = cbar
+                end if
+             end if
+             d = ctm%cref(j,n) - cbar
+             jmm(1,2*j) = d
+             jmm(1,2*j+1) = d**2
+             jmm(2*j,2*j) = 1
+             jmm(2*j,2*j+1) = 2*d
+             jmm(2*j+1,2*j+1) = 1
+          end do
+          ctm%beta(:,n) = matmul(jmm,bm)
+          ctm%cov(:,:,n) = matmul(jmm,matmul(cvm,transpose(jmm)))
+
        else
 
           ! the coefficients fixed: the zero point of y - g(c)
-          x = col(:,n) - ctm%cref(n)
+          x = col(:,n,1) - ctm%cref(1,n)
           g = ctm%beta(1,n)*x + ctm%beta(2,n)*x**2
           gp = ctm%beta(1,n) + 2*ctm%beta(2,n)*x
           where( valid )
@@ -430,26 +497,71 @@ contains
        if( present(nsys) ) nsys(n) = nf
 
        ! the mean colour and the mean correction of the calibration stars
-       x = col(:,n) - ctm%cref(n)
-       g = ctm%beta(1,n)*x + ctm%beta(2,n)*x**2
-       sw = sum(q,mask=valid)
-       if( sw > 0 ) then
-          ctm%cmean(n) = sum(q*col(:,n),mask=valid) / sw
-          ctm%cstd(n) = sqrt(sum(q*(col(:,n) - ctm%cmean(n))**2,mask=valid)/sw)
-          ctm%gmean(n) = sum(q*g,mask=valid) / sw
-          ctm%gstd(n) = sqrt(sum(q*(g - ctm%gmean(n))**2,mask=valid) / sw)
+       if( nt == 1 ) then
+          x = col(:,n,1) - ctm%cref(1,n)
+          g = ctm%beta(1,n)*x + ctm%beta(2,n)*x**2
+          sw = sum(q,mask=valid)
+          if( sw > 0 ) then
+             ctm%cmean(1,n) = sum(q*col(:,n,1),mask=valid) / sw
+             ctm%cstd(1,n) = sqrt(sum(q*(col(:,n,1) - ctm%cmean(1,n))**2, &
+                  mask=valid)/sw)
+             ctm%gmean(1,n) = sum(q*g,mask=valid) / sw
+             ctm%gstd(1,n) = sqrt(sum(q*(g - ctm%gmean(1,n))**2,mask=valid) / sw)
+          end if
+       else
+          ! of every colour, the covariances of the corrections
+          do j = 1, nt
+             x = col(:,n,j) - ctm%cref(j,n)
+             gj(:,j) = ctm%beta(2*j-1,n)*x + ctm%beta(2*j,n)*x**2
+             known(:,j) = dcol(:,n,j) >= 0
+          end do
+          sw = sum(q,mask=valid)
+          if( sw > 0 ) then
+             do j = 1, nt
+                ctm%cmean(j,n) = sum(q*col(:,n,j),mask=valid) / sw
+                ctm%cstd(j,n) = sqrt(sum(q*(col(:,n,j) - ctm%cmean(j,n))**2, &
+                     mask=valid)/sw)
+                ctm%gmean(j,n) = sum(q*gj(:,j),mask=valid) / sw
+                ctm%gstd(j,n) = sqrt(sum(q*(gj(:,j) - ctm%gmean(j,n))**2, &
+                     mask=valid) / sw)
+             end do
+             do j = 1, nt
+                do k = 1, nt
+                   ctm%ccs(j,k,n) = sum(q*(col(:,n,j) - ctm%cmean(j,n))* &
+                        (col(:,n,k) - ctm%cmean(k,n)),mask=valid) / sw
+                end do
+             end do
+          end if
+          ! the corrections of the stars: the missing colours predicted
+          ! by the known ones (colour_corr)
+          do i = 1, ndat
+             if( valid(i) ) then
+                g(i) = sum(gj(i,:))
+             else
+                call colour_corr(ctm,n,col(i,n,:),dcol(i,n,:),g(i),d)
+             end if
+          end do
        end if
 
        if( verbose ) then
-          write(*,'(a,i0,a,i0,a)') ' Colour term, band ',n,' (',ctm%nstars(n), &
-               ' stars with a colour):'
-          write(*,'(a,f0.4,a,f0.4,a,f0.4)') '  reference colour: ',ctm%cref(n), &
-               ', mean colour: ',ctm%cmean(n),' +- ',ctm%cstd(n)
-          write(*,'(a,f0.5,a,f0.5,a)') '  k1 = ',-magln*ctm%beta(1,n),' +- ', &
-               magln*sqrt(max(ctm%cov(2,2,n),0.0_dbl)),' mag/mag'
-          if( ctm%order(n) >= 2 .or. ctm%beta(2,n) /= 0 ) &
-               write(*,'(a,f0.5,a,f0.5,a)') '  k2 = ',-magln*ctm%beta(2,n), &
-               ' +- ',magln*sqrt(max(ctm%cov(3,3,n),0.0_dbl)),' mag/mag**2'
+          if( nt == 1 ) then
+             write(*,'(a,i0,a,i0,a)') ' Colour term, band ',n,' (',ctm%nstars(n), &
+                  ' stars with a colour):'
+          else
+             write(*,'(a,i0,a,i0,a)') ' Colour terms, band ',n,' (',ctm%nstars(n), &
+                  ' stars with all the colours):'
+          end if
+          do j = 1, nt
+             if( nt > 1 ) write(*,'(a,i0,4a)') '  colour ',j,': ', &
+                  trim(ctm%cola(j,n)),' - ',trim(ctm%colb(j,n))
+             write(*,'(a,f0.4,a,f0.4,a,f0.4)') '  reference colour: ',ctm%cref(j,n), &
+                  ', mean colour: ',ctm%cmean(j,n),' +- ',ctm%cstd(j,n)
+             write(*,'(a,f0.5,a,f0.5,a)') '  k1 = ',-magln*ctm%beta(2*j-1,n),' +- ', &
+                  magln*sqrt(max(ctm%cov(2*j,2*j,n),0.0_dbl)),' mag/mag'
+             if( ctm%order(j,n) >= 2 .or. ctm%beta(2*j,n) /= 0 ) &
+                  write(*,'(a,f0.5,a,f0.5,a)') '  k2 = ',-magln*ctm%beta(2*j,n), &
+                  ' +- ',magln*sqrt(max(ctm%cov(2*j+1,2*j+1,n),0.0_dbl)),' mag/mag**2'
+          end do
           write(*,'(a,f0.5,a,f0.5,a,f0.5,a,i0,a,f0.3,a,1pg0.6,a,1pg0.2)') &
                '  systematic error: ',sys(n),' mag (',magln*si(1),' .. ', &
                magln*si(2),', ',nf,' stars), outlier fraction: ',fout, &
@@ -459,9 +571,11 @@ contains
        ! the residuals by the colour of the stars (the mean correction
        ! for the stars without a colour); the counts are corrected
        ! to the reference colour
-       do i = 1, ndat
-          if( .not. valid(i) ) g(i) = ctm%gmean(n)
-       end do
+       if( nt == 1 ) then
+          do i = 1, ndat
+             if( .not. valid(i) ) g(i) = ctm%gmean(1,n)
+          end do
+       end if
        ct = cts(:,n) * exp(g)
        phres(n)%pht = pht(:,n)
        phres(n)%cts = ct

@@ -45,6 +45,22 @@
 !  and its covariance with the catalogue magnitude of the calibration
 !  (the colour B-V has the error of V).
 !
+!  Several colour terms (COLT_CAT, at most ncolmax of exscatter.f08):
+!
+!      m_cat - m_inst = ZP + sum_j k1_j (c_j - cref_j) + k2_j (c_j - cref_j)**2,
+!
+!  a passband that depends on more than one colour (QUVIK 260-360 nm
+!  against SDSS u: u - g and g - r); beta(2j-1), beta(2j) are b1, b2 of
+!  the colour j, the covariance of beta in the same order. The errors of
+!  the colours of a star are correlated when they share a band (u - g and
+!  g - r share g: cov = -err(g)**2), the effective variance includes it.
+!  A star without some of its colours gets them predicted by the colours
+!  it has, by the colour-colour relation of the calibration stars (their
+!  colours as a Gaussian, the conditional mean, colour_predict), with
+!  the conditional scatter as their error (without any colour, the mean
+!  colours and their scatter); the calibration uses the stars with all
+!  the colours only.
+!
 
 module colterm
 
@@ -72,41 +88,61 @@ module colterm
 
   type, public :: colour_term
      integer :: model = COLT_NONE
-     ! the colour of every band: the names of the catalogue columns
-     ! (COLT_CAT) or of the filters (COLT_TRA), c = A - B
-     character(len=68), dimension(:), allocatable :: cola, colb
+     ! the number of the colours (terms), one for COLT_TRA
+     integer :: nterm = 1
+     ! the colours (j) of every band (n): the names of the catalogue
+     ! columns (COLT_CAT) or of the filters (COLT_TRA), c = A - B, (j,n)
+     character(len=68), dimension(:,:), allocatable :: cola, colb
      ! COLT_TRA: the indices of the filters of the colour of every band
      integer, dimension(:), allocatable :: ia, ib
-     ! the order of the polynomial, the number of the stars used
-     integer, dimension(:), allocatable :: order, nstars
-     ! ln(ph/ct) = beta(0) + beta(1) d + beta(2) d**2, d = c - cref
-     ! (beta(0,:) is ln CTPH), the covariance of beta (in the order 0,1,2)
+     ! the order of the polynomial of every colour (j,n), the number of
+     ! the stars used (with all the colours)
+     integer, dimension(:,:), allocatable :: order
+     integer, dimension(:), allocatable :: nstars
+     ! ln(ph/ct) = beta(0) + sum_j beta(2j-1) d_j + beta(2j) d_j**2,
+     ! d_j = c_j - cref_j (beta(0,:) is ln CTPH), the covariance of beta
+     ! (in the order 0,1,2,...)
      real(dbl), dimension(:,:), allocatable :: beta
      real(dbl), dimension(:,:,:), allocatable :: cov
-     ! the reference colour; the mean colour of the calibration stars,
-     ! its scatter, the mean colour correction g of the calibration stars
-     ! and its scatter (used for the stars without a colour)
-     real(dbl), dimension(:), allocatable :: cref, cmean, cstd, gmean, gstd
-     ! COLT_CAT: the catalogue (all its stars): positions [deg], colours,
-     ! their errors (< 0 for an undefined colour), the search radius [deg]
-     real(dbl), dimension(:), allocatable :: ra, dec, col, dcol
+     ! the reference colours (j,n); the mean colours of the calibration
+     ! stars, their scatter, the mean colour corrections g_j of
+     ! the calibration stars and their scatter (used for the stars
+     ! without a colour), the covariances of the colours of the calibration
+     ! stars (j,k,n; several colours: the prediction of a missing colour)
+     real(dbl), dimension(:,:), allocatable :: cref, cmean, cstd, gmean, gstd
+     real(dbl), dimension(:,:,:), allocatable :: ccs
+     ! COLT_CAT: the catalogue (all its stars): positions [deg], colours
+     ! (i,j), their errors (< 0 for an undefined colour), the covariances
+     ! of the colours of a star (i,j,k), the search radius [deg]
+     real(dbl), dimension(:), allocatable :: ra, dec
+     real(dbl), dimension(:,:), allocatable :: col, dcol
+     real(dbl), dimension(:,:,:), allocatable :: ccov
      real(dbl) :: tol = 0
   end type colour_term
 
-  public :: colterm_init, colour_corr, colour_solve
+  public :: colterm_init, colour_corr, colour_predict, colour_solve
 
 contains
 
-  subroutine colterm_init(ctm,model,nbands)
+  subroutine colterm_init(ctm,model,nbands,nterm)
+
+    ! nterm (optional, 1 by default) the number of the colours
 
     type(colour_term), intent(out) :: ctm
     integer, intent(in) :: model, nbands
+    integer, intent(in), optional :: nterm
 
+    integer :: nt
+
+    nt = 1
+    if( present(nterm) ) nt = nterm
     ctm%model = model
-    allocate(ctm%cola(nbands),ctm%colb(nbands),ctm%ia(nbands),ctm%ib(nbands),&
-         ctm%order(nbands),ctm%nstars(nbands),ctm%beta(0:2,nbands), &
-         ctm%cov(3,3,nbands),ctm%cref(nbands),ctm%cmean(nbands), &
-         ctm%cstd(nbands),ctm%gmean(nbands),ctm%gstd(nbands))
+    ctm%nterm = nt
+    allocate(ctm%cola(nt,nbands),ctm%colb(nt,nbands),ctm%ia(nbands), &
+         ctm%ib(nbands),ctm%order(nt,nbands),ctm%nstars(nbands), &
+         ctm%beta(0:2*nt,nbands),ctm%cov(2*nt+1,2*nt+1,nbands), &
+         ctm%cref(nt,nbands),ctm%cmean(nt,nbands),ctm%cstd(nt,nbands), &
+         ctm%gmean(nt,nbands),ctm%gstd(nt,nbands),ctm%ccs(nt,nt,nbands))
     ctm%cola = ''
     ctm%colb = ''
     ctm%ia = 0
@@ -120,41 +156,182 @@ contains
     ctm%cstd = 0
     ctm%gmean = 0
     ctm%gstd = 0
-    allocate(ctm%ra(0),ctm%dec(0),ctm%col(0),ctm%dcol(0))
+    ctm%ccs = 0
+    allocate(ctm%ra(0),ctm%dec(0),ctm%col(0,nt),ctm%dcol(0,nt),ctm%ccov(0,nt,nt))
 
   end subroutine colterm_init
 
 
-  subroutine colour_corr(ctm,n,c,dc,g,dg)
+  subroutine colour_corr(ctm,n,c,dc,g,dg,ccv)
 
-    ! The colour correction g = ln(ph/ct) - ln CTPH of a star of the colour
-    ! c (with the error dc, dc < 0: an undefined colour) in the band n,
-    ! and its error dg: the error of the calibration at the colour (by
-    ! the covariance of beta, the error of CTPH included) and the error of
-    ! the colour. A star without a colour gets the mean correction of
-    ! the calibration stars, its error inflated by their scatter.
+    ! The colour correction g = ln(ph/ct) - ln CTPH of a star of
+    ! the colours c (with the errors dc, dc < 0: an undefined colour) in
+    ! the band n, and its error dg: the error of the calibration at
+    ! the colours (by the covariance of beta, the error of CTPH included)
+    ! and the errors of the colours, ccv (optional) their covariances
+    ! (j /= k). A star without a colour gets the mean correction of
+    ! the calibration stars for it, its error inflated by their scatter
+    ! (one colour); with several colours, the missing ones are predicted
+    ! by the known ones (colour_predict).
 
     type(colour_term), intent(in) :: ctm
     integer, intent(in) :: n
-    real(dbl), intent(in) :: c, dc
+    real(dbl), dimension(:), intent(in) :: c, dc
     real(dbl), intent(out) :: g, dg
+    real(dbl), dimension(:,:), intent(in), optional :: ccv
 
     real(dbl), dimension(3) :: x
+    real(dbl), dimension(2*ctm%nterm+1) :: xm
+    real(dbl), dimension(ctm%nterm) :: gpm, gk, cp
+    real(dbl), dimension(ctm%nterm,ctm%nterm) :: cv, a
+    logical, dimension(ctm%nterm) :: known
     real(dbl) :: d, gp, v
+    integer :: j, k, nt
 
-    if( dc >= 0 ) then
-       d = c - ctm%cref(n)
-       g = ctm%beta(1,n)*d + ctm%beta(2,n)*d**2
-       gp = ctm%beta(1,n) + 2*ctm%beta(2,n)*d
-       x = [ 1.0_dbl, d, d**2 ]
-       v = dot_product(x,matmul(ctm%cov(:,:,n),x)) + (gp*dc)**2
-    else
-       g = ctm%gmean(n)
-       v = ctm%cov(1,1,n) + ctm%gstd(n)**2
+    nt = ctm%nterm
+    if( nt == 1 ) then
+       if( dc(1) >= 0 ) then
+          d = c(1) - ctm%cref(1,n)
+          g = ctm%beta(1,n)*d + ctm%beta(2,n)*d**2
+          gp = ctm%beta(1,n) + 2*ctm%beta(2,n)*d
+          x = [ 1.0_dbl, d, d**2 ]
+          v = dot_product(x,matmul(ctm%cov(:,:,n),x)) + (gp*dc(1))**2
+       else
+          g = ctm%gmean(1,n)
+          v = ctm%cov(1,1,n) + ctm%gstd(1,n)**2
+       end if
+       dg = sqrt(max(v,0.0_dbl))
+       return
     end if
+
+    ! several colours: the missing ones predicted by the known ones
+    ! (colour_predict), the gradient of the correction by the known
+    ! colours includes their part through the prediction
+    call colour_predict(ctm,n,c,dc,cp,cv,a)
+    known = dc(1:nt) >= 0
+    g = 0
+    xm = 0
+    xm(1) = 1
+    gpm = 0
+    do j = 1, nt
+       d = cp(j) - ctm%cref(j,n)
+       g = g + ctm%beta(2*j-1,n)*d + ctm%beta(2*j,n)*d**2
+       gpm(j) = ctm%beta(2*j-1,n) + 2*ctm%beta(2*j,n)*d
+       xm(2*j) = d
+       xm(2*j+1) = d**2
+    end do
+    v = dot_product(xm,matmul(ctm%cov(:,:,n),xm))
+    ! the missing colours: the conditional covariance
+    do j = 1, nt
+       if( known(j) ) cycle
+       do k = 1, nt
+          if( .not. known(k) ) v = v + gpm(j)*gpm(k)*cv(j,k)
+       end do
+    end do
+    ! the known colours: their errors, by the total gradient
+    gk = 0
+    do k = 1, nt
+       if( .not. known(k) ) cycle
+       gk(k) = gpm(k)
+       do j = 1, nt
+          if( .not. known(j) ) gk(k) = gk(k) + gpm(j)*a(j,k)
+       end do
+    end do
+    do j = 1, nt
+       if( .not. known(j) ) cycle
+       v = v + (gk(j)*dc(j))**2
+       if( present(ccv) ) then
+          do k = j + 1, nt
+             if( known(k) ) v = v + 2*gk(j)*gk(k)*ccv(j,k)
+          end do
+       end if
+    end do
     dg = sqrt(max(v,0.0_dbl))
 
   end subroutine colour_corr
+
+
+  subroutine colour_predict(ctm,n,c,dc,cp,cv,a)
+
+    ! The colours of a star with the missing ones (dc < 0) predicted by
+    ! the known ones: the colours of the calibration stars of the band n
+    ! as a Gaussian (the mean cmean, the covariance ccs), the conditional
+    ! mean of the missing colours M given the known K,
+    !
+    !    c_M = mu_M + A (c_K - mu_K),  A = S_MK S_KK**-1,
+    !
+    ! and their conditional covariance cv = S_MM - A S_KM (the scatter
+    ! about the colour-colour relation of the calibration stars, small for
+    ! u - g and g - r of the main sequence); without a known colour,
+    ! the mean and the covariance. cp the colours (the known ones as
+    ! given), cv (missing rows and columns only), a(j,k) the coefficients
+    ! A of the missing j by the known k (zero elsewhere).
+
+    type(colour_term), intent(in) :: ctm
+    integer, intent(in) :: n
+    real(dbl), dimension(:), intent(in) :: c, dc
+    real(dbl), dimension(:), intent(out) :: cp
+    real(dbl), dimension(:,:), intent(out) :: cv, a
+
+    real(dbl), dimension(ctm%nterm,ctm%nterm) :: s, sk
+    logical, dimension(ctm%nterm) :: known
+    integer, dimension(ctm%nterm) :: ik
+    real(dbl) :: det
+    integer :: nt, nk, j, k, i, l
+
+    nt = ctm%nterm
+    s = ctm%ccs(:,:,n)
+    known = dc(1:nt) >= 0
+    cp = c(1:nt)
+    cv = 0
+    a = 0
+    nk = 0
+    do j = 1, nt
+       if( known(j) ) then
+          nk = nk + 1
+          ik(nk) = j
+       end if
+    end do
+    if( nk == nt ) return
+
+    ! the inverse of S_KK (1 x 1 or 2 x 2)
+    sk = 0
+    if( nk == 1 ) then
+       if( s(ik(1),ik(1)) > 0 ) sk(1,1) = 1 / s(ik(1),ik(1))
+    else if( nk == 2 ) then
+       det = s(ik(1),ik(1))*s(ik(2),ik(2)) - s(ik(1),ik(2))**2
+       if( det > 0 ) then
+          sk(1,1) = s(ik(2),ik(2)) / det
+          sk(2,2) = s(ik(1),ik(1)) / det
+          sk(1,2) = -s(ik(1),ik(2)) / det
+          sk(2,1) = sk(1,2)
+       end if
+    end if
+
+    do j = 1, nt
+       if( known(j) ) cycle
+       do k = 1, nk
+          do l = 1, nk
+             a(j,ik(k)) = a(j,ik(k)) + s(j,ik(l))*sk(l,k)
+          end do
+       end do
+       cp(j) = ctm%cmean(j,n)
+       do k = 1, nk
+          cp(j) = cp(j) + a(j,ik(k))*(c(ik(k)) - ctm%cmean(ik(k),n))
+       end do
+    end do
+    do j = 1, nt
+       if( known(j) ) cycle
+       do i = 1, nt
+          if( known(i) ) cycle
+          cv(j,i) = s(j,i)
+          do k = 1, nk
+             cv(j,i) = cv(j,i) - a(j,ik(k))*s(ik(k),i)
+          end do
+       end do
+    end do
+
+  end subroutine colour_predict
 
 
   subroutine colour_solve(ctm,m0,dm0,m,dm,c,dc,status)
@@ -187,7 +364,7 @@ contains
     m = m0
     status = 1
     do iter = 1, 50
-       d = m(ctm%ia) - m(ctm%ib) - ctm%cref
+       d = m(ctm%ia) - m(ctm%ib) - ctm%cref(1,:)
        f = m - m0 - k1*d - k2*d**2
        gp = k1 + 2*k2*d
        call jacobian
@@ -201,10 +378,10 @@ contains
        status = 1
     end do
 
-    d = m(ctm%ia) - m(ctm%ib) - ctm%cref
+    d = m(ctm%ia) - m(ctm%ib) - ctm%cref(1,:)
     gp = k1 + 2*k2*d
     call jacobian
-    c = d + ctm%cref
+    c = d + ctm%cref(1,:)
 
     ! the errors: dm = (I - G)**-1 (dm0 + errors of k1, k2)
     s2 = dm0**2 + magln**2*(d**2*ctm%cov(2,2,:) + d**4*ctm%cov(3,3,:))
