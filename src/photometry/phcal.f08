@@ -513,15 +513,19 @@ contains
           end if
           deallocate(cra,cdec,cmag,cdmag)
        end do
+       ! (both colours with the error columns only, symmetric: the error of
+       ! the shared band the mean of its two error columns; a colour without
+       ! them is taken as exact, its covariances zero)
        ccv = 0
        do j = 1, ncterm
-          do k = 1, ncterm
-             if( j == k ) cycle
+          do k = j + 1, ncterm
+             if( .not. (ncolor(j) == 4 .and. ncolor(k) == 4) ) cycle
              where( dccol(:,j) >= 0 .and. dccol(:,k) >= 0 )
-                ccv(:,j,k) = shared(1,j,1,k)*cerr(:,1,j)**2 &
-                     - shared(1,j,2,k)*cerr(:,1,j)**2 &
-                     - shared(2,j,1,k)*cerr(:,2,j)**2 &
-                     + shared(2,j,2,k)*cerr(:,2,j)**2
+                ccv(:,j,k) = shared(1,j,1,k)*(cerr(:,1,j)**2 + cerr(:,1,k)**2)/2 &
+                     - shared(1,j,2,k)*(cerr(:,1,j)**2 + cerr(:,2,k)**2)/2 &
+                     - shared(2,j,1,k)*(cerr(:,2,j)**2 + cerr(:,1,k)**2)/2 &
+                     + shared(2,j,2,k)*(cerr(:,2,j)**2 + cerr(:,2,k)**2)/2
+                ccv(:,k,j) = ccv(:,j,k)
              end where
           end do
        end do
