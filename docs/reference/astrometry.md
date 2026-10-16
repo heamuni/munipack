@@ -1,16 +1,14 @@
 # astrometry — astrometric calibration
 
-`astrometry` computes the astrometric calibration (WCS) of a frame and writes
-it to the primary header. It works in two steps. First it **matches** the
-detected stars to a reference catalogue or to an already calibrated frame,
-which pairs each frame star with its catalogue star. Then it **fits** the
-projection (gnomonic `TAN`, or `TPV` with polynomial distortion) to those
-pairs by a robust fit. When the frame header already holds an approximate
-WCS, or when you give the pointing (`--rcen`, `--dcen`) and the scale, the
-match is guided by it. Otherwise the match is blind: it searches sequences
-of star triangles. Every solution is tested against chance coincidences
-before it is saved. Frames are independent: when one frame fails, the rest
-of the run is still processed, and the exit status is 1.
+`astrometry` finds the WCS of a frame, so that every pixel gets a sky
+position. It pairs the stars detected on the frame with a reference
+catalogue (or an already calibrated frame), fits a projection to those
+pairs, and writes the result into the primary header. The image data are
+not changed.
+
+If the header already has a rough WCS, or you know where the telescope
+pointed, the match uses that and is fast. Otherwise it searches blindly.
+Each solution is checked against chance coincidences before it is saved.
 
 ## Synopsis
 
@@ -19,270 +17,149 @@ munipack astrometry [options] file(s)
 munipack astrometry [options] 'input.fits output.fits'
 ```
 
-By default each file is updated in place. To write the result to a new file,
-give the input and the output name as one argument separated by a space
-(quoted, as above), or use `-t`/`-O`. A list of files (one name, or an
-input and an output name, per line) can be read from a file with `@list.txt`
-or from standard input with `-` as the file name.
+Files are updated in place. To keep the original, give the input and output
+name as one quoted argument, or write into a directory with `-t`. A list of
+files can be read with `@list.txt`, or from standard input with `-`. If one
+frame fails, the others are still processed and the exit status is 1.
 
-In a container:
-
-```bash
-docker run --rm -u $(id -u):$(id -g) -v "$PWD":/data munipack:0.6.2-hg1653-fixes \
-    astrometry -c cone.fits frame.fits
-```
-
-**Prerequisites.** The matching modes (`match`, `cross`, `sequence`) need:
-
-- the `FIND` extension from [`find`](find.md) (required);
-- the `APERPHOT` extension from [`aphot`](aphot.md) (strongly recommended).
-  Its first aperture ranks the stars by brightness, feeds the flux check of
-  the match and gives the weights of the final fit. Without it all stars get
-  the same flux: they stay in the order of `FIND` and the fit is unweighted.
-
-They also need a reference: a catalogue (`-c`, e.g. from [`cone`](catalogues.md))
-or a calibrated frame (`-r`, `-R`). This build has no default catalogue.
-Without a reference the run fails with "too few stars … in the reference".
-The `manual` mode needs none of these.
+**Before you start**, run [`find`](find.md) (required) and
+[`aphot`](aphot.md) (strongly recommended) on the frame, and get a reference catalogue, for example with
+[`cone`](catalogues.md). `astrometry` uses the photometry to pick the
+brightest stars and to weight the fit. There is no default catalogue, so a
+reference (`-c`, `-r` or `-R`) is always needed, except in `manual` mode.
 
 ## Modes
 
-| Mode | What it does | ASTRMETH |
-|---|---|---|
-| `match` (default) | Guided match by the WCS in the header or by the pointing, falling back to the blind match; then the fit. | `WCS`, `POINTING` or `BLIND` |
-| `cross` | Cross-matches the stars by an approximate calibration that is known within the tolerances of the guided match. The calibration comes from the header WCS or from `--scale`, `--angle`, `--reflex` (and `--rcen`, `--dcen`). The offset is found by the same vote as in the guided match. If the vote fails, the nearest stars within 5 × `--sig` are used. Add `--roll-unknown` to allow any rotation. | `CROSS` |
-| `sequence` | Uses a correspondence that you give: `--seq1` lists catalogue (or reference) indices and `--seq2` the matching frame indices. Both lists must have the same length. | `SEQUENCE` |
-| `manual` | Writes the WCS from `-p`, `--rcen`, `--dcen`, `--xcen`, `--ycen`, `--scale`, `--angle`, `--reflex` with no catalogue, no star table and no checks. | — |
-
-Mode names are case-insensitive.
+| Mode | Use it when |
+|---|---|
+| `match` (default) | Almost always. Uses the header WCS or your pointing if available, otherwise matches blindly. |
+| `cross` | You know the calibration approximately (header WCS or `--scale`, `--angle`, `--reflex`) and just want the stars paired by position. |
+| `sequence` | You pair the stars yourself with `--seq1` and `--seq2`. |
+| `manual` | You want to write a known WCS by hand, with no catalogue. |
 
 ## Options
 
 ### Mode and reference
 
-| Option | Argument | Default | Description |
-|---|---|---|---|
-| `-m`, `--mode` | `match`, `cross`, `sequence`, `manual` | `match` | Calibration mode (see above). |
-| `-c`, `--cat` | FITS table | — | Reference catalogue. FITSIO filters can be used, e.g. `'cone.fits[1][$f.mag$>12]'`. |
-| `-r`, `--ref` | FITS file | — | Already calibrated frame. Its stars are the reference. |
-| `-R`, `--rel` | FITS file | — | Reference frame for relative astrometry: no projection, coordinates in pixels. |
-| `--vocat` | XML file | built-in `VOcat_conf.xml` | VO catalogue configuration. It maps the catalogue to its default column labels. |
-| `--col-ra` | label | by the catalogue (`RAJ2000`) | Right Ascension column [deg]. |
-| `--col-dec` | label | by the catalogue (`DEJ2000`) | Declination column [deg]. |
-| `--col-pm-ra` | label | by the catalogue (`pmRA`) | Proper-motion column in RA, μ<sub>α</sub> cos δ. RA moves by pmRA·Δt / cos δ. |
-| `--col-pm-dec` | label | by the catalogue (`pmDE`) | Proper-motion column in Dec. |
-| `--col-epoch-ra` | label | by the catalogue | Reference epoch of RA, per star. |
-| `--col-epoch-dec` | label | by the catalogue | Reference epoch of Dec, per star. |
-| `--col-mag` | label | by the catalogue (`f.mag` for UCAC) | Magnitude-like column. The catalogue is sorted by it. |
+| Option | Default | Description |
+|---|---|---|
+| `-m`, `--mode` *mode* | `match` | `match`, `cross`, `sequence` or `manual`. |
+| `-c`, `--cat` *file* | — | Reference catalogue (FITS table). FITSIO filters work, e.g. `'cone.fits[1][$f.mag$>12]'`. |
+| `-r`, `--ref` *file* | — | Calibrated frame used as the reference. |
+| `-R`, `--rel` *file* | — | Reference frame for relative astrometry (pixel coordinates, no projection). |
+| `--vocat` *file* | built-in | VO catalogue configuration that sets the default column names. |
+| `--col-ra` *label* | `RAJ2000` | Right Ascension column [deg]. |
+| `--col-dec` *label* | `DEJ2000` | Declination column [deg]. |
+| `--col-pm-ra` *label* | `pmRA` | Proper motion in RA column. |
+| `--col-pm-dec` *label* | `pmDE` | Proper motion in Dec column. |
+| `--col-epoch-ra` *label* | by catalogue | Epoch of RA column. |
+| `--col-epoch-dec` *label* | by catalogue | Epoch of Dec column. |
+| `--col-mag` *label* | by catalogue | Magnitude column, used to pick the brightest stars. |
 
-Give only one of `-c`, `-r` and `-R`. Proper motions are applied from the
-epoch of the catalogue (the table key `JEPOCH` or the epoch columns) to the
-`DATE-OBS` of the frame. If the catalogue has proper motions but no epoch,
-they are ignored with a warning on stderr and a `COMMENT` in the header.
+Use only one of `-c`, `-r` and `-R`. Proper motions are applied to the
+`DATE-OBS` of the frame when the catalogue gives an epoch.
 
-### Projection, pointing and manual parameters
+### Projection and pointing
 
-| Option | Argument | Default | Description |
-|---|---|---|---|
-| `-p`, `--projection` | `TAN`, `TPV` | `TAN` | `TAN`: gnomonic. `TPV`: gnomonic with third-order polynomial distortion (`PV1_0…PV2_11`). |
-| `--xcen` | real [pix] | width/2 | Reference pixel x (CRPIX1). Give it together with `--ycen`; one of them alone is ignored. |
-| `--ycen` | real [pix] | height/2 | Reference pixel y (CRPIX2). |
-| `--rcen` | real [deg] | — | RA of the reference pixel (CRVAL1). In `match` mode, together with a scale, it is the **pointing** for the guided match. Give it together with `--dcen`; one of them alone is ignored. |
-| `--dcen` | real [deg] | — | Dec of the reference pixel (CRVAL2); the pointing in `match` mode. |
-| `--scale` | real [pix/deg] | — | Plate scale **in pixels per degree** (1″/px = 3600). In `match` mode it is the scale prior. |
-| `--angle` | real [deg] | — | Rotation, clockwise positive. In `match` mode it is the known roll for the guided match. |
-| `--reflex` | — | off | The frame is mirrored. |
-| `--radesys` | string | `ICRS` | Reference system written to `RADESYS`. |
-| `--epoch` | real [yr] | from the catalogue | Reference epoch written to `JEPOCH`. |
+| Option | Default | Description |
+|---|---|---|
+| `-p`, `--projection` *name* | `TAN` | `TAN` (gnomonic) or `TPV` (gnomonic with polynomial distortion). |
+| `--xcen`, `--ycen` *pix* | frame centre | Reference pixel. Give both. |
+| `--rcen`, `--dcen` *deg* | — | Sky position of the reference pixel; in `match` mode, the pointing. Give both. |
+| `--scale` *pix/deg* | — | Plate scale in **pixels per degree** (1″/px = 3600). |
+| `--angle` *deg* | — | Rotation, clockwise positive. |
+| `--reflex` | off | The frame is mirrored. |
+| `--radesys` *name* | `ICRS` | Reference system written to the header. |
+| `--epoch` *year* | from catalogue | Reference epoch written to the header. |
 
-### Guided match and scale prior
+### Guided match
 
-| Option | Argument | Default | Description |
-|---|---|---|---|
-| `--blind` | — | off | Ignore the header WCS and the pointing: no guided match and no scale prior from the header. `--scale`, if given, is still used as the prior. |
-| `--scale-tol` | real | 0.05 | Relative tolerance of the scale prior, which comes from `--scale` or the header WCS. 0 or less: any scale. |
-| `--scale-free` | — | off | Match with any scale. Same as `--scale-tol 0`. Use it when the header scale is wrong by more than the tolerance. |
-| `--wcs-offset` | number[unit] | 10% of the frame, ≥ 100 pix | Tolerance of the offset of the header WCS or of `--rcen`, `--dcen`. A plain number is pixels; units `pix`, `arcsec` (`"`), `arcmin` (`'`), `deg`, `%` (of the larger side) are accepted, e.g. `90arcsec`, `3arcmin`, `0.1deg`, `20%`. The vote uses at most the frame diagonal. |
-| `--wcs-rot` | real [deg] | 3 | Tolerance of the rotation of the WCS or of `--angle`. 180 or more means any rotation, as `--roll-unknown`. |
-| `--wcs-scale` | real | 0.03 | Relative tolerance of the scale used by the guided match. |
-| `--roll-unknown` | — | off | Search any rotation at once and skip the pass within `--wcs-rot`. |
-| `--roll-known` | — | off | The rotation is known within `--wcs-rot`: no pass over any rotation. If that fails, the blind match follows. Cannot be combined with `--roll-unknown`. |
-| `--reflex-unknown` | — | off | The guided match tries both reflections, which doubles the trials. |
+These tune how far the header WCS or your pointing may be off.
 
-### Blind match and acceptance tests
+| Option | Default | Description |
+|---|---|---|
+| `--blind` | off | Ignore the header WCS and the pointing (`--scale` is still used). |
+| `--scale-tol` *r* | 0.05 | Allowed relative error of the known scale; 0 means any scale. |
+| `--scale-free` | off | Match with any scale (same as `--scale-tol 0`). |
+| `--wcs-offset` *value* | 10% of frame (≥ 100 px) | Allowed pointing error, in pixels or with a unit: `90arcsec`, `3arcmin`, `0.1deg`, `20%`. |
+| `--wcs-rot` *deg* | 3 | Allowed rotation error; 180 means any rotation. |
+| `--wcs-scale` *r* | 0.03 | Allowed relative scale error of the header WCS. |
+| `--roll-unknown` | off | The rotation is unknown: try any rotation straight away. |
+| `--roll-known` | off | The rotation is known within `--wcs-rot`: don't try other rotations. |
+| `--reflex-unknown` | off | Try both mirror orientations. |
 
-| Option | Argument | Default | Description |
-|---|---|---|---|
-| `--sig` | real [pix] | 1 | Error of the frame centroids. It sets the match tolerances, the vote bins (4 × `--sig`) and the cross-match limit (5 × `--sig`). |
-| `--sigcat` | real [deg] | 1″ (2.8e-4) | Error of the catalogue or reference coordinates. |
-| `--flxmin` | real | 0.63 (−0.5 mag) | Lower limit of the flux ratio of matched stars. |
-| `--flxmax` | real | 1.58 (+0.5 mag) | Upper limit of the flux ratio of matched stars. Widen the range for a filter that differs from the catalogue band. |
-| `--minmatch` | integer ≥ 5 | 5 | Minimum length of the match sequence. Values below 5 are an error. Raise it to 7 or more on crowded fields. |
-| `--maxmatch` | integer | 42 | Stars per chunk. Chunks of the frame and of the catalogue are matched against each other. 30–50 suits crowded fields. |
-| `--maxstars` | integer | 250 | Number of the brightest stars used from the frame and from the catalogue. When the pointing is known, the catalogue stars are taken near the frame. |
-| `--luckymatch` | integer | 3 | The match is accepted as reliable at `--minmatch` + this many stars. |
-| `--disable-lucky-match` | — | off | Stop at the first successful match. Same as `--luckymatch 0`. |
-| `--disable-flux-check` | — | off | Do not use fluxes during matching. Mismatches become more likely on crowded fields. |
-| `--disable-rms-check` | — | off | Skip the RMS check and the significance test. Use with care. |
+### Matching
 
-### Sequence mode
+| Option | Default | Description |
+|---|---|---|
+| `--sig` *pix* | 1 | Position error of the frame stars. |
+| `--sigcat` *deg* | 1″ | Position error of the reference stars. |
+| `--flxmin`, `--flxmax` *r* | 0.63, 1.58 | Allowed flux ratio of paired stars (±0.5 mag). Widen it if your filter differs from the catalogue band. |
+| `--minmatch` *n* | 5 | Fewest stars in a match (at least 5). Use 7 or more on crowded fields. |
+| `--maxmatch` *n* | 42 | Stars per chunk compared at once. |
+| `--maxstars` *n* | 250 | How many of the brightest stars are used. |
+| `--luckymatch` *n* | 3 | Accept a match once it is this many stars longer than `--minmatch`. |
+| `--disable-lucky-match` | off | Stop at the first match found. |
+| `--disable-flux-check` | off | Don't compare fluxes while matching. |
+| `--disable-rms-check` | off | Skip the quality checks of the solution. Use with care. |
+| `--seq1` *i,j,…* | — | Reference star indices (`sequence` mode). |
+| `--seq2` *i,j,…* | — | Matching frame star indices (`sequence` mode). |
 
-| Option | Argument | Default | Description |
-|---|---|---|---|
-| `--seq1` | `i,j,k,…` | — | Indices of the reference (catalogue) stars. |
-| `--seq2` | `i,j,k,…` | — | Indices of the corresponding frame stars. Same length as `--seq1`. |
+### Fit and output
 
-### Fit and saving
+| Option | Default | Description |
+|---|---|---|
+| `--fit` *method* | `robust` | `robust` or `squares`. |
+| `--units` *unit* | auto | Units of the RMS in the header comments: `deg`, `arcmin`, `arcsec`, `mas`, `uas` (`pix` is accepted but ignored). |
+| `--disable-save` | off | Compute the solution but don't write it. |
+| `--remove` | off | Remove the astrometric calibration from the header. |
+| `--report` | off | Add an `ASTROREPORT` table of the stars used in the fit. |
+| `--show-defaults` | — | Print the default parameters and exit. |
+| `-t`, `--target-directory` *dir* | — | Write output files into this directory. |
+| `-O` | off | Enable advanced output names (`--pattern`, `--mask`, `--format`). |
+| `--pattern` *regex* | `(.+)\.(.+)` | Pattern matched against input names. |
+| `--mask` *string* | — | Output name from back-references `\1`, `\2`, … |
+| `--format` *printf* | — | Numbered output names, e.g. `out_%02d.fits`. |
+| `-mproc`, `--mproc` *n* | 1 | Number of parallel processes. |
+| `--Xproc` *string* | — | Extra options for `mpirun`. |
+| `--verbose` | off | Print details of the match and the fit. |
+| `-h`, `--help` | — | Show help and exit. |
 
-| Option | Argument | Default | Description |
-|---|---|---|---|
-| `--fit` | `robust`, `squares` | `robust` | Fitting method. |
-| `--units` | `deg`, `arcmin`, `arcsec`, `mas`, `uas` | auto | Units of the RMS in the header comments. By default they follow the size of the RMS (pixels for `-R`). `pix`, listed by `--help`, is ignored (auto). |
-| `--disable-save` | — | off | Compute the calibration without saving it. |
-| `--remove` | — | off | Remove the calibration: the WCS keys, `PVi_j`, `RADESYS`, `JEPOCH`, `ASTRMETH` and the comment block. |
-| `--report` | — | off | Add the `ASTROREPORT` extension (see Outputs). |
-| `--show-defaults` | — | — | Print the default parameters and exit. |
+## Tips
 
-### Output files
+**Catalogue size.** If the pointing is known, a cone larger than the frame
+is fine, since only stars near the frame are used. For a blind match, make
+the cone just a bit larger than the field of view (radius about 0.8 × the
+frame side for a square frame).
 
-| Option | Argument | Default | Description |
-|---|---|---|---|
-| `-t`, `--target-directory` | directory | — | Write the output files into this directory. |
-| `-O` | — | off | Turn on advanced output filenames (`--pattern`, `--mask`, `--format`). |
-| `--pattern` | regex | `(.+)\.(.+)` | Regular expression matched against input filenames (with `-O`). |
-| `--mask` | string | — | Output filename built from back-references `\0`, `\1`, … (with `-O`). |
-| `--format` | printf format | — | Format for numbered output files, e.g. `out_%02d.fits` (with `-O`). |
+**Magnitudes.** Choose a catalogue magnitude range that matches the stars
+that are well exposed but not saturated on your frame, using
+`cone --magmin/--magmax` or a FITSIO filter.
 
-### Parallel processing and general
+**Crowded fields and few stars.** At least five stars must be paired; seven
+or more is safer, so raise `--minmatch` to 7 on crowded fields. With few stars, a tight `--wcs-offset` helps, because a smaller
+search is less likely to be fooled by chance alignments.
 
-| Option | Argument | Default | Description |
-|---|---|---|---|
-| `-mproc`, `--mproc` | integer | 1 | Number of parallel processes; the frames are shared among them. The solutions do not depend on N. |
-| `--Xproc` | string | — | Extra options passed to `mpirun`. |
-| `--verbose` | — | off | Print the match, the vote, the significance, the number of threads and the fit. |
-| `-h`, `--help` | — | — | Show the help and exit. |
+**Distortion.** `-p TPV` fits a polynomial distortion on top of the
+gnomonic projection. It needs plenty of stars: with 25 matched stars or
+fewer it falls back to `TAN` with a warning.
 
-## How the match works
+**Speed.** The blind match runs in parallel threads; set the number with
+`OMP_NUM_THREADS`.
 
-**Order of the passes (`match` mode).** The guided match is used when the
-frame has a WCS in its header (CD, or CDELT with PC), or when you give
-`--rcen`, `--dcen` with a scale from `--scale` or the WCS. Unless `--blind`
-is set, the passes are tried in this order:
+## Output
 
-1. **Known rotation** (when the WCS or `--angle` gives one; skipped with
-   `--roll-unknown`). The catalogue is predicted on the frame and rotated and
-   scaled on a grid within `--wcs-rot` and `--wcs-scale`. At each node of
-   the grid, the position differences of the 60 brightest frame stars and the
-   nearby catalogue stars vote for the offset, within `--wcs-offset`.
-   `ASTRMETH = 'WCS'`.
-2. **Any rotation** (skipped with `--roll-known`). Pairs of the 30 brightest
-   frame stars and the catalogue stars of matching length do not depend on
-   the rotation or the offset. Each such pair votes for a rotation and an
-   offset. The vote above is then repeated around the eight best candidates.
-   `ASTRMETH = 'POINTING'`. This pass is the right one when the pointing and
-   the scale are known but the roll is not.
-3. **Blind match**, with the scale prior. It is tried first on the
-   catalogue stars near the frame (by the pointing), then on the brightest
-   stars of the whole catalogue. Triangle sequences of at least `--minmatch`
-   stars are built from chunks of `--maxmatch` stars. `ASTRMETH = 'BLIND'`.
-
-**Scale prior.** When the scale is known from `--scale` or the header WCS,
-the blind match skips star pairs whose length disagrees with it by more than
-`--scale-tol` (5%). Solutions outside the tolerance are rejected. This makes
-matching tens of times faster and removes false solutions with a wrong scale.
-Without any scale the match is scale-free.
-
-**Significance test.** Every solution is tested against chance. The test
-counts the stars within 3 × the scatter of the fit, apart from the two that
-fix the transformation. That count is compared with the Poisson number of
-coincidences expected from the catalogue density in the overlap of the
-catalogue and the frame. The probability is multiplied by the number of
-trials of the search, and the solution is accepted below 10⁻³. Larger
-searches (big `--wcs-offset`, `--reflex-unknown`, any rotation) count more
-trials, so a frame of only 5–6 stars needs a tight `--wcs-offset`.
-`--verbose` prints the numbers on the `# significance:` line.
-
-**Five stars minimum.** The solution has four parameters (scale, rotation,
-centre) and their errors, so at least five matched stars are required. A
-frame or reference with fewer stars fails with "too few stars". Seven or
-more stars is safer, and over 20 is ideal.
-
-**Final fit.** The TAN fit of ten stars or more is weighted by the centroid
-errors, estimated from the S/N in the first aperture and the PSF width, plus
-an excess scatter. With `-p TPV` the fit goes in stages:
-
-1. the gnomonic solution;
-2. a second-order deformation, with all stars cross-matched again by it until
-   the matched set is stable;
-3. the third order, iterated the same way.
-
-Distortions of about 15 px are recovered to about 0.1 px. With 25 matched
-stars or fewer, TPV falls back to TAN with a warning. The TPV terms are fitted
-without weights. Atmospheric refraction is not modelled.
-
-**Threads.** The blind match runs the chunk pairs in OpenMP threads, and the
-solution and significance are the same for any number of threads. The thread
-count is `OMP_NUM_THREADS` (in a container pass it with
-`docker run -e OMP_NUM_THREADS=4 …`). When it is unset, the count is the CPUs available
-to the process (its affinity mask and CPU quota, e.g. `docker run --cpus 4`)
-divided by `--mproc`. `--verbose` prints the count. Threads help most when no
-solution exists, for example a wrong field without a scale prior.
-
-## Choosing the catalogue cone
-
-- **Pointing known** (header WCS, or `--rcen`, `--dcen`, `--scale`): the
-  whole catalogue is read, and the brightest `--maxstars` stars within the
-  frame half-diagonal + 10% + `--wcs-offset` are used. A cone larger than
-  the frame is fine.
-- **No pointing:** the brightest `--maxstars` stars of the whole cone are
-  used. Make the cone about the field of view plus a 10% margin. For a square
-  frame of side *L*, a radius of about 0.8 *L* works (the half-diagonal
-  0.71 *L* plus 10%).
-- **Magnitudes:** match the magnitude range to the stars that are well
-  exposed and unsaturated on the frame. Use `cone --magmin/--magmax` or a
-  FITSIO filter, e.g. `-c 'cone.fits[1][$f.mag$>12]'`. Sorting the cone is not
-  needed: `astrometry` sorts it by `--col-mag`.
-- **Crowded fields:** use `--minmatch 7 --maxmatch 44`, and on large
-  telescopes also limit the bright end of the catalogue.
-
-## Outputs
-
-The calibration is written to the primary header and replaces any earlier
-one. The image data are not changed.
-
-| Key | Content |
-|---|---|
-| `CTYPE1`, `CTYPE2` | `RA---TAN`, `DEC--TAN` (or `…TPV`) |
-| `CRVAL1`, `CRVAL2` | RA, Dec of the reference pixel [deg] |
-| `CRPIX1`, `CRPIX2` | Reference pixel (by default the frame centre) |
-| `CD1_1`, `CD1_2`, `CD2_1`, `CD2_2` | Scale, rotation and reflection matrix [deg/pix] |
-| `CUNIT1`, `CUNIT2` | `deg` (`pix` for relative astrometry) |
-| `CRDER1`, `CRDER2` | RMS of the residuals [deg] |
-| `PV1_0…PV1_11`, `PV2_0…PV2_11` | TPV coefficients (`-p TPV` only) |
-| `RADESYS`, `JEPOCH` | Reference system and epoch |
-| `ASTRMETH` | How the match was found: `WCS`, `POINTING`, `BLIND`, `CROSS` or `SEQUENCE` |
-
-A `COMMENT` block between `=== Astrometric Solution by Munipack ===` and
-`=== End of Astrometric Solution by Munipack ===` records:
-
-- the reference and the projection;
-- the match sequence length and the number of objects used;
-- the fitting method and the match type;
-- the RMS, and the scale and rotation angle with their errors;
-- the reflection and the projection centre.
-
-With `--report` the extension **`ASTROREPORT`** lists the stars of the fit:
-
-| Column | Description |
-|---|---|
-| RA, Dec (named as in the catalogue, e.g. `RAJ2000`, `DEJ2000`) | Catalogue coordinates [deg] |
-| `X`, `Y` | Frame coordinates [pix] |
-| `RA_OFF`, `DEC_OFF` | Residuals [deg] |
-| `MATCH` | Position of the star in the match sequence; 0 for stars added by the final cross-match |
+The WCS is written to the primary header (`CTYPE`, `CRVAL`, `CRPIX`, `CD`,
+plus `PV` terms for TPV) and replaces any earlier solution. `CRDER1/2` hold
+the RMS of the fit, and `ASTRMETH` records how the match was found
+(`WCS`, `POINTING`, `BLIND`, `CROSS` or `SEQUENCE`). A `COMMENT` block
+summarises the solution: reference, number of stars, RMS, scale and
+rotation. With `--report`, the `ASTROREPORT` extension lists each star's
+catalogue and frame coordinates and its residuals.
 
 ## Examples
 
-Calibrate a frame from scratch against a cone around the target:
+Calibrate a frame from scratch:
 
 ```bash
 munipack cone -c UCAC5 -r 0.2 -o cone.fits -- 110.25 71.34
@@ -291,26 +168,14 @@ munipack aphot frame.fits
 munipack astrometry -c cone.fits frame.fits
 ```
 
-The pointing and the scale are known but the roll is not (common for
-space-borne or alt-az instruments). This example uses a 0.756″/px detector
-(4761.9 pix/deg) and a pointing known to a few arcminutes:
+You know the pointing and the pixel scale, but not the rotation:
 
 ```bash
 munipack astrometry -c cone.fits --rcen 180.02 --dcen 0.51 --scale 4761.9 \
     --wcs-offset 3arcmin frame.fits
 ```
 
-The frames already have an approximate header WCS whose rotation may be
-wrong. This skips the pass within 3°, writes the TPV distortion and the
-residual table, and uses four threads (in the container, pass
-`-e OMP_NUM_THREADS=4` to `docker run` instead):
-
-```bash
-OMP_NUM_THREADS=4 munipack astrometry --roll-unknown -p TPV --report \
-    -c cone.fits -t calibrated/ frame_*.fits
-```
-
-Write a known calibration by hand (no catalogue), or remove one:
+Write a known calibration by hand, or remove one:
 
 ```bash
 munipack astrometry -m manual --rcen 30 --dcen 60 --xcen 300 --ycen 300 \
@@ -319,12 +184,9 @@ munipack astrometry --remove frame.fits
 ```
 
 ```{note}
-In `manual` mode, give `--xcen` and `--ycen` explicitly. If they are left
-out, this build writes `CRPIX1 = CRPIX2 = 0` instead of the frame centre.
+In `manual` mode, always give `--xcen` and `--ycen`. Without them the
+reference pixel is written as 0 rather than the frame centre.
 ```
 
-```{note}
-Relative astrometry (`-R`) failed with "No common stars found" in tests of
-this build on simulated frames that `-r` and `-c` solve. Use `-r` (a
-calibrated reference frame) or a catalogue instead.
-```
+Relative astrometry with `-R` is unreliable in this version; use a
+calibrated reference frame (`-r`) or a catalogue instead.

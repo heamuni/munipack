@@ -1,35 +1,29 @@
 # Reference
 
-One page per action or group of related actions. Each lists the options with
-their units and defaults (as printed by `munipack <action> --help`), the
-method, the outputs and examples.
+Every Munipack task is an action, run as `munipack <action> [options] file(s)`.
+Each page below covers one action or a few related ones: what it does, its
+options and a couple of examples. For the full option list on your own
+machine, run `munipack <action> --help`.
 
-All actions are run as `munipack <action> [options] file(s)`; in the
-container, `munipack` is the entry point (see {doc}`../install`).
-
-| Page | Actions | Purpose |
+| Page | Actions | What for |
 |---|---|---|
-| {doc}`preprocessing` | `bias`, `dark`, `flat`, `phcorr` | Master calibration frames and their application |
-| {doc}`find` | `find` | Star detection |
-| {doc}`aphot` | `aphot` | Aperture photometry and aperture corrections |
+| {doc}`preprocessing` | `bias`, `dark`, `flat`, `phcorr` | Make calibration frames and apply them |
+| {doc}`find` | `find` | Detect stars |
+| {doc}`aphot` | `aphot` | Aperture photometry |
 | {doc}`psfphot` | `psfphot` | PSF photometry |
 | {doc}`gphot` | `gphot` | Growth-curve photometry |
 | {doc}`astrometry` | `astrometry` | Astrometric calibration (WCS) |
-| {doc}`phcal` | `phcal`, `phfotran` | Photometric calibration and instrument transformations |
-| {doc}`kombine` | `kombine`, `colouring` | Stacks, mosaics and colour frames |
+| {doc}`phcal` | `phcal`, `phfotran` | Photometric calibration and colour transformations |
+| {doc}`kombine` | `kombine`, `colouring` | Stacks, mosaics and colour images |
 | {doc}`artificial` | `artificial` | Simulated frames |
-| {doc}`catalogues` | `cone`, `sesame`, `votable`, `cross` | Catalogues and Virtual Observatory |
+| {doc}`catalogues` | `cone`, `sesame`, `votable`, `cross` | Catalogues and the Virtual Observatory |
 | {doc}`utilities` | `fits`, `timeseries` | FITS files and time series |
 
-The front end itself:
-
-```text
-Usage: munipack [--version] [-h] [--verbose] [action]
-```
-
-`--version` prints the version and licence, `--help` the list of actions,
-`--verbose` makes the actions log their progress. The exit status is 0 on
-success and 1 on any error, with the reason on stderr.
+`munipack` on its own takes three options: `--version` prints the version and
+licence, `-h`/`--help` lists the actions, and `--verbose` makes the action report
+its progress. An action exits with status 0 on success and 1 on an error,
+with the reason printed to stderr, so it is easy to use in scripts. If you
+run Munipack from the container, see {doc}`../install`.
 
 ```{toctree}
 :hidden:

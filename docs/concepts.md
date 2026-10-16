@@ -1,265 +1,138 @@
 # Concepts
 
-This page collects the conventions that every action shares: where the
-results are stored, the units, how errors are propagated, how photometric
-systems are described, and the PSF file format.
+The conventions shared by all Munipack actions: where results go, units,
+errors, photometric systems and the PSF file format.
 
 ## Files and extensions
 
-Munipack keeps the results of a frame in the frame's own FITS file. The
-primary array stays as it is, and every step adds (or replaces) a binary-table
-extension. Always address extensions by name (`frame.fits[APERPHOT]`), not by
-index, because their order can vary.
+Munipack keeps everything about a frame in the frame's own FITS file. The
+image itself is left untouched, and each processing step adds its results as
+a new table extension. Refer to extensions by name (`frame.fits[APERPHOT]`),
+not by number, because their order can change.
 
-| Step | Writes | Contents |
+| Step | Adds | What is in it |
 |---|---|---|
-| `artificial` | new frame, `PSF`, `CATALOGUE` | the simulated image; the PSF used (with `ZOOM`; not written with `--psf-file`); the true `X`, `Y` and `COUNT` (mean electrons) of every star |
-| `find` | `FIND` | detected stars: `X`, `Y`, `PEAKRATIO`, `SHARP`, `ROUND`, sorted by decreasing `PEAKRATIO` (the brightest first) |
-| `aphot` | `APERPHOT` | per star: `X`, `Y`, `SKY`, `SKYERR`, `APCOUNTi`, `APCOUNTERRi` for each aperture *i*; optionally `APEEi`, `APEEERRi` (enclosed energy) |
-| `gphot` | `GROWPHOT`, `GROWCURVE` | `X`, `Y`, `SKY`, `SKYERR`, `GCOUNT`, `GCOUNTERR`, `GROWFLAG`; the growth curve itself (`R`, `GROWCURVE`, `GROWCURVEERR`, `RADIALPROFILE`) |
-| `psfphot` | `PSFPHOT` | `X`, `Y`, `XERR`, `YERR`, `PSFCOUNT`, `PSFCOUNTERR`, `SKY`, `SKYERR`, `CHI2`, `SHARP`, `ROUND`, `NPIX`, `FLAG`, `GROUP`, `GSIZE`; `PSFMODERR` for an empirical PSF |
-| `astrometry` | primary header | the WCS (`CTYPEi`, `CRVALi`, `CRPIXi`, `CDi_j`, …), `RADESYS`, `JEPOCH`, `ASTRMETH`; `ASTROREPORT` with `--report` |
-| `phcal` | new file `*_cal.fits` with `PHOTOMETRY` | the frame converted to photons, and a table `RAJ2000`, `DEJ2000`, `SKY`, `SKYERR`, `PHOTON`, `PHOTONERR`, then `Q`, `QERR` for every quantity of `-q` (default `FLUX`, `MAG`); `COLOR`, `COLORERR`, `COLORSRC` with a colour term; `PHRES` with `--advanced` |
-| `phcorr`, `kombine` | primary array, `STDERR` | the corrected or combined frame and the standard error of every pixel |
+| `artificial` | new frame, `PSF`, `CATALOGUE` | the simulated image, the PSF used, and the true positions and fluxes of the stars |
+| `find` | `FIND` | detected stars with positions and shape parameters, brightest first |
+| `aphot` | `APERPHOT` | sky and counts with errors for every aperture |
+| `gphot` | `GROWPHOT`, `GROWCURVE` | total counts from the growth curve, and the curve itself |
+| `psfphot` | `PSFPHOT` | positions, counts, sky and fit quality from the PSF fit |
+| `astrometry` | primary header | the WCS solution |
+| `phcal` | new file `*_cal.fits` with `PHOTOMETRY` | the frame in photons and a table of calibrated fluxes and magnitudes |
+| `phcorr`, `kombine` | image, `STDERR` | the corrected or combined frame and the error of each pixel |
 
-`find`, `aphot`, `gphot` and `psfphot` update the input file in place;
-`-t dir` writes the updated copy to `dir` instead (`-O` with `--pattern`,
-`--mask`, `--format` sets other output names). `phcal` writes a new file, `frame.fits` →
-`frame_cal.fits` by default.
+`find`, `aphot`, `gphot` and `psfphot` update the input file in place; use
+`-t dir` to write the updated copy elsewhere. `phcal` writes a new file
+(by default `frame.fits` gives `frame_cal.fits`).
 
-A negative value (−1) in a count or error column means the value could not be
-measured: the aperture crosses the frame edge, contains saturated or bad
-pixels, the star is fainter than the sky, or the aperture is contaminated by a
-brighter neighbour. Undefined magnitudes are 99.99999, with the error 9.99999.
+A value of −1 in a count or error column means the star could not be measured
+(it is at the frame edge, saturated, fainter than the sky, or blended with a
+brighter neighbour). Undefined magnitudes are written as 99.99999.
 
 ### Header keywords
 
-Keywords of the primary header that the actions read:
+These keywords of the primary header describe the detector. Set them
+correctly, because they drive the errors and the detection threshold.
 
-| Keyword | Units | Meaning | Used by |
-|---|---|---|---|
-| `GAIN` | e⁻/ADU | electrons per unit of the pixel values (1 for frames in electrons, also implied by `BUNIT = 'COUNTS'`) | find, aphot, psfphot, dark, kombine, phcorr |
-| `READNS` | ADU | read noise in the units of the pixel values | find, aphot, psfphot, dark, kombine, phcorr |
-| `RDNOISE` | e⁻ | read noise in electrons (used when `READNS` is missing) | as `READNS` |
-| `BIASLEV` | ADU | level of zero electrons (bias pedestal) still in the values | find, aphot, psfphot, dark, kombine, phcorr |
-| `SATURATE` | ADU | saturation level | find, aphot, psfphot, dark, flat, phcorr |
-| `EXPTIME` | s | exposure time | phcal, phfotran, dark, phcorr, kombine |
-| `AREA` | m² | collecting area (1 when missing) | phcal, phfotran |
-| `FILTER` | — | filter name, matched to a row of the photometric system | phcal, phfotran |
-| `PHOTSYS` | — | photometric system of the frame (instrumental) | phcal, phfotran |
-
-`artificial` writes `GAIN`, `RDNOISE` (not `READNS`), `BIASLEV`, `SATURATE`,
-`EXPTIME`, `AREA` and `FILTER`, plus `DARKCUR` [e⁻/s/pix], `ARTSEED`,
-`WMARKX1/X2/Y1/Y2` (the region of the watermark) and `HWHM`, which there is
-the PSF width parameter (σ for GAUSS and SEEING, α for MOFFAT), not a true
-half width.
-
-Keywords of the extension headers (selection):
-
-| Extension | Keyword | Meaning |
+| Keyword | Units | Meaning |
 |---|---|---|
-| `FIND` | `FWHM` | typical FWHM of the stars [pix] |
-| | `THRESH` | requested threshold [σ of Normal noise, as a false-alarm rate] |
-| | `HTHRESH`, `SKEWFILT`, `KURTFILT` | threshold height under the noise model, skewness and kurtosis of the filtered sky |
-| | `FALSERAT` | expected number of noise detections per frame |
-| | `LOWBAD`, `HIGHBAD` | range of good data [ADU] |
-| | `SHAPESIG`, `SHARPREF`, `ROUNDREF`, `SHRPLO`, `SHRPHI`, `RNDLO`, `RNDHI` | shape acceptance |
-| `APERPHOT` | `NAPER`, `APERi`, `ANNULUS1`, `ANNULUS2` | aperture and sky-ring radii [pix] |
-| | `HWHM` | true half width at half maximum [pix] (1.1774 σ of a Gaussian) |
-| | `APERRGN` | gain [e⁻/ADU] applied to the Poisson term of `APCOUNTERR` |
-| | `EESOURCE`, `EEPSF`, `EEVAR`, `EERTOT1/2`, `EER99`, … | source and model of the enclosed energy (`APEEi`) |
-| `GROWPHOT` | `HWHM`, `RADFLX90`, `GROWMETH` | half width, radius of 90 % of the flux [pix], `EE` or `LEGACY` |
-| `PSFPHOT` | `PSFTYPE`, `FWHM`, `PSFSIGMA` / `PSFALPHA`, `PSFBETA` | PSF model and its shape |
-| | `GAIN`, `READNS`, `BIASLEV`, `SATURATE` | the noise model used for the weights |
-| | `PSFNSTAR`, `PSFRAD`, `PSFZOOM`, `PSFVAR`, `PSFVARR`, `PSFSYSER` | empirical PSF: stars, table radius, sampling, variation, relative systematic error |
-| `PHOTOMETRY` | `PHOTOTYP` | photometry calibrated: `APHOT`, `GPHOT` or `PSFPHOT` |
-| | `CTPH`, `CTPHERR` | the calibration ratio (photons per count, see below) and its error |
-| | `PHSYSERR`, `PHSYSERE`, `PHSYSNST` | systematic error [mag], its upper error, calibration stars used |
-| | `APCORTYP`, `APCORR` | aperture correction: `EE`, `CONST` (the factor in `APCORR`) or `NONE` |
-| | `APER`, `ANNULUS1`, `ANNULUS2` | calibration aperture and sky ring [deg] |
-| | `COLTERM`, `COLTREF`, `COLTK1`, `COLTK1E`, … | colour term, if any |
-
-The primary header of a calibrated frame also gets `BUNIT`, `PHOTFLAM`,
-`PHOTZPT`, `PHOTPLAM` and `PHOTBW` (HST-style keywords), and `PHOTSYS`.
+| `GAIN` | e⁻/ADU | electrons per unit of the pixel values (1 for a frame in electrons) |
+| `READNS` | ADU | read noise in the units of the frame |
+| `RDNOISE` | e⁻ | read noise in electrons (used when `READNS` is missing) |
+| `BIASLEV` | ADU | bias level still present in the values |
+| `SATURATE` | ADU | saturation level |
+| `EXPTIME` | s | exposure time |
+| `AREA` | m² | collecting area of the telescope (1 when missing) |
+| `FILTER` | — | filter name, matched to the photometric system |
+| `PHOTSYS` | — | instrumental photometric system of the frame |
 
 ## Units
 
-### Counts, ADU and electrons
+### ADU and electrons
 
-*Counts* in Munipack are values in the units of the frame. `APCOUNT`, `GCOUNT`,
-`PSFCOUNT` and `SKY` are therefore in ADU for a raw frame, and in electrons
-for a frame that `phcorr` has converted (it converts when the gain is known,
-from `GAIN` or `-gain`). No other action multiplies by the gain: the gain only
-enters the **noise model**, through `GAIN`.
+Counts (`APCOUNT`, `GCOUNT`, `PSFCOUNT`, `SKY`) are always in the units of
+the frame: ADU for a raw frame, electrons after `phcorr` has converted it
+(it does so when the gain is known). No other action rescales the data; the
+gain is used only to estimate the noise.
 
-- A raw frame: `GAIN` is the detector gain, `READNS` [ADU] or `RDNOISE` [e⁻],
-  and `BIASLEV` if the pedestal has not been subtracted.
-- A frame in electrons: `GAIN = 1`, the read noise in electrons, and no
-  `BIASLEV`. `phcorr` writes exactly this header, with `BUNIT = 'COUNTS'`, and
-  keeps the conversion gain in `PHCGAIN`.
+- **Raw frame:** `GAIN` is the detector gain, the read noise is in `READNS` or
+  `RDNOISE`, and `BIASLEV` is set if the bias has not been subtracted.
+- **Frame in electrons:** `GAIN = 1`, the read noise is in electrons and there
+  is no `BIASLEV`. `phcorr` writes exactly this header for you.
 
 ```{note}
-A wrong `GAIN` gives wrong errors and a wrong detection threshold, but the
-fluxes are not scaled by it. If the header has no `GAIN`, the sky clipping
-falls back to the observed scatter of the sky, and `aphot` takes 1 e⁻/ADU for
-the Poisson term of the errors (with a warning).
+A wrong `GAIN` does not change the fluxes, but it gives wrong errors and a
+wrong detection threshold. When `GAIN` is missing, `aphot` assumes
+1 e⁻/ADU and warns.
 ```
 
-`CTPH` converts the counts to photons, *n* = `CTPH` · *c*. Despite its name
-and its header comment ("counts per photons"), it is photons per count, the
-inverse of the efficiency. It absorbs everything between the photons arriving
-at the telescope and the values in the frame: throughput, quantum efficiency,
-the gain (for ADU frames), the light outside an uncorrected aperture, and an
-`AREA` that is not set. For a frame in electrons with the right `AREA` it is
-therefore at least 1; for an ADU frame it is about `GAIN` / efficiency.
+After calibration, `CTPH` in the `PHOTOMETRY` header converts counts to
+photons (photons = `CTPH` × counts). Despite its header comment ("counts
+per photons"), it is photons per count. It absorbs throughput, quantum
+efficiency, gain, light lost outside the aperture and an unset `AREA`.
 
 ### Angular scale
 
-`--scale` is in **pixels per degree** in `artificial`, `astrometry`,
-`kombine`, `aphot` and `psfphot`. Older Munipack versions used degrees per
-pixel in `artificial`, `astrometry` and `kombine`.
+`--scale` is in **pixels per degree** in every action that takes it
+(`artificial`, `astrometry`, `kombine`, `aphot`, `psfphot`). Compute it as
+3600 / (arcsec per pixel). Older Munipack versions used degrees per pixel in
+`artificial`, `astrometry` and `kombine`, so update old scripts.
 
-| Plate scale | `--scale` [pix/deg] |
+| Plate scale | `--scale` |
 |---|---|
 | 2″/pix | 1800 |
 | 1″/pix | 3600 |
-| 0.756″/pix | 4761.9 |
-| 0.396″/pix | 9090.9 |
+| 0.5″/pix | 7200 |
 
-In general `--scale` = 3600 / (arcsec per pixel).
+Aperture radii, FWHM and fitting radii are in pixels. In the `PHOTOMETRY`
+extension of a calibrated frame, the aperture radii are in degrees (when the
+frame has an astrometric solution) and the sky is in photons per pixel.
 
-Other units:
+## How errors are estimated
 
-| Quantity | Units |
-|---|---|
-| aperture and ring radii, FWHM, `--fitrad`, `--psf-radius` | pixels |
-| `APER`, `ANNULUS1/2` in `PHOTOMETRY` | degrees (with an astrometric solution) |
-| `SKY`, `SKYERR` in `PHOTOMETRY` | photons per pixel |
-| `artificial --hwhm` | pixels: Gaussian σ (GAUSS, SEEING) or Moffat α |
-| `artificial --sky-mag` | mag/arcsec² |
-| `astrometry --wcs-offset` | pixels, or with units: `30arcsec`, `2arcmin`, `0.1deg`, `20%` (of the frame) |
-| `phcal --tol` | degrees |
-| `phcal --syserr` | magnitudes |
+Every pixel's noise is the Poisson noise of its electrons plus the read
+noise, both taken from the header keywords above. Sky levels are clipped
+means rather than medians, because a median is biased low on a faint sky.
 
-## Noise model and errors
+- **Aperture photometry:** the error combines the sky noise inside the
+  aperture, the Poisson noise of the star, and the uncertainty of the sky
+  level. The last part grows with the aperture size.
+- **PSF photometry:** a weighted least-squares fit, with the noise of each
+  pixel predicted from the model. For an empirical PSF, the uncertainty of the
+  PSF itself is included.
+- **Calibration:** `phcal` adds the error of the star's counts, of the
+  calibration ratio and a systematic error. By default (`--syserr auto`) the
+  systematic error is the extra scatter of the calibration stars, fitted in a
+  way that ignores outliers such as variables or blends. With few calibration
+  stars (`phcal` warns below 10), give a fixed `--syserr` measured on many
+  frames; `--syserr 0` turns it off.
+- **Pre-processing and stacking:** `phcorr` and `kombine` write the error of
+  each output pixel to the `STDERR` extension.
 
-### Pixels
-
-The variance of a pixel of value *t* [ADU] is taken as
-
-```{math}
-\sigma^2 = \frac{\max(t - \mathrm{BIASLEV},\,0)}{\mathrm{GAIN}} + R^2 ,
-```
-
-where *R* is the read noise in ADU (`READNS`, or `RDNOISE`/`GAIN`). The first
-term is the Poisson noise of the electrons, the second is Gaussian. At a few
-electrons per pixel the Poisson distribution is skewed, and Munipack accounts
-for this where it matters:
-
-- **Sky and averages** (the sky of `aphot`, `find`, `psfphot`; the master of
-  `dark` and the default mean of `kombine`): the *mean* of the pixels, clipped
-  by limits that follow the noise model (asymmetric, so that the Poisson tail
-  is kept). It is not a median or a robust mean, because those are biased low
-  on a faint sky.
-- **Detection** (`find -th t`): the threshold height is chosen so that the
-  skewed noise of the filtered sky exceeds it as rarely as Normal noise exceeds
-  *t*σ. `--false-rate N` sets it by the expected number of noise detections per
-  frame instead.
-
-### Aperture photometry
-
-For aperture *k* with area *A* = Σ*f* (where *f* is the fraction of each pixel
-inside the aperture), sky-subtracted counts *C*, sky scatter σ_sky and error of
-the mean sky σ_S (`SKYERR`):
-
-```{math}
-\sigma_C^2 = \sigma_\mathrm{sky}^2 \sum f^2 \;+\; \frac{C}{\mathrm{APERRGN}} \;+\; A^2\,\sigma_S^2 .
-```
-
-The terms are, in order: the noise of the sky pixels in the aperture (read
-noise included), the Poisson noise of the star, and the sky-subtraction term.
-The last term is the same for all stars that share a sky level, and it grows
-with the area of the aperture. `APERRGN` is the frame's `GAIN` (1 when it is
-unknown).
-
-### PSF photometry
-
-`psfphot` fits by weighted least squares. The variance of each pixel comes
-from the model *M* (star + sky), not from the data:
-max(*M* − `BIASLEV`, 0)/`GAIN` + *R*². There is no one-electron floor, so
-χ² ≈ 1 on a sparse sky. For an empirical PSF, `PSFMODERR` (the uncertainty of
-the PSF model) is included in `PSFCOUNTERR`.
-
-### Calibration
-
-`phcal` converts the counts *c* to photons, *n* = `CTPH` · *c*. Here *c* is
-`APCOUNT`/`APEE` (or `APCOUNT` without EE), `GCOUNT` or `PSFCOUNT`, as chosen
-by `--photometry`. The relative errors add in quadrature:
-
-```{math}
-\left(\frac{\sigma_n}{n}\right)^2 =
-\left(\frac{\sigma_c}{c}\right)^2 +
-\left(\frac{\sigma_\mathrm{EE}}{\mathrm{EE}}\right)^2 +
-\left(\frac{\sigma_\mathrm{CTPH}}{\mathrm{CTPH}}\right)^2 +
-s^2,
-\qquad s = \frac{\mathrm{PHSYSERR}}{1.0857},
-```
-
-and `MAGERR` = 1.0857 σ_n/n. The colour terms, when present, add the errors of
-their coefficients and of the star's colour.
-
-- **Systematic error** `PHSYSERR` (`--syserr auto`, the default) is the scatter
-  of the calibration stars beyond their own errors. It is fitted together with
-  `CTPH` by a mixture likelihood, so outliers (blends, variables,
-  misidentifications) carry no weight. It is ≈ 0 on well-behaved frames. With
-  fewer than 10 calibration stars `phcal` warns; in that case pass a fixed
-  `--syserr` value measured on many frames. `--syserr 0` turns it off.
-- `CTPHERR` is common to all stars of a frame. It is a zero-point error,
-  correlated between stars, and it cancels in differential photometry on one
-  frame. `PHSYSERR` acts per star.
-
-### Pre-processing and stacking
-
-`phcorr` and `kombine` write the error of every output pixel to the `STDERR`
-extension. For `phcorr` it includes the Poisson noise of the electrons (dark
-current too), the read noise, the errors of the bias, dark and flat masters,
-and the quantisation of integer frames. For `kombine` it is the standard error
-of the combined value, on the scale of the output image.
+The error of the calibration ratio is common to all stars on a frame, so it
+cancels in differential photometry.
 
 ## Photometric systems
 
-A photometric system is a FITS table extension, one row per filter. The
-`FILTER` column is matched against the `FILTER` keyword of the frames. The
-values are in SI units, except `FLAM_REF` (per nm). The extension name is the
-name of the system; its header also needs `FILTREF` (a reference filter of the
-system) and `REFID` (a reference string).
+A photometric system is a FITS table with one row per filter. The `FILTER`
+column is matched against the `FILTER` keyword of your frames.
 
 | Column | Meaning | Units |
 |---|---|---|
 | `FILTER` | filter name | — |
-| `LAM_EFF` | effective wavelength λ_eff | m |
-| `LAM_FWHM` | passband width Δλ, taken as **2σ** of a Gaussian | m |
+| `LAM_EFF` | effective wavelength | m |
+| `LAM_FWHM` | passband width | m |
 | `NU_EFF`, `NU_FWHM` | the same in frequency (informative only) | Hz |
-| `FNU_REF` | f_ν of a zero-magnitude star (informative only) | W/m²/Hz |
-| `FLAM_REF` | f_λ of a zero-magnitude star | W/m²/nm |
+| `FNU_REF` | flux of a zero-magnitude star per Hz (informative only) | W/m²/Hz |
+| `FLAM_REF` | flux of a zero-magnitude star per nm | W/m²/nm |
 
-Only `LAM_EFF`, `LAM_FWHM` and `FLAM_REF` enter the calibration. The passband
-is modelled as a Gaussian with σ = `LAM_FWHM`/2, so its equivalent (effective)
-width is
+Only `LAM_EFF`, `LAM_FWHM` and `FLAM_REF` are used in the calibration.
+The passband is treated as a Gaussian with σ = `LAM_FWHM`/2, so for your own
+filters `LAM_FWHM` means 2σ rather than the true FWHM. The
+extension name is the name of the system, and its header also needs `FILTREF`
+(a reference filter) and `REFID` (a literature reference).
 
-```{math}
-W = \sqrt{2\pi}\,\sigma = \sqrt{\pi/2}\;\mathrm{LAM\_FWHM} = 1.2533\,\mathrm{LAM\_FWHM}.
-```
-
-A Gaussian whose true FWHM was `LAM_FWHM` would give 1.0645 `LAM_FWHM`
-instead. The expected photon flux of a star of magnitude *m* is
-
-```{math}
-\phi = \mathrm{FLAM\_REF}\; 10^{-0.4m}\; W\; \frac{\mathrm{LAM\_EFF}}{hc}
-\quad [\mathrm{ph/s/m^2}], \qquad n = \phi\,A\,T .
-```
-
-Systems bundled with Munipack (`phcal --list`):
+Systems bundled with Munipack (see `phcal --list`):
 
 | System | Filters | Reference |
 |---|---|---|
@@ -267,89 +140,64 @@ Systems bundled with Munipack (`phcal --list`):
 | `Gunn` | g, r, i, z | Schneider, Gunn & Hoessel (1983) |
 | `Stromgren` | u, v, b, y, Hbetan, Hbetaw | Fiorucci & Munari (2003) |
 
-For example, Johnson V has `LAM_EFF` = 553.8 nm and `LAM_FWHM` = 75.0 nm, so
-*W* = 94.0 nm. To add a system, such as a UV band of your own instrument,
-copy `photosystems.lst` (in the source tree `src/photometry/`, installed as
-`share/munipack/photosystems.lst`, `/opt/munipack/share/munipack/` in the
-Docker image). Append an extension (`# BEGIN HDU n` … `# END HDU n`) with the
-same columns, your `EXTNAME`, `FILTREF`, `REFID` and one row per filter, then
-convert the file to FITS (`file.lst` gives `file.fits`) and pass it with
-`--phsystab`. The file replaces the bundled table, so keep the systems you
-still need in it:
+To add your own system, copy `photosystems.lst` (installed in
+`share/munipack/`; `/opt/munipack/share/munipack/` in the Docker image),
+append a block `# BEGIN HDU n` … `# END HDU n` for your system with the same
+columns, convert it to FITS and pass it with `--phsystab`. Your file replaces the
+bundled one, so keep in it the systems you still need:
 
 ```bash
 munipack fits --restore my_photosystems.lst      # writes my_photosystems.fits
-munipack phcal --phsystab my_photosystems.fits --list
 munipack phcal --phsystab my_photosystems.fits --photsys-ref MySystem -f NUV \
     -c cat.fits --col-ra RAJ2000 --col-dec DEJ2000 \
     --col-mag NUVmag --col-magerr e_NUVmag frame.fits
 ```
 
-`artificial --phsystab my_photosystems.fits --photsys MySystem -f NUV`
-simulates frames in the same band.
+The same file works with `artificial --phsystab` to simulate frames in that
+band.
 
 ### Calibrated quantities
 
-`phcal -q` selects the output columns. All of them are derived from the
-photons with the same *W*. The frequency width is *W*_ν = *c W* / λ_eff².
+`phcal -q` chooses which quantities appear in the output table (by default
+`FLUX` and `MAG`):
 
-| Quantity | Definition | Units |
+| Quantity | Meaning | Units |
 |---|---|---|
-| `PHOTON` | *n* | photons |
-| `PHOTRATE` | ϕ = *n* / (*A T*) | ph/s/m² |
-| `PHOTNU` | ϕ / *W*_ν | ph/s/m²/Hz |
-| `PHOTLAM` | ϕ / *W* | ph/s/m²/nm |
-| `FLUX` | *F* = ϕ *hc* / λ_eff | eV/s/m² |
-| `FNU` | *F* / *W*_ν | W/m²/Hz |
-| `FLAM` | *F* / *W* | W/m²/nm |
-| `MAG` | −2.5 log₁₀(*F* / (`FLAM_REF` · *W*)) | mag |
-| `ABMAG` | −2.5 log₁₀(f_ν / 3.631×10⁻²³ W/m²/Hz) | mag |
-| `STMAG` | −2.5 log₁₀(f_λ / 3.6335×10⁻¹¹ W/m²/nm) | mag |
+| `PHOTON` | number of photons | photons |
+| `PHOTRATE` | photon rate per area | ph/s/m² |
+| `PHOTNU` | photon rate per Hz | ph/s/m²/Hz |
+| `PHOTLAM` | photon rate per nm | ph/s/m²/nm |
+| `FLUX` | energy flux in the band | eV/s/m² |
+| `FNU` | flux density per Hz | W/m²/Hz |
+| `FLAM` | flux density per nm | W/m²/nm |
+| `MAG` | magnitude in the photometric system | mag |
+| `ABMAG` | AB magnitude | mag |
+| `STMAG` | ST magnitude | mag |
 
+(psf-format)=
 ## PSF file format
 
-One format describes a PSF, constant or varying over the field, for
-`artificial --psf-file`, `psfphot --psf-file`, `aphot --psf-file` (the
-enclosed energy), and the output of `psfphot --psf-save`. All of these use the
-same code to interpolate and pixelise it, so a frame simulated with a PSF file
-is fitted with exactly that PSF.
+One file format describes a PSF, either constant or varying over the field.
+It is read by `artificial`, `aphot` and `psfphot` (`--psf-file`) and written
+by `psfphot --psf-save`, so a frame simulated with a PSF file is fitted with
+exactly the same PSF.
 
 | Where | Keyword | Meaning |
 |---|---|---|
-| primary header | `ZOOM` | integer, PSF samples per pixel along each axis (the same for all PSFs) |
-| each image extension | `RADCOO` | angular distance of this PSF from the field centre [deg] |
-| | `ANGCOO` | position angle atan2(*y*, *x*) of the offset from the field centre [deg], counter-clockwise from the *x* axis |
-| | `CRPIX1`, `CRPIX2` | optional: the sample (1-based) at the centre of the star; default (`NAXIS1`/2, `NAXIS2`/2), integer division |
+| primary header | `ZOOM` | PSF samples per pixel along each axis |
+| each image extension | `RADCOO` | distance of this PSF from the field centre [deg] |
+| | `ANGCOO` | position angle of this PSF, counter-clockwise from the *x* axis [deg] |
+| | `CRPIX1`, `CRPIX2` | optional: the sample at the star's centre (default: the middle of the stamp) |
 
-- **Grid.** Every extension that has both `RADCOO` and `ANGCOO` is one PSF.
-  `RADCOO = 0` is the centre. PSFs with equal `RADCOO` form a ring. The number
-  of rings, the number of angles per ring, the sizes of the stamps and the
-  order of the extensions are all free. Extensions without both keywords are
-  ignored. A file with only a 2-D primary image and `ZOOM` is one PSF for the
-  whole field.
-- **Normalisation.** The samples should **sum to ZOOM²** (for example 4 for
-  `ZOOM = 2`); a star then gets its whole flux. A sum *s* gives the fraction
-  *s*/ZOOM², which can model light outside the stamp. A sum that differs from
-  ZOOM² by more than 0.1 % triggers a warning.
-- **Field position.** A star at pixel offsets (*x*, *y*) from the frame centre
-  (pixel `NAXIS`/2) is at radius √(*x*² + *y*²) / *scale* [deg], with *scale*
-  in pix/deg (the WCS, or `--scale`), and at angle atan2(*y*, *x*).
-  `--psf-centre x,y` of `aphot` and `psfphot` moves the centre.
-- **Interpolation.** On a ring, linear in angle (periodic). Between the centre
-  and the first ring, and between rings, linear in radius. Beyond the last
-  ring, the last ring is used.
-- **Pixelisation.** The image of a star is the exact integral over each
-  detector pixel of the interpolated samples: linear between samples for even
-  `ZOOM`, constant per sample for odd `ZOOM`. Flux is conserved at any
-  sub-pixel position. The analytic PSFs of `artificial` and `psfphot` are
-  sampled with `ZOOM = 16` and integrated in the same way.
+Each image extension with `RADCOO` and `ANGCOO` holds one PSF; those with
+the same `RADCOO` form a ring, and Munipack interpolates between them.
+The field centre is the centre of the frame; `--psf-centre x,y` of `aphot`
+and `psfphot` moves it. A file
+with just a primary image and `ZOOM` is one PSF for the whole field. The
+samples should sum to ZOOM² (4 for `ZOOM = 2`) so that a star gets all of its
+flux.
 
-`psfphot --psf-save` adds `PSFCEN1`, `PSFCEN2` (the field centre [pix]),
-`PSFSCALE` [pix/deg], `FWHM` and `PSFRAD` [pix] to the primary header. With
-no WCS on the frame, `PSFSCALE = 1`: `RADCOO` is then in pixels, and the file
-is used with `--scale 1`.
-
-A minimal file with one Gaussian PSF (σ = 1.5 px), written with Astropy:
+A minimal file with one Gaussian PSF (σ = 1.5 pixels), written with Astropy:
 
 ```python
 import numpy as np
@@ -368,6 +216,11 @@ ext.header.update(RADCOO=0.0, ANGCOO=0.0, CRPIX1=k + 1, CRPIX2=k + 1)
 fits.HDUList([pri, ext]).writeto('psf.fits', overwrite=True)
 ```
 
-To make it vary over the field, add more extensions with the same `ZOOM`.
-For example, four PSFs at `RADCOO = 0.3` and `ANGCOO = 0, 90, 180, 270`
-make one ring at 0.3° from the centre.
+To make the PSF vary over the field, add more extensions with the same
+`ZOOM`. For example, four PSFs at `RADCOO = 0.3` and `ANGCOO = 0, 90, 180,
+270` form a ring 0.3° from the centre.
+
+```{note}
+When the frame has no WCS, `psfphot --psf-save` writes `RADCOO` in pixels
+instead of degrees; use such a file with `--scale 1`.
+```

@@ -1,489 +1,261 @@
 # bias, dark, flat, phcorr — calibration frames and corrections
 
 These four actions turn raw CCD or CMOS exposures into calibrated frames in
-electrons:
+electrons, ready for `find`, `aphot`, `psfphot` and `astrometry`.
 
-| Action | Input | Output |
-|---|---|---|
-| `bias` | zero-exposure frames | master bias (per-pixel robust mean) |
-| `dark` | dark frames, optionally a master bias | master dark (per-pixel mean clipped by the noise model) |
-| `flat` | flat-field frames, optionally bias and dark | master flat, normalised to a mean of 1 |
-| `phcorr` | science frames, any of the masters above | corrected frames in electrons, with a `STDERR` extension |
-
-The masters are single files. `phcorr` writes one output per input frame.
-The calibrated frames are then ready for `find`, `aphot`, `psfphot` and
-`astrometry`.
-
-In the container, mount the working directory on `/data`:
-
-```bash
-docker run --rm -u $(id -u):$(id -g) -v "$PWD":/data munipack:0.6.2-hg1653-fixes \
-    bias -o bias.fits bias_*.fits
-```
+| Action | What it makes |
+|---|---|
+| `bias` | a master bias from zero-exposure frames |
+| `dark` | a master dark from dark frames |
+| `flat` | a master flat (mean of 1) for one filter |
+| `phcorr` | calibrated science frames, one output per input |
 
 (calibration-sequence)=
 ## Typical calibration sequence
 
 ```bash
-# 1. master bias from many zero-exposure frames (more than 10 is better)
+# 1. master bias (more than 10 frames is better)
 munipack bias -o bias.fits bias_*.fits
 
-# 2. master dark, bias subtracted (so that it can be scaled by exposure time)
+# 2. master dark with the bias removed, so it can be scaled to any exposure time
 munipack dark -bias bias.fits -o dark120.fits dark120_*.fits
 
-# 3. master flat for each filter, from bias- and dark-corrected flats
+# 3. one master flat per filter
 munipack flat -bias bias.fits -dark dark120.fits -o flat_V.fits flat_V_*.fits
-munipack flat -bias bias.fits -dark dark120.fits -o flat_R.fits flat_R_*.fits
 
-# 4. the science frames: gain, bias, scaled dark, flat; originals untouched
+# 4. calibrate the science frames into cal/, leaving the originals untouched
 mkdir -p cal
 munipack phcorr -bias bias.fits -dark dark120.fits -flat flat_V.fits \
     -t cal object_V_*.fits
 ```
 
-`phcorr` computes, for every pixel,
+For every pixel, `phcorr` computes *C* = *g* (*S* − *t D* − *B*) / *F*: the
+raw frame *S* minus the bias *B* and the dark *D* (scaled by the exposure-time
+ratio *t*), divided by the flat *F* and multiplied by the gain *g*.
 
-*C* = *g* (*S* − *t D* − *B*) / *F*,
+You can work in one of two ways:
 
-where *S* is the raw frame, *g* the gain, *B* the bias, *D* the dark, *t* the
-dark time factor and *F* the flat-field (see [phcorr](#phcorr)). There are
-two common strategies:
+- **Darks of the same exposure time as your science frames, no bias.** Run
+  `dark` and `phcorr` without `-bias`. The dark then includes the bias. This
+  is the simplest choice when all frames share one exposure time.
+- **Bias plus scaled darks.** Make the dark with `-bias` and give the same
+  bias to `flat` and `phcorr`. One long dark then serves every exposure time.
 
-- **Darks of the science exposure time, no bias.** Use `dark` without
-  `-bias` and `phcorr -dark` without `-bias`. The dark then contains the
-  bias, and *t* = 1 because the exposure times are equal. This is the
-  simplest choice when all frames have one exposure time.
-- **Bias plus scaled darks.** Make the dark with `-bias`, then give the
-  *same* bias to `flat` and `phcorr`. *t* is the ratio of the exposure
-  times, so one long dark serves every exposure time.
-
-```{note}
-Do not scale a dark that still contains the bias. With a dark made without
-`-bias`, an exposure-time ratio other than 1 scales the bias pedestal too.
-Use such a dark only for frames of its own exposure time, or make the dark
-with `-bias` and give the same bias to `flat` and `phcorr`.
+```{warning}
+Do not scale a dark that still contains the bias: the bias would be scaled
+too. Use such a dark only for frames of its own exposure time.
 ```
 
-## Behaviour common to bias, dark and flat
+## Common to bias, dark and flat
 
-**Pixel rejection.** Input pixel values outside `threshold < value <
-saturation` are left out of the average. Both limits are in the units of the
-raw input frames (ADU) and apply before any correction.
+**Pixel rejection.** Raw pixel values outside the range set by `-th`
+(threshold) and `-st` (saturation) are left out of the average. Both are in
+raw ADU. Saturation defaults to the `SATURATE` header keyword.
 
-- **Saturation (`-st`).** Defaults to the `SATURATE` header keyword. Without
-  it, integer frames use 2<sup>BITPIX</sup> − 1 and float frames the type
-  maximum, which turns the check off.
-- **Threshold (`-th`).** Defaults to 1 for `bias` and `dark`, and to the
-  machine epsilon for `flat`. It must be > 0, so frames with no pedestal and
-  values near zero lose their low pixels.
+**Masks.** `-bitmask` takes a FITS image of the same size. Pixels with value
+1 are used and pixels with value 0 are skipped.
 
-**Masks (`-bitmask`).** A FITS image of the same size. Pixels with a value
-above 0.5 are used and pixels ≤ 0.5 are skipped (`BITPIX = 8` is enough).
-`bias` and `dark` set the masked pixels, and pixels with fewer than two valid
-values, to the mean level of the master. `flat` leaves masked pixels out of
-the fit and out of its normalisation, and sets them to 1 in the master.
+**Header checks.** `bias` and `dark` warn when the inputs differ in exposure
+time or chip temperature, and `flat` warns when the filters differ. If your
+files use other keyword names, set the `FITS_KEY_*` environment variables,
+for example `FITS_KEY_EXPTIME=EXPOSURE`. Others are `FITS_KEY_FILTER`,
+`FITS_KEY_TEMPERATURE`, `FITS_KEY_DATEOBS`, `FITS_KEY_GAIN` and
+`FITS_KEY_SATURATE`. The read noise is taken from `READNS` (in ADU) or
+`RDNOISE` (in electrons).
 
-**Header checks.** `bias` and `dark` compare the exposure time and chip
-temperature of the inputs. A frame differing from the mean by more than
-`MUNIPACK_EXPTIME_TOLERANCE` (default 10⁻⁶ s) or
-`MUNIPACK_TEMPERATURE_TOLERANCE` (default 1 °C) gets a warning. `flat`
-warns when the inputs have different or empty filters. If the keywords
-have other names in your files, rename them with the `FITS_KEY_*`
-environment variables. For example, `FITS_KEY_EXPTIME=EXPOSURE` reads the
-exposure time from `EXPOSURE` (and writes it there in the master). Others
-are `FITS_KEY_FILTER`, `FITS_KEY_TEMPERATURE`, `FITS_KEY_DATEOBS`,
-`FITS_KEY_GAIN` and `FITS_KEY_SATURATE`. The read noise is always read from
-`READNS` [ADU] or `RDNOISE` [e⁻]. In Docker, pass the variables with
-`-e FITS_KEY_EXPTIME=EXPOSURE`.
+**Input lists.** Give files as arguments, as `@list.txt` (one name per line),
+or as `-` to read the names from standard input.
 
-**Output.** The default output type is `-B -32` (float), which is the one to
-use for masters. The default output names are `bias.fits`, `dark.fits` and
-`flat.fits`, written to the current directory. An existing file of that name
-is replaced.
-
-**Input lists.** Files can be given as arguments, as `@list.txt` (one name
-per line), or as `-` to read names from standard input (in Docker, add `-i`
-to `docker run`).
+**Output.** Each master has a `STDERR` extension with the error of each
+pixel. Keep the default float output (`-B -32`); an existing output file is
+replaced.
 
 (bias)=
 ## bias
 
-Averages zero-exposure (bias) frames into a master bias, which maps the
-electronic offset of the readout. Each output pixel is the robust mean
-(Hampel M-estimator) of that pixel over the input frames. Bias frames contain
-only read noise, which is symmetric, so the robust mean is unbiased. It also
-rejects outliers such as cosmic-ray hits. Bias exposures are short, so
-average many of them: more than 10.
-
-### Synopsis
+Averages zero-exposure frames into a master bias, the electronic offset of the
+readout. Each pixel is a robust mean, so cosmic-ray hits are rejected. Bias
+frames are cheap, so take many.
 
 ```bash
 munipack bias [options] file(s)
 ```
 
-### Options
-
-| Option | Argument | Default | Description |
-|---|---|---|---|
-| `-o`, `--output` | file | `bias.fits` | Output file. |
-| `-st`, `--saturate` | ADU | header `SATURATE` | Upper limit: pixels at or above it are not averaged. |
-| `-th`, `--threshold` | ADU | 1 | Lower limit: pixels at or below it are not averaged. Must be > 0. |
-| `-bitmask` | file | — | Mask frame: pixels ≤ 0.5 are skipped and set to the frame mean. |
-| `-B`, `--bitpix` | −32, 32, 16, 8 | −32 | Numerical type of the output. |
-| `--verbose` | — | off | Prints the mean level, exposure time and temperature. |
-| `-h`, `--help` | — | — | Shows the help. |
-
-### Outputs
-
-- **Primary HDU:** the master bias, in the units of the input (ADU).
-- **`STDERR` extension:** the standard error of the mean of each pixel.
-- **Header:** `DATE-OBS` of the first input frame. `EXPTIME` and `TEMPERAT`:
-  the averages of the inputs. `IMAGETYP` copied from the inputs.
-  `DARKMEAN = 'HAMPEL'` (the averaging method). `COMMENT` lines with the mean
-  level and the list of input files.
-
-### Examples
+| Option | Default | Description |
+|---|---|---|
+| `-o`, `--output` | `bias.fits` | Output file. |
+| `-st`, `--saturate` | header `SATURATE` | Upper limit of raw values used [ADU]. |
+| `-th`, `--threshold` | 1 | Lower limit of raw values used [ADU]. |
+| `-bitmask` | — | Mask frame (0 = skip pixel). |
+| `-B`, `--bitpix` | −32 | Output type: −32, 32, 16 or 8. |
+| `--verbose` | off | Print the mean level, exposure time and temperature. |
+| `-h`, `--help` | — | Show the help. |
 
 ```bash
 # master bias from all bias frames in the directory
 munipack bias -o bias.fits bias_*.fits
 
 # frames listed in a file, with a bad-column mask
-ls raw/bias*.fits > bias.lst
 munipack bias -bitmask badcols.fits -o bias.fits @bias.lst
-
-# 16-bit camera saturating at 60000 ADU
-munipack bias -st 60000 -o bias.fits bias_*.fits
 ```
 
 (dark)=
 ## dark
 
-Averages dark frames into a master dark. The dark current is proportional to
-the exposure time and depends steeply on the chip temperature. With `-bias`,
-the master bias is subtracted from every frame before averaging, so the
-master contains the dark current only. `phcorr` and `flat` can then scale it
-to other exposure times.
+Averages dark frames into a master dark. With `-bias`, the bias is subtracted
+first, so the master holds the dark current alone and `flat` and `phcorr` can
+scale it to other exposure times. Remember that dark current depends strongly
+on chip temperature, so take darks at the temperature of your science frames.
 
-By default each pixel is the **mean clipped by the noise model** of its
-frames. The mean is taken over the values within *t* − 5σ … *t* + *q* +
-√(*q*² + (5σ)²), iterated from the median. Here *t* is the mean, σ the larger
-of the observed scatter and the model noise √((*t* − *b*)/`GAIN` + RN²), and
-*q* = 25/6 photo-electrons.
-
-- **RN** is the read noise, from `READNS` [ADU] or `RDNOISE` [e⁻].
-- **b** is the zero-electron level: 0 with `-bias`, otherwise the header
-  `BIASLEV`, otherwise 0.
-- **Without `GAIN`**, σ is the observed scatter alone and *q* = 25/6 ADU.
-
-This rejects cosmic rays and hot outliers. It does not clip the skewed Poisson
-tail of a weak dark of a fraction of an electron per pixel. The robust mean
-used before (`--hampel`) is biased low on such darks: about −18% at
-0.13 e⁻/pixel. The clipped mean is unbiased from 0.05 to 20 e⁻/pixel.
-
-### Synopsis
+By default each pixel is a mean clipped by the expected noise, which rejects
+cosmic rays and hot outliers while staying accurate for very weak darks.
 
 ```bash
 munipack dark [-bias file] [--arith | --hampel] [options] file(s)
 ```
 
-### Options
-
-| Option | Argument | Default | Description |
-|---|---|---|---|
-| `-bias` | file | — | Master bias subtracted from every dark frame before averaging. Recorded as `DARKBIAS`. |
-| `--arith` | — | off | Plain arithmetic mean of the pixel values, with no rejection. |
-| `--hampel` | — | off | Robust mean (Hampel M-estimator) of earlier versions. Biased low on darks of a few electrons per pixel. Cannot be combined with `--arith`. |
-| `-o`, `--output` | file | `dark.fits` | Output file. |
-| `-st`, `--saturate` | ADU | header `SATURATE` | Upper limit of the raw values used. |
-| `-th`, `--threshold` | ADU | 1 | Lower limit of the raw values used (before the bias is subtracted). Must be > 0. |
-| `-bitmask` | file | — | Mask frame: pixels ≤ 0.5 are skipped and set to the frame mean. |
-| `-B`, `--bitpix` | −32, 32, 16, 8 | −32 | Numerical type of the output. Keep −32 for a bias-subtracted dark, whose values can be near or below zero. |
-| `--verbose` | — | off | Prints the noise model of the clipping (gain, read noise, zero-electron level), the mean level, exposure time and temperature. |
-| `-h`, `--help` | — | — | Shows the help. |
-
-### Outputs
-
-- **Primary HDU:** the master dark (ADU), bias-subtracted when `-bias` is
-  given. This also applies to a single input frame.
-- **`STDERR` extension:** the error of the mean of each pixel,
-  √(Σ(*x* − ⟨*x*⟩)²/(*n* − 1)/*n*), from the values kept. The error of the
-  subtracted bias is not included. For a single input frame `STDERR` is zero.
-- **Header:**
-  - `EXPTIME`, `TEMPERAT`: the averages of the inputs.
-  - `DATE-OBS`: from the first input frame.
-  - `IMAGETYP`: copied from the inputs.
-  - `DARKMEAN`: `CLIP`, `ARITH` or `HAMPEL`.
-  - `DARKBIAS`: the name of the subtracted bias, with `-bias`.
-  - `COMMENT` lines: the inputs, the bias and mask used, `-th` and `-st`.
-
-  `phcorr` reads `EXPTIME` to scale the dark. If it reads `DARKBIAS` and
-  is given the same bias, it propagates the bias error correctly.
-
-### Examples
+| Option | Default | Description |
+|---|---|---|
+| `-bias` | — | Master bias subtracted from every dark frame. |
+| `--arith` | off | Plain arithmetic mean, no rejection. |
+| `--hampel` | off | Robust (Hampel) mean, the old default; underestimates weak darks. Not with `--arith`. |
+| `-o`, `--output` | `dark.fits` | Output file. |
+| `-st`, `--saturate` | header `SATURATE` | Upper limit of raw values used [ADU]. |
+| `-th`, `--threshold` | 1 | Lower limit of raw values used [ADU]. |
+| `-bitmask` | — | Mask frame (0 = skip pixel). |
+| `-B`, `--bitpix` | −32 | Output type; keep −32 for a bias-subtracted dark, whose values can be below zero. |
+| `--verbose` | off | Print the noise model, mean level, exposure time and temperature. |
+| `-h`, `--help` | — | Show the help. |
 
 ```bash
-# darks of the science exposure time, bias left in (t = 1 in phcorr)
+# dark of the science exposure time, bias left in
 munipack dark -o dark120.fits dark120_*.fits
 
 # bias-subtracted dark, to be scaled to any exposure time
 munipack dark -bias bias.fits -o dark300.fits dark300_*.fits
-
-# the exposure time is stored as EXPOSURE in these files
-FITS_KEY_EXPTIME=EXPOSURE munipack dark -bias bias.fits -o dark.fits d_*.fits
-
-# the same in the container
-docker run --rm -u $(id -u):$(id -g) -v "$PWD":/data -e FITS_KEY_EXPTIME=EXPOSURE \
-    munipack:0.6.2-hg1653-fixes dark -bias bias.fits -o dark.fits d_*.fits
 ```
 
 (flat)=
 ## flat
 
-Builds a master flat-field from flat frames: twilight sky, dome or night-sky
-exposures. The flat maps the relative response of the whole light path:
-pixel sensitivity, vignetting, dust shadows and filter non-uniformity. Each
-input is first corrected as *g*(*F* − *t D* − *B*). Here *t* is the
-exposure-time ratio of the flat to the dark, or `-xdark`, or 1 when no
-exposure times are known. The frames are then scaled and averaged.
+Builds a master flat from twilight, dome or night-sky flats. The flat maps the
+response of the whole light path: pixel sensitivity, vignetting, dust and
+filter non-uniformity. Each input is corrected for bias and dark, then the
+frames are combined using their photon statistics, which suppresses cosmic
+rays and other defects. The result is normalised to a mean of 1.
 
-The standard method uses the Poisson statistics of the photons, where the
-variance equals the mean in electrons. It solves pixel by pixel for the flat
-that best fits all the scaled frames, iterating until the residuals fall
-below the photon noise. Cosmic rays and other defects of single frames are
-suppressed. The result is normalised to a mean of 1, and the filter is
-copied from the inputs.
-
-Guidelines:
-
-- Use flats exposed to about half of the full well.
-- Use more than 13 frames. The accuracy grows as √*N*.
-- Memory use is about width × height × 8 bytes per frame: 100 frames of
-  1000 × 1000 take 800 MB.
-- Give each filter its own flat, and make sure the `FILTER` keyword (or
-  `FITS_KEY_FILTER`) is set. `phcorr` uses it to check that flat and frame
-  match.
-
-### Synopsis
+For a good flat, expose to about half of the full well, take more than 13
+frames, and make one flat per filter with the `FILTER` keyword set, so that
+`phcorr` can check that flat and frame match.
 
 ```bash
 munipack flat [options] file(s)
 ```
 
-### Options
-
-#### Pre-corrections of the input flats
-
-| Option | Argument | Default | Description |
-|---|---|---|---|
-| `-gain` | e⁻/ADU | header `GAIN`, otherwise 1 | Gain applied to every input flat. Overrides the header. |
-| `-bias` | file | — | Master bias subtracted from every flat. |
-| `-dark` | file | — | Master dark subtracted from every flat, scaled by *t*. |
-| `-xdark` | factor | exposure-time ratio | Dark time factor *t*. If not given, *t* = `EXPTIME`(flat) / `EXPTIME`(dark), or 1 when unknown. |
-| `-bitmask` | file | — | Mask frame: pixels ≤ 0.5 are not used and are set to 1 in the master. |
-| `-st`, `--saturate` | ADU | header `SATURATE` | Upper limit of the raw values used (no gain applied). |
-| `-th`, `--threshold` | ADU | machine epsilon | Lower limit of the raw values used (no gain applied). Must be > 0. |
-
-#### Method and output
-
-| Option | Argument | Default | Description |
-|---|---|---|---|
-| `--approximation` | `basic`, `standard` | `standard` | `standard`: the iterative photon-noise solution. `basic`: only the robust mean of the scaled frames, a rough estimate. |
-| `-o`, `--output` | file | `flat.fits` | Output file. |
-| `-B`, `--bitpix` | −32, 32, 16, 8 | −32 | Numerical type of the output. Use −32. Integer types scale the flat to a mean of 10², 10⁴ or 10⁹ (8, 16, 32 bits) and lose precision; `phcorr` normalises such flats. |
-| `--verbose` | — | off | Prints the per-frame statistics and the gain estimate (see below). It also writes `GAIN_AVG` and `GAIN_STD` to the header. |
-| `-h`, `--help` | — | — | Shows the help. |
-
-### Gain estimate
-
-For pure photon noise the corrected flat values satisfy *c*/σ² = 1 (in
-electrons). With `--verbose`, `flat` prints for each frame the mean level
-*c*, its standard error, the standard deviation σ and the ratio *g* =
-*c*/σ², flagged as reliable or not. It also prints the mean of the ratios,
-which is the **gain relative to the gain applied** (`-gain` or `GAIN`):
-
-```text
-Filename, mean level[ct], std.err., std.dev., gain, reliable:
-flat-V_000006.fits:   99142.  0.151 313.73  1.007  T
-...
- Estimated relative gain, std.err:  1.006  .002 (original gain was 2.300).
-```
-
-To estimate an unknown gain, start with `-gain 1`. Multiply the gain by the
-reported ratio and repeat until the ratio is 1 within the accuracy you need.
-Read noise, non-linearity and fixed-pattern structure all violate the
-Poisson assumption, so check the result against another method, such as the
-manufacturer's value or a photon-transfer curve.
-
-### Outputs
-
-- **Primary HDU:** the master flat, dimensionless, with a mean of 1.
-- **`STDERR` extension:** the standard error of each pixel of the flat.
-- **Header:**
-  - `FILTER`: from the inputs.
-  - `DATE-OBS`: of the first input.
-  - `IMAGETYP`: copied from the inputs.
-  - `GAIN_AVG`, `GAIN_STD`: the estimated relative gain and its spread, with
-    `--verbose` only.
-  - `COMMENT` lines: the inputs, the gain, bias, dark (with *t*) and mask
-    used, `-th`, `-st` and the mean level.
-
-### Examples
+| Option | Default | Description |
+|---|---|---|
+| `-gain` | header `GAIN`, else 1 | Gain [e⁻/ADU]; overrides the header. |
+| `-bias` | — | Master bias subtracted from every flat. |
+| `-dark` | — | Master dark subtracted from every flat. |
+| `-xdark` | exposure-time ratio | Dark scaling factor *t*. |
+| `-bitmask` | — | Mask frame (0 = skip pixel; set to 1 in the master). |
+| `-st`, `--saturate` | header `SATURATE` | Upper limit of raw values used [ADU]. |
+| `-th`, `--threshold` | tiny positive value | Lower limit of raw values used [ADU]. |
+| `--approximation` | `standard` | `standard` (full fit) or `basic` (quick robust mean). |
+| `-o`, `--output` | `flat.fits` | Output file. |
+| `-B`, `--bitpix` | −32 | Output type; keep −32, integer types lose precision. |
+| `--verbose` | off | Print per-frame statistics and a gain estimate. |
+| `-h`, `--help` | — | Show the help. |
 
 ```bash
 # V flat from bias- and dark-corrected twilight flats
 munipack flat -bias bias.fits -dark dark30.fits -o flat_V.fits flat_V_*.fits
 
-# gain given on the command line, saturation at 60000 ADU
-munipack flat -gain 2.3 -dark d30.fits -st 6e4 -o f_R.fits f30_*R.fits
-
-# estimate the gain (prints c, sigma and c/sigma^2 for every frame)
+# estimate the gain of the camera
 munipack flat --verbose -gain 1 -bias bias.fits -o flat_test.fits flat_V_*.fits
-
-# quick, rough flat (robust mean only)
-munipack flat --approximation basic -o flat_quick.fits flat_V_*.fits
 ```
+
+**Estimating the gain.** With `--verbose`, `flat` reports the gain relative to
+the one it applied. Start with `-gain 1`, multiply by the reported ratio and
+repeat until the ratio is close to 1. Read noise and non-linearity bias this
+estimate, so compare it with the manufacturer's value.
 
 (phcorr)=
 ## phcorr
 
-Applies the photometric corrections (gain, bias, dark and flat-field) to
-science frames and converts the values to electrons:
+Applies gain, bias, dark and flat corrections to science frames and converts
+them to electrons. Any master you leave out is simply skipped. The masters
+must match the frame size, and the flat must be positive everywhere.
 
-*C* = *g* (*S* − *t D* − *B*) / *F*
-
-- *g* is the gain: from `-gain`, otherwise `GAIN`, otherwise 1 with a warning.
-- *t* is the dark time factor: from `-xdark`, otherwise `EXPTIME`(frame) /
-  `EXPTIME`(dark), otherwise 1.
-- *F* is the flat-field, used as it is (a `flat` master has a mean of 1). It
-  is divided by its robust mean with `--normalise-flat`, and always for
-  integer flats.
-
-A missing bias or dark counts as zero, and a missing flat as one. The masters
-must have the dimensions of the frame. The flat must be positive everywhere.
-`phcorr` warns when the flat has no filter. With `--verbose`, it also warns
-when the filter of the flat differs from that of the frame, or when the
-temperature of the dark differs by more than
-`MUNIPACK_TEMPERATURE_TOLERANCE`.
-
-The standard error of every corrected pixel goes to a `STDERR` extension:
-
-σ² = [*g* max(*m*, 0) + *g*²(*r*² + *q* + τ²σ<sub>B</sub>² + *t*²σ<sub>D</sub>²)] / *F*² + (*C* σ<sub>F</sub> / *F*)²
-
-- *m* is the detected signal *S* − *B*, from the mean of the eight
-  neighbours of the pixel. It includes the sky, the stars and the dark
-  current. The pixel itself is not used, so inverse-variance weights do not
-  depend on its own noise.
-- *r* is the read noise in ADU: `READNS`, or `RDNOISE` [e⁻] / *g*.
-- *q* = 1/12 for integer frames (the quantisation noise).
-- σ<sub>B</sub>, σ<sub>D</sub> and σ<sub>F</sub> are the `STDERR`s of the
-  masters.
-- τ = 1 − *t* when the dark was made with `dark -bias` and the same bias
-  (`DARKBIAS`), otherwise 1.
-
-The error is at least 0.01 *g*.
-
-The output header carries the noise model in electrons, so `find`, `aphot`
-and `psfphot` use the right one without further options.
-
-### Synopsis
+Each output gets a `STDERR` extension with the error of every pixel, and its
+header carries the noise model in electrons. `find`, `aphot` and `psfphot`
+pick this up automatically.
 
 ```bash
 munipack phcorr [options] file(s)
 ```
 
-### Options
+### Corrections
 
-#### Corrections
+| Option | Default | Description |
+|---|---|---|
+| `-gain` | header `GAIN`, else 1 | Gain [e⁻/ADU]; without one, values stay in ADU. |
+| `-bias` | — | Master bias. |
+| `-dark` | — | Master dark. |
+| `-xdark` | exposure-time ratio | Dark scaling factor *t* (1 when exposure times are unknown). |
+| `-flat` | — | Master flat. |
+| `--normalise-flat` | off | Divide the flat by its mean first; use for flats not normalised to 1. |
 
-| Option | Argument | Default | Description |
-|---|---|---|---|
-| `-gain` | e⁻/ADU | header `GAIN`, otherwise 1 | Gain of the conversion to electrons. Overrides the header. Without either, the values stay in ADU (`BUNIT = 'ADU'`). |
-| `-bias` | file | — | Master bias (from `bias`). |
-| `-dark` | file | — | Master dark (from `dark`). |
-| `-xdark` | factor | exposure-time ratio | Dark time factor *t*. Otherwise *t* = `EXPTIME`(frame) / `EXPTIME`(dark), or 1 when either is unknown. |
-| `-flat` | file | — | Master flat-field (from `flat`). All values must be positive. |
-| `--normalise-flat` | — | off | Divides the flat by its robust mean before use, so the frame keeps its mean level. Needed for a flat not normalised to 1, for example one from another program. Integer flats are always normalised. |
+### Masking
 
-#### Masking
+| Option | Default | Description |
+|---|---|---|
+| `-bitmask` | — | Mask frame; pixels with value 0 are replaced (e.g. hot pixels, bad columns). |
+| `-xbitmask` | `MEAN` | Replacement value: `ZERO`, `MEAN` (frame mean) or `MEDIAN` (local mean in a box). |
+| `-box` | 5 | Box size for `MEDIAN`; use 3 for isolated pixels. |
 
-| Option | Argument | Default | Description |
-|---|---|---|---|
-| `-bitmask` | file | — | Mask frame of the same size: pixels of value 0 are replaced, all others (e.g. 1) are kept (`BITPIX = 8` is enough). Useful for hot pixels and bad columns. |
-| `-xbitmask` | `ZERO`, `MEAN`, `MEDIAN` | `MEAN` | Replacement of masked pixels (case-insensitive; any other value acts as `ZERO`). `ZERO`: 0. `MEAN`: the robust mean of the corrected frame. `MEDIAN`: the robust mean of the unmasked pixels in a box around the pixel (falls back to `MEAN` when the box has none). |
-| `-box` | pixels | 5 | Box size for `-xbitmask MEDIAN`. Use 3 for isolated masked pixels. |
+### Output
 
-#### Output files and general
+| Option | Default | Description |
+|---|---|---|
+| `-t`, `--target-directory` | — | Write outputs to this (existing) directory. |
+| `--enable-overwrite` | off | Allow replacing existing files, including the inputs. |
+| `-O` | off | Enable custom output names (`--pattern`, `--mask`, `--format`). |
+| `--pattern` | `(.+)\.(.+)` | Regular expression matched against input names (for `-O`). |
+| `--mask` | — | Output name built from the pattern groups, e.g. `'\1_c.\2'` (for `-O`). |
+| `--format` | — | Numbered output names, e.g. `'cal_%03d.fits'` (for `-O`). |
+| `-B`, `--bitpix` | −32 | Output type; keep −32 for frames in electrons. |
+| `--verbose` | off | Print the corrections applied to each frame. |
+| `-h`, `--help` | — | Show the help. |
 
-| Option | Argument | Default | Description |
-|---|---|---|---|
-| `-t`, `--target-directory` | directory | — | Writes the outputs to this directory (it must exist). The inputs are untouched. |
-| `--enable-overwrite` | — | off | Allows replacing an existing output file, including the input itself (in-place correction). |
-| `-O` | — | off | Turns on advanced output names (`--pattern`, `--mask`, `--format`); `--mask` alone also does. The names are written in the current directory: `-t` does not apply to them. |
-| `--pattern` | regex | `(.+)\.(.+)` | Regular expression matched against the input names; its groups are `\1`, `\2`, … (for `-O`). |
-| `--mask` | string | — | Output name from the groups of `--pattern`, e.g. `'\1_c.\2'` (for `-O`). Unrelated to `-bitmask`. |
-| `--format` | printf format | — | Numbered output names, counted from 0, e.g. `'cal_%03d.fits'` gives `cal_000.fits`, `cal_001.fits`, … (for `-O`). |
-| `-B`, `--bitpix` | −32, 32, 16, 8 | −32 | Numerical type of the output. Integer types clip the values to 0 … 2<sup>BITPIX</sup> − 1. Keep −32 for frames in electrons. |
-| `--verbose` | — | off | Prints the correction applied to each frame. |
-| `-h`, `--help` | — | — | Shows the help. |
-
-**Output file names.**
-
-- **Default:** the input file name, without its directory, written in the
-  current directory.
-- **With `-t dir`:** `dir/` plus the input name.
-- **With an existing output:** the run fails (exit status 1) unless
-  `--enable-overwrite` is given. Running `phcorr` on files in the current
-  directory therefore needs `-t`, `-O --mask …` or `--enable-overwrite`.
-- **Lists:** `@list` with two names per line (`input output`) sets each
-  output explicitly.
-
-### Outputs
-
-For every input frame, a FITS file with:
-
-- **The first image HDU:** the corrected frame (in electrons when a gain is
-  known). Its header is copied from the input and updated as follows:
-
-  | Keyword | Value |
-  |---|---|
-  | `BUNIT` | `'COUNTS'` (electrons) when a gain is known, else `'ADU'` |
-  | `GAIN` | 1: the values are electrons (when a gain is known) |
-  | `PHCGAIN` | the gain used for the conversion [e⁻/ADU] (when a gain is known) |
-  | `READNS`, `RDNOISE` | the read noise in electrons (if the input had either); without a gain only `READNS`, in ADU |
-  | `SATURATE` | the saturation level converted to the output units |
-  | `BIASLEV` | removed when a bias or dark is subtracted, otherwise converted |
-  | `BITPIX` | the output type (`-B`) |
-  | `COMMENT` | `PHCORR gain/flat-field/dark/bias/mask` records (the flat with its mean, the dark with *t*) |
-
-- **`STDERR` extension:** the standard error of each pixel (see above). An
-  existing `STDERR` of the input is replaced.
-- **Other extensions** of the input (tables and so on) are copied unchanged.
-
-### Examples
+By default the output keeps the input's name and goes to the current
+directory. `phcorr` refuses to overwrite an existing file, so when the inputs
+are in the current directory use `-t`, `-O --mask …` or `--enable-overwrite`.
 
 ```bash
 # full correction, outputs in cal/ with the same names
-mkdir -p cal
 munipack phcorr -bias bias.fits -dark dark300.fits -flat flat_V.fits \
     -t cal object_V_*.fits
-
-# dark of the same exposure time (contains the bias), no bias frame
-munipack phcorr -dark dark120.fits -flat flat_R.fits -t cal m51_R_*.fits
 
 # outputs next to the inputs with a suffix: m51_001.fits -> m51_001_c.fits
 munipack phcorr -bias bias.fits -dark dark.fits -flat flat_V.fits \
     -O --mask '\1_c.\2' m51_*.fits
 
-# replace hot pixels by the local robust mean (3 x 3), correct in place
+# replace hot pixels by the local mean, correcting in place
 munipack phcorr -bias bias.fits -flat flat_V.fits -bitmask hot.fits \
     -xbitmask MEDIAN -box 3 --enable-overwrite frame_*.fits
 ```
 
-```{note}
-Older versions (before 0.6.2+hg1653 with these fixes) kept the raw `GAIN`,
-`READNS` [ADU] and `BIASLEV` in the corrected header, and their `STDERR` had
-a one-electron floor and no dark current. Frames corrected by them give
-`find`, `aphot` and `psfphot` a wrong noise model. Correct the raw frames
-again with this version.
-```
+## Notes
+
+- `flat` keeps all input frames in memory (about 8 bytes per pixel per
+  frame), so a large set of big frames needs plenty of RAM.
+- Output names can also be set explicitly with an `@list` file of two names
+  per line (`input output`).
+- With `-O`, the outputs are written to the current directory; `-t` does not
+  apply.
+- In Docker, mount your data on `/data` and pass environment variables with
+  `-e`, e.g. `-e FITS_KEY_EXPTIME=EXPOSURE`. Add `-i` to `docker run` when
+  reading file names from standard input.
+- Frames calibrated with older Munipack versions carry a wrong noise model.
+  Calibrate the raw frames again with the current version before photometry.

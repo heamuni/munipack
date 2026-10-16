@@ -1,12 +1,8 @@
 # Building the documentation
 
-The documentation is a [Sphinx](https://www.sphinx-doc.org/) site written in
-[MyST Markdown](https://myst-parser.readthedocs.io/), with the
-[Furo](https://pradyunsg.me/furo/) theme (search box, light/dark toggle).
-The sources are the `.md` files in `docs/`; `docs/tests.md` includes
-`tests/README.md`.
-
-From the top of the repository:
+This site is built with [Sphinx](https://www.sphinx-doc.org/) from the
+Markdown ([MyST](https://myst-parser.readthedocs.io/)) files in `docs/`.
+To build it, run from the top of the repository:
 
 ```bash
 python3 -m venv .venv-docs
@@ -14,23 +10,20 @@ python3 -m venv .venv-docs
 .venv-docs/bin/sphinx-build -W --keep-going -b html docs docs/_build/html
 ```
 
-Then open `docs/_build/html/index.html`. With the virtual environment
-activated, `make -C docs html` does the same, and `make -C docs linkcheck`
-checks the links (it needs network access for the external ones).
-
-`-W --keep-going` turns every warning into an error and lists them all, so a
-broken reference or toctree entry fails the build. The output in
-`docs/_build/` is ignored by git.
+Then open `docs/_build/html/index.html` in a browser. With the virtual
+environment activated, `make -C docs html` does the same, and
+`make -C docs linkcheck` checks the links (this needs network access).
+Any warning, such as a broken reference, makes the build fail, so problems
+are caught early.
 
 ## Writing pages
 
-- Pages are MyST Markdown: fenced code blocks with a language (` ```bash `),
-  admonitions as ` ```{note} `, tables in Markdown.
-- The extensions `colon_fence`, `deflist`, `fieldlist` and `html_admonition`
-  are enabled, and `sphinx_design` for grids and cards.
-- Link other pages by a relative path (`[aphot](reference/aphot.md)`) or by
-  `` {doc}`reference/aphot` ``; link a section by a label (`(name)=` above
-  the heading, then `` {ref}`name` ``). Headings down to level 4 also have
-  anchors (`page.md#heading-text`).
-- Options, defaults and units must agree with `munipack <action> --help`.
-- New pages go into a toctree of `index.md` or `reference/index.md`.
+Pages are ordinary Markdown with a few MyST extras, such as ` ```{note} `
+boxes. Link to another page with `` {doc}`reference/aphot` `` or a relative
+path, and to a section by putting a label like `(name)=` above its heading
+and writing `` {ref}`name` ``. Add new pages to the table of contents in
+`index.md` or `reference/index.md`. The Tests page is pulled in from
+`tests/README.md`, so edit that file to change it.
+
+When you document an option, check it against `munipack <action> --help`
+so the names and defaults stay correct.
