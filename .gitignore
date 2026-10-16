@@ -5,3 +5,6 @@
 *.log
 .claude/
 .vscode/
+
+# Documentation build
+docs/_build/
