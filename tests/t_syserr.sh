@@ -38,6 +38,13 @@ check "6 stars: PHSYSERE [mag]" "$(key 'few/frame.fits[PHOTOMETRY]' PHSYSERE)" 0
 check "6 stars: warning" "$(grep -c 'estimated from 6 stars only' few/err.txt)" 1 1
 check "6 stars: COMMENT interval" "$(comments few/frame.fits '68% interval')" 1 1
 check "6 stars: COMMENT warning" "$(comments few/frame.fits 'Warning: the systematic')" 1 1
+# CTPHERR with the uncertainty of the estimated PHSYSERR (P55): at least
+# t(5) = 1.11 times the error of the mean of 6 stars of the scatter PHSYSERR
+# (the errors of the stars, a few mmag, are negligible; it was 1.0)
+check "6 stars: CTPHERR / (PHSYSERR/sqrt 6)" "$(awk -v t="$(key 'few/frame.fits[PHOTOMETRY]' CTPH)" \
+    -v dt="$(key 'few/frame.fits[PHOTOMETRY]' CTPHERR)" \
+    -v s="$(key 'few/frame.fits[PHOTOMETRY]' PHSYSERR)" \
+    'BEGIN { print 1.0857 * dt / t * sqrt(6) / s }')" 1.06 3
 
 pcal few.fits fixed --syserr 0.05
 check "fixed: PHSYSERR [mag]" "$(key 'fixed/frame.fits[PHOTOMETRY]' PHSYSERR)" 0.05 0.05

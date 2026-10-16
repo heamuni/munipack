@@ -155,7 +155,8 @@ not biased by few stars, <i>f</i> as the mean of 1 − <i>q<sub>i</sub></i>
 least 9 (median <i>e<sub>i</sub></i>² + σ²) and (0.1 mag)²).
 Outliers have a negligible weight in both <i>t</i> and σ and no star
 is clipped, so the stars in the tails of the distribution keep their
-weight. CTPHERR is the error of the weighted mean. With
+weight. CTPHERR is the error of the weighted mean with the uncertainty of
+σ (<a href="#ctpherr">below</a>). With
 <samp>--verbose</samp>, σ, its interval, the number of stars, <i>f</i>
 and <i>t</i> are printed.
 </p>
@@ -165,8 +166,9 @@ and <i>t</i> are printed.
 estimated from a few stars, and their likelihood has two modes: a star
 deviating from the others is either an outlier or a part of the
 systematic scatter. EM from the robust start takes the first, so with
-3–7 stars σ was 15–25% low. Below 8 stars (8 + the number of the colour
-coefficients with <samp>--color-term</samp>), <i>f</i> is fixed at 0.1
+3–7 stars σ was 15–25% low, with 8–15 stars 7–13%. Below 16 stars (16 +
+the number of the colour coefficients with <samp>--color-term</samp>),
+<i>f</i> is fixed at 0.1
 and <i>B</i> at 1 mag, EM runs from the robust start and from all stars
 as calibration stars (the plain restricted likelihood), and the mode of
 the larger posterior is taken: the restricted likelihood of the mixture
@@ -175,8 +177,9 @@ with a weak prior of σ (half-normal, 0.1 mag: a systematic scatter of
 (the mean of σ is still low by the square root of a few degrees of
 freedom, as for any estimate), stars far from the others are still found
 as outliers, while a star a few σ off cannot be told from the scatter of
-3–7 stars. With 8 and more stars the results are those of the adaptive
-mixture (bit-identical to the previous version).
+3–7 stars. With 16 and more stars the results are those of the adaptive
+mixture. One degree of freedom is enough for σ (3 stars and a linear colour
+term), the prior keeps it finite.
 </p>
 
 <p id="syserre">
@@ -205,7 +208,7 @@ treated by the robust ratio.
 Monte Carlo (stars with errors 0.005–0.08 mag, 2000 sets per case):
 with 30 and 100 stars, σ = 0.01, 0.03, 0.06 mag is recovered within
 1–6% with up to 10% of outliers at 0.3–3 mag; with 10 stars the mean
-estimate is 7–18% low, the root mean square within 5% (the square root
+estimate was 7–18% low (the adaptive mixture; now the mixture of few stars, below), the rms within 5% (the square root
 of an unbiased variance is low). Without outliers, σ = 0.06 mag, the mean
 and the root mean square of the estimate are 0.048 and 0.060 mag for
 3 stars, 0.052 and 0.059 for 5, 0.055 and 0.059 for 7 stars (before the
@@ -219,9 +222,54 @@ for a true 0 (the previous estimator, a robust ratio followed by the
 excess scatter of the residuals clipped at 3σ: 63 mmag and 0.007 mag),
 with 10% of outliers and σ = 0.01 mag 6 mmag and 0.008 mag (179 mmag,
 0.053 mag); with 5 stars and 5% of outliers, σ = 0.01 mag, 28 mmag (a set
-with an outlier of a few σ among 5 stars cannot be corrected). CTPHERR
-does not include the uncertainty of σ: with 3–7 stars and σ ≥ 0.03 mag it
-contains the true zero point in 54–63% of the sets (68% expected).
+with an outlier of a few σ among 5 stars cannot be corrected). With 10
+stars the mixture of few stars gives 0.028 and 0.055 mag for σ = 0.03 and
+0.06 (the adaptive one 0.026 and 0.053), the interval covers in 64–65%
+(59–61%).
+</p>
+
+<p id="ctpherr">
+<b>The errors of the calibration.</b> The error of the weighted mean takes
+σ as known, but few stars determine it poorly (from 3 stars σ = 0 is as
+likely as twice the true value), so it is too small exactly when σ
+dominates: CTPHERR contained the true zero point in 54–63% of the sets of
+3–10 stars with σ ≥ 0.03 mag (68% expected). With σ estimated, the
+covariance of the calibration (CTPHERR, the colour terms COLTK1E,
+COLTK2E, and by them the part of MAGERR from the calibration) is that of
+Knapp &amp; Hartung (2003, Stat. Med. 22, 2693; the random-effects
+meta-regression, the same model of values with known errors and an
+excess variance) in the modification of Röver, Knapp &amp; Friede (2015,
+BMC Med. Res. Methodol. 15, 99):
+</p>
+<p>
+<i>C</i> = <i>t</i>² max(1, <i>Q</i>) (<i>X</i>′<i>UX</i>)<sup>−1</sup>,
+<i>Q</i> = Σ <i>u<sub>i</sub> r<sub>i</sub></i>² / ν,
+</p>
+<p>
+<i>u<sub>i</sub></i> = <i>q<sub>i</sub></i>/(<i>e<sub>i</sub></i>² + σ²),
+<i>r<sub>i</sub></i> the residuals, ν = Σ <i>q<sub>i</sub></i> − <i>p</i>
+the degrees of freedom of the calibration stars (<i>p</i> the coefficients)
+and <i>t</i> the 68.27% quantile of Student's t of ν degrees of freedom
+(1.84 for ν = 1, 1.32 for 2, 1.14 for 4, 1.05 for 10, 1.02 for 30). <i>Q</i>
+is the scatter of the calibration stars in the units of their errors with
+σ: when σ is underestimated (often zero from few stars) the stars scatter
+more and <i>Q</i> &gt; 1; the floor keeps the errors at least those of
+the weighted mean; <i>t</i> is the distribution of a mean divided by an
+error estimated from ν degrees of freedom. Monte Carlo of the calibration
+(as above, no outliers), the coverage of CTPHERR for σ = 0.01, 0.03,
+0.06 mag: 3 stars 0.76, 0.67, 0.65 (0.63, 0.55, 0.54 before), 5 stars
+0.70, 0.65, 0.66 (0.62, 0.58, 0.60), 7 stars 0.69, 0.68, 0.67 (0.64, 0.62,
+0.63), 10 stars 0.68, 0.67, 0.66 (0.62, 0.60, 0.59), 30 and 100 stars
+0.65–0.68 (0.65–0.69); of <i>k</i><sub>1</sub> of a linear colour term
+0.66–0.76 for 5–100 stars (0.59–0.68 before), 0.73–0.90 for 3 stars
+(0.26–0.61); with 5% of outliers the same within 0.03. For σ = 0 the
+errors are conservative, 0.70–0.87 (0.96 for 3 stars and a colour term):
+few stars cannot tell σ = 0 from 0.03 mag, and the intervals that cover
+0.03 mag cover more at 0. Marginalising over the posterior of σ (the
+restricted likelihood with the prior of σ) covers 68% for σ ≥ 0.03 as
+well, but 85–96% for σ = 0 with errors 1.3–1.8 times larger. With 30 and
+more stars the errors grow by 1–6% (100 stars: 1–3%). A fixed <samp>--syserr</samp> keeps
+the errors of the weighted mean.
 </p>
 
 <p>
@@ -268,9 +316,11 @@ star includes the error of its colour propagated by the slope,
 (d<i>g</i>/d<i>c</i>)² σ<sub>c</sub>², and its covariance with the
 catalogue magnitude of the calibration when the band is one of A, B
 (the colour B − V has the error of V). A fixed <samp>--syserr</samp>
-fixes σ. With few stars (<a href="#fewstars">above</a>; below 9 stars for
-a linear term, 10 for a quadratic one) the outlier model is fixed and the mode of the likelihood chosen in
-the same way. The stars without a colour in the catalogue are not used.
+fixes σ. With few stars (<a href="#fewstars">above</a>; below 17 stars for
+a linear term, 18 for a quadratic one) the outlier model is fixed and
+the mode of the likelihood chosen in the same way. The errors of the
+coefficients include the uncertainty of σ (<a href="#ctpherr">above</a>).
+The stars without a colour in the catalogue are not used.
 </p>
 <p>
 The colour term multiplies the photons, <i>ph</i> = CTPH
@@ -313,6 +363,39 @@ adds <i>k</i>·0.014 mag, included in MAGERR: pull 1.01); 10% of the stars
 without a colour: their residuals scatter by 0.058 (<i>k</i> = 0.1) for
 MAGERR 0.057. Without <samp>--color-term</samp> the results are
 bit-identical to the previous version.
+</p>
+
+<p>
+Validation with real stellar colours (SDSS DR16 cones of 0.3° about
+RA 180°, Dec 0° and the field of M67, 132.825°, 11.81°: stars, clean,
+14 &lt; g &lt; 20.5, 400 and 800 stars, <i>u</i> − <i>g</i> 0.2–2.9,
+<i>g</i> − <i>r</i> 0.1–1.5; main sequence, the turn-off and giants of M67):
+a <i>g</i> frame rendered from the catalogue <i>g</i> and calibrated against
+the catalogue <i>r</i> with <samp>--color-term gpmag,rpmag</samp>, where
+<i>k</i><sub>1</sub> = −1 exactly: −1.0003 ± 0.0023 and −1.0005 ± 0.0019,
+<i>k</i><sub>2</sub> (order 2) −0.002 ± 0.006, 0.000 ± 0.006, no slope of
+the residuals (0.001 ± 0.005), their scatter 0.006–0.009 mag, the noise of
+the frame (without the term σ = 0.37–0.39 mag). A passband between
+<i>u</i> and <i>g</i> (400 nm; the SED linear in log <i>F</i><sub>ν</sub>
+and log λ through <i>u</i> and <i>g</i>, so <i>u</i> − <i>m</i> =
+0.4293 (<i>u</i> − <i>g</i>)) calibrated against <i>u</i> with
+<i>u</i> − <i>g</i>: <i>k</i><sub>1</sub> = 0.4295 ± 0.0016. A QUVIK-like
+band (310 nm, the Gaussian of the equivalent width 100 nm; the SED a
+parabola in log λ through <i>u</i>, <i>g</i>, <i>r</i>, extrapolated):
+<i>k</i><sub>1</sub> = −0.686 ± 0.007 and −0.686 ± 0.011 for −0.683 and
+−0.691 fitted to the true transformation, the residuals without a slope
+in <i>u</i> − <i>g</i>, scatter 0.024 and 0.034 mag (the transformation
+depends also on <i>g</i> − <i>r</i>: 0.02–0.03 mag about the best
+function of <i>u</i> − <i>g</i>); the bluest stars (<i>u</i> − <i>g</i>
+&lt; 0.8) are 0.03–0.07 mag off, the reddest (&gt; 2.4) 0.02–0.05; the
+order 2 does not improve it (<i>k</i><sub>2</sub> −0.02 ± 0.01,
+0.004 ± 0.015). QUVIK-like 2048² frames of this band (20 and 60 s, the
+detector of QUVIK, true magnitudes scattered about the catalogue by its
+errors), find, aphot, astrometry, phcal against SDSS <i>u</i>: 27–92
+stars, <i>k</i><sub>1</sub> within 2σ of the true one in all 12 frames
+(errors 0.04–0.17 mag/mag, the root mean square of (<i>k</i> −
+<i>k</i><sub>true</sub>)/σ<sub><i>k</i></sub> 1.12), Q (the residuals in
+the units of MAGERR and the catalogue errors) 0.84–1.13.
 </p>
 
 <p>When photometry transformation table from instrumental to

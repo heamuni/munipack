@@ -71,22 +71,53 @@
 !  - 2 g' cov(y,x) (g' the slope of the polynomial at x(i)). The covariance
 !  of beta is (X' U X)**(-1). mixture_mean is mixture_fit of the order 0.
 !
-!  Few stars (n - p + 1 < 8, p the number of the coefficients): f and B
+!  Few stars (n - p + 1 < 16, p the number of the coefficients): f and B
 !  cannot be estimated from few values, and the likelihood has two modes,
 !  a deviating value either an outlier or a part of the scatter; EM from
 !  the robust start, which prefers the first, biased sigma low by 15-25%
-!  for 3-7 values (Monte Carlo). For few values, f is fixed at 0.1 and B
-!  at 1 mag (at least 3 times the inliers), EM runs from the robust start
-!  and from the plain restricted likelihood of all values (q = 1), and
-!  the solution of the larger posterior is taken: the restricted
-!  likelihood of the mixture, sum ln((1-f) N(r,v) + f N(r,v+B**2))
-!  - 1/2 ln det X'UX, with a weak prior of sigma, half-normal of the scale
-!  0.1 mag (a scatter of 0.2 mag is unlikely, an outlier of 0.4 mag is
-!  not). Sigma is then nearly as unbiased as by the plain REML (its square
-!  within 1-2% for 3-7 values) and the outliers far from the others are
-!  still found; moderate ones (a few sigma) cannot be told from
-!  the scatter. The results of 8 and more values are those of the mixture
-!  above.
+!  for 3-7 values and by 5-10% for 10-15 values (Monte Carlo). For few
+!  values, f is fixed at 0.1 and B at 1 mag (at least 3 times
+!  the inliers), EM runs from the robust start and from the plain
+!  restricted likelihood of all values (q = 1), and the solution of
+!  the larger posterior is taken: the restricted likelihood of the mixture,
+!  sum ln((1-f) N(r,v) + f N(r,v+B**2)) - 1/2 ln det X'UX, with a weak
+!  prior of sigma, half-normal of the scale 0.1 mag (a scatter of 0.2 mag
+!  is unlikely, an outlier of 0.4 mag is not). Sigma is then nearly as
+!  unbiased as by the plain REML (its square within 1-2% for 3-7 values)
+!  and the outliers far from the others are still found; moderate ones
+!  (a few sigma) cannot be told from the scatter. The results of 16 and
+!  more values are those of the mixture above. With the prior, one degree
+!  of freedom (n = p + 1) is enough for an estimate of sigma (3 stars and
+!  a linear colour term); n = p, and n = p + 1 with a fixed sigma, is
+!  the plain weighted fit.
+!
+!  The errors of beta (with sigma estimated): the covariance (X' U X)**(-1)
+!  takes sigma as known, while few stars determine it poorly (from 3 stars
+!  sigma = 0 is as likely as twice its true value), so the errors are too
+!  small exactly when sigma dominates: the zero point within its error in
+!  54-63% of sets of 3-10 stars for sigma >= 0.03 mag (Monte Carlo). The
+!  covariance is the one of Knapp & Hartung (2003, Stat. Med. 22, 2693;
+!  the random-effects meta-regression, the same model: known errors of
+!  the values and an estimated excess variance) in the modification of
+!  Roever, Knapp & Friede (2015, BMC Med. Res. Meth. 15, 99),
+!
+!      C = t**2 max(1, Q) (X' U X)**(-1),  Q = sum u r**2 / nu,
+!
+!  nu = sum q - p the degrees of freedom of the calibration stars, t
+!  the quantile of Student's t of nu (at least 1) of the probability 68.27%
+!  (1.84 for nu = 1, 1.32 for 2, 1.14 for 4, 1.05 for 10, 1.02 for 30). The
+!  scale Q is the scatter of the calibration stars about the fit in
+!  the units of their errors (with sigma): when sigma is underestimated
+!  (from few stars, often zero) the stars scatter more and Q > 1; the floor
+!  1 keeps the errors at least those by the errors of the stars. The t
+!  quantile is the distribution of the mean divided by an error estimated
+!  from nu degrees of freedom (exact for equal errors). The coverage of
+!  the zero point is then 65-70% for 3-100 stars and sigma 0.01-0.06 mag
+!  (54-69% before), of the slope of a colour term 66-76% for 5-100 stars;
+!  for sigma = 0, 70-87% (few stars cannot tell sigma = 0 from 0.03 mag,
+!  so the intervals that cover 0.03 cover more at 0). With 30 and more
+!  stars the errors grow by 1-6% (100: 1-3%). A fixed sigma (fixsig >= 0) keeps
+!  (X' U X)**(-1).
 !
 !  The interval of sigma (optional) is given by the profile of
 !  the restricted likelihood of the calibration stars (q fixed),
@@ -113,7 +144,7 @@ module exscatter
   ! the fraction of outliers fixed at ffew, their width at 1 mag; the two
   ! modes of the likelihood compared with a prior of sigma, half-normal
   ! of the scale sfew [mag]
-  integer, parameter :: nfew = 8
+  integer, parameter :: nfew = 16
   real(dbl), parameter :: ffew = 0.1_dbl, sfew = 0.1_dbl
 
 contains
@@ -327,7 +358,7 @@ contains
     q = 1
     th = 0
 
-    if( n < p + 2 ) then
+    if( n < p + 1 .or. (fixsig >= 0 .and. n < p + 2) ) then
        ! too few stars for the scatter and outliers: the weighted fit
        call effvar(th)
        v = e2 + sigma**2
@@ -400,6 +431,8 @@ contains
     beta(0:p-1) = th(1:p)
     cov(1:p,1:p) = ainv(1:p,1:p)
     if( present(dbeta0) ) dbeta0 = 1 / sqrt(sum(w))
+    ! the uncertainty of the estimated sigma in the errors of beta
+    if( fixsig < 0 ) call smallsample(th)
     ! the fraction of outliers found
     if( few ) fout = sum(1 - q) / n
 
@@ -417,6 +450,23 @@ contains
     end if
 
   contains
+
+    subroutine smallsample(th)
+      ! the covariance of beta (and dbeta0) with the uncertainty of
+      ! the estimated sigma (see above): scaled by the scatter of
+      ! the calibration stars about the fit th (weights w, at least 1)
+      ! and by the square of the quantile of Student's t of nu degrees
+      ! of freedom (at least 1)
+      real(dbl), dimension(3), intent(in) :: th
+      real(dbl) :: nu, qhk, fac
+      nu = sum(q) - p
+      if( .not. (nu > 0.5_dbl) ) return
+      r = yy - matmul(xm(:,1:p),th(1:p))
+      qhk = max(sum(w*r**2) / nu, 1.0_dbl)
+      fac = tquant68(max(nu,1.0_dbl))**2 * qhk
+      cov(1:p,1:p) = fac * cov(1:p,1:p)
+      if( present(dbeta0) ) dbeta0 = sqrt(fac) * dbeta0
+    end subroutine smallsample
 
     subroutine emloop(th,sigma,f)
       ! the EM algorithm from th, sigma, f; the fraction f and the width B
@@ -703,6 +753,104 @@ contains
     end function remlfun
 
   end subroutine mixfit
+
+
+  real(dbl) function tquant68(nu)
+
+    ! the quantile t of Student's distribution of nu degrees of freedom
+    ! (nu >= 1, real) of the probability of the standard error of the Normal
+    ! distribution, P(|T| < t) = erf(1/sqrt(2)) = 0.6827, by bisection of
+    ! P(|T| < t) = 1 - I_x(nu/2,1/2), x = nu/(nu + t**2); t = 1.8373 for
+    ! nu = 1, 1.3213 for 2, 1.0 for nu -> infinity
+
+    real(dbl), intent(in) :: nu
+
+    real(dbl), parameter :: p68 = 0.6826894921370859_dbl
+    real(dbl) :: a, b, m
+    integer :: i
+
+    if( nu > 1e7_dbl ) then
+       tquant68 = 1
+       return
+    end if
+    a = 1
+    b = 2
+    do i = 1, 60
+       m = (a + b) / 2
+       if( 1 - betai(nu/2,0.5_dbl,nu/(nu + m**2)) < p68 ) then
+          a = m
+       else
+          b = m
+       end if
+       if( b - a < 1e-12_dbl ) exit
+    end do
+    tquant68 = (a + b) / 2
+
+  end function tquant68
+
+
+  real(dbl) function betai(a,b,x)
+
+    ! the regularised incomplete beta function I_x(a,b) by the continued
+    ! fraction (modified Lentz), Numerical Recipes 6.4
+
+    real(dbl), intent(in) :: a, b, x
+
+    real(dbl), parameter :: fpmin = 1e-300_dbl, eps = 1e-15_dbl
+    real(dbl) :: bt, aa, c, d, del, h, qab, qam, qap, xx, aa1, bb
+    integer :: m, m2
+    logical :: swap
+
+    if( x <= 0 ) then
+       betai = 0
+       return
+    else if( x >= 1 ) then
+       betai = 1
+       return
+    end if
+    swap = x >= (a + 1) / (a + b + 2)
+    if( swap ) then
+       xx = 1 - x
+       aa1 = b
+       bb = a
+    else
+       xx = x
+       aa1 = a
+       bb = b
+    end if
+    bt = exp(log_gamma(aa1 + bb) - log_gamma(aa1) - log_gamma(bb) + &
+         aa1*log(xx) + bb*log(1 - xx))
+    qab = aa1 + bb
+    qap = aa1 + 1
+    qam = aa1 - 1
+    c = 1
+    d = 1 - qab*xx/qap
+    if( abs(d) < fpmin ) d = fpmin
+    d = 1 / d
+    h = d
+    do m = 1, 10000
+       m2 = 2*m
+       aa = m*(bb - m)*xx / ((qam + m2)*(aa1 + m2))
+       d = 1 + aa*d
+       if( abs(d) < fpmin ) d = fpmin
+       c = 1 + aa/c
+       if( abs(c) < fpmin ) c = fpmin
+       d = 1 / d
+       h = h*d*c
+       aa = -(aa1 + m)*(qab + m)*xx / ((aa1 + m2)*(qap + m2))
+       d = 1 + aa*d
+       if( abs(d) < fpmin ) d = fpmin
+       c = 1 + aa/c
+       if( abs(c) < fpmin ) c = fpmin
+       d = 1 / d
+       del = d*c
+       h = h*del
+       if( abs(del - 1) < eps ) exit
+    end do
+    betai = bt*h/aa1
+    if( swap ) betai = 1 - betai
+
+  end function betai
 
 
   real(dbl) function logdet(a,p)
