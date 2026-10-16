@@ -691,11 +691,12 @@ MuniCmdLineParser::MuniCmdLineParser(const wxString& action, int xargc,
     AddOption(wxEmptyString,"col-mag","magnitude column(s)");
     AddOption(wxEmptyString,"col-magerr","magnitude std. error column(s)");
     AddOption("","color-term","colour term by the catalogue colour A-B: "
-	      "columns A,B[,errA,errB]");
-    AddOption("","color-order","order of the colour term: 1 (default) or 2",
-	      wxCMD_LINE_VAL_NUMBER);
+	      "columns A,B[,errA,errB]; repeat for more colours (up to 3)");
+    AddOption("","color-order","order of the colour term: 1 (default) or 2; "
+	      "a list for every --color-term");
     AddOption("","color-ref","reference colour of the colour term [mag]: "
-	      "mean (of the calibration stars, default) or a value");
+	      "mean (of the calibration stars, default) or a value; "
+	      "a list for every --color-term");
     AddOption("","photsys-ref","reference photometry system (catalogue)");
     AddOption("","photsys-instr","instrumental photometry system (frames)");
     AddOption(wxEmptyString,"area","area of input aperture [m2]",wxCMD_LINE_VAL_DOUBLE);
